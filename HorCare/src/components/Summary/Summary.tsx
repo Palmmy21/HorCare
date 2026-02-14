@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
     Rocket, CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer
@@ -7,6 +7,7 @@ import type { MonthlyBill, DormConfig } from '../../types';
 import { formatCurrency, formatMonthThai } from '../../utils/calculations';
 import InvoiceBill from './InvoiceBill';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface SummaryProps {
     bills: MonthlyBill[];
@@ -38,7 +39,9 @@ export default function Summary({
     });
     const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
     const [showAllInvoices, setShowAllInvoices] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
+    const invoiceRef = useRef<HTMLDivElement>(null);
 
     const monthBills = bills.filter(b => b.month === currentMonth);
     const isLocked = monthBills.some(b => b.is_locked);
@@ -110,6 +113,36 @@ export default function Summary({
             window.print();
         }, 300);
     };
+
+    const handleDownloadBill = useCallback(async (bill: MonthlyBill) => {
+        setIsDownloading(true);
+        // Briefly show the bill in the modal so we can capture it
+        setSelectedBill(bill);
+        // Wait for render
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        const el = invoiceRef.current;
+        if (!el) {
+            setIsDownloading(false);
+            return;
+        }
+
+        try {
+            const canvas = await html2canvas(el, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            });
+            const link = document.createElement('a');
+            link.download = `bill_${bill.room_number}_${currentMonth}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error('Download failed:', err);
+        } finally {
+            setIsDownloading(false);
+        }
+    }, [currentMonth]);
 
     return (
         <div>
@@ -247,14 +280,24 @@ export default function Summary({
                                             )}
                                         </td>
                                         <td className="text-center">
-                                            <button
-                                                className="btn btn-outline btn-sm"
-                                                onClick={() => setSelectedBill(bill)}
-                                                title="ดูใบแจ้งยอด"
-                                            >
-                                                <Eye size={14} />
-                                                ดูบิล
-                                            </button>
+                                            <div className="flex gap-2 justify-center">
+                                                <button
+                                                    className="btn btn-outline btn-sm"
+                                                    onClick={() => setSelectedBill(bill)}
+                                                    title="ดูใบแจ้งยอด"
+                                                >
+                                                    <Eye size={14} />
+                                                    ดูบิล
+                                                </button>
+                                                <button
+                                                    className="btn btn-outline btn-sm"
+                                                    onClick={() => handleDownloadBill(bill)}
+                                                    title="ดาวน์โหลดใบแจ้งยอด"
+                                                    disabled={isDownloading}
+                                                >
+                                                    <Download size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -315,7 +358,7 @@ export default function Summary({
                 <div className="modal-overlay" onClick={() => setSelectedBill(null)}>
                     <div className="modal invoice-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="modal-title">📄 ใบแจ้งยอด — ห้อง {selectedBill.room_number}</h3>
+                            <h3 className="modal-title">📄 ใบเรียกเก็บ — ห้อง {selectedBill.room_number}</h3>
                             <button
                                 className="btn btn-outline btn-sm btn-icon"
                                 onClick={() => setSelectedBill(null)}
@@ -325,6 +368,7 @@ export default function Summary({
                         </div>
                         <div className="modal-body">
                             <InvoiceBill
+                                ref={invoiceRef}
                                 bill={selectedBill}
                                 config={config}
                                 billDate={billDate}
@@ -333,6 +377,14 @@ export default function Summary({
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setSelectedBill(null)}>
                                 ปิด
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => handleDownloadBill(selectedBill)}
+                                disabled={isDownloading}
+                            >
+                                <Download size={18} />
+                                {isDownloading ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด'}
                             </button>
                             <button className="btn btn-primary" onClick={() => {
                                 setShowAllInvoices(false);
