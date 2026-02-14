@@ -5,6 +5,7 @@ import { getCurrentMonth } from '../utils/calculations';
 
 // Default configuration
 const DEFAULT_CONFIG: DormConfig = {
+    building_type: 'dormitory',
     electricity_rate: 8,
     water_config: {
         type: 'flat_rate_tier',

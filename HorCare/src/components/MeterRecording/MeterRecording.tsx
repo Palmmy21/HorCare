@@ -10,7 +10,8 @@ import {
     validateReading,
     formatMonthThai,
     getPreviousMonth,
-    getNextMonth
+    getNextMonth,
+    getEffectiveRates
 } from '../../utils/calculations';
 
 interface MeterRecordingProps {
@@ -103,6 +104,7 @@ export default function MeterRecording({
         const currWater = parseInt(state.currWater) || 0;
 
         const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+        const { electricityRate, waterConfig } = getEffectiveRates(room, config);
 
         const calculation = calculateFullBill(
             prevElec,
@@ -110,7 +112,9 @@ export default function MeterRecording({
             prevWater,
             currWater,
             config,
-            effectiveRent
+            effectiveRent,
+            electricityRate,
+            waterConfig
         );
 
         const bill: MonthlyBill = {
@@ -164,10 +168,11 @@ export default function MeterRecording({
         const waterValidation = state.currWater ? validateReading(prevWater, currWater) : { valid: true };
 
         const effectiveRentPreview = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+        const { electricityRate: roomElecRate, waterConfig: roomWaterCfg } = getEffectiveRates(room, config);
 
         // Calculate preview
         const calculation = state.currElec && state.currWater
-            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview)
+            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, roomElecRate, roomWaterCfg)
             : null;
 
         const canSave = state.prevElec && state.prevWater && state.currElec && state.currWater && elecValidation.valid && waterValidation.valid;

@@ -7,6 +7,7 @@ import type { DormConfig, Room, MonthlyBill } from '../types';
 import { getCurrentMonth } from '../utils/calculations';
 
 const DEFAULT_CONFIG: DormConfig = {
+    building_type: 'dormitory',
     electricity_rate: 8,
     water_config: {
         type: 'flat_rate_tier',

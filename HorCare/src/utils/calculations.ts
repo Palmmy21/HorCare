@@ -1,5 +1,5 @@
 // DormUtility Pro - Core Calculation Logic
-import type { DormConfig, BillCalculation, WaterConfig } from '../types';
+import type { DormConfig, BillCalculation, WaterConfig, Room } from '../types';
 
 /**
  * Calculate electricity bill
@@ -74,6 +74,19 @@ export function calculateWater(
 }
 
 /**
+ * Get effective rates for a room (room override > global config)
+ */
+export function getEffectiveRates(
+    room: Room,
+    config: DormConfig
+): { electricityRate: number; waterConfig: WaterConfig } {
+    return {
+        electricityRate: room.custom_electricity_rate ?? config.electricity_rate,
+        waterConfig: room.custom_water_config ?? config.water_config
+    };
+}
+
+/**
  * Calculate full bill for a room
  */
 export function calculateFullBill(
@@ -82,10 +95,15 @@ export function calculateFullBill(
     prevWater: number,
     currWater: number,
     config: DormConfig,
-    roomRent: number
+    roomRent: number,
+    roomElecRate?: number,
+    roomWaterConfig?: WaterConfig
 ): BillCalculation {
-    const elec = calculateElectricity(prevElec, currElec, config.electricity_rate);
-    const water = calculateWater(prevWater, currWater, config.water_config);
+    const elecRate = roomElecRate ?? config.electricity_rate;
+    const waterCfg = roomWaterConfig ?? config.water_config;
+
+    const elec = calculateElectricity(prevElec, currElec, elecRate);
+    const water = calculateWater(prevWater, currWater, waterCfg);
 
     return {
         elec_units: elec.units,

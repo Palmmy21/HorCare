@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2 } from 'lucide-react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import type { DormConfig, WaterConfig } from '../../types';
@@ -11,6 +11,7 @@ interface SettingsProps {
 
 export default function Settings({ config, onSaveConfig }: SettingsProps) {
     const [formData, setFormData] = useState({
+        building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,
         room_rent: config.room_rent,
         water_type: config.water_config.type,
@@ -29,6 +30,7 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
 
     useEffect(() => {
         setFormData({
+            building_type: config.building_type || 'dormitory',
             electricity_rate: config.electricity_rate,
             room_rent: config.room_rent,
             water_type: config.water_config.type,
@@ -55,6 +57,7 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
             };
 
         const newConfig: DormConfig = {
+            building_type: formData.building_type as 'dormitory' | 'commercial',
             electricity_rate: Number(formData.electricity_rate),
             room_rent: Number(formData.room_rent),
             water_config: waterConfig
@@ -112,11 +115,43 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
                 <p className="page-subtitle">กำหนดอัตราค่าบริการและค่าเช่า</p>
             </div>
 
+            {/* Building Type */}
+            <div className="settings-section">
+                <h3 className="settings-title">
+                    <Building2 size={20} color="#6366F1" />
+                    ประเภทอาคาร
+                </h3>
+                <div className="form-group">
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                            className={`btn ${formData.building_type === 'dormitory' ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => handleChange('building_type', 'dormitory')}
+                            style={{ flex: 1 }}
+                        >
+                            🏠 หอพัก
+                        </button>
+                        <button
+                            className={`btn ${formData.building_type === 'commercial' ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => handleChange('building_type', 'commercial')}
+                            style={{ flex: 1 }}
+                        >
+                            🏢 อาคารพาณิชย์
+                        </button>
+                    </div>
+                    <p className="form-hint">
+                        {formData.building_type === 'commercial'
+                            ? 'โหมดอาคารพาณิชย์: ตั้งค่าน้ำ/ไฟเฉพาะห้องได้ในหน้าจัดการห้อง'
+                            : 'โหมดหอพัก: ทุกห้องใช้อัตราค่าน้ำ/ไฟเดียวกัน'
+                        }
+                    </p>
+                </div>
+            </div>
+
             {/* Electricity Settings */}
             <div className="settings-section">
                 <h3 className="settings-title">
                     <Zap size={20} color="#F59E0B" />
-                    ค่าไฟฟ้า
+                    {formData.building_type === 'commercial' ? 'ค่าไฟฟ้า (เริ่มต้น)' : 'ค่าไฟฟ้า'}
                 </h3>
                 <div className="form-group">
                     <label className="form-label">ราคาต่อหน่วย (บาท)</label>
@@ -127,7 +162,12 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
                         value={formData.electricity_rate}
                         onChange={e => handleChange('electricity_rate', e.target.value)}
                     />
-                    <p className="form-hint">ราคาที่เรียกเก็บต่อหน่วยไฟฟ้า</p>
+                    <p className="form-hint">
+                        {formData.building_type === 'commercial'
+                            ? 'ราคาเริ่มต้น (ห้องที่ไม่ได้ตั้งค่าเฉพาะจะใช้ค่านี้)'
+                            : 'ราคาที่เรียกเก็บต่อหน่วยไฟฟ้า'
+                        }
+                    </p>
                 </div>
             </div>
 

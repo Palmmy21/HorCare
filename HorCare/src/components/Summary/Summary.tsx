@@ -3,14 +3,15 @@ import {
     Rocket, CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer
 } from 'lucide-react';
-import type { MonthlyBill, DormConfig } from '../../types';
-import { formatCurrency, formatMonthThai } from '../../utils/calculations';
+import type { MonthlyBill, DormConfig, Room } from '../../types';
+import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
 import InvoiceBill from './InvoiceBill';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 interface SummaryProps {
     bills: MonthlyBill[];
+    rooms: Room[];
     config: DormConfig;
     currentMonth: string;
     stats: {
@@ -25,6 +26,7 @@ interface SummaryProps {
 
 export default function Summary({
     bills,
+    rooms,
     config,
     currentMonth,
     stats,
@@ -367,12 +369,20 @@ export default function Summary({
                             </button>
                         </div>
                         <div className="modal-body">
-                            <InvoiceBill
-                                ref={invoiceRef}
-                                bill={selectedBill}
-                                config={config}
-                                billDate={billDate}
-                            />
+                            {(() => {
+                                const room = rooms.find(r => r.id === selectedBill.room_id);
+                                const rates = room ? getEffectiveRates(room, config) : null;
+                                return (
+                                    <InvoiceBill
+                                        ref={invoiceRef}
+                                        bill={selectedBill}
+                                        config={config}
+                                        billDate={billDate}
+                                        effectiveElecRate={rates?.electricityRate}
+                                        effectiveWaterConfig={rates?.waterConfig}
+                                    />
+                                );
+                            })()}
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setSelectedBill(null)}>
@@ -436,11 +446,19 @@ export default function Summary({
                 <div className="print-only-area" ref={printRef}>
                     {monthBills.map(bill => (
                         <div key={bill.id} className="invoice-print-page">
-                            <InvoiceBill
-                                bill={bill}
-                                config={config}
-                                billDate={billDate}
-                            />
+                            {(() => {
+                                const room = rooms.find(r => r.id === bill.room_id);
+                                const rates = room ? getEffectiveRates(room, config) : null;
+                                return (
+                                    <InvoiceBill
+                                        bill={bill}
+                                        config={config}
+                                        billDate={billDate}
+                                        effectiveElecRate={rates?.electricityRate}
+                                        effectiveWaterConfig={rates?.waterConfig}
+                                    />
+                                );
+                            })()}
                         </div>
                     ))}
                 </div>

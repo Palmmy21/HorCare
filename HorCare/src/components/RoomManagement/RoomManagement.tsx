@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets } from 'lucide-react';
 import type { Room, DormConfig } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 
@@ -13,7 +13,7 @@ interface RoomManagementProps {
 
 export default function RoomManagement({
     rooms,
-    config: _config,
+    config,
     onAddRoom,
     onUpdateRoom,
     onDeleteRoom
@@ -23,7 +23,11 @@ export default function RoomManagement({
     const [editValue, setEditValue] = useState('');
     const [editRentAmount, setEditRentAmount] = useState('');
     const [editRentType, setEditRentType] = useState<'monthly' | 'semester'>('monthly');
+    const [editCustomElecRate, setEditCustomElecRate] = useState('');
+    const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+
+    const isCommercial = config.building_type === 'commercial';
 
     const handleAddRoom = () => {
         if (!newRoomNumber.trim()) return;
@@ -49,15 +53,32 @@ export default function RoomManagement({
         setEditValue(room.room_number);
         setEditRentAmount(room.rent_amount.toString());
         setEditRentType(room.rent_type);
+        setEditCustomElecRate(room.custom_electricity_rate?.toString() || '');
+        setEditCustomWaterRate(
+            room.custom_water_config
+                ? (room.custom_water_config.type === 'normal'
+                    ? (room.custom_water_config.unit_rate || 0).toString()
+                    : '')
+                : ''
+        );
     };
 
     const saveEdit = (roomId: string) => {
         if (!editValue.trim()) return;
-        onUpdateRoom(roomId, {
+        const updates: Partial<Room> = {
             room_number: editValue.trim(),
             rent_amount: Number(editRentAmount) || 0,
             rent_type: editRentType
-        });
+        };
+        if (isCommercial) {
+            updates.custom_electricity_rate = editCustomElecRate
+                ? Number(editCustomElecRate)
+                : undefined;
+            updates.custom_water_config = editCustomWaterRate
+                ? { type: 'normal' as const, unit_rate: Number(editCustomWaterRate) }
+                : undefined;
+        }
+        onUpdateRoom(roomId, updates);
         setEditingRoom(null);
     };
 
@@ -66,6 +87,8 @@ export default function RoomManagement({
         setEditValue('');
         setEditRentAmount('');
         setEditRentType('monthly');
+        setEditCustomElecRate('');
+        setEditCustomWaterRate('');
     };
 
     const confirmDelete = (roomId: string) => {
@@ -129,6 +152,7 @@ export default function RoomManagement({
                                     <th className="text-center">ประเภท</th>
                                     <th className="text-right">มิเตอร์ไฟ</th>
                                     <th className="text-right">มิเตอร์น้ำ</th>
+                                    {isCommercial && <th className="text-center">ค่าน้ำ/ไฟ</th>}
                                     <th className="text-center" style={{ width: '140px' }}>จัดการ</th>
                                 </tr>
                             </thead>
@@ -149,7 +173,14 @@ export default function RoomManagement({
                                                     />
                                                 </div>
                                             ) : (
-                                                <span className="mono font-bold">{room.room_number}</span>
+                                                <>
+                                                    <span className="mono font-bold">{room.room_number}</span>
+                                                    {isCommercial && (room.custom_electricity_rate || room.custom_water_config) && (
+                                                        <span className="badge badge-info" style={{ marginLeft: '0.5rem', fontSize: '0.625rem' }}>
+                                                            ค่ากำหนดเอง
+                                                        </span>
+                                                    )}
+                                                </>
                                             )}
                                         </td>
                                         <td className="text-right">
@@ -185,6 +216,48 @@ export default function RoomManagement({
                                         </td>
                                         <td className="text-right mono">{room.current_meter_elec.toLocaleString()}</td>
                                         <td className="text-right mono">{room.current_meter_water.toLocaleString()}</td>
+                                        {isCommercial && (
+                                            <td className="text-center" style={{ fontSize: '0.75rem' }}>
+                                                {editingRoom === room.id ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                            <Zap size={12} color="#F59E0B" />
+                                                            <input
+                                                                type="number"
+                                                                className="form-input mono"
+                                                                style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                                value={editCustomElecRate}
+                                                                onChange={e => setEditCustomElecRate(e.target.value)}
+                                                                placeholder={config.electricity_rate.toString()}
+                                                            />
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                            <Droplets size={12} color="#2563EB" />
+                                                            <input
+                                                                type="number"
+                                                                className="form-input mono"
+                                                                style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                                value={editCustomWaterRate}
+                                                                onChange={e => setEditCustomWaterRate(e.target.value)}
+                                                                placeholder="ค่าเริ่มต้น"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        {room.custom_electricity_rate && (
+                                                            <div>⚡ {room.custom_electricity_rate} บ./หน่วย</div>
+                                                        )}
+                                                        {room.custom_water_config?.unit_rate && (
+                                                            <div>💧 {room.custom_water_config.unit_rate} บ./หน่วย</div>
+                                                        )}
+                                                        {!room.custom_electricity_rate && !room.custom_water_config && (
+                                                            <span className="text-muted">ค่าเริ่มต้น</span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        )}
                                         <td className="text-center">
                                             {editingRoom === room.id ? (
                                                 <div className="delete-confirm-actions">

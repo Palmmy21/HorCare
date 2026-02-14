@@ -273,6 +273,7 @@ function App() {
         {currentView === 'summary' && (
           <Summary
             bills={bills}
+            rooms={rooms}
             config={config}
             currentMonth={currentMonth}
             stats={stats}

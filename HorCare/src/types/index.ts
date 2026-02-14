@@ -26,6 +26,7 @@ export interface WaterConfig {
 }
 
 export interface DormConfig {
+  building_type: 'dormitory' | 'commercial';
   electricity_rate: number;
   water_config: WaterConfig;
   room_rent: number;
@@ -40,6 +41,9 @@ export interface Room {
   is_active: boolean;
   rent_amount: number;
   rent_type: 'monthly' | 'semester';
+  // Per-room rate overrides (used in commercial mode)
+  custom_electricity_rate?: number;
+  custom_water_config?: WaterConfig;
 }
 
 export interface MonthlyBill {
