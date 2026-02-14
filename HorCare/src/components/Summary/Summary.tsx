@@ -226,95 +226,159 @@ export default function Summary({
                         <p>กรุณาจดมิเตอร์และบันทึกข้อมูลก่อน</p>
                     </div>
                 ) : (
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>ห้อง</th>
-                                    <th className="text-center">ไฟฟ้า</th>
-                                    <th className="text-center">น้ำประปา</th>
-                                    <th className="text-right">ค่าห้อง</th>
-                                    <th className="text-right">ยอดรวม</th>
-                                    <th className="text-center">สถานะ</th>
-                                    <th className="text-center">ใบแจ้งยอด</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {monthBills.map(bill => (
-                                    <tr key={bill.id}>
-                                        <td className="mono font-bold">{bill.room_number}</td>
-                                        <td className="text-center">
-                                            <div className="mono">{bill.elec_units} หน่วย</div>
-                                            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                {formatCurrency(bill.elec_bill)}
-                                            </div>
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="mono">{bill.water_units} หน่วย</div>
-                                            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                {bill.water_excess_units > 0
-                                                    ? `เกิน ${bill.water_excess_units} หน่วย`
-                                                    : 'เหมาจ่าย'
-                                                }
-                                            </div>
-                                            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                {formatCurrency(bill.water_bill)}
-                                            </div>
-                                        </td>
-                                        <td className="text-right mono">{formatCurrency(bill.room_rent)}</td>
-                                        <td className="text-right mono font-bold">{formatCurrency(bill.total_bill)}</td>
-                                        <td className="text-center">
-                                            {bill.is_locked ? (
-                                                <span className="badge badge-success">
-                                                    <Lock size={12} />
-                                                    ปิดยอดแล้ว
-                                                </span>
-                                            ) : bill.is_saved ? (
-                                                <span className="badge badge-success">
-                                                    <CheckCircle size={12} />
-                                                    พร้อมส่ง
-                                                </span>
-                                            ) : (
-                                                <span className="badge badge-warning">
-                                                    <AlertTriangle size={12} />
-                                                    รอบันทึก
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="text-center">
-                                            <div className="flex gap-2 justify-center">
-                                                <button
-                                                    className="btn btn-outline btn-sm"
-                                                    onClick={() => setSelectedBill(bill)}
-                                                    title="ดูใบแจ้งยอด"
-                                                >
-                                                    <Eye size={14} />
-                                                    ดูบิล
-                                                </button>
-                                                <button
-                                                    className="btn btn-outline btn-sm"
-                                                    onClick={() => handleDownloadBill(bill)}
-                                                    title="ดาวน์โหลดใบแจ้งยอด"
-                                                    disabled={isDownloading}
-                                                >
-                                                    <Download size={14} />
-                                                </button>
-                                            </div>
-                                        </td>
+                    <>
+                        {/* Desktop Table */}
+                        <div className="table-container summary-table-desktop">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>ห้อง</th>
+                                        <th className="text-center">ไฟฟ้า</th>
+                                        <th className="text-center">น้ำประปา</th>
+                                        <th className="text-right">ค่าห้อง</th>
+                                        <th className="text-right">ยอดรวม</th>
+                                        <th className="text-center">สถานะ</th>
+                                        <th className="text-center">ใบแจ้งยอด</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                            <tfoot>
-                                <tr style={{ background: 'var(--color-gray-50)' }}>
-                                    <td colSpan={4} className="text-right font-bold">รวมทั้งสิ้น</td>
-                                    <td className="text-right mono font-bold" style={{ fontSize: '1.125rem', color: 'var(--color-primary)' }}>
-                                        {formatCurrency(stats.totalRevenue)}
-                                    </td>
-                                    <td colSpan={2}></td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {monthBills.map(bill => (
+                                        <tr key={bill.id}>
+                                            <td className="mono font-bold">{bill.room_number}</td>
+                                            <td className="text-center">
+                                                <div className="mono">{bill.elec_units} หน่วย</div>
+                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                    {formatCurrency(bill.elec_bill)}
+                                                </div>
+                                            </td>
+                                            <td className="text-center">
+                                                <div className="mono">{bill.water_units} หน่วย</div>
+                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                    {bill.water_excess_units > 0
+                                                        ? `เกิน ${bill.water_excess_units} หน่วย`
+                                                        : 'เหมาจ่าย'
+                                                    }
+                                                </div>
+                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                    {formatCurrency(bill.water_bill)}
+                                                </div>
+                                            </td>
+                                            <td className="text-right mono">{formatCurrency(bill.room_rent)}</td>
+                                            <td className="text-right mono font-bold">{formatCurrency(bill.total_bill)}</td>
+                                            <td className="text-center">
+                                                {bill.is_locked ? (
+                                                    <span className="badge badge-success">
+                                                        <Lock size={12} />
+                                                        ปิดยอดแล้ว
+                                                    </span>
+                                                ) : bill.is_saved ? (
+                                                    <span className="badge badge-success">
+                                                        <CheckCircle size={12} />
+                                                        พร้อมส่ง
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge badge-warning">
+                                                        <AlertTriangle size={12} />
+                                                        รอบันทึก
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="text-center">
+                                                <div className="flex gap-2 justify-center">
+                                                    <button
+                                                        className="btn btn-outline btn-sm"
+                                                        onClick={() => setSelectedBill(bill)}
+                                                        title="ดูใบแจ้งยอด"
+                                                    >
+                                                        <Eye size={14} />
+                                                        ดูบิล
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-outline btn-sm"
+                                                        onClick={() => handleDownloadBill(bill)}
+                                                        title="ดาวน์โหลดใบแจ้งยอด"
+                                                        disabled={isDownloading}
+                                                    >
+                                                        <Download size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ background: 'var(--color-gray-50)' }}>
+                                        <td colSpan={4} className="text-right font-bold">รวมทั้งสิ้น</td>
+                                        <td className="text-right mono font-bold" style={{ fontSize: '1.125rem', color: 'var(--color-primary)' }}>
+                                            {formatCurrency(stats.totalRevenue)}
+                                        </td>
+                                        <td colSpan={2}></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        {/* Mobile Cards */}
+                        <div className="summary-cards-mobile">
+                            {monthBills.map(bill => (
+                                <div key={bill.id} className="summary-bill-card">
+                                    <div className="summary-bill-card-header">
+                                        <span className="mono font-bold" style={{ fontSize: '1.125rem' }}>🏠 {bill.room_number}</span>
+                                        {bill.is_locked ? (
+                                            <span className="badge badge-success"><Lock size={12} /> ปิดยอด</span>
+                                        ) : bill.is_saved ? (
+                                            <span className="badge badge-success"><CheckCircle size={12} /> พร้อมส่ง</span>
+                                        ) : (
+                                            <span className="badge badge-warning"><AlertTriangle size={12} /> รอบันทึก</span>
+                                        )}
+                                    </div>
+                                    <div className="summary-bill-card-body">
+                                        <div className="summary-bill-card-row">
+                                            <span>⚡ ไฟฟ้า</span>
+                                            <span className="mono">{bill.elec_units} หน่วย = {formatCurrency(bill.elec_bill)}</span>
+                                        </div>
+                                        <div className="summary-bill-card-row">
+                                            <span>💧 น้ำประปา</span>
+                                            <span className="mono">{bill.water_units} หน่วย = {formatCurrency(bill.water_bill)}</span>
+                                        </div>
+                                        <div className="summary-bill-card-row">
+                                            <span>🏠 ค่าห้อง</span>
+                                            <span className="mono">{formatCurrency(bill.room_rent)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="summary-bill-card-footer">
+                                        <div className="summary-bill-card-total">
+                                            <span>รวม</span>
+                                            <span className="mono font-bold" style={{ color: 'var(--color-primary)', fontSize: '1.125rem' }}>
+                                                {formatCurrency(bill.total_bill)}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="btn btn-outline btn-sm"
+                                                onClick={() => setSelectedBill(bill)}
+                                            >
+                                                <Eye size={14} /> ดูบิล
+                                            </button>
+                                            <button
+                                                className="btn btn-outline btn-sm"
+                                                onClick={() => handleDownloadBill(bill)}
+                                                disabled={isDownloading}
+                                            >
+                                                <Download size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="summary-total-card">
+                                <span className="font-bold">รวมทั้งสิ้น</span>
+                                <span className="mono font-bold" style={{ fontSize: '1.25rem', color: 'var(--color-primary)' }}>
+                                    {formatCurrency(stats.totalRevenue)}
+                                </span>
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
 

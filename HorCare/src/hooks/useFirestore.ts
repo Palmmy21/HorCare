@@ -95,6 +95,7 @@ export function useFirestore(userId: string | null) {
         const newRoom: Room = {
             id: roomId,
             room_number: roomNumber,
+            room_type: config.building_type || 'dormitory',
             current_meter_elec: 0,
             current_meter_water: 0,
             is_active: true,
@@ -103,7 +104,7 @@ export function useFirestore(userId: string | null) {
         };
         await setDoc(doc(db, userPath, 'rooms', roomId), newRoom);
         return newRoom;
-    }, [userPath, config.room_rent]);
+    }, [userPath, config.room_rent, config.building_type]);
 
     const updateRoom = useCallback(async (roomId: string, updates: Partial<Room>) => {
         if (!userPath) return;

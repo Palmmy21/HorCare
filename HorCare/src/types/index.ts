@@ -35,6 +35,7 @@ export interface DormConfig {
 export interface Room {
   id: string;
   room_number: string;
+  room_type: 'dormitory' | 'commercial';
   line_user_id?: string;
   current_meter_elec: number;
   current_meter_water: number;

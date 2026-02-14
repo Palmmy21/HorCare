@@ -23,11 +23,12 @@ export default function RoomManagement({
     const [editValue, setEditValue] = useState('');
     const [editRentAmount, setEditRentAmount] = useState('');
     const [editRentType, setEditRentType] = useState<'monthly' | 'semester'>('monthly');
+    const [editRoomType, setEditRoomType] = useState<'dormitory' | 'commercial'>('dormitory');
     const [editCustomElecRate, setEditCustomElecRate] = useState('');
     const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
-    const isCommercial = config.building_type === 'commercial';
+    const hasAnyCommercial = rooms.some(r => (r.room_type || 'dormitory') === 'commercial');
 
     const handleAddRoom = () => {
         if (!newRoomNumber.trim()) return;
@@ -53,6 +54,7 @@ export default function RoomManagement({
         setEditValue(room.room_number);
         setEditRentAmount(room.rent_amount.toString());
         setEditRentType(room.rent_type);
+        setEditRoomType(room.room_type || 'dormitory');
         setEditCustomElecRate(room.custom_electricity_rate?.toString() || '');
         setEditCustomWaterRate(
             room.custom_water_config
@@ -68,15 +70,20 @@ export default function RoomManagement({
         const updates: Partial<Room> = {
             room_number: editValue.trim(),
             rent_amount: Number(editRentAmount) || 0,
-            rent_type: editRentType
+            rent_type: editRentType,
+            room_type: editRoomType
         };
-        if (isCommercial) {
+        if (editRoomType === 'commercial') {
             updates.custom_electricity_rate = editCustomElecRate
                 ? Number(editCustomElecRate)
                 : undefined;
             updates.custom_water_config = editCustomWaterRate
                 ? { type: 'normal' as const, unit_rate: Number(editCustomWaterRate) }
                 : undefined;
+        } else {
+            // Clear custom rates when switching to dormitory
+            updates.custom_electricity_rate = undefined;
+            updates.custom_water_config = undefined;
         }
         onUpdateRoom(roomId, updates);
         setEditingRoom(null);
@@ -87,6 +94,7 @@ export default function RoomManagement({
         setEditValue('');
         setEditRentAmount('');
         setEditRentType('monthly');
+        setEditRoomType('dormitory');
         setEditCustomElecRate('');
         setEditCustomWaterRate('');
     };
@@ -148,11 +156,12 @@ export default function RoomManagement({
                                 <tr>
                                     <th style={{ width: '60px' }}>#</th>
                                     <th>หมายเลขห้อง</th>
+                                    <th className="text-center">ประเภทห้อง</th>
                                     <th className="text-right">ค่าเช่า</th>
-                                    <th className="text-center">ประเภท</th>
+                                    <th className="text-center">การชำระ</th>
                                     <th className="text-right">มิเตอร์ไฟ</th>
                                     <th className="text-right">มิเตอร์น้ำ</th>
-                                    {isCommercial && <th className="text-center">ค่าน้ำ/ไฟ</th>}
+                                    {hasAnyCommercial && <th className="text-center">ค่าน้ำ/ไฟ</th>}
                                     <th className="text-center" style={{ width: '140px' }}>จัดการ</th>
                                 </tr>
                             </thead>
@@ -173,14 +182,24 @@ export default function RoomManagement({
                                                     />
                                                 </div>
                                             ) : (
-                                                <>
-                                                    <span className="mono font-bold">{room.room_number}</span>
-                                                    {isCommercial && (room.custom_electricity_rate || room.custom_water_config) && (
-                                                        <span className="badge badge-info" style={{ marginLeft: '0.5rem', fontSize: '0.625rem' }}>
-                                                            ค่ากำหนดเอง
-                                                        </span>
-                                                    )}
-                                                </>
+                                                <span className="mono font-bold">{room.room_number}</span>
+                                            )}
+                                        </td>
+                                        <td className="text-center">
+                                            {editingRoom === room.id ? (
+                                                <select
+                                                    className="form-input"
+                                                    style={{ width: '130px', fontSize: '0.8125rem' }}
+                                                    value={editRoomType}
+                                                    onChange={e => setEditRoomType(e.target.value as 'dormitory' | 'commercial')}
+                                                >
+                                                    <option value="dormitory">🏠 หอพัก</option>
+                                                    <option value="commercial">🏢 พาณิชย์</option>
+                                                </select>
+                                            ) : (
+                                                <span className={`badge ${(room.room_type || 'dormitory') === 'commercial' ? 'badge-info' : 'badge-success'}`} style={{ fontSize: '0.75rem' }}>
+                                                    {(room.room_type || 'dormitory') === 'commercial' ? '🏢 พาณิชย์' : '🏠 หอพัก'}
+                                                </span>
                                             )}
                                         </td>
                                         <td className="text-right">
@@ -216,45 +235,53 @@ export default function RoomManagement({
                                         </td>
                                         <td className="text-right mono">{room.current_meter_elec.toLocaleString()}</td>
                                         <td className="text-right mono">{room.current_meter_water.toLocaleString()}</td>
-                                        {isCommercial && (
+                                        {hasAnyCommercial && (
                                             <td className="text-center" style={{ fontSize: '0.75rem' }}>
-                                                {editingRoom === room.id ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                            <Zap size={12} color="#F59E0B" />
-                                                            <input
-                                                                type="number"
-                                                                className="form-input mono"
-                                                                style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                                                value={editCustomElecRate}
-                                                                onChange={e => setEditCustomElecRate(e.target.value)}
-                                                                placeholder={config.electricity_rate.toString()}
-                                                            />
+                                                {(room.room_type || 'dormitory') === 'commercial' ? (
+                                                    editingRoom === room.id ? (
+                                                        editRoomType === 'commercial' ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                                    <Zap size={12} color="#F59E0B" />
+                                                                    <input
+                                                                        type="number"
+                                                                        className="form-input mono"
+                                                                        style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                                        value={editCustomElecRate}
+                                                                        onChange={e => setEditCustomElecRate(e.target.value)}
+                                                                        placeholder={config.electricity_rate.toString()}
+                                                                    />
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                                    <Droplets size={12} color="#2563EB" />
+                                                                    <input
+                                                                        type="number"
+                                                                        className="form-input mono"
+                                                                        style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                                                        value={editCustomWaterRate}
+                                                                        onChange={e => setEditCustomWaterRate(e.target.value)}
+                                                                        placeholder="ค่าเริ่มต้น"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted">—</span>
+                                                        )
+                                                    ) : (
+                                                        <div>
+                                                            {room.custom_electricity_rate && (
+                                                                <div>⚡ {room.custom_electricity_rate} บ./หน่วย</div>
+                                                            )}
+                                                            {room.custom_water_config?.unit_rate && (
+                                                                <div>💧 {room.custom_water_config.unit_rate} บ./หน่วย</div>
+                                                            )}
+                                                            {!room.custom_electricity_rate && !room.custom_water_config && (
+                                                                <span className="text-muted">ค่าเริ่มต้น</span>
+                                                            )}
                                                         </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                            <Droplets size={12} color="#2563EB" />
-                                                            <input
-                                                                type="number"
-                                                                className="form-input mono"
-                                                                style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                                                value={editCustomWaterRate}
-                                                                onChange={e => setEditCustomWaterRate(e.target.value)}
-                                                                placeholder="ค่าเริ่มต้น"
-                                                            />
-                                                        </div>
-                                                    </div>
+                                                    )
                                                 ) : (
-                                                    <div>
-                                                        {room.custom_electricity_rate && (
-                                                            <div>⚡ {room.custom_electricity_rate} บ./หน่วย</div>
-                                                        )}
-                                                        {room.custom_water_config?.unit_rate && (
-                                                            <div>💧 {room.custom_water_config.unit_rate} บ./หน่วย</div>
-                                                        )}
-                                                        {!room.custom_electricity_rate && !room.custom_water_config && (
-                                                            <span className="text-muted">ค่าเริ่มต้น</span>
-                                                        )}
-                                                    </div>
+                                                    <span className="text-muted">—</span>
                                                 )}
                                             </td>
                                         )}
