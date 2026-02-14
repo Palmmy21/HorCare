@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 
 interface LoginPageProps {
     onLogin: (email: string, password: string) => Promise<void>;
@@ -14,6 +14,7 @@ export default function LoginPage({ onLogin, onRegister, error, clearError }: Lo
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -86,7 +87,7 @@ export default function LoginPage({ onLogin, onRegister, error, clearError }: Lo
                         <div className="login-input-wrapper">
                             <Lock size={18} className="login-input-icon" />
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 className="login-input"
                                 placeholder="รหัสผ่าน"
                                 value={password}
@@ -94,7 +95,28 @@ export default function LoginPage({ onLogin, onRegister, error, clearError }: Lo
                                 required
                                 minLength={6}
                                 autoComplete={isRegister ? 'new-password' : 'current-password'}
+                                style={{ paddingRight: '40px' }}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    position: 'absolute',
+                                    right: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    color: '#6B7280',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
                         </div>
                     </div>
 
