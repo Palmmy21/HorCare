@@ -30,28 +30,24 @@ function formatThaiMonth(dateStr: string): string {
 
 const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
     ({ bill, config, billDate }, ref) => {
-        const waterRateDisplay = config.water_config.type === 'normal'
-            ? config.water_config.unit_rate || 0
-            : config.water_config.flat_price || 0;
-
         const isWaterFlat = config.water_config.type === 'flat_rate_tier';
 
         return (
             <div className="invoice-bill" ref={ref}>
                 {/* Header */}
                 <div className="invoice-header">
-                    <h2 className="invoice-title">ใบแจ้งยอด</h2>
+                    <h2 className="invoice-title">ใบเรียกเก็บค่าบริการ</h2>
                     <div className="invoice-meta">
                         <div className="invoice-meta-row">
-                            <span className="invoice-meta-label">ห้อง</span>
+                            <span className="invoice-meta-label">ห้องพัก</span>
                             <span className="invoice-meta-value invoice-room-number">{bill.room_number}</span>
                         </div>
                         <div className="invoice-meta-row">
-                            <span className="invoice-meta-label">เดือน</span>
+                            <span className="invoice-meta-label">ประจำเดือน</span>
                             <span className="invoice-meta-value">{formatThaiMonth(bill.month + '-01')}</span>
                         </div>
                         <div className="invoice-meta-row">
-                            <span className="invoice-meta-label">วันที่</span>
+                            <span className="invoice-meta-label">วันที่ออกบิล</span>
                             <span className="invoice-meta-value">{formatThaiDate(billDate)}</span>
                         </div>
                     </div>
@@ -61,55 +57,88 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 <table className="invoice-table">
                     <thead>
                         <tr>
-                            <th className="invoice-th">จำนวน</th>
                             <th className="invoice-th">รายการ</th>
-                            <th className="invoice-th text-right">หน่วยละ</th>
-                            <th className="invoice-th text-right">จำนวนเงิน</th>
+                            <th className="invoice-th text-center">หน่วยที่ใช้</th>
+                            <th className="invoice-th text-right">ค่าต่อหน่วย</th>
+                            <th className="invoice-th text-right">จำนวนเงิน (บาท)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {/* ค่าเช่า */}
+                        {/* ค่าเช่าห้อง */}
                         <tr className="invoice-row">
-                            <td className="invoice-td text-center">1</td>
-                            <td className="invoice-td">ค่าเช่า</td>
+                            <td className="invoice-td">
+                                <div style={{ fontWeight: 500 }}>ค่าเช่าห้องพัก</div>
+                                {bill.room_rent === 0 && (
+                                    <div className="invoice-detail">รายเทอม (ไม่คิดค่าเช่ารายเดือน)</div>
+                                )}
+                            </td>
+                            <td className="invoice-td text-center">—</td>
                             <td className="invoice-td text-right">—</td>
-                            <td className="invoice-td text-right mono">{bill.room_rent > 0 ? bill.room_rent.toLocaleString() : '—'}</td>
+                            <td className="invoice-td text-right mono">{bill.room_rent > 0 ? bill.room_rent.toLocaleString() : '0'}</td>
                         </tr>
 
                         {/* ค่าไฟฟ้า */}
                         <tr className="invoice-row">
-                            <td className="invoice-td text-center">{bill.elec_units}</td>
                             <td className="invoice-td">
-                                ค่าไฟฟ้า
-                                <span className="invoice-detail">
-                                    ({bill.prev_elec.toLocaleString()} → {bill.curr_elec.toLocaleString()})
-                                </span>
+                                <div style={{ fontWeight: 500 }}>ค่าไฟฟ้า</div>
+                                <div className="invoice-detail">
+                                    เลขเดือนก่อน {bill.prev_elec.toLocaleString()} → เดือนนี้ {bill.curr_elec.toLocaleString()}
+                                </div>
                             </td>
-                            <td className="invoice-td text-right mono">{config.electricity_rate}</td>
+                            <td className="invoice-td text-center mono">{bill.elec_units} หน่วย</td>
+                            <td className="invoice-td text-right mono">{config.electricity_rate} บาท</td>
                             <td className="invoice-td text-right mono">{bill.elec_bill.toLocaleString()}</td>
                         </tr>
 
                         {/* ค่าน้ำประปา */}
-                        <tr className="invoice-row">
-                            <td className="invoice-td text-center">{bill.water_units}</td>
-                            <td className="invoice-td">
-                                ค่าน้ำประปา
-                                <span className="invoice-detail">
-                                    ({bill.prev_water.toLocaleString()} → {bill.curr_water.toLocaleString()})
-                                    {isWaterFlat && bill.water_excess_units > 0
-                                        ? ` เกิน ${bill.water_excess_units} หน่วย`
-                                        : isWaterFlat ? ' (เหมาจ่าย)' : ''
-                                    }
-                                </span>
-                            </td>
-                            <td className="invoice-td text-right mono">
-                                {isWaterFlat
-                                    ? `${waterRateDisplay}`
-                                    : `${waterRateDisplay}`
-                                }
-                            </td>
-                            <td className="invoice-td text-right mono">{bill.water_bill.toLocaleString()}</td>
-                        </tr>
+                        {isWaterFlat ? (
+                            <>
+                                {/* แบบเหมาจ่าย: แถวเหมาจ่าย */}
+                                <tr className="invoice-row">
+                                    <td className="invoice-td">
+                                        <div style={{ fontWeight: 500 }}>ค่าน้ำประปา (เหมาจ่าย)</div>
+                                        <div className="invoice-detail">
+                                            เลขเดือนก่อน {bill.prev_water.toLocaleString()} → เดือนนี้ {bill.curr_water.toLocaleString()}
+                                        </div>
+                                        <div className="invoice-detail">
+                                            ใช้ {bill.water_units} หน่วย (เหมา {config.water_config.flat_limit_unit} หน่วยแรก)
+                                        </div>
+                                    </td>
+                                    <td className="invoice-td text-center mono">{bill.water_units} หน่วย</td>
+                                    <td className="invoice-td text-right mono">{config.water_config.flat_price?.toLocaleString()} บาท</td>
+                                    <td className="invoice-td text-right mono">{(config.water_config.flat_price || 0).toLocaleString()}</td>
+                                </tr>
+                                {/* ถ้ามีส่วนเกิน ให้แยกแถว */}
+                                {bill.water_excess_units > 0 && (
+                                    <tr className="invoice-row">
+                                        <td className="invoice-td">
+                                            <div style={{ fontWeight: 500, color: 'var(--color-warning, #F59E0B)' }}>
+                                                ค่าน้ำส่วนเกิน
+                                            </div>
+                                            <div className="invoice-detail">
+                                                ใช้เกินจากเหมา {bill.water_excess_units} หน่วย
+                                            </div>
+                                        </td>
+                                        <td className="invoice-td text-center mono">{bill.water_excess_units} หน่วย</td>
+                                        <td className="invoice-td text-right mono">{config.water_config.excess_unit_rate} บาท</td>
+                                        <td className="invoice-td text-right mono">{bill.water_excess_amount.toLocaleString()}</td>
+                                    </tr>
+                                )}
+                            </>
+                        ) : (
+                            /* แบบคิดตามจริง */
+                            <tr className="invoice-row">
+                                <td className="invoice-td">
+                                    <div style={{ fontWeight: 500 }}>ค่าน้ำประปา</div>
+                                    <div className="invoice-detail">
+                                        เลขเดือนก่อน {bill.prev_water.toLocaleString()} → เดือนนี้ {bill.curr_water.toLocaleString()}
+                                    </div>
+                                </td>
+                                <td className="invoice-td text-center mono">{bill.water_units} หน่วย</td>
+                                <td className="invoice-td text-right mono">{config.water_config.unit_rate} บาท</td>
+                                <td className="invoice-td text-right mono">{bill.water_bill.toLocaleString()}</td>
+                            </tr>
+                        )}
                     </tbody>
                     <tfoot>
                         <tr className="invoice-total-row">
@@ -123,7 +152,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
 
                 {/* Footer */}
                 <div className="invoice-footer">
-                    <p>กรุณาชำระภายในวันที่กำหนด</p>
+                    <p>กรุณาชำระภายในวันที่กำหนด ขอบคุณค่ะ/ครับ</p>
                 </div>
             </div>
         );

@@ -58,34 +58,48 @@ export default function Summary({
     const generatePDF = () => {
         const doc = new jsPDF();
 
-        doc.setFontSize(18);
-        doc.text(`HorCare - Bill Summary`, 20, 20);
-        doc.setFontSize(12);
-        doc.text(`Month: ${currentMonth}`, 20, 30);
-
-        let y = 50;
+        doc.setFontSize(16);
+        doc.text('HorCare', 20, 20);
         doc.setFontSize(10);
+        doc.text(`Month: ${currentMonth}`, 20, 28);
+
+        let y = 42;
+        doc.setFontSize(9);
 
         // Header
-        doc.text('Room', 20, y);
-        doc.text('Elec', 50, y);
-        doc.text('Water', 80, y);
-        doc.text('Rent', 110, y);
-        doc.text('Total', 140, y);
-        y += 10;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Room', 14, y);
+        doc.text('Elec (units x rate)', 40, y);
+        doc.text('Water (units x rate)', 90, y);
+        doc.text('Rent', 140, y);
+        doc.text('Total', 170, y);
+        doc.setFont('helvetica', 'normal');
+
+        y += 4;
+        doc.setDrawColor(200);
+        doc.line(14, y, 196, y);
+        y += 6;
 
         monthBills.forEach(bill => {
-            doc.text(bill.room_number, 20, y);
-            doc.text(bill.elec_bill.toString(), 50, y);
-            doc.text(bill.water_bill.toString(), 80, y);
-            doc.text(bill.room_rent.toString(), 110, y);
-            doc.text(bill.total_bill.toString(), 140, y);
-            y += 8;
+            doc.text(bill.room_number, 14, y);
+            doc.text(`${bill.elec_units} x ${config.electricity_rate} = ${bill.elec_bill.toLocaleString()}`, 40, y);
+            doc.text(`${bill.water_units} = ${bill.water_bill.toLocaleString()}`, 90, y);
+            doc.text(bill.room_rent.toLocaleString(), 140, y);
+            doc.text(bill.total_bill.toLocaleString(), 170, y);
+            y += 7;
+
+            if (y > 270) {
+                doc.addPage();
+                y = 20;
+            }
         });
 
-        y += 10;
-        doc.setFontSize(12);
-        doc.text(`Total Revenue: ${stats.totalRevenue} THB`, 20, y);
+        y += 6;
+        doc.line(14, y, 196, y);
+        y += 8;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text(`Total: ${stats.totalRevenue.toLocaleString()} THB`, 140, y);
 
         doc.save(`bills_${currentMonth}.pdf`);
     };
