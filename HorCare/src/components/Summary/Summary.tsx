@@ -100,7 +100,7 @@ export default function Summary({
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📊 สรุปยอดและส่ง LINE</h1>
+                <h1 className="page-title">📊 สรุปยอดรายเดือน</h1>
                 <p className="page-subtitle">
                     รอบเดือน {formatMonthThai(currentMonth)}
                 </p>
@@ -287,7 +287,7 @@ export default function Summary({
                                 ) : (
                                     <>
                                         <Rocket size={24} />
-                                        🚀 ส่งบิลเข้า LINE & ปิดยอดเดือน
+                                        🚀 ปิดยอดเดือน
                                     </>
                                 )}
                             </button>
@@ -337,12 +337,11 @@ export default function Summary({
                 <div className="modal-overlay" onClick={() => setShowConfirm(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="modal-title">⚠️ ยืนยันการส่งบิลและปิดยอด</h3>
+                            <h3 className="modal-title">⚠️ ยืนยันการปิดยอด</h3>
                         </div>
                         <div className="modal-body">
                             <p style={{ marginBottom: 'var(--space-4)' }}>
-                                คุณกำลังจะส่งบิลแจ้งเตือนไปยังผู้เช่าทุกห้อง
-                                และปิดรอบเดือน <strong>{formatMonthThai(currentMonth)}</strong>
+                                คุณกำลังจะปิดรอบเดือน <strong>{formatMonthThai(currentMonth)}</strong>
                             </p>
                             <div className="card" style={{ background: 'var(--color-gray-50)', padding: 'var(--space-4)' }}>
                                 <p>📍 จำนวนห้อง: <strong>{stats.totalRooms} ห้อง</strong></p>

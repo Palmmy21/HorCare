@@ -52,7 +52,7 @@ function App() {
     { id: 'dashboard' as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'rooms' as ViewMode, icon: Home, label: 'จัดการห้อง' },
     { id: 'recording' as ViewMode, icon: FileText, label: 'จดมิเตอร์' },
-    { id: 'summary' as ViewMode, icon: Send, label: 'สรุป/ส่ง LINE' },
+    { id: 'summary' as ViewMode, icon: Send, label: 'สรุปยอด' },
     { id: 'settings' as ViewMode, icon: SettingsIcon, label: 'ตั้งค่า' },
   ];
 
@@ -82,6 +82,36 @@ function App() {
       }}>
         <div className="loading-spinner" style={{ width: 40, height: 40 }}></div>
         <p>กำลังโหลด...</p>
+      </div>
+    );
+  }
+
+  // Trial expired → block usage
+  if (user && isTrialExpired) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '1rem',
+        padding: '2rem',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '3rem' }}>⏰</div>
+        <h2 style={{ color: '#EF4444', marginBottom: '0.5rem' }}>ทดลองใช้หมดอายุแล้ว</h2>
+        <p style={{ color: '#737373', maxWidth: '400px' }}>
+          ระยะเวลาทดลองใช้งานฟรี 30 วันของคุณหมดอายุแล้ว
+          กรุณาอัปเกรดเพื่อใช้งานต่อ
+        </p>
+        <button
+          className="btn btn-primary"
+          onClick={logout}
+          style={{ marginTop: '1rem' }}
+        >
+          ออกจากระบบ
+        </button>
       </div>
     );
   }
