@@ -57,16 +57,16 @@ export default function MeterRecording({
 
             if (existingBill) {
                 initialState[room.id] = {
-                    prevElec: existingBill.prev_elec.toString(),
-                    prevWater: existingBill.prev_water.toString(),
-                    currElec: existingBill.curr_elec.toString(),
-                    currWater: existingBill.curr_water.toString(),
+                    prevElec: existingBill.prev_elec === 0 ? '' : existingBill.prev_elec.toString(),
+                    prevWater: existingBill.prev_water === 0 ? '' : existingBill.prev_water.toString(),
+                    currElec: existingBill.curr_elec === 0 ? '' : existingBill.curr_elec.toString(),
+                    currWater: existingBill.curr_water === 0 ? '' : existingBill.curr_water.toString(),
                     isSaved: existingBill.is_saved
                 };
             } else {
                 initialState[room.id] = {
-                    prevElec: defaultPrevElec.toString(),
-                    prevWater: defaultPrevWater.toString(),
+                    prevElec: defaultPrevElec === 0 ? '' : defaultPrevElec.toString(),
+                    prevWater: defaultPrevWater === 0 ? '' : defaultPrevWater.toString(),
                     currElec: '',
                     currWater: '',
                     isSaved: false
@@ -92,6 +92,20 @@ export default function MeterRecording({
     };
 
 
+
+    const handleClear = (roomId: string) => {
+        setRecordingState(prev => ({
+            ...prev,
+            [roomId]: {
+                ...prev[roomId],
+                prevElec: '',
+                prevWater: '',
+                currElec: '',
+                currWater: '',
+                isSaved: false
+            }
+        }));
+    };
 
     const handleSave = (roomId: string) => {
         const state = recordingState[roomId];
@@ -325,12 +339,21 @@ export default function MeterRecording({
                     </div>
                 )}
 
-                {/* Save Button */}
-                <div className="room-card-actions">
+                {/* Save & Clear Buttons */}
+                <div className="room-card-actions flex gap-2">
+                    <button
+                        className="btn btn-outline btn-danger"
+                        onClick={() => handleClear(room.id)}
+                        title="ล้างข้อมูล"
+                        style={{ padding: '0.5rem' }}
+                    >
+                        <AlertTriangle size={18} />
+                    </button>
                     <button
                         className={`btn ${state.isSaved ? 'btn-success' : 'btn-primary'}`}
                         onClick={() => handleSave(room.id)}
                         disabled={!canSave}
+                        style={{ flex: 1 }}
                     >
                         {state.isSaved ? (
                             <>

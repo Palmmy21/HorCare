@@ -60,53 +60,47 @@ export default function Summary({
         setShowConfirm(false);
     };
 
-    const generatePDF = () => {
-        const doc = new jsPDF();
+    const [isExporting, setIsExporting] = useState(false);
+    const reportRef = useRef<HTMLDivElement>(null);
 
-        doc.setFontSize(16);
-        doc.text('HorCare', 20, 20);
-        doc.setFontSize(10);
-        doc.text(`Month: ${currentMonth}`, 20, 28);
+    const generatePDF = async () => {
+        if (!reportRef.current) return;
 
-        let y = 42;
-        doc.setFontSize(9);
+        setIsExporting(true);
+        try {
+            const canvas = await html2canvas(reportRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            });
 
-        // Header
-        doc.setFont('helvetica', 'bold');
-        doc.text('Room', 14, y);
-        doc.text('Elec (units x rate)', 40, y);
-        doc.text('Water (units x rate)', 90, y);
-        doc.text('Rent', 140, y);
-        doc.text('Total', 170, y);
-        doc.setFont('helvetica', 'normal');
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pdfWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-        y += 4;
-        doc.setDrawColor(200);
-        doc.line(14, y, 196, y);
-        y += 6;
+            let heightLeft = imgHeight;
+            let position = 0;
 
-        monthBills.forEach(bill => {
-            doc.text(bill.room_number, 14, y);
-            doc.text(`${bill.elec_units} x ${config.electricity_rate} = ${bill.elec_bill.toLocaleString()}`, 40, y);
-            doc.text(`${bill.water_units} = ${bill.water_bill.toLocaleString()}`, 90, y);
-            doc.text(bill.room_rent.toLocaleString(), 140, y);
-            doc.text(bill.total_bill.toLocaleString(), 170, y);
-            y += 7;
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
 
-            if (y > 270) {
-                doc.addPage();
-                y = 20;
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pdfHeight;
             }
-        });
 
-        y += 6;
-        doc.line(14, y, 196, y);
-        y += 8;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text(`Total: ${stats.totalRevenue.toLocaleString()} THB`, 140, y);
-
-        doc.save(`bills_${currentMonth}.pdf`);
+            pdf.save(`HorCare_Summary_${currentMonth}.pdf`);
+        } catch (error) {
+            console.error('PDF Generation failed:', error);
+            alert('เกิดข้อผิดพลาดในการสร้าง PDF');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const handlePrintAll = () => {
@@ -213,9 +207,9 @@ export default function Summary({
             <div className="card mb-6">
                 <div className="card-header">
                     <span className="card-title">📋 รายการบิลทั้งหมด</span>
-                    <button className="btn btn-outline btn-sm" onClick={generatePDF}>
+                    <button className="btn btn-outline btn-sm" onClick={generatePDF} disabled={isExporting}>
                         <Download size={16} />
-                        Export PDF
+                        {isExporting ? 'สร้าง PDF...' : 'Export PDF'}
                     </button>
                 </div>
 
@@ -527,6 +521,45 @@ export default function Summary({
                     ))}
                 </div>
             )}
+            {/* Hidden Report Table for PDF Capture */}
+            <div style={{ position: 'absolute', top: -9999, left: -9999, width: '210mm', background: 'white', padding: '40px', color: 'black', fontFamily: 'Sarabun, sans-serif' }} ref={reportRef}>
+                <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '24px' }}>รายงานสรุปยอดหอพัก</h2>
+                <p style={{ textAlign: 'center', marginBottom: '20px', fontSize: '16px' }}>ประจำเดือน: {formatMonthThai(currentMonth)}</p>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '2px solid #000' }}>
+                            <th style={{ padding: '10px', textAlign: 'left' }}>ห้อง</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>ค่าไฟ</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>ค่าน้ำ</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>ค่าห้อง</th>
+                            <th style={{ padding: '10px', textAlign: 'right' }}>รวม</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {monthBills.map(bill => (
+                            <tr key={bill.id} style={{ borderBottom: '1px solid #ddd' }}>
+                                <td style={{ padding: '10px' }}>{bill.room_number}</td>
+                                <td style={{ padding: '10px', textAlign: 'right' }}>
+                                    <div style={{ fontWeight: 'bold' }}>{formatCurrency(bill.elec_bill)}</div>
+                                    <div style={{ fontSize: '12px', color: '#666' }}>{bill.elec_units} หน่วย</div>
+                                </td>
+                                <td style={{ padding: '10px', textAlign: 'right' }}>
+                                    <div style={{ fontWeight: 'bold' }}>{formatCurrency(bill.water_bill)}</div>
+                                    <div style={{ fontSize: '12px', color: '#666' }}>{bill.water_units} หน่วย</div>
+                                </td>
+                                <td style={{ padding: '10px', textAlign: 'right' }}>{formatCurrency(bill.room_rent)}</td>
+                                <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', fontSize: '16px' }}>{formatCurrency(bill.total_bill)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr style={{ borderTop: '2px solid #000' }}>
+                            <td colSpan={4} style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>รวมทั้งสิ้น</td>
+                            <td style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>{formatCurrency(stats.totalRevenue)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
         </div>
     );
 }

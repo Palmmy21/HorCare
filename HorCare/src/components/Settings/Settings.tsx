@@ -223,35 +223,54 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
                 <p className="page-subtitle">กำหนดอัตราค่าบริการและค่าเช่า</p>
             </div>
 
-            {/* Building Type */}
+            {/* Supported Building Types (Static) */}
             <div className="settings-section">
                 <h3 className="settings-title">
                     <Building2 size={20} color="#6366F1" />
-                    ประเภทอาคาร
+                    ประเภทอาคารที่รองรับ
                 </h3>
-                <div className="form-group">
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <button
-                            className={`btn ${formData.building_type === 'dormitory' ? 'btn-primary' : 'btn-outline'}`}
-                            onClick={() => handleChange('building_type', 'dormitory')}
-                            style={{ flex: 1, minWidth: '150px', padding: '0.875rem 1.25rem', fontSize: '1rem' }}
-                        >
-                            🏠 หอพัก
-                        </button>
-                        <button
-                            className={`btn ${formData.building_type === 'commercial' ? 'btn-primary' : 'btn-outline'}`}
-                            onClick={() => handleChange('building_type', 'commercial')}
-                            style={{ flex: 1, minWidth: '150px', padding: '0.875rem 1.25rem', fontSize: '1rem' }}
-                        >
-                            🏢 อาคารพาณิชย์
-                        </button>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                    <div style={{
+                        flex: 1,
+                        padding: '1.25rem',
+                        border: '1px solid var(--color-gray-200)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        backgroundColor: '#F3F4F6'
+                    }}>
+                        <div style={{ background: '#E0E7FF', padding: '0.75rem', borderRadius: '50%' }}>
+                            <Home size={24} color="#4F46E5" />
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>หอพัก (Dormitory)</h4>
+                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#6B7280' }}>
+                                คิดค่าน้ำ/ไฟอัตราเดียวกันทุกห้อง
+                            </p>
+                        </div>
                     </div>
-                    <p className="form-hint">
-                        {formData.building_type === 'commercial'
-                            ? 'โหมดอาคารพาณิชย์: ตั้งค่าน้ำ/ไฟเฉพาะห้องได้ในหน้าจัดการห้อง'
-                            : 'โหมดหอพัก: ทุกห้องใช้อัตราค่าน้ำ/ไฟเดียวกัน'
-                        }
-                    </p>
+
+                    <div style={{
+                        flex: 1,
+                        padding: '1.25rem',
+                        border: '1px solid var(--color-gray-200)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        backgroundColor: '#F3F4F6'
+                    }}>
+                        <div style={{ background: '#FEF3C7', padding: '0.75rem', borderRadius: '50%' }}>
+                            <Building2 size={24} color="#D97706" />
+                        </div>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>อาคารพาณิชย์ (Commercial)</h4>
+                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#6B7280' }}>
+                                ตั้งค่าน้ำ/ไฟแยกรายห้องได้
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

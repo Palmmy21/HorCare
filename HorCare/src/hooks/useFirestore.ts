@@ -4,7 +4,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { DormConfig, Room, MonthlyBill, UserProfile } from '../types';
-import { getCurrentMonth, calculateFullBill, getEffectiveRates } from '../utils/calculations';
+import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth } from '../utils/calculations';
 
 const DEFAULT_CONFIG: DormConfig = {
     building_type: 'dormitory',
@@ -178,8 +178,49 @@ export function useFirestore(userId: string | null) {
             current_meter_water: bill.curr_water
         });
 
+        // Check for next month's bill to update recursively
+        const nextMonth = getNextMonth(bill.month);
+        const nextMonthBill = bills.find(b => b.room_id === bill.room_id && b.month === nextMonth);
+
+        if (nextMonthBill && !nextMonthBill.is_locked) {
+            // Recalculate next month's bill with new previous readings
+            const room = rooms.find(r => r.id === bill.room_id);
+            if (room) {
+                const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+                const { electricityRate, waterConfig } = getEffectiveRates(room, config);
+
+                const calculation = calculateFullBill(
+                    bill.curr_elec, // New prev for next month
+                    nextMonthBill.curr_elec,
+                    bill.curr_water, // New prev for next month
+                    nextMonthBill.curr_water,
+                    config,
+                    effectiveRent,
+                    room.tenant_count,
+                    electricityRate,
+                    waterConfig
+                );
+
+                const updatedNextBill: Partial<MonthlyBill> = {
+                    prev_elec: bill.curr_elec,
+                    prev_water: bill.curr_water,
+                    elec_units: calculation.elec_units,
+                    elec_bill: calculation.elec_bill,
+                    water_units: calculation.water_units,
+                    water_bill: calculation.water_bill,
+                    water_flat_amount: calculation.water_flat_amount,
+                    water_excess_units: calculation.water_excess_units,
+                    water_excess_amount: calculation.water_excess_amount,
+                    total_bill: calculation.total_bill,
+                    updated_at: new Date().toISOString()
+                };
+
+                await updateDoc(doc(db, userPath, 'bills', nextMonthBill.id), updatedNextBill);
+            }
+        }
+
         return bill;
-    }, [userPath]);
+    }, [userPath, bills, rooms, config]);
 
     const getBillForRoom = useCallback((roomId: string, month: string): MonthlyBill | undefined => {
         return bills.find(b => b.room_id === roomId && b.month === month);
