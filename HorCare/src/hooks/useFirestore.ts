@@ -3,8 +3,8 @@ import {
     collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { DormConfig, Room, MonthlyBill } from '../types';
-import { getCurrentMonth } from '../utils/calculations';
+import type { DormConfig, Room, MonthlyBill, UserProfile } from '../types';
+import { getCurrentMonth, calculateFullBill, getEffectiveRates } from '../utils/calculations';
 
 const DEFAULT_CONFIG: DormConfig = {
     building_type: 'dormitory',
@@ -14,6 +14,10 @@ const DEFAULT_CONFIG: DormConfig = {
         flat_price: 250,
         flat_limit_unit: 10,
         excess_unit_rate: 25
+    },
+    commercial_water_config: {
+        type: 'normal',
+        unit_rate: 24
     },
     room_rent: 3500
 };
@@ -108,8 +112,55 @@ export function useFirestore(userId: string | null) {
 
     const updateRoom = useCallback(async (roomId: string, updates: Partial<Room>) => {
         if (!userPath) return;
+
+        // 1. Update the room
         await updateDoc(doc(db, userPath, 'rooms', roomId), updates);
-    }, [userPath]);
+
+        // 2. Check for active bill in current month
+        const currentMonth = getCurrentMonth();
+        const existingBill = bills.find(b => b.room_id === roomId && b.month === currentMonth);
+
+        // 3. If bill exists and is not locked, recalculate it using new room settings + old meter readings
+        if (existingBill && !existingBill.is_locked) {
+            const currentRoom = rooms.find(r => r.id === roomId);
+            if (!currentRoom) return;
+
+            const newRoom = { ...currentRoom, ...updates };
+
+            const effectiveRent = newRoom.rent_type === 'semester' ? 0 : (newRoom.rent_amount ?? config.room_rent);
+            const { electricityRate, waterConfig } = getEffectiveRates(newRoom, config);
+
+            // Use meter readings from the existing bill (snapshot)
+            const calculation = calculateFullBill(
+                existingBill.prev_elec,
+                existingBill.curr_elec,
+                existingBill.prev_water,
+                existingBill.curr_water,
+                config,
+                effectiveRent,
+                newRoom.tenant_count,
+                electricityRate,
+                waterConfig
+            );
+
+            // Update the bill
+            const updatedBill: Partial<MonthlyBill> = {
+                elec_units: calculation.elec_units,
+                elec_bill: calculation.elec_bill,
+                water_units: calculation.water_units,
+                water_bill: calculation.water_bill,
+                water_flat_amount: calculation.water_flat_amount,
+                water_excess_units: calculation.water_excess_units,
+                water_excess_amount: calculation.water_excess_amount,
+                room_rent: effectiveRent,
+                total_bill: calculation.total_bill,
+                tenant_count: newRoom.tenant_count || 1, // Update snapshot of tenant count
+                updated_at: new Date().toISOString()
+            };
+
+            await updateDoc(doc(db, userPath, 'bills', existingBill.id), updatedBill);
+        }
+    }, [userPath, bills, rooms, config]);
 
     const deleteRoom = useCallback(async (roomId: string) => {
         if (!userPath) return;
@@ -187,6 +238,20 @@ export function useFirestore(userId: string | null) {
         };
     }, [bills, rooms]);
 
+    // Admin functions
+    const getAllUsers = useCallback(async () => {
+        const usersRef = collection(db, 'users');
+        // Fetch all and sort client-side to avoid index requirement
+        const snap = await import('firebase/firestore').then(m => m.getDocs(usersRef));
+        return snap.docs
+            .map(d => d.data() as UserProfile)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }, []);
+
+    const updateUserLicense = useCallback(async (targetUid: string, updates: Partial<UserProfile>) => {
+        await updateDoc(doc(db, 'users', targetUid), updates);
+    }, []);
+
     return {
         config,
         rooms,
@@ -201,6 +266,8 @@ export function useFirestore(userId: string | null) {
         getBillsForMonth,
         getPreviousBill,
         closeMonth,
-        getMonthStats
+        getMonthStats,
+        getAllUsers,
+        updateUserLicense
     };
 }

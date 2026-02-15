@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string;
   display_name: string;
   license: 'trial' | 'active';
+  role?: 'admin' | 'user';
   trial_expires_at: string; // ISO date
   created_at: string;
 }
@@ -28,7 +29,8 @@ export interface WaterConfig {
 export interface DormConfig {
   building_type: 'dormitory' | 'commercial';
   electricity_rate: number;
-  water_config: WaterConfig;
+  water_config: WaterConfig; // Default for dormitory rooms
+  commercial_water_config?: WaterConfig; // Default for commercial rooms
   room_rent: number;
 }
 
@@ -36,6 +38,7 @@ export interface Room {
   id: string;
   room_number: string;
   room_type: 'dormitory' | 'commercial';
+  tenant_count?: number; // Defaults to 1 if undefined
   line_user_id?: string;
   current_meter_elec: number;
   current_meter_water: number;
@@ -43,8 +46,8 @@ export interface Room {
   rent_amount: number;
   rent_type: 'monthly' | 'semester';
   // Per-room rate overrides (used in commercial mode)
-  custom_electricity_rate?: number;
-  custom_water_config?: WaterConfig;
+  custom_electricity_rate?: number | null;
+  custom_water_config?: WaterConfig | null;
 }
 
 export interface MonthlyBill {
@@ -70,6 +73,7 @@ export interface MonthlyBill {
   is_notified: boolean;
   created_at: string;
   updated_at: string;
+  tenant_count?: number; // Snapshot of tenant count at time of billing
 }
 
 export interface BillCalculation {

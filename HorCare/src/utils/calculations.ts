@@ -23,7 +23,8 @@ export function calculateElectricity(
 export function calculateWater(
     prevReading: number,
     currReading: number,
-    waterConfig: WaterConfig
+    waterConfig: WaterConfig,
+    tenantCount: number = 1
 ): {
     units: number;
     bill: number;
@@ -44,9 +45,11 @@ export function calculateWater(
         };
     }
 
-    // Flat rate tier calculation
-    const flatPrice = waterConfig.flat_price || 0;
-    const flatLimitUnit = waterConfig.flat_limit_unit || 0;
+    // Flat rate tier calculation (Scaled by tenants)
+    // Example: 1 person = 150B/5units -> 2 people = 300B/10units
+    const tenants = Math.max(1, tenantCount);
+    const flatPrice = (waterConfig.flat_price || 0) * tenants;
+    const flatLimitUnit = (waterConfig.flat_limit_unit || 0) * tenants;
     const excessUnitRate = waterConfig.excess_unit_rate || 0;
 
     if (units <= flatLimitUnit) {
@@ -74,15 +77,21 @@ export function calculateWater(
 }
 
 /**
- * Get effective rates for a room (room override > global config)
+ * Get effective rates for a room (room override > room-type default > global config)
  */
 export function getEffectiveRates(
     room: Room,
     config: DormConfig
 ): { electricityRate: number; waterConfig: WaterConfig } {
+    // Water config priority: room custom > room-type default > global
+    const isCommercial = (room.room_type || 'dormitory') === 'commercial';
+    const defaultWaterConfig = isCommercial
+        ? (config.commercial_water_config ?? config.water_config)
+        : config.water_config;
+
     return {
         electricityRate: room.custom_electricity_rate ?? config.electricity_rate,
-        waterConfig: room.custom_water_config ?? config.water_config
+        waterConfig: room.custom_water_config ?? defaultWaterConfig
     };
 }
 
@@ -96,6 +105,7 @@ export function calculateFullBill(
     currWater: number,
     config: DormConfig,
     roomRent: number,
+    tenantCount: number = 1,
     roomElecRate?: number,
     roomWaterConfig?: WaterConfig
 ): BillCalculation {
@@ -103,7 +113,7 @@ export function calculateFullBill(
     const waterCfg = roomWaterConfig ?? config.water_config;
 
     const elec = calculateElectricity(prevElec, currElec, elecRate);
-    const water = calculateWater(prevWater, currWater, waterCfg);
+    const water = calculateWater(prevWater, currWater, waterCfg, tenantCount);
 
     return {
         elec_units: elec.units,

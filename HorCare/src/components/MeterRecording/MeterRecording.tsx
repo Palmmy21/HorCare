@@ -113,6 +113,7 @@ export default function MeterRecording({
             currWater,
             config,
             effectiveRent,
+            room.tenant_count,
             electricityRate,
             waterConfig
         );
@@ -172,7 +173,7 @@ export default function MeterRecording({
 
         // Calculate preview
         const calculation = state.currElec && state.currWater
-            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, roomElecRate, roomWaterCfg)
+            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg)
             : null;
 
         const canSave = state.prevElec && state.prevWater && state.currElec && state.currWater && elecValidation.valid && waterValidation.valid;
@@ -294,14 +295,17 @@ export default function MeterRecording({
                         <div className="bill-row">
                             <span className="bill-label">
                                 <Zap size={14} color="#F59E0B" />
-                                ค่าไฟ ({calculation.elec_units} หน่วย × {config.electricity_rate}฿)
+                                ค่าไฟ ({calculation.elec_units} หน่วย × {roomElecRate}฿)
                             </span>
                             <span className="bill-value">{formatCurrency(calculation.elec_bill)}</span>
                         </div>
                         <div className="bill-row">
                             <span className="bill-label">
                                 <Droplets size={14} color="#2563EB" />
-                                ค่าน้ำ {calculation.water_excess_units > 0 ? `(เกิน ${calculation.water_excess_units} หน่วย)` : '(เหมา)'}
+                                {roomWaterCfg.type === 'normal'
+                                    ? `ค่าน้ำ (${calculation.water_units} หน่วย × ${roomWaterCfg.unit_rate}฿)`
+                                    : `ค่าน้ำ ${calculation.water_excess_units > 0 ? `(เกิน ${calculation.water_excess_units} หน่วย)` : '(เหมา)'}`
+                                }
                             </span>
                             <span className="bill-value">{formatCurrency(calculation.water_bill)}</span>
                         </div>

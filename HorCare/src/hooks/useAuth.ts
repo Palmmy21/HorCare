@@ -24,15 +24,13 @@ export function useAuth() {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
             if (firebaseUser) {
-                // Load user profile from Firestore
-                try {
-                    const profileDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-                    if (profileDoc.exists()) {
-                        setProfile(profileDoc.data() as UserProfile);
+                // Subscribe to user profile changes
+                const { onSnapshot, doc } = await import('firebase/firestore');
+                onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
+                    if (docSnap.exists()) {
+                        setProfile(docSnap.data() as UserProfile);
                     }
-                } catch (err) {
-                    console.error('Error loading profile:', err);
-                }
+                });
             } else {
                 setProfile(null);
             }

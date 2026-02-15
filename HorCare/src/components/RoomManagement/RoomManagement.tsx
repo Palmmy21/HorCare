@@ -7,7 +7,7 @@ interface RoomManagementProps {
     rooms: Room[];
     config: DormConfig;
     onAddRoom: (roomNumber: string) => void;
-    onUpdateRoom: (roomId: string, updates: Partial<Room>) => void;
+    onUpdateRoom: (roomId: string, updates: Partial<Room>) => Promise<void>;
     onDeleteRoom: (roomId: string) => void;
 }
 
@@ -24,6 +24,7 @@ export default function RoomManagement({
     const [editRentAmount, setEditRentAmount] = useState('');
     const [editRentType, setEditRentType] = useState<'monthly' | 'semester'>('monthly');
     const [editRoomType, setEditRoomType] = useState<'dormitory' | 'commercial'>('dormitory');
+    const [editTenantCount, setEditTenantCount] = useState<string>('1');
     const [editCustomElecRate, setEditCustomElecRate] = useState('');
     const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function RoomManagement({
         setEditRentAmount(room.rent_amount.toString());
         setEditRentType(room.rent_type);
         setEditRoomType(room.room_type || 'dormitory');
+        setEditTenantCount((room.tenant_count || 1).toString());
         setEditCustomElecRate(room.custom_electricity_rate?.toString() || '');
         setEditCustomWaterRate(
             room.custom_water_config
@@ -63,30 +65,39 @@ export default function RoomManagement({
                     : '')
                 : ''
         );
+        console.log('Starting edit for room:', room.room_number, 'Current tenants:', room.tenant_count);
     };
 
-    const saveEdit = (roomId: string) => {
+    const saveEdit = async (roomId: string) => {
         if (!editValue.trim()) return;
+        console.log('Saving room:', roomId, 'Tenant count input:', editTenantCount);
         const updates: Partial<Room> = {
             room_number: editValue.trim(),
             rent_amount: Number(editRentAmount) || 0,
             rent_type: editRentType,
-            room_type: editRoomType
+            room_type: editRoomType,
+            tenant_count: Number(editTenantCount) || 1
         };
         if (editRoomType === 'commercial') {
             updates.custom_electricity_rate = editCustomElecRate
                 ? Number(editCustomElecRate)
-                : undefined;
+                : null;
             updates.custom_water_config = editCustomWaterRate
                 ? { type: 'normal' as const, unit_rate: Number(editCustomWaterRate) }
-                : undefined;
+                : null;
         } else {
             // Clear custom rates when switching to dormitory
-            updates.custom_electricity_rate = undefined;
-            updates.custom_water_config = undefined;
+            updates.custom_electricity_rate = null;
+            updates.custom_water_config = null;
         }
-        onUpdateRoom(roomId, updates);
-        setEditingRoom(null);
+        console.log('Sending updates:', updates);
+        try {
+            await onUpdateRoom(roomId, updates);
+            setEditingRoom(null);
+        } catch (error) {
+            console.error('Error updating room:', error);
+            alert('โอนข้อมูลไม่สำเร็จ กรุณาลองใหม่');
+        }
     };
 
     const cancelEdit = () => {
@@ -95,6 +106,7 @@ export default function RoomManagement({
         setEditRentAmount('');
         setEditRentType('monthly');
         setEditRoomType('dormitory');
+        setEditTenantCount('1');
         setEditCustomElecRate('');
         setEditCustomWaterRate('');
     };
@@ -157,6 +169,7 @@ export default function RoomManagement({
                                     <th style={{ width: '60px' }}>#</th>
                                     <th>หมายเลขห้อง</th>
                                     <th className="text-center">ประเภทห้อง</th>
+                                    <th className="text-center">ผู้พักอาศัย</th>
                                     <th className="text-right">ค่าเช่า</th>
                                     <th className="text-center">การชำระ</th>
                                     <th className="text-right">มิเตอร์ไฟ</th>
@@ -200,6 +213,20 @@ export default function RoomManagement({
                                                 <span className={`badge ${(room.room_type || 'dormitory') === 'commercial' ? 'badge-info' : 'badge-success'}`} style={{ fontSize: '0.75rem' }}>
                                                     {(room.room_type || 'dormitory') === 'commercial' ? '🏢 พาณิชย์' : '🏠 หอพัก'}
                                                 </span>
+                                            )}
+                                        </td>
+                                        <td className="text-center">
+                                            {editingRoom === room.id ? (
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    className="form-input mono text-center"
+                                                    style={{ width: '60px' }}
+                                                    value={editTenantCount}
+                                                    onChange={e => setEditTenantCount(e.target.value)}
+                                                />
+                                            ) : (
+                                                <span className="mono">{room.tenant_count || 1} คน</span>
                                             )}
                                         </td>
                                         <td className="text-right">

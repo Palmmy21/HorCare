@@ -2,29 +2,22 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read/write their own profile
+    // Helper function for Admin check
+    function isAdmin() {
+       return request.auth.token.email == 'sakdidechneverdie@gmail.com' ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // User's data sub-collection (config)
-      match /data/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      // User's rooms
-      match /rooms/{roomId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-      
-      // User's bills
-      match /bills/{billId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Direct access to user profile
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+
+      // Access to all subcollections (rooms, bills, data, etc.)
+      match /{document=**} {
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
       }
     }
-    
-    // Deny all other access
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
 }
+}
+

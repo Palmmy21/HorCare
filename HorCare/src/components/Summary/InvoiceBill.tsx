@@ -35,12 +35,14 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
         const elecRate = effectiveElecRate ?? config.electricity_rate;
         const waterCfg = effectiveWaterConfig ?? config.water_config;
         const isWaterFlat = waterCfg.type === 'flat_rate_tier';
+        const tenants = Math.max(1, bill.tenant_count || 1);
+        const adjustedFlatLimit = (waterCfg.flat_limit_unit || 0) * tenants;
 
         return (
             <div className="invoice-bill" ref={ref}>
                 {/* Header */}
                 <div className="invoice-header">
-                    <h2 className="invoice-title">ใบเรียกเก็บค่าบริการ</h2>
+                    <h2 className="invoice-title">ใบแจ้งหนี้/ใบเสร็จรับเงิน</h2>
                     <div className="invoice-meta">
                         <div className="invoice-meta-row">
                             <span className="invoice-meta-label">ห้องพัก</span>
@@ -105,12 +107,17 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                             เลขเดือนก่อน {bill.prev_water.toLocaleString()} → เดือนนี้ {bill.curr_water.toLocaleString()}
                                         </div>
                                         <div className="invoice-detail">
-                                            ใช้ {bill.water_units} หน่วย (เหมา {config.water_config.flat_limit_unit} หน่วยแรก)
+                                            ใช้ {bill.water_units} หน่วย (เหมา {adjustedFlatLimit} หน่วยแรก)
                                         </div>
+                                        {tenants > 1 && (
+                                            <div className="invoice-detail" style={{ color: 'var(--color-info, #3B82F6)' }}>
+                                                พัก {tenants} คน (เหมา {waterCfg.flat_limit_unit}×{tenants}={adjustedFlatLimit} หน่วย, {waterCfg.flat_price?.toLocaleString()}×{tenants}={bill.water_flat_amount.toLocaleString()} บาท)
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="invoice-td text-center mono">{bill.water_units} หน่วย</td>
-                                    <td className="invoice-td text-right mono">{waterCfg.flat_price?.toLocaleString()} บาท</td>
-                                    <td className="invoice-td text-right mono">{(waterCfg.flat_price || 0).toLocaleString()}</td>
+                                    <td className="invoice-td text-right mono">{bill.water_flat_amount.toLocaleString()} บาท</td>
+                                    <td className="invoice-td text-right mono">{bill.water_flat_amount.toLocaleString()}</td>
                                 </tr>
                                 {/* ถ้ามีส่วนเกิน ให้แยกแถว */}
                                 {bill.water_excess_units > 0 && (

@@ -175,19 +175,13 @@ export default function Dashboard({ config, stats, currentMonth, recentBills }: 
                         </div>
                     </div>
                     <div>
-                        <div className="stat-label">ค่าน้ำเหมาจ่าย</div>
+                        <div className="stat-label">ค่าน้ำประปา</div>
                         <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-                            {config.water_config.flat_price} บาท ({config.water_config.flat_limit_unit} หน่วย)
+                            {config.water_config.unit_rate || config.water_config.excess_unit_rate} บาท/หน่วย
                         </div>
                     </div>
                     <div>
-                        <div className="stat-label">ค่าน้ำส่วนเกิน</div>
-                        <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-                            {config.water_config.excess_unit_rate} บาท/หน่วย
-                        </div>
-                    </div>
-                    <div>
-                        <div className="stat-label">ค่าเช่าห้อง</div>
+                        <div className="stat-label">ค่าเช่าห้องเริ่มต้น</div>
                         <div className="stat-value" style={{ fontSize: '1.25rem' }}>
                             {formatCurrency(config.room_rent)}
                         </div>

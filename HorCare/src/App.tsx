@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock
+  Menu, X, LogOut, Clock, Shield
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -12,9 +12,10 @@ import MeterRecording from './components/MeterRecording/MeterRecording';
 import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
+import AdminDashboard from './components/Admin/AdminDashboard';
 import './index.css';
 
-type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings';
+type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings' | 'admin';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
@@ -55,6 +56,12 @@ function App() {
     { id: 'summary' as ViewMode, icon: Send, label: 'สรุปยอด' },
     { id: 'settings' as ViewMode, icon: SettingsIcon, label: 'ตั้งค่า' },
   ];
+
+  const isAdmin = profile?.role === 'admin' || user?.email === 'sakdidechneverdie@gmail.com';
+
+  if (isAdmin) {
+    navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
+  }
 
   const handleNavClick = (view: ViewMode) => {
     setCurrentView(view);
@@ -286,6 +293,10 @@ function App() {
             config={config}
             onSaveConfig={saveConfig}
           />
+        )}
+
+        {currentView === 'admin' && profile?.role === 'admin' && (
+          <AdminDashboard />
         )}
       </main>
     </div>
