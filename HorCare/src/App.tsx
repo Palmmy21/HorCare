@@ -26,7 +26,7 @@ function App() {
   // Auth
   const {
     user, profile, loading: authLoading, error: authError,
-    login, register, logout, isTrialExpired, trialDaysLeft, isBanned, setError
+    login, register, logout, resetPassword, isTrialExpired, trialDaysLeft, isBanned, setError
   } = useAuth();
 
   // Firestore (only loads when user is logged in)
@@ -157,6 +157,7 @@ function App() {
       <LoginPage
         onLogin={handleLogin}
         onRegister={handleRegister}
+        onResetPassword={resetPassword}
         error={authError}
         clearError={() => setError(null)}
       />

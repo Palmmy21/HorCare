@@ -5,6 +5,7 @@ import {
     createUserWithEmailAndPassword,
     signOut,
     updateProfile,
+    sendPasswordResetEmail,
     type User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -110,6 +111,24 @@ export function useAuth() {
         setProfile(null);
     }, []);
 
+    // Reset Password (Forgot Password)
+    const resetPassword = useCallback(async (email: string) => {
+        setError(null);
+        try {
+            await sendPasswordResetEmail(auth, email);
+        } catch (err: unknown) {
+            const firebaseErr = err as { code?: string; message?: string };
+            if (firebaseErr.code === 'auth/user-not-found' || firebaseErr.code === 'auth/invalid-email') {
+                setError('ไม่พบบัญชีที่ใช้อีเมลนี้');
+            } else if (firebaseErr.code === 'auth/too-many-requests') {
+                setError('ส่งคำขอบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่');
+            } else {
+                setError(firebaseErr.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+            }
+            throw err;
+        }
+    }, []);
+
     // Check if trial is expired
     const isTrialExpired = profile?.license === 'trial' &&
         new Date(profile.trial_expires_at) < new Date();
@@ -133,6 +152,7 @@ export function useAuth() {
         register,
         login,
         logout,
+        resetPassword,
         isTrialExpired,
         isLicenseActive,
         trialDaysLeft,
