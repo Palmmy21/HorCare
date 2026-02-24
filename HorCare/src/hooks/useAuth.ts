@@ -122,6 +122,9 @@ export function useAuth() {
         ? Math.max(0, Math.ceil((new Date(profile.trial_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
         : null;
 
+    // Ban check — admin sets status: 'banned' in Firestore
+    const isBanned = profile?.status === 'banned';
+
     return {
         user,
         profile,
@@ -133,6 +136,7 @@ export function useAuth() {
         isTrialExpired,
         isLicenseActive,
         trialDaysLeft,
+        isBanned,
         setError
     };
 }

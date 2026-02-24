@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2 } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid } from 'lucide-react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import type { DormConfig, WaterConfig } from '../../types';
@@ -9,8 +9,55 @@ interface SettingsProps {
     onSaveConfig: (config: DormConfig) => void;
 }
 
+const BUILDING_TYPES = [
+    {
+        key: 'dormitory',
+        icon: Home,
+        iconBg: '#E0E7FF',
+        iconColor: '#4F46E5',
+        title: 'หอพัก',
+        subtitle: '(Dormitory)',
+        desc: 'คิดค่าน้ำ/ไฟอัตราเดียวกันทุกห้อง',
+    },
+    {
+        key: 'commercial',
+        icon: Building2,
+        iconBg: '#FEF3C7',
+        iconColor: '#D97706',
+        title: 'อาคารพาณิชย์',
+        subtitle: '(Commercial)',
+        desc: 'ตั้งค่าน้ำ/ไฟแยกรายห้องได้',
+    },
+    {
+        key: 'resort',
+        icon: Trees,
+        iconBg: '#D1FAE5',
+        iconColor: '#059669',
+        title: 'รีสอร์ท',
+        subtitle: '(Resort)',
+        desc: 'เหมาะสำหรับรีสอร์ทและที่พักธรรมชาติ',
+    },
+    {
+        key: 'hotel',
+        icon: Hotel,
+        iconBg: '#DBEAFE',
+        iconColor: '#2563EB',
+        title: 'โรงแรม',
+        subtitle: '(Hotel)',
+        desc: 'สำหรับโรงแรมและที่พักแบบมืออาชีพ',
+    },
+    {
+        key: 'other',
+        icon: LayoutGrid,
+        iconBg: '#F3F4F6',
+        iconColor: '#6B7280',
+        title: 'อื่นๆ',
+        subtitle: '(Others)',
+        desc: 'อาคารประเภทอื่นที่ต้องการจัดการมิเตอร์',
+    },
+];
+
 export default function Settings({ config, onSaveConfig }: SettingsProps) {
-    // Dormitory water config (main water_config)
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,
@@ -60,7 +107,6 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
     };
 
     const handleSave = () => {
-        // Build dormitory water config
         const dormWaterConfig: WaterConfig = formData.dorm_water_type === 'normal'
             ? { type: 'normal', unit_rate: Number(formData.dorm_water_unit_rate) }
             : {
@@ -70,7 +116,6 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
                 excess_unit_rate: Number(formData.dorm_water_excess_rate)
             };
 
-        // Build commercial water config
         const commWaterConfig: WaterConfig = formData.comm_water_type === 'normal'
             ? { type: 'normal', unit_rate: Number(formData.comm_water_unit_rate) }
             : {
@@ -130,11 +175,7 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
         }
     };
 
-    // Reusable water config form
-    const renderWaterForm = (
-        prefix: 'dorm' | 'comm',
-        waterType: string
-    ) => {
+    const renderWaterForm = (prefix: 'dorm' | 'comm', waterType: string) => {
         const typeField = `${prefix}_water_type`;
         const unitRateField = `${prefix}_water_unit_rate`;
         const flatPriceField = `${prefix}_water_flat_price`;
@@ -223,54 +264,57 @@ export default function Settings({ config, onSaveConfig }: SettingsProps) {
                 <p className="page-subtitle">กำหนดอัตราค่าบริการและค่าเช่า</p>
             </div>
 
-            {/* Supported Building Types (Static) */}
+            {/* Supported Building Types (Static Display) */}
             <div className="settings-section">
                 <h3 className="settings-title">
                     <Building2 size={20} color="#6366F1" />
                     ประเภทอาคารที่รองรับ
                 </h3>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                    <div style={{
-                        flex: 1,
-                        padding: '1.25rem',
-                        border: '1px solid var(--color-gray-200)',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '1rem',
-                        backgroundColor: '#F3F4F6'
-                    }}>
-                        <div style={{ background: '#E0E7FF', padding: '0.75rem', borderRadius: '50%' }}>
-                            <Home size={24} color="#4F46E5" />
-                        </div>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>หอพัก (Dormitory)</h4>
-                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#6B7280' }}>
-                                คิดค่าน้ำ/ไฟอัตราเดียวกันทุกห้อง
-                            </p>
-                        </div>
-                    </div>
-
-                    <div style={{
-                        flex: 1,
-                        padding: '1.25rem',
-                        border: '1px solid var(--color-gray-200)',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '1rem',
-                        backgroundColor: '#F3F4F6'
-                    }}>
-                        <div style={{ background: '#FEF3C7', padding: '0.75rem', borderRadius: '50%' }}>
-                            <Building2 size={24} color="#D97706" />
-                        </div>
-                        <div>
-                            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>อาคารพาณิชย์ (Commercial)</h4>
-                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#6B7280' }}>
-                                ตั้งค่าน้ำ/ไฟแยกรายห้องได้
-                            </p>
-                        </div>
-                    </div>
+                <p className="form-hint" style={{ marginBottom: '1rem' }}>
+                    ระบบ HorCare รองรับอาคารหลายประเภท — ตั้งค่าประเภทห้องได้ในหน้าจัดการห้อง
+                </p>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                    gap: '0.75rem',
+                }}>
+                    {BUILDING_TYPES.map(bt => {
+                        const Icon = bt.icon;
+                        return (
+                            <div
+                                key={bt.key}
+                                style={{
+                                    padding: '1rem',
+                                    border: '1px solid var(--color-gray-200)',
+                                    borderRadius: '12px',
+                                    backgroundColor: '#F9FAFB',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    textAlign: 'center',
+                                }}
+                            >
+                                <div style={{
+                                    background: bt.iconBg,
+                                    padding: '0.65rem',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}>
+                                    <Icon size={22} color={bt.iconColor} />
+                                </div>
+                                <div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3 }}>{bt.title}</div>
+                                    <div style={{ fontSize: '0.75rem', color: '#6B7280', lineHeight: 1.3 }}>{bt.subtitle}</div>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.75rem', color: '#9CA3AF', lineHeight: 1.4 }}>
+                                    {bt.desc}
+                                </p>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 

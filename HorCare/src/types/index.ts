@@ -6,6 +6,7 @@ export interface UserProfile {
   display_name: string;
   license: 'trial' | 'active';
   role?: 'admin' | 'user';
+  status?: 'active' | 'banned'; // 'banned' = blocked by admin
   trial_expires_at: string; // ISO date
   created_at: string;
 }

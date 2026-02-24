@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield
+  Menu, X, LogOut, Clock, Shield, Calculator
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -13,9 +13,10 @@ import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
 import AdminDashboard from './components/Admin/AdminDashboard';
+import MeterCalculator from './components/MeterCalculator/MeterCalculator';
 import './index.css';
 
-type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings' | 'admin';
+type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings' | 'admin' | 'calculator';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
@@ -25,7 +26,7 @@ function App() {
   // Auth
   const {
     user, profile, loading: authLoading, error: authError,
-    login, register, logout, isTrialExpired, trialDaysLeft, setError
+    login, register, logout, isTrialExpired, trialDaysLeft, isBanned, setError
   } = useAuth();
 
   // Firestore (only loads when user is logged in)
@@ -54,6 +55,7 @@ function App() {
     { id: 'rooms' as ViewMode, icon: Home, label: 'จัดการห้อง' },
     { id: 'recording' as ViewMode, icon: FileText, label: 'จดมิเตอร์' },
     { id: 'summary' as ViewMode, icon: Send, label: 'สรุปยอด' },
+    { id: 'calculator' as ViewMode, icon: Calculator, label: 'คำนวณมิเตอร์' },
     { id: 'settings' as ViewMode, icon: SettingsIcon, label: 'ตั้งค่า' },
   ];
 
@@ -89,6 +91,32 @@ function App() {
       }}>
         <div className="loading-spinner" style={{ width: 40, height: 40 }}></div>
         <p>กำลังโหลด...</p>
+      </div>
+    );
+  }
+
+  // Banned → block usage and force sign out
+  if (user && isBanned) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', flexDirection: 'column', gap: '1rem',
+        padding: '2rem', textAlign: 'center',
+        background: 'linear-gradient(135deg, #1a0a0a 0%, #2d0000 100%)'
+      }}>
+        <div style={{ fontSize: '3.5rem' }}>🚫</div>
+        <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.25rem' }}>บัญชีถูกระงับ</h2>
+        <p style={{ color: '#9CA3AF', maxWidth: '380px', lineHeight: 1.7 }}>
+          บัญชีของคุณถูกระงับโดยผู้ดูแลระบบ
+          หากคิดว่าเป็นการผิดพลาด กรุณาติดต่อทีมสนับสนุน
+        </p>
+        <button
+          className="btn"
+          onClick={logout}
+          style={{ marginTop: '1rem', background: '#DC2626', color: '#fff', padding: '0.75rem 2rem', borderRadius: '12px' }}
+        >
+          ออกจากระบบ
+        </button>
       </div>
     );
   }
@@ -286,6 +314,10 @@ function App() {
             stats={stats}
             onCloseMonth={closeMonth}
           />
+        )}
+
+        {currentView === 'calculator' && (
+          <MeterCalculator />
         )}
 
         {currentView === 'settings' && (
