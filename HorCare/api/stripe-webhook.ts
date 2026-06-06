@@ -19,7 +19,7 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 function getStripe(): Stripe {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error('STRIPE_SECRET_KEY not set');
-    return new Stripe(key, { apiVersion: '2024-06-20' });
+    return new Stripe(key);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -94,21 +94,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
 
     const licenseType = `${cycle}_${plan}`;
-    const subId = typeof session.subscription === 'string'
-        ? session.subscription
-        : session.subscription?.id ?? '';
 
-    const stripe = getStripe();
-    const sub = await stripe.subscriptions.retrieve(subId);
-    const periodEnd = new Date(sub.current_period_end * 1000).toISOString();
+    // จ่ายแบบ one-time (PromptPay/บัตร) — คำนวณวันหมดอายุจากรอบบิลเอง
+    const periodEnd = new Date();
+    if (cycle === 'yearly') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
+    const paymentIntentId = typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id ?? '';
 
     await db.collection('users').doc(uid).update({
         license: licenseType,
         plan_name: plan,
         billing_cycle: cycle,
-        subscription_id: subId,
         subscription_status: 'active',
-        current_period_end: periodEnd,
+        current_period_end: periodEnd.toISOString(),
+        last_payment_intent: paymentIntentId,
     });
 }
 

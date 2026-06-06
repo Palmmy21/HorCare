@@ -2,7 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import {
     Check, Zap, Sparkles, Shield, Clock, CreditCard, X,
     ChevronLeft, Infinity as InfinityIcon,
-    Home, Building, Building2, Package, PartyPopper,
+    Home, Building, Building2, Package, PartyPopper, QrCode,
 } from 'lucide-react';
 import type { UserProfile, PlanName, BillingCycle } from '../../types';
 
@@ -486,31 +486,18 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
                 </div>
 
                 <div style={{
-                    background: 'rgba(245,158,11,0.09)', border: '1px solid rgba(245,158,11,0.22)',
-                    borderRadius: '14px', padding: '1rem', marginBottom: '1.25rem',
+                    background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.22)',
+                    borderRadius: '14px', padding: '1rem', marginBottom: '1.5rem',
                     display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                 }}>
-                    <Zap size={16} color="#FBBF24" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                    <QrCode size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
                     <div>
-                        <div style={{ fontWeight: 700, color: '#FCD34D', fontSize: '0.8rem', marginBottom: '0.2rem' }}>Demo Mode</div>
-                        <div style={{ fontSize: '0.775rem', color: 'rgba(253,211,77,0.65)', lineHeight: 1.55 }}>
-                            ระบบชำระเงินอยู่ในโหมดทดสอบ<br />
-                            กด "ยืนยัน" เพื่อ simulate payment สำเร็จ
+                        <div style={{ fontWeight: 700, color: '#C4B5FD', fontSize: '0.8rem', marginBottom: '0.2rem' }}>ชำระด้วย QR PromptPay</div>
+                        <div style={{ fontSize: '0.775rem', color: 'rgba(196,181,253,0.7)', lineHeight: 1.55 }}>
+                            กด "ยืนยัน" เพื่อไปหน้าชำระเงินที่ปลอดภัยของ Stripe<br />
+                            แล้วสแกน QR ด้วยแอปธนาคารได้เลย
                         </div>
                     </div>
-                </div>
-
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: '0.625rem',
-                    padding: '0.75rem 1rem', marginBottom: '1.5rem',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-                    borderRadius: '12px',
-                }}>
-                    <CreditCard size={15} color="rgba(255,255,255,0.28)" />
-                    <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>
-                        •••• •••• •••• 4242
-                    </span>
-                    <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', padding: '0.15rem 0.4rem' }}>Test</span>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -552,7 +539,7 @@ function SuccessScreen({ plan, cycle, onBack }: { plan: Plan; cycle: BillingCycl
                 ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'}) เรียบร้อยแล้ว
             </p>
             <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '0.8rem', marginBottom: '2rem' }}>
-                Demo Mode: ระบบ Stripe จริงจะพร้อมเร็วๆ นี้
+                ขอบคุณที่อุดหนุน HorCare 💜
             </p>
             <button onClick={onBack} style={{
                 background: 'linear-gradient(135deg,#10B981,#059669)',

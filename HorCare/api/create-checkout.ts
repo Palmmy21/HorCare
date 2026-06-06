@@ -5,7 +5,7 @@ import { db, admin } from './_firebase';
 function getStripe(): Stripe {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error('STRIPE_SECRET_KEY not set');
-    return new Stripe(key, { apiVersion: '2024-06-20' });
+    return new Stripe(key);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -42,19 +42,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const licenseKey = `${cycle}_${plan}`;
-        
-        const PRICE_IDS: Record<string, string> = {
-            monthly_small:  process.env.STRIPE_PRICE_MONTHLY_SMALL  ?? '',
-            monthly_medium: process.env.STRIPE_PRICE_MONTHLY_MEDIUM ?? '',
-            monthly_large:  process.env.STRIPE_PRICE_MONTHLY_LARGE  ?? '',
-            yearly_small:   process.env.STRIPE_PRICE_YEARLY_SMALL   ?? '',
-            yearly_medium:  process.env.STRIPE_PRICE_YEARLY_MEDIUM  ?? '',
-            yearly_large:   process.env.STRIPE_PRICE_YEARLY_LARGE   ?? '',
+
+        // PromptPay (QR) รองรับเฉพาะจ่ายครั้งเดียว จึงคิดราคาเป็นยอดต่อรอบแบบ one-time
+        // (ไม่ใช้ recurring Price ID เพราะ payment mode ใช้ราคาแบบ subscription ไม่ได้)
+        const PLAN_NAMES_TH: Record<string, string> = {
+            small: 'หอเล็ก', medium: 'หอกลาง', large: 'หอใหญ่',
+        };
+        const AMOUNTS: Record<string, number> = {
+            monthly_small:  79,  yearly_small:  790,
+            monthly_medium: 259, yearly_medium: 1590,
+            monthly_large:  399, yearly_large:  2590,
         };
 
-        const priceId = PRICE_IDS[licenseKey];
-        if (!priceId) {
-            res.status(400).json({ error: `ไม่พบ Price ID สำหรับ ${licenseKey}` });
+        const amount = AMOUNTS[licenseKey];
+        if (!amount) {
+            res.status(400).json({ error: `ไม่พบราคาสำหรับ ${licenseKey}` });
             return;
         }
 
@@ -78,17 +80,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
+        const cycleLabel = cycle === 'monthly' ? 'รายเดือน' : 'รายปี';
         const session = await stripe.checkout.sessions.create({
             customer: customerId,
-            mode: 'subscription',
-            line_items: [{ price: priceId, quantity: 1 }],
+            mode: 'payment',
+            payment_method_types: ['promptpay', 'card'],
+            line_items: [{
+                price_data: {
+                    currency: 'thb',
+                    product_data: {
+                        name: `HorCare ${PLAN_NAMES_TH[plan]} (${cycleLabel})`,
+                    },
+                    unit_amount: amount * 100, // satang
+                },
+                quantity: 1,
+            }],
             success_url: `${appUrl}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${appUrl}?payment=cancel`,
             metadata: { uid, plan, cycle },
-            subscription_data: {
-                metadata: { uid, plan, cycle },
-            },
-            currency: 'thb',
             locale: 'th',
             allow_promotion_codes: true,
         });
