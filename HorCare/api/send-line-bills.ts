@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, admin } from './_firebase';
-import { buildBillFlex, linePush } from './_line';
+import { db, admin } from './_firebase.js';
+import { buildBillFlex, linePush } from './_line.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');

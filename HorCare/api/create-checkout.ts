@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { db, admin } from './_firebase';
+import { db, admin } from './_firebase.js';
 
 function getStripe(): Stripe {
     const key = process.env.STRIPE_SECRET_KEY;

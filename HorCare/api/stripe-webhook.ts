@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { db, admin } from './_firebase';
+import { db } from './_firebase.js';
 
 export const config = {
     api: {
@@ -58,21 +58,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 await handleCheckoutCompleted(session);
                 break;
             }
-            case 'customer.subscription.updated': {
-                const sub = event.data.object as Stripe.Subscription;
-                await handleSubscriptionUpdated(sub);
-                break;
-            }
-            case 'customer.subscription.deleted': {
-                const sub = event.data.object as Stripe.Subscription;
-                await handleSubscriptionDeleted(sub);
-                break;
-            }
-            case 'invoice.payment_failed': {
-                const invoice = event.data.object as Stripe.Invoice;
-                await handlePaymentFailed(invoice);
-                break;
-            }
             default:
                 console.log(`Unhandled event type: ${event.type}`);
         }
@@ -117,49 +102,3 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     });
 }
 
-async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
-    const uid = sub.metadata?.uid;
-    if (!uid) return;
-
-    const periodEnd = new Date(sub.current_period_end * 1000).toISOString();
-    await db.collection('users').doc(uid).update({
-        subscription_status: sub.status,
-        current_period_end: periodEnd,
-    });
-}
-
-async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
-    const uid = sub.metadata?.uid;
-    if (!uid) return;
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    await db.collection('users').doc(uid).update({
-        license: 'trial',
-        plan_name: admin.firestore.FieldValue.delete(),
-        billing_cycle: admin.firestore.FieldValue.delete(),
-        subscription_id: admin.firestore.FieldValue.delete(),
-        subscription_status: 'canceled',
-        trial_expires_at: yesterday.toISOString(),
-    });
-}
-
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
-    const customerId = typeof invoice.customer === 'string'
-        ? invoice.customer
-        : invoice.customer?.id;
-    if (!customerId) return;
-
-    const snap = await db.collection('users')
-        .where('stripe_customer_id', '==', customerId)
-        .limit(1)
-        .get();
-
-    if (snap.empty) return;
-    const uid = snap.docs[0].id;
-
-    await db.collection('users').doc(uid).update({
-        subscription_status: 'past_due',
-    });
-}

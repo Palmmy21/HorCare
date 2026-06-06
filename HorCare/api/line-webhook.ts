@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, admin } from './_firebase';
-import { verifyLineSignature, lineReply, buildBillFlex } from './_line';
+import { db, admin } from './_firebase.js';
+import { verifyLineSignature, lineReply, buildBillFlex } from './_line.js';
 
 export const config = {
     api: {
