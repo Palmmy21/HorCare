@@ -46,7 +46,7 @@ const CSS = `
 /* -- Pricing page wrapper -- */
 .pricing-page {
   min-height: 100vh;
-  margin: -2rem;
+  margin: 0;
   padding: 2.5rem 2rem 4rem;
   background: linear-gradient(160deg, #0d0820 0%, #0a0a18 50%, #060414 100%);
   position: relative;
@@ -270,13 +270,13 @@ const CSS = `
   will-change: transform;
 }
 
-/* -- Responsive: match main-content padding so the full-bleed bg
-      doesn't overflow the viewport horizontally on mobile -- */
+/* -- Responsive: tighter internal padding on smaller screens
+      (full-bleed handled by .main-content:has(.pricing-page) in index.css) -- */
 @media (max-width: 768px) {
-  .pricing-page { margin: -1rem; padding: 1.75rem 1rem 3rem; }
+  .pricing-page { padding: 1.75rem 1rem 3rem; }
 }
 @media (max-width: 359px) {
-  .pricing-page { margin: -0.75rem; padding: 1.5rem 0.75rem 2.5rem; }
+  .pricing-page { padding: 1.5rem 0.75rem 2.5rem; }
 }
 `;
 

@@ -235,10 +235,13 @@ body {
 .main-content {
   flex: 1;
   margin-left: 240px;
-  padding: var(--space-8);
+  /* Center the content column (max 1200px) in the space right of the
+     sidebar, keeping a min 2rem side gutter — fixes left-stuck content
+     with empty space on wide / ultrawide screens. (1440 = 1200 content
+     + 240 sidebar, so the column is truly centered beside the sidebar.) */
+  padding: var(--space-8) max(var(--space-8), calc((100% - 1440px) / 2));
   background-color: var(--color-gray-50);
   min-height: 100vh;
-  max-width: 1200px;
 }
 
 /* Mobile header - hidden by default, shown on mobile */
@@ -2790,6 +2793,17 @@ body {
 
 .app-container:has(.trial-banner) .mobile-header {
   top: 36px;
+}
+
+/* Pricing page is a full-bleed dark hero: fill the whole content area so
+   no light gutters show on wide screens (overrides the centered padding).
+   Higher-specificity variant keeps the top offset to clear the trial banner. */
+.main-content:has(.pricing-page) {
+  padding: 0;
+}
+
+.app-container:has(.trial-banner) .main-content:has(.pricing-page) {
+  padding: 36px 0 0;
 }
 
 @media (max-width: 768px) {
