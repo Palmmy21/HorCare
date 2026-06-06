@@ -269,6 +269,15 @@ const CSS = `
   animation: p-check 0.55s cubic-bezier(0.16,1,0.3,1) both;
   will-change: transform;
 }
+
+/* -- Responsive: match main-content padding so the full-bleed bg
+      doesn't overflow the viewport horizontally on mobile -- */
+@media (max-width: 768px) {
+  .pricing-page { margin: -1rem; padding: 1.75rem 1rem 3rem; }
+}
+@media (max-width: 359px) {
+  .pricing-page { margin: -0.75rem; padding: 1.5rem 0.75rem 2.5rem; }
+}
 `;
 
 /* ----------- Inject CSS once ----------- */
