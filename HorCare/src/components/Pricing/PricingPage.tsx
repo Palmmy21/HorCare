@@ -580,6 +580,12 @@ export default function PricingPage({ profile, onBack }: Omit<PricingPageProps, 
 
     const handleConfirmPayment = async () => {
         if (!selectedPlan) return;
+
+        // Open a blank tab synchronously (inside the click gesture) so the
+        // browser's popup blocker doesn't block it after the async fetch.
+        // We redirect this tab to Stripe once the session URL is ready.
+        const checkoutTab = window.open('', '_blank');
+
         setProcessing(true);
         try {
             const { getAuth } = await import('firebase/auth');
@@ -606,12 +612,18 @@ export default function PricingPage({ profile, onBack }: Omit<PricingPageProps, 
             }
 
             const { data } = await res.json();
-            if (data?.url) {
-                window.location.href = data.url;
+            if (!data?.url) throw new Error('No checkout URL returned');
+
+            if (checkoutTab) {
+                // Send the pre-opened tab to Stripe Checkout
+                checkoutTab.location.href = data.url;
             } else {
-                throw new Error('No checkout URL returned');
+                // Popup blocked — fall back to redirecting the current tab
+                window.location.href = data.url;
             }
+            setSelectedPlan(null);
         } catch (err: any) {
+            if (checkoutTab) checkoutTab.close();
             console.error('Checkout error:', err);
             alert(`เกิดข้อผิดพลาด: ${err.message}`);
             setSelectedPlan(null);
