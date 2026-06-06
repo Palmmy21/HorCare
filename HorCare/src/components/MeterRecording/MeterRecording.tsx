@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, Home, Banknote, FileText
 } from 'lucide-react';
 import type { Room, DormConfig, MonthlyBill } from '../../types';
 import {
@@ -30,6 +30,7 @@ interface RoomRecordingState {
     currElec: string;
     currWater: string;
     isSaved: boolean;
+    isLocked: boolean;
 }
 
 export default function MeterRecording({
@@ -43,7 +44,6 @@ export default function MeterRecording({
 }: MeterRecordingProps) {
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
 
-    // Initialize state from existing bills or previous data
     useEffect(() => {
         const initialState: Record<string, RoomRecordingState> = {};
 
@@ -51,7 +51,6 @@ export default function MeterRecording({
             const existingBill = getBillForRoom(room.id, currentMonth);
             const prevBill = getPreviousBill(room.id, currentMonth);
 
-            // Get default previous readings
             const defaultPrevElec = prevBill?.curr_elec ?? room.current_meter_elec ?? 0;
             const defaultPrevWater = prevBill?.curr_water ?? room.current_meter_water ?? 0;
 
@@ -61,7 +60,8 @@ export default function MeterRecording({
                     prevWater: existingBill.prev_water === 0 ? '' : existingBill.prev_water.toString(),
                     currElec: existingBill.curr_elec === 0 ? '' : existingBill.curr_elec.toString(),
                     currWater: existingBill.curr_water === 0 ? '' : existingBill.curr_water.toString(),
-                    isSaved: existingBill.is_saved
+                    isSaved: existingBill.is_saved,
+                    isLocked: existingBill.is_locked
                 };
             } else {
                 initialState[room.id] = {
@@ -69,13 +69,15 @@ export default function MeterRecording({
                     prevWater: defaultPrevWater === 0 ? '' : defaultPrevWater.toString(),
                     currElec: '',
                     currWater: '',
-                    isSaved: false
+                    isSaved: false,
+                    isLocked: false
                 };
             }
         });
 
         setRecordingState(initialState);
-    }, [rooms, currentMonth, getBillForRoom, getPreviousBill]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rooms, currentMonth]);
 
     const handleInputChange = (roomId: string, field: 'prevElec' | 'prevWater' | 'currElec' | 'currWater', value: string) => {
         // Only allow numbers
@@ -195,7 +197,7 @@ export default function MeterRecording({
         return (
             <div key={room.id} className={`room-card ${state.isSaved ? 'saved' : ''}`}>
                 <div className="room-card-header">
-                    <span className="room-number">🏠 ห้อง {room.room_number}</span>
+                    <span className="room-number" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={18} /> ห้อง {room.room_number}</span>
                     <span className={`room-status ${state.isSaved ? 'saved' : 'pending'}`}>
                         {state.isSaved ? (
                             <>
@@ -227,6 +229,7 @@ export default function MeterRecording({
                                 placeholder="0"
                                 value={state.prevElec}
                                 onChange={e => handleInputChange(room.id, 'prevElec', e.target.value)}
+                                disabled={state.isLocked}
                             />
                         </div>
                         <ArrowRight size={16} className="meter-arrow" />
@@ -239,6 +242,7 @@ export default function MeterRecording({
                                 placeholder="0"
                                 value={state.currElec}
                                 onChange={e => handleInputChange(room.id, 'currElec', e.target.value)}
+                                disabled={state.isLocked}
                             />
                         </div>
                         <span className="meter-units">
@@ -273,6 +277,7 @@ export default function MeterRecording({
                                 placeholder="0"
                                 value={state.prevWater}
                                 onChange={e => handleInputChange(room.id, 'prevWater', e.target.value)}
+                                disabled={state.isLocked}
                             />
                         </div>
                         <ArrowRight size={16} className="meter-arrow" />
@@ -285,6 +290,7 @@ export default function MeterRecording({
                                 placeholder="0"
                                 value={state.currWater}
                                 onChange={e => handleInputChange(room.id, 'currWater', e.target.value)}
+                                disabled={state.isLocked}
                             />
                         </div>
                         <span className="meter-units">
@@ -325,7 +331,7 @@ export default function MeterRecording({
                         </div>
                         <div className="bill-row">
                             <span className="bill-label">
-                                🏠 ค่าห้อง
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#16A34A" /> ค่าห้อง</span>
                                 {room.rent_type === 'semester' && (
                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-warning)', marginLeft: '4px' }}>(รายเทอม)</span>
                                 )}
@@ -333,7 +339,7 @@ export default function MeterRecording({
                             <span className="bill-value">{formatCurrency(effectiveRentPreview)}</span>
                         </div>
                         <div className="bill-row total">
-                            <span className="bill-label">💰 รวมทั้งสิ้น</span>
+                            <span className="bill-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Banknote size={16} /> รวมทั้งสิ้น</span>
                             <span className="bill-value">{formatCurrency(calculation.total_bill)}</span>
                         </div>
                     </div>
@@ -346,13 +352,14 @@ export default function MeterRecording({
                         onClick={() => handleClear(room.id)}
                         title="ล้างข้อมูล"
                         style={{ padding: '0.5rem' }}
+                        disabled={state.isLocked}
                     >
                         <AlertTriangle size={18} />
                     </button>
                     <button
                         className={`btn ${state.isSaved ? 'btn-success' : 'btn-primary'}`}
                         onClick={() => handleSave(room.id)}
-                        disabled={!canSave}
+                        disabled={!canSave || state.isLocked}
                         style={{ flex: 1 }}
                     >
                         {state.isSaved ? (
@@ -363,7 +370,7 @@ export default function MeterRecording({
                         ) : (
                             <>
                                 <Save size={18} />
-                                💾 บันทึก
+                                บันทึก
                             </>
                         )}
                     </button>
@@ -377,7 +384,7 @@ export default function MeterRecording({
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📝 จดมิเตอร์</h1>
+                <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
                 <p className="page-subtitle">
                     กรอกเลขมิเตอร์และกดบันทึกแต่ละห้อง
                 </p>
@@ -407,7 +414,7 @@ export default function MeterRecording({
 
             {activeRooms.length === 0 ? (
                 <div className="card empty-state">
-                    <div>🏠</div>
+                    <div><Home size={48} color="#9CA3AF" style={{ margin: '0 auto 1rem' }} /></div>
                     <h3>ยังไม่มีห้องพัก</h3>
                     <p>กรุณาเพิ่มห้องพักในหน้า "จัดการห้อง" ก่อน</p>
                 </div>

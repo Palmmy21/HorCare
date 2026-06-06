@@ -186,6 +186,19 @@ export function getNextMonth(monthStr: string): string {
 }
 
 /**
+ * Generate a unique dormitory code for LINE registration (e.g. HC-K7MN2P)
+ * Excludes O, 0, I, 1 to avoid confusion
+ */
+export function generateDormCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'HC-';
+    for (let i = 0; i < 6; i++) {
+        code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+}
+
+/**
  * Validate meter reading
  */
 export function validateReading(

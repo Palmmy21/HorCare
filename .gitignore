@@ -1,0 +1,8 @@
+# Editor / tooling
+.vscode/
+.gemini/
+.idea/
+.DS_Store
+
+# Scratch
+unzip.bat

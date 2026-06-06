@@ -153,12 +153,10 @@ export function useLocalStorage() {
     // Close month and forward meter readings
     const closeMonth = useCallback((month: string) => {
         const monthBills = bills.filter(b => b.month === month);
-
         // Lock all bills for this month
         const updatedBills = bills.map(bill =>
             bill.month === month ? { ...bill, is_locked: true } : bill
         );
-
         // Update room meters with current readings
         const updatedRooms = rooms.map(room => {
             const bill = monthBills.find(b => b.room_id === room.id);
@@ -177,6 +175,15 @@ export function useLocalStorage() {
         setBillsState(updatedBills);
         setRoomsState(updatedRooms);
     }, [bills, rooms]);
+
+    // Unlock month
+    const unlockMonth = useCallback((month: string) => {
+        const updatedBills = bills.map(bill =>
+            bill.month === month ? { ...bill, is_locked: false } : bill
+        );
+        localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(updatedBills));
+        setBillsState(updatedBills);
+    }, [bills]);
 
     // Get current month stats
     const getMonthStats = useCallback((month: string = getCurrentMonth()) => {
@@ -209,6 +216,7 @@ export function useLocalStorage() {
         getBillsForMonth,
         getPreviousBill,
         closeMonth,
+        unlockMonth,
         getMonthStats
     };
 }

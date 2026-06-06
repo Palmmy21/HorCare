@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-    collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy
+    collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { DormConfig, Room, MonthlyBill, UserProfile } from '../types';
@@ -22,14 +22,16 @@ const DEFAULT_CONFIG: DormConfig = {
     room_rent: 3500
 };
 
-export function useFirestore(userId: string | null) {
+export function useFirestore(userId: string | null, buildingId: string | null) {
     const [config, setConfigState] = useState<DormConfig>(DEFAULT_CONFIG);
     const [rooms, setRoomsState] = useState<Room[]>([]);
     const [bills, setBillsState] = useState<MonthlyBill[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Base path for this user's data
-    const userPath = userId ? `users/${userId}` : null;
+    // Base path scoped to the active building
+    const userPath = userId && buildingId
+        ? `users/${userId}/buildings/${buildingId}`
+        : null;
 
     // Load data with realtime listeners
     useEffect(() => {
@@ -88,9 +90,19 @@ export function useFirestore(userId: string | null) {
 
     // Save config
     const saveConfig = useCallback(async (newConfig: DormConfig) => {
-        if (!userPath) return;
+        if (!userPath || !userId || !buildingId) return;
         await setDoc(doc(db, userPath, 'data', 'config'), newConfig);
-    }, [userPath]);
+        // Sync dorm_code lookup table so LINE webhook can find this building
+        if (newConfig.dorm_code) {
+            await setDoc(doc(db, 'dorm_codes', newConfig.dorm_code), {
+                uid: userId,
+                building_id: buildingId,
+                dorm_name: newConfig.bill_customization?.dorm_name || '',
+                due_day: newConfig.bill_customization?.due_day || 5,
+                updated_at: serverTimestamp()
+            });
+        }
+    }, [userPath, userId, buildingId]);
 
     // Room operations
     const addRoom = useCallback(async (roomNumber: string) => {
@@ -121,7 +133,7 @@ export function useFirestore(userId: string | null) {
         const existingBill = bills.find(b => b.room_id === roomId && b.month === currentMonth);
 
         // 3. If bill exists and is not locked, recalculate it using new room settings + old meter readings
-        if (existingBill && !existingBill.is_locked) {
+        if (existingBill) {
             const currentRoom = rooms.find(r => r.id === roomId);
             if (!currentRoom) return;
 
@@ -167,6 +179,11 @@ export function useFirestore(userId: string | null) {
         await deleteDoc(doc(db, userPath, 'rooms', roomId));
     }, [userPath]);
 
+    const deleteBill = useCallback(async (billId: string) => {
+        if (!userPath) return;
+        await deleteDoc(doc(db, userPath, 'bills', billId));
+    }, [userPath]);
+
     // Bill operations
     const saveBill = useCallback(async (bill: MonthlyBill) => {
         if (!userPath) return bill;
@@ -182,7 +199,7 @@ export function useFirestore(userId: string | null) {
         const nextMonth = getNextMonth(bill.month);
         const nextMonthBill = bills.find(b => b.room_id === bill.room_id && b.month === nextMonth);
 
-        if (nextMonthBill && !nextMonthBill.is_locked) {
+        if (nextMonthBill) {
             // Recalculate next month's bill with new previous readings
             const room = rooms.find(r => r.id === bill.room_id);
             if (room) {
@@ -244,14 +261,14 @@ export function useFirestore(userId: string | null) {
 
         // Lock all bills for this month
         const lockPromises = monthBills.map(bill =>
-            updateDoc(doc(db, userPath!, 'bills', bill.id), { is_locked: true })
+            updateDoc(doc(db, userPath, 'bills', bill.id), { is_locked: true })
         );
 
         // Update room meters
         const meterPromises = rooms.map(room => {
             const bill = monthBills.find(b => b.room_id === room.id);
             if (bill) {
-                return updateDoc(doc(db, userPath!, 'rooms', room.id), {
+                return updateDoc(doc(db, userPath, 'rooms', room.id), {
                     current_meter_elec: bill.curr_elec,
                     current_meter_water: bill.curr_water
                 });
@@ -262,13 +279,34 @@ export function useFirestore(userId: string | null) {
         await Promise.all([...lockPromises, ...meterPromises]);
     }, [userPath, bills, rooms]);
 
+    // Unlock month
+    const unlockMonth = useCallback(async (month: string) => {
+        if (!userPath) return;
+        const monthBills = bills.filter(b => b.month === month);
+
+        // Unlock all bills for this month
+        const unlockPromises = monthBills.map(bill =>
+            updateDoc(doc(db, userPath, 'bills', bill.id), { is_locked: false })
+        );
+
+        await Promise.all(unlockPromises);
+    }, [userPath, bills]);
+
     // Stats
     const getMonthStats = useCallback((month: string = getCurrentMonth()) => {
         const monthBills = bills.filter(b => b.month === month);
-        const savedCount = monthBills.filter(b => b.is_saved).length;
-        const totalRooms = rooms.filter(r => r.is_active).length;
+        const activeRooms = rooms.filter(r => r.is_active !== false);
+        const totalRooms = activeRooms.length;
         const totalRevenue = monthBills.reduce((sum, b) => sum + b.total_bill, 0);
-        const isAllSaved = savedCount === totalRooms && totalRooms > 0;
+        
+        // Count how many ACTIVE rooms have saved bills
+        const savedCount = activeRooms.filter(room => 
+            monthBills.some(b => b.room_id === room.id && b.is_saved)
+        ).length;
+
+        const isAllSaved = activeRooms.length > 0 && activeRooms.every(room => 
+            monthBills.some(b => b.room_id === room.id && b.is_saved)
+        );
 
         return {
             savedCount,
@@ -303,10 +341,12 @@ export function useFirestore(userId: string | null) {
         updateRoom,
         deleteRoom,
         saveBill,
+        deleteBill,
         getBillForRoom,
         getBillsForMonth,
         getPreviousBill,
         closeMonth,
+        unlockMonth,
         getMonthStats,
         getAllUsers,
         updateUserLicense

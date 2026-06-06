@@ -1,14 +1,33 @@
 // HorCare - Type Definitions
 
+export type PlanName = 'small' | 'medium' | 'large';
+export type BillingCycle = 'monthly' | 'yearly';
+export type LicenseType =
+  | 'trial'
+  | 'active'
+  | 'monthly_small'
+  | 'monthly_medium'
+  | 'monthly_large'
+  | 'yearly_small'
+  | 'yearly_medium'
+  | 'yearly_large';
+
 export interface UserProfile {
   uid: string;
   email: string;
   display_name: string;
-  license: 'trial' | 'active';
+  license: LicenseType;
   role?: 'admin' | 'user';
   status?: 'active' | 'banned'; // 'banned' = blocked by admin
   trial_expires_at: string; // ISO date
   created_at: string;
+  // Subscription info (Stripe)
+  subscription_id?: string;
+  subscription_status?: 'active' | 'past_due' | 'canceled' | 'incomplete';
+  current_period_end?: string; // ISO date
+  plan_name?: PlanName;
+  billing_cycle?: BillingCycle;
+  stripe_customer_id?: string;
 }
 
 export interface Dorm {
@@ -16,6 +35,13 @@ export interface Dorm {
   owner_uid: string;
   name: string;
   created_at: string;
+}
+
+export interface Building {
+  id: string;
+  name: string;
+  created_at: string;
+  order: number;
 }
 export interface WaterConfig {
   type: 'normal' | 'flat_rate_tier';
@@ -27,12 +53,24 @@ export interface WaterConfig {
   excess_unit_rate?: number;
 }
 
+export interface BillCustomization {
+  dorm_name: string;          // ชื่อหอพัก
+  dorm_address: string;       // ที่อยู่
+  dorm_phone: string;         // เบอร์โทร
+  promptpay_number: string;   // เลข PromptPay
+  promptpay_name: string;     // ชื่อบัญชี PromptPay
+  footer_text: string;        // ข้อความด้านล่างบิล
+  due_day: number;            // กำหนดชำระวันที่
+}
+
 export interface DormConfig {
   building_type: 'dormitory' | 'commercial';
   electricity_rate: number;
   water_config: WaterConfig; // Default for dormitory rooms
   commercial_water_config?: WaterConfig; // Default for commercial rooms
   room_rent: number;
+  bill_customization?: BillCustomization; // ตั้งค่าใบแจ้งหนี้
+  dorm_code?: string; // รหัสสำหรับลงทะเบียนรับบิลผ่าน LINE
 }
 
 export interface Room {

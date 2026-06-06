@@ -1,11 +1,15 @@
 import { useState, useRef, useCallback } from 'react';
 import {
-    Rocket, CheckCircle, XCircle, AlertTriangle,
-    FileText, Send, Lock, Download, Eye, Printer
+    CheckCircle, XCircle, AlertTriangle,
+    FileText, Send, Lock, Download, Eye, Printer, BarChart3,
+    Home, Zap, Droplets, Banknote, ClipboardList, Calendar, MapPin,
+    MessageCircle
 } from 'lucide-react';
+import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
 import InvoiceBill from './InvoiceBill';
+import MonthlyReport from './MonthlyReport';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -22,6 +26,11 @@ interface SummaryProps {
         progress: number;
     };
     onCloseMonth: (month: string) => void;
+    onUnlockMonth: (month: string) => void;
+    uid?: string;
+    buildingId?: string;
+    isTrial?: boolean;
+    onUpgrade?: () => void;
 }
 
 export default function Summary({
@@ -30,11 +39,18 @@ export default function Summary({
     config,
     currentMonth,
     stats,
-    onCloseMonth
+    onCloseMonth,
+    onUnlockMonth,
+    uid,
+    buildingId,
+    isTrial = false,
+    onUpgrade,
 }: SummaryProps) {
     const [showConfirm, setShowConfirm] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [sendComplete, setSendComplete] = useState(false);
+    const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+    const [lineResult, setLineResult] = useState<{ sent: number; skipped: number } | null>(null);
     const [billDate, setBillDate] = useState(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -42,64 +58,114 @@ export default function Summary({
     const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
     const [showAllInvoices, setShowAllInvoices] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [showMonthlyReport, setShowMonthlyReport] = useState(false);
+    const [isExportingReport, setIsExportingReport] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
     const invoiceRef = useRef<HTMLDivElement>(null);
+    const monthlyReportRef = useRef<HTMLDivElement>(null);
+    const hiddenReportRef = useRef<HTMLDivElement>(null);
+
+    const billCustomization = config.bill_customization;
 
     const monthBills = bills.filter(b => b.month === currentMonth);
     const isLocked = monthBills.some(b => b.is_locked);
 
+    const handleSendLineBills = async () => {
+        if (!uid || !buildingId) return;
+        setLineStatus('sending');
+        setLineResult(null);
+        try {
+            const { getAuth } = await import('firebase/auth');
+            const auth = getAuth(app);
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) throw new Error('Not authenticated');
+
+            const res = await fetch('/api/send-line-bills', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    building_id: buildingId,
+                    month: currentMonth
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to send bills');
+            const { data } = await res.json();
+            setLineResult(data);
+            setLineStatus('done');
+        } catch (error) {
+            console.error('Send LINE bills error:', error);
+            setLineStatus('error');
+        }
+    };
+
     const handleCloseMonth = async () => {
         setIsSending(true);
-
-        // Simulate sending process
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        onCloseMonth(currentMonth);
+        await onCloseMonth(currentMonth);
         setIsSending(false);
-        setSendComplete(true);
         setShowConfirm(false);
     };
 
-    const [isExporting, setIsExporting] = useState(false);
-    const reportRef = useRef<HTMLDivElement>(null);
+    const handleSendBills = async () => {
+        setIsSending(true);
+        
+        // Use handlePrintAll to "send" (print/save as PDF) the individual bills to tenants
+        handlePrintAll();
 
-    const generatePDF = async () => {
-        if (!reportRef.current) return;
+        setIsSending(false);
+        setSendComplete(true);
+    };
 
-        setIsExporting(true);
-        try {
-            const canvas = await html2canvas(reportRef.current, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff'
-            });
 
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgWidth = pdfWidth;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            let heightLeft = imgHeight;
-            let position = 0;
+    const generatePDFFromElement = async (element: HTMLElement, filename: string) => {
+        const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff'
+        });
 
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+
+        while (heightLeft >= 0) {
+            position = heightLeft - imgHeight;
+            pdf.addPage();
             pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
             heightLeft -= pdfHeight;
+        }
 
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pdfHeight;
-            }
+        pdf.save(filename);
+    };
 
-            pdf.save(`HorCare_Summary_${currentMonth}.pdf`);
+
+    const generateMonthlyReportPDF = async () => {
+        if (isTrial) { onUpgrade?.(); return; }
+        if (!monthlyReportRef.current) return;
+        setIsExportingReport(true);
+        try {
+            await generatePDFFromElement(
+                monthlyReportRef.current,
+                `HorCare_MonthlyReport_${currentMonth}.pdf`
+            );
         } catch (error) {
-            console.error('PDF Generation failed:', error);
+            console.error('Monthly Report PDF failed:', error);
             alert('เกิดข้อผิดพลาดในการสร้าง PDF');
         } finally {
-            setIsExporting(false);
+            setIsExportingReport(false);
         }
     };
 
@@ -111,6 +177,7 @@ export default function Summary({
     };
 
     const handleDownloadBill = useCallback(async (bill: MonthlyBill) => {
+        if (isTrial) { onUpgrade?.(); return; }
         setIsDownloading(true);
         // Briefly show the bill in the modal so we can capture it
         setSelectedBill(bill);
@@ -138,12 +205,12 @@ export default function Summary({
         } finally {
             setIsDownloading(false);
         }
-    }, [currentMonth]);
+    }, [currentMonth, isTrial, onUpgrade]);
 
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">📊 สรุปยอดรายเดือน</h1>
+                <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BarChart3 size={28} /> สรุปยอดรายเดือน</h1>
                 <p className="page-subtitle">
                     รอบเดือน {formatMonthThai(currentMonth)}
                 </p>
@@ -152,7 +219,7 @@ export default function Summary({
             {/* Bill Date Selector */}
             <div className="card mb-6">
                 <div className="card-header">
-                    <span className="card-title">📅 วันที่ในบิล</span>
+                    <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Calendar size={16} /> วันที่ในบิล</span>
                 </div>
                 <div className="flex gap-4 items-center" style={{ flexWrap: 'wrap' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
@@ -165,11 +232,39 @@ export default function Summary({
                         />
                         <p className="form-hint">วันที่ที่จะแสดงในใบแจ้งยอด</p>
                     </div>
+                    {lineStatus === 'done' && lineResult && (
+                        <div className="line-send-result success">
+                            <CheckCircle size={15} />
+                            ส่งสำเร็จ {lineResult.sent} ห้อง
+                            {lineResult.skipped > 0 && ` · ข้าม ${lineResult.skipped} ห้อง (ยังไม่ลงทะเบียน LINE)`}
+                        </div>
+                    )}
+                    {lineStatus === 'error' && (
+                        <div className="line-send-result error">
+                            <XCircle size={15} /> เกิดข้อผิดพลาด กรุณาลองใหม่
+                        </div>
+                    )}
                     {monthBills.length > 0 && (
-                        <button className="btn btn-outline" onClick={handlePrintAll}>
-                            <Printer size={18} />
-                            🖨️ พิมพ์ใบแจ้งยอดทั้งหมด
-                        </button>
+                        <>
+                            <button className="btn btn-outline" onClick={handlePrintAll}>
+                                <Printer size={18} />
+                                พิมพ์ใบแจ้งยอดทั้งหมด
+                            </button>
+                            {uid && buildingId && config.dorm_code && (
+                                <button
+                                    className="btn btn-line"
+                                    onClick={handleSendLineBills}
+                                    disabled={lineStatus === 'sending'}
+                                >
+                                    <MessageCircle size={18} />
+                                    {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
+                                </button>
+                            )}
+                            <button className="btn btn-primary" onClick={() => setShowMonthlyReport(true)}>
+                                <BarChart3 size={18} />
+                                สรุปรายเดือน
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -206,11 +301,7 @@ export default function Summary({
             {/* Summary Table */}
             <div className="card mb-6">
                 <div className="card-header">
-                    <span className="card-title">📋 รายการบิลทั้งหมด</span>
-                    <button className="btn btn-outline btn-sm" onClick={generatePDF} disabled={isExporting}>
-                        <Download size={16} />
-                        {isExporting ? 'สร้าง PDF...' : 'Export PDF'}
-                    </button>
+                    <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardList size={18} /> รายการบิลทั้งหมด</span>
                 </div>
 
                 {monthBills.length === 0 ? (
@@ -236,40 +327,65 @@ export default function Summary({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {monthBills.map(bill => (
-                                        <tr key={bill.id}>
-                                            <td className="mono font-bold">{bill.room_number}</td>
+                                    {rooms.filter(r => r.is_active).map(room => {
+                                        const bill = monthBills.find(b => b.room_id === room.id);
+                                        const hasBill = !!bill;
+                                        return (
+                                        <tr key={room.id}>
+                                            <td className="mono font-bold">{room.room_number}</td>
                                             <td className="text-center">
-                                                <div className="mono">{bill.elec_units} หน่วย</div>
-                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                    {formatCurrency(bill.elec_bill)}
-                                                </div>
+                                                {hasBill ? (
+                                                    <>
+                                                        <div className="mono">{bill.elec_units} หน่วย</div>
+                                                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                            {formatCurrency(bill.elec_bill)}
+                                                        </div>
+                                                    </>
+                                                ) : <div className="text-muted">-</div>}
                                             </td>
                                             <td className="text-center">
-                                                <div className="mono">{bill.water_units} หน่วย</div>
-                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                    {bill.water_excess_units > 0
-                                                        ? `เกิน ${bill.water_excess_units} หน่วย`
-                                                        : 'เหมาจ่าย'
-                                                    }
-                                                </div>
-                                                <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                    {formatCurrency(bill.water_bill)}
-                                                </div>
+                                                {hasBill ? (
+                                                    <>
+                                                        <div className="mono">{bill.water_units} หน่วย</div>
+                                                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                            {bill.water_excess_units > 0
+                                                                ? `เกิน ${bill.water_excess_units} หน่วย`
+                                                                : 'เหมาจ่าย'
+                                                            }
+                                                        </div>
+                                                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                                                            {formatCurrency(bill.water_bill)}
+                                                        </div>
+                                                    </>
+                                                ) : <div className="text-muted">-</div>}
                                             </td>
-                                            <td className="text-right mono">{formatCurrency(bill.room_rent)}</td>
-                                            <td className="text-right mono font-bold">{formatCurrency(bill.total_bill)}</td>
+                                            <td className="text-right mono">
+                                                {formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}
+                                            </td>
+                                            <td className="text-right mono font-bold">
+                                                {hasBill ? formatCurrency(bill.total_bill) : <span className="text-muted">-</span>}
+                                            </td>
                                             <td className="text-center">
-                                                {bill.is_locked ? (
-                                                    <span className="badge badge-success">
-                                                        <Lock size={12} />
-                                                        ปิดยอดแล้ว
-                                                    </span>
-                                                ) : bill.is_saved ? (
-                                                    <span className="badge badge-success">
-                                                        <CheckCircle size={12} />
-                                                        พร้อมส่ง
-                                                    </span>
+                                                {hasBill ? (
+                                                    <div className="flex flex-col gap-1 items-center">
+                                                        {bill.is_locked ? (
+                                                            <span className="badge badge-success">
+                                                                <Lock size={12} />
+                                                                ปิดยอดแล้ว
+                                                            </span>
+                                                        ) : (
+                                                            <span className="badge badge-success">
+                                                                <CheckCircle size={12} />
+                                                                พร้อมส่ง
+                                                            </span>
+                                                        )}
+                                                        {bill.is_notified && (
+                                                            <span className="badge" style={{ background: '#E8F5E9', color: '#059669', borderColor: '#bbf7d0' }}>
+                                                                <MessageCircle size={12} />
+                                                                ส่ง LINE แล้ว
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <span className="badge badge-warning">
                                                         <AlertTriangle size={12} />
@@ -281,24 +397,27 @@ export default function Summary({
                                                 <div className="flex gap-2 justify-center">
                                                     <button
                                                         className="btn btn-outline btn-sm"
-                                                        onClick={() => setSelectedBill(bill)}
+                                                        onClick={() => bill && setSelectedBill(bill)}
                                                         title="ดูใบแจ้งยอด"
+                                                        disabled={!hasBill}
                                                     >
                                                         <Eye size={14} />
                                                         ดูบิล
                                                     </button>
                                                     <button
                                                         className="btn btn-outline btn-sm"
-                                                        onClick={() => handleDownloadBill(bill)}
-                                                        title="ดาวน์โหลดใบแจ้งยอด"
-                                                        disabled={isDownloading}
+                                                        onClick={() => bill && handleDownloadBill(bill)}
+                                                        title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด PDF' : 'ดาวน์โหลดใบแจ้งยอด'}
+                                                        disabled={isDownloading || !hasBill}
+                                                        style={isTrial ? { opacity: 0.55 } : undefined}
                                                     >
-                                                        <Download size={14} />
+                                                        {isTrial ? <Lock size={14} /> : <Download size={14} />}
                                                     </button>
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    );
+                                    })}
                                 </tbody>
                                 <tfoot>
                                     <tr style={{ background: 'var(--color-gray-50)' }}>
@@ -314,57 +433,76 @@ export default function Summary({
 
                         {/* Mobile Cards */}
                         <div className="summary-cards-mobile">
-                            {monthBills.map(bill => (
-                                <div key={bill.id} className="summary-bill-card">
+                            {rooms.filter(r => r.is_active).map(room => {
+                                const bill = monthBills.find(b => b.room_id === room.id);
+                                const hasBill = !!bill;
+                                return (
+                                <div key={room.id} className="summary-bill-card">
                                     <div className="summary-bill-card-header">
-                                        <span className="mono font-bold" style={{ fontSize: '1.125rem' }}>🏠 {bill.room_number}</span>
-                                        {bill.is_locked ? (
-                                            <span className="badge badge-success"><Lock size={12} /> ปิดยอด</span>
-                                        ) : bill.is_saved ? (
-                                            <span className="badge badge-success"><CheckCircle size={12} /> พร้อมส่ง</span>
-                                        ) : (
-                                            <span className="badge badge-warning"><AlertTriangle size={12} /> รอบันทึก</span>
-                                        )}
+                                        <span className="mono font-bold" style={{ fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={18} /> {room.room_number}</span>
+                                        <div className="flex flex-wrap justify-end gap-1">
+                                            {hasBill ? (
+                                                <>
+                                                    {bill.is_locked ? (
+                                                        <span className="badge badge-success"><Lock size={12} /> ปิดยอด</span>
+                                                    ) : (
+                                                        <span className="badge badge-success"><CheckCircle size={12} /> พร้อมส่ง</span>
+                                                    )}
+                                                    {bill.is_notified && (
+                                                        <span className="badge" style={{ background: '#E8F5E9', color: '#059669', borderColor: '#bbf7d0' }}>
+                                                            <MessageCircle size={12} /> ส่งแล้ว
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span className="badge badge-warning"><AlertTriangle size={12} /> รอบันทึก</span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="summary-bill-card-body">
                                         <div className="summary-bill-card-row">
-                                            <span>⚡ ไฟฟ้า</span>
-                                            <span className="mono">{bill.elec_units} หน่วย = {formatCurrency(bill.elec_bill)}</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Zap size={14} color="#D97706" /> ไฟฟ้า</span>
+                                            <span className="mono">{hasBill ? `${bill.elec_units} หน่วย = ${formatCurrency(bill.elec_bill)}` : '-'}</span>
                                         </div>
                                         <div className="summary-bill-card-row">
-                                            <span>💧 น้ำประปา</span>
-                                            <span className="mono">{bill.water_units} หน่วย = {formatCurrency(bill.water_bill)}</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Droplets size={14} color="#2563EB" /> น้ำประปา</span>
+                                            <span className="mono">{hasBill ? `${bill.water_units} หน่วย = ${formatCurrency(bill.water_bill)}` : '-'}</span>
                                         </div>
                                         <div className="summary-bill-card-row">
-                                            <span>🏠 ค่าห้อง</span>
-                                            <span className="mono">{formatCurrency(bill.room_rent)}</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#16A34A" /> ค่าห้อง</span>
+                                            <span className="mono">{formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}</span>
                                         </div>
                                     </div>
                                     <div className="summary-bill-card-footer">
                                         <div className="summary-bill-card-total">
                                             <span>รวม</span>
                                             <span className="mono font-bold" style={{ color: 'var(--color-primary)', fontSize: '1.125rem' }}>
-                                                {formatCurrency(bill.total_bill)}
+                                                {hasBill ? formatCurrency(bill.total_bill) : '-'}
                                             </span>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                className="btn btn-outline btn-sm"
-                                                onClick={() => setSelectedBill(bill)}
+                                                className="btn btn-outline btn-sm flex-1"
+                                                onClick={() => bill && setSelectedBill(bill)}
+                                                disabled={!hasBill}
                                             >
-                                                <Eye size={14} /> ดูบิล
+                                                <Eye size={14} />
+                                                ดู
                                             </button>
                                             <button
-                                                className="btn btn-outline btn-sm"
-                                                onClick={() => handleDownloadBill(bill)}
-                                                disabled={isDownloading}
+                                                className="btn btn-outline btn-sm flex-1"
+                                                onClick={() => bill && handleDownloadBill(bill)}
+                                                disabled={isDownloading || !hasBill}
+                                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด PDF' : undefined}
+                                                style={isTrial ? { opacity: 0.55 } : undefined}
                                             >
-                                                <Download size={14} />
+                                                {isTrial ? <Lock size={14} /> : <Download size={14} />}
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                            })}
                             <div className="summary-total-card">
                                 <span className="font-bold">รวมทั้งสิ้น</span>
                                 <span className="mono font-bold" style={{ fontSize: '1.25rem', color: 'var(--color-primary)' }}>
@@ -376,49 +514,108 @@ export default function Summary({
                 )}
             </div>
 
-            {/* Magic Button */}
-            {!isLocked && (
-                <div className="magic-button-container">
-                    {sendComplete ? (
-                        <div className="text-success font-bold" style={{ fontSize: '1.25rem' }}>
-                            ✅ ส่งบิลและปิดยอดเรียบร้อยแล้ว!
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* 1. Send Bills System */}
+                <div className="card text-center" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                    <div className="card-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
+                            <Send size={20} />
+                            <h3 style={{ margin: 0 }}>ระบบส่งบิล</h3>
                         </div>
-                    ) : (
-                        <>
-                            <p className="text-muted mb-4">
-                                {stats.isAllSaved
-                                    ? 'ทุกห้องพร้อมแล้ว! กดปุ่มด้านล่างเพื่อส่งบิลและปิดยอดเดือน'
-                                    : 'กรุณาจดมิเตอร์และบันทึกให้ครบทุกห้องก่อน'
-                                }
+                        
+                        <p className="text-muted mb-4" style={{ fontSize: '0.875rem' }}>
+                            พิมพ์หรือบันทึกใบแจ้งหนี้ของทุกห้อง เพื่อส่งให้ผู้เช่า
+                        </p>
+
+                        {!stats.isAllSaved && !isLocked && (
+                            <p className="text-warning mb-4" style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>
+                                *กรุณาจดมิเตอร์ให้ครบทุกห้องก่อน ({stats.savedCount}/{stats.totalRooms} ห้อง)
                             </p>
+                        )}
+                        
+                        {sendComplete ? (
+                            <div className="text-success font-bold mb-4 flex justify-center items-center gap-2">
+                                <CheckCircle size={18} /> พิมพ์บิลเรียบร้อยแล้ว!
+                            </div>
+                        ) : null}
+
+                        <button
+                            className={`btn ${stats.isAllSaved ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={handleSendBills}
+                            disabled={isSending || !stats.isAllSaved}
+                            style={{ width: '100%' }}
+                        >
+                            {isSending ? (
+                                <>
+                                    <span className="loading-spinner"></span>
+                                    กำลังดำเนินการ...
+                                </>
+                            ) : (
+                                <>
+                                    <FileText size={18} />
+                                    พิมพ์ใบแจ้งหนี้ทั้งหมด
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                {/* 2. Close Month System */}
+                <div className={`card text-center ${isLocked ? 'saved' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <h3 className="card-title mb-2 flex justify-center items-center gap-2">
+                        <Lock size={20} color={isLocked ? "var(--color-success)" : "var(--color-warning)"} />
+                        ระบบปิดยอดเดือน
+                    </h3>
+                    <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
+                        ล็อคข้อมูลบิลทั้งหมดของเดือนนี้ เพื่อป้องกันการแก้ไข
+                    </p>
+                    
+                    {!isLocked ? (
+                        <>
+                            {!stats.isAllSaved && (
+                                <p className="text-warning mb-4" style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>
+                                    *กรุณาจดมิเตอร์ให้ครบทุกห้องก่อนปิดยอด
+                                </p>
+                            )}
                             <button
-                                className="magic-button"
+                                className="btn btn-warning w-full mt-auto"
                                 disabled={!stats.isAllSaved || isSending}
                                 onClick={() => setShowConfirm(true)}
+                                style={{ color: 'white' }}
                             >
-                                {isSending ? (
-                                    <>
-                                        <span className="loading-spinner"></span>
-                                        กำลังส่ง...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Rocket size={24} />
-                                        🚀 ปิดยอดเดือน
-                                    </>
-                                )}
+                                <Lock size={18} />
+                                ปิดยอดเดือนนี้
                             </button>
                         </>
+                    ) : (
+                        <div>
+                            <div className="text-success font-bold mb-3 flex justify-center items-center gap-2">
+                                <CheckCircle size={18} /> ปิดยอดเรียบร้อยแล้ว
+                            </div>
+                            <button
+                                className="btn btn-outline btn-danger w-full"
+                                onClick={async () => {
+                                    if (confirm('คุณต้องการยกเลิกการปิดยอดใช่หรือไม่? (สถานะของบิลทั้งหมดจะกลับไปเป็น "รอบันทึก" และคุณจะสามารถแก้ไขได้)')) {
+                                        await onUnlockMonth(currentMonth);
+                                        setSendComplete(false);
+                                    }
+                                }}
+                            >
+                                <XCircle size={18} />
+                                ยกเลิกการปิดยอด
+                            </button>
+                        </div>
                     )}
                 </div>
-            )}
+            </div>
 
             {/* Invoice Modal */}
             {selectedBill && (
                 <div className="modal-overlay" onClick={() => setSelectedBill(null)}>
                     <div className="modal invoice-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="modal-title">📄 ใบเรียกเก็บ — ห้อง {selectedBill.room_number}</h3>
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={18} /> ใบเรียกเก็บ — ห้อง {selectedBill.room_number}</h3>
                             <button
                                 className="btn btn-outline btn-sm btn-icon"
                                 onClick={() => setSelectedBill(null)}
@@ -438,6 +635,7 @@ export default function Summary({
                                         billDate={billDate}
                                         effectiveElecRate={rates?.electricityRate}
                                         effectiveWaterConfig={rates?.waterConfig}
+                                        billCustomization={billCustomization}
                                     />
                                 );
                             })()}
@@ -450,9 +648,11 @@ export default function Summary({
                                 className="btn btn-outline"
                                 onClick={() => handleDownloadBill(selectedBill)}
                                 disabled={isDownloading}
+                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด PDF' : undefined}
+                                style={isTrial ? { opacity: 0.6 } : undefined}
                             >
-                                <Download size={18} />
-                                {isDownloading ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด'}
+                                {isTrial ? <Lock size={18} /> : <Download size={18} />}
+                                {isDownloading ? 'กำลังดาวน์โหลด...' : (isTrial ? 'ล็อก — อัปเกรด' : 'ดาวน์โหลด')}
                             </button>
                             <button className="btn btn-primary" onClick={() => {
                                 setShowAllInvoices(false);
@@ -471,15 +671,15 @@ export default function Summary({
                 <div className="modal-overlay" onClick={() => setShowConfirm(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h3 className="modal-title">⚠️ ยืนยันการปิดยอด</h3>
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={20} color="var(--color-warning)" /> ยืนยันการปิดยอด</h3>
                         </div>
                         <div className="modal-body">
                             <p style={{ marginBottom: 'var(--space-4)' }}>
                                 คุณกำลังจะปิดรอบเดือน <strong>{formatMonthThai(currentMonth)}</strong>
                             </p>
                             <div className="card" style={{ background: 'var(--color-gray-50)', padding: 'var(--space-4)' }}>
-                                <p>📍 จำนวนห้อง: <strong>{stats.totalRooms} ห้อง</strong></p>
-                                <p>💰 ยอดรวม: <strong>{formatCurrency(stats.totalRevenue)}</strong></p>
+                                <p style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}><MapPin size={16} /> จำนวนห้อง: <strong>{stats.totalRooms} ห้อง</strong></p>
+                                <p style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}><Banknote size={16} /> ยอดรวม: <strong>{formatCurrency(stats.totalRevenue)}</strong></p>
                             </div>
                             <p className="text-muted mt-4" style={{ fontSize: '0.875rem' }}>
                                 หลังจากปิดยอดแล้ว จะไม่สามารถแก้ไขข้อมูลเดือนนี้ได้
@@ -514,6 +714,7 @@ export default function Summary({
                                         billDate={billDate}
                                         effectiveElecRate={rates?.electricityRate}
                                         effectiveWaterConfig={rates?.waterConfig}
+                                        billCustomization={billCustomization}
                                     />
                                 );
                             })()}
@@ -521,45 +722,62 @@ export default function Summary({
                     ))}
                 </div>
             )}
-            {/* Hidden Report Table for PDF Capture */}
-            <div style={{ position: 'absolute', top: -9999, left: -9999, width: '210mm', background: 'white', padding: '40px', color: 'black', fontFamily: 'Sarabun, sans-serif' }} ref={reportRef}>
-                <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '24px' }}>รายงานสรุปยอดหอพัก</h2>
-                <p style={{ textAlign: 'center', marginBottom: '20px', fontSize: '16px' }}>ประจำเดือน: {formatMonthThai(currentMonth)}</p>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '2px solid #000' }}>
-                            <th style={{ padding: '10px', textAlign: 'left' }}>ห้อง</th>
-                            <th style={{ padding: '10px', textAlign: 'right' }}>ค่าไฟ</th>
-                            <th style={{ padding: '10px', textAlign: 'right' }}>ค่าน้ำ</th>
-                            <th style={{ padding: '10px', textAlign: 'right' }}>ค่าห้อง</th>
-                            <th style={{ padding: '10px', textAlign: 'right' }}>รวม</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {monthBills.map(bill => (
-                            <tr key={bill.id} style={{ borderBottom: '1px solid #ddd' }}>
-                                <td style={{ padding: '10px' }}>{bill.room_number}</td>
-                                <td style={{ padding: '10px', textAlign: 'right' }}>
-                                    <div style={{ fontWeight: 'bold' }}>{formatCurrency(bill.elec_bill)}</div>
-                                    <div style={{ fontSize: '12px', color: '#666' }}>{bill.elec_units} หน่วย</div>
-                                </td>
-                                <td style={{ padding: '10px', textAlign: 'right' }}>
-                                    <div style={{ fontWeight: 'bold' }}>{formatCurrency(bill.water_bill)}</div>
-                                    <div style={{ fontSize: '12px', color: '#666' }}>{bill.water_units} หน่วย</div>
-                                </td>
-                                <td style={{ padding: '10px', textAlign: 'right' }}>{formatCurrency(bill.room_rent)}</td>
-                                <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', fontSize: '16px' }}>{formatCurrency(bill.total_bill)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                    <tfoot>
-                        <tr style={{ borderTop: '2px solid #000' }}>
-                            <td colSpan={4} style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>รวมทั้งสิ้น</td>
-                            <td style={{ padding: '15px', textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>{formatCurrency(stats.totalRevenue)}</td>
-                        </tr>
-                    </tfoot>
-                </table>
+
+
+            {/* Hidden Monthly Report for PDF Generation */}
+            <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
+                <div ref={hiddenReportRef} style={{ width: '900px', padding: '2rem', background: '#fff' }}>
+                    <MonthlyReport
+                        bills={bills}
+                        currentMonth={currentMonth}
+                        config={config}
+                        billCustomization={billCustomization}
+                    />
+                </div>
             </div>
+
+            {/* Monthly Report Modal */}
+            {showMonthlyReport && (
+                <div className="modal-overlay" onClick={() => setShowMonthlyReport(false)}>
+                    <div className="modal invoice-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+                        <div className="modal-header">
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BarChart3 size={18} /> สรุปรายรับประจำเดือน</h3>
+                            <button
+                                className="btn btn-outline btn-sm btn-icon"
+                                onClick={() => setShowMonthlyReport(false)}
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ maxHeight: '70vh', overflow: 'auto' }}>
+                            <MonthlyReport
+                                ref={monthlyReportRef}
+                                bills={bills}
+                                currentMonth={currentMonth}
+                                config={config}
+                                billCustomization={billCustomization}
+                            />
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowMonthlyReport(false)}>
+                                ปิด
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={generateMonthlyReportPDF}
+                                disabled={isExportingReport}
+                            >
+                                <Download size={18} />
+                                {isExportingReport ? 'กำลังสร้าง PDF...' : 'ดาวน์โหลด PDF'}
+                            </button>
+                            <button className="btn btn-primary" onClick={() => window.print()}>
+                                <Printer size={18} />
+                                พิมพ์
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

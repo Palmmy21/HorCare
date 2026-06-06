@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ─────────────────────────────────────
+    // ── Helpers ─────────────────────────────────────────────────────────
     function isSignedIn() {
       return request.auth != null;
     }
@@ -20,32 +20,78 @@ service cloud.firestore {
       );
     }
 
-    // ── User Profile ─────────────────────────────────
-    // Admin can read all profiles (to list users), and write license/trial fields.
-    // Owner can read & write their own profile.
+    function isNotBanned() {
+      return !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') != 'banned';
+    }
+
+    // Fields only the backend (or admin) should write — never the user directly
+    function isWritingProtectedFields() {
+      let protectedFields = ['license', 'subscription_id', 'subscription_status',
+                             'current_period_end', 'plan_name', 'billing_cycle',
+                             'stripe_customer_id', 'trial_expires_at', 'role', 'status'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields);
+    }
+
+    // ── User Profile ─────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read:  if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
 
-      // ── Rooms: owner ONLY — Admin has no access ───
+      // User can write their own profile, but NOT protected subscription/license fields
+      allow write: if isAdmin();
+      allow update: if isOwner(userId) && !isWritingProtectedFields() && isNotBanned();
+      allow create: if isOwner(userId) && !isWritingProtectedFields();
+
+      // ── Buildings ───────────────────────────────────────────────────────
+      match /buildings/{buildingId} {
+        allow read, write: if isOwner(userId) && isNotBanned();
+
+        match /rooms/{roomId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
+        match /bills/{billId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
+        match /data/{docId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
+      }
+
+      // ── Legacy flat paths ──────────────────────────────────────────────
       match /rooms/{roomId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isNotBanned();
       }
-
-      // ── Bills: owner ONLY — Admin has no access ───
       match /bills/{billId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isNotBanned();
       }
-
-      // ── Config & other data: owner ONLY ──────────
       match /data/{docId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isNotBanned();
       }
-
-      // ── Fallback for any other sub-collections ───
       match /{subCol}/{docId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) && isNotBanned();
       }
+    }
+
+    // ── LINE registration tables (written by backend API only) ───────────
+    // No client-side access — backend writes via Service Account (bypasses rules)
+    match /line_rooms/{lineUserId} {
+      allow read: if isAdmin();
+      allow write: if false; // backend only via admin SDK
+    }
+    match /line_pending/{lineUserId} {
+      allow read: if isAdmin();
+      allow write: if false; // backend only via admin SDK
+    }
+
+    // ── Dorm codes (readable by backend, writable by admin) ─────────────
+    match /dorm_codes/{code} {
+      allow read: if false;  // backend only
+      allow write: if isAdmin();
+    }
+
+    // ── Deny all other paths ─────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

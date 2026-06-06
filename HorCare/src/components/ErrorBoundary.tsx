@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
     children: ReactNode;
@@ -37,7 +38,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                     textAlign: 'center',
                     fontFamily: "'Inter', sans-serif"
                 }}>
-                    <div style={{ fontSize: '3rem' }}>⚠️</div>
+                    <div><AlertTriangle size={64} color="#EF4444" /></div>
                     <h2 style={{ color: '#EF4444' }}>เกิดข้อผิดพลาด</h2>
                     <p style={{ color: '#737373', maxWidth: '400px' }}>
                         กรุณาลองรีเฟรชหน้าเว็บ หากยังพบปัญหา กรุณาติดต่อผู้ดูแลระบบ
@@ -55,7 +56,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                             fontWeight: 500
                         }}
                     >
-                        🔄 รีเฟรชหน้าเว็บ
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}><RefreshCw size={18} /> รีเฟรชหน้าเว็บ</span>
                     </button>
                 </div>
             );

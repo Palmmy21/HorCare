@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2, AlertTriangle, Smartphone, Receipt, Cloud } from 'lucide-react';
 
 interface LoginPageProps {
     onLogin: (email: string, password: string) => Promise<void>;
@@ -122,7 +122,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
 
                                 {error && (
                                     <div className="login-error">
-                                        ⚠️ {error}
+                                        <AlertTriangle size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> {error}
                                     </div>
                                 )}
 
@@ -263,7 +263,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
 
                     {error && (
                         <div className="login-error">
-                            ⚠️ {error}
+                            <AlertTriangle size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> {error}
                         </div>
                     )}
 
@@ -300,9 +300,9 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                 {/* Features */}
                 {mode === 'login' && (
                     <div className="login-features">
-                        <div className="login-feature">📱 จดมิเตอร์จากมือถือ</div>
-                        <div className="login-feature">🧾 ออกบิลอัตโนมัติ</div>
-                        <div className="login-feature">☁️ ข้อมูลปลอดภัยบน Cloud</div>
+                        <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Smartphone size={16} /> จดมิเตอร์จากมือถือ</div>
+                        <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Receipt size={16} /> ออกบิลอัตโนมัติ</div>
+                        <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Cloud size={16} /> ข้อมูลปลอดภัยบน Cloud</div>
                     </div>
                 )}
             </div>

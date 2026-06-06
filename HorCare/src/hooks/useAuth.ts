@@ -6,6 +6,8 @@ import {
     signOut,
     updateProfile,
     sendPasswordResetEmail,
+    setPersistence,
+    browserLocalPersistence,
     type User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -22,28 +24,49 @@ export function useAuth() {
 
     // Listen to auth state
     useEffect(() => {
+        let profileUnsubscribe: (() => void) | null = null;
+
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
+            // Always unsubscribe old profile listener first to prevent leaks
+            if (profileUnsubscribe) {
+                profileUnsubscribe();
+                profileUnsubscribe = null;
+            }
             if (firebaseUser) {
                 // Subscribe to user profile changes
                 const { onSnapshot, doc } = await import('firebase/firestore');
-                onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
-                    if (docSnap.exists()) {
-                        setProfile(docSnap.data() as UserProfile);
+                profileUnsubscribe = onSnapshot(
+                    doc(db, 'users', firebaseUser.uid),
+                    (docSnap) => {
+                        if (docSnap.exists()) {
+                            setProfile(docSnap.data() as UserProfile);
+                        }
+                    },
+                    (error) => {
+                        // Silently handle permission errors (e.g. user just signed out)
+                        if (error.code !== 'permission-denied') {
+                            console.error('Profile listener error:', error);
+                        }
                     }
-                });
+                );
             } else {
                 setProfile(null);
             }
             setLoading(false);
         });
-        return unsubscribe;
+
+        return () => {
+            unsubscribe();
+            if (profileUnsubscribe) profileUnsubscribe();
+        };
     }, []);
 
     // Register
     const register = useCallback(async (email: string, password: string, displayName: string) => {
         setError(null);
         try {
+            await setPersistence(auth, browserLocalPersistence);
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(cred.user, { displayName });
 
@@ -83,6 +106,7 @@ export function useAuth() {
     const login = useCallback(async (email: string, password: string) => {
         setError(null);
         try {
+            await setPersistence(auth, browserLocalPersistence);
             const cred = await signInWithEmailAndPassword(auth, email, password);
 
             // Load profile
@@ -129,12 +153,14 @@ export function useAuth() {
         }
     }, []);
 
-    // Check if trial is expired
+    // Check if trial is expired — treat missing trial_expires_at as expired (safe default)
     const isTrialExpired = profile?.license === 'trial' &&
-        new Date(profile.trial_expires_at) < new Date();
+        (!profile.trial_expires_at || new Date(profile.trial_expires_at) < new Date());
 
-    const isLicenseActive = profile?.license === 'active' ||
-        (profile?.license === 'trial' && !isTrialExpired);
+    const isLicenseActive =
+        profile?.license === 'active' ||
+        (profile?.license === 'trial' && !isTrialExpired) ||
+        Boolean(profile?.license?.startsWith('monthly_') || profile?.license?.startsWith('yearly_'));
 
     // Days remaining in trial
     const trialDaysLeft = profile?.license === 'trial'

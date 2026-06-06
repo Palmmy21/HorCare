@@ -1,6 +1,8 @@
 import { forwardRef } from 'react';
-import type { MonthlyBill, DormConfig, WaterConfig } from '../../types';
+import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
+import generatePayload from 'promptpay-qr';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface InvoiceBillProps {
     bill: MonthlyBill;
@@ -8,6 +10,7 @@ interface InvoiceBillProps {
     billDate: string; // YYYY-MM-DD format
     effectiveElecRate?: number;
     effectiveWaterConfig?: WaterConfig;
+    billCustomization?: BillCustomization;
 }
 
 function formatThaiDate(dateStr: string): string {
@@ -31,31 +34,60 @@ function formatThaiMonth(dateStr: string): string {
 }
 
 const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
-    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig }, ref) => {
+    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization }, ref) => {
         const elecRate = effectiveElecRate ?? config.electricity_rate;
         const waterCfg = effectiveWaterConfig ?? config.water_config;
         const isWaterFlat = waterCfg.type === 'flat_rate_tier';
         const tenants = Math.max(1, bill.tenant_count || 1);
         const adjustedFlatLimit = (waterCfg.flat_limit_unit || 0) * tenants;
 
+        const hasDormInfo = billCustomization && (
+            billCustomization.dorm_name ||
+            billCustomization.dorm_address ||
+            billCustomization.dorm_phone
+        );
+
+        const footerText = billCustomization?.footer_text ||
+            `กรุณาชำระภายในวันที่ ${billCustomization?.due_day || 5} ของทุกเดือน`;
+
         return (
             <div className="invoice-bill" ref={ref}>
-                {/* Header */}
+                {/* Premium Header */}
                 <div className="invoice-header">
-                    <h2 className="invoice-title">ใบแจ้งหนี้/ใบเสร็จรับเงิน</h2>
-                    <div className="invoice-meta">
-                        <div className="invoice-meta-row">
-                            <span className="invoice-meta-label">ห้องพัก</span>
-                            <span className="invoice-meta-value invoice-room-number">{bill.room_number}</span>
+                    <div>
+                        {hasDormInfo ? (
+                            <>
+                                {billCustomization!.dorm_name && (
+                                    <div className="invoice-dorm-name">{billCustomization!.dorm_name}</div>
+                                )}
+                                {billCustomization!.dorm_address && (
+                                    <div className="invoice-address">{billCustomization!.dorm_address}</div>
+                                )}
+                                {billCustomization!.dorm_phone && (
+                                    <div className="invoice-address">โทร. {billCustomization!.dorm_phone}</div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="invoice-dorm-name">ใบแจ้งหนี้</div>
+                        )}
+                    </div>
+                    <div className="invoice-details">
+                        <h2 className="invoice-title">INVOICE</h2>
+                        <div className="invoice-meta">
+                            <div>วันที่ออกบิล: {formatThaiDate(billDate)}</div>
                         </div>
-                        <div className="invoice-meta-row">
-                            <span className="invoice-meta-label">ประจำเดือน</span>
-                            <span className="invoice-meta-value">{formatThaiMonth(bill.month + '-01')}</span>
-                        </div>
-                        <div className="invoice-meta-row">
-                            <span className="invoice-meta-label">วันที่ออกบิล</span>
-                            <span className="invoice-meta-value">{formatThaiDate(billDate)}</span>
-                        </div>
+                    </div>
+                </div>
+
+                {/* Room & Month Tags */}
+                <div style={{ marginBottom: '32px' }}>
+                    <div className="invoice-number-box">
+                        <span className="invoice-number-label">ห้องพัก / ROOM</span>
+                        <span className="invoice-number-value">{bill.room_number}</span>
+                    </div>
+                    <div className="invoice-number-box" style={{ marginLeft: '12px' }}>
+                        <span className="invoice-number-label">ประจำเดือน / MONTH</span>
+                        <span className="invoice-number-value">{formatThaiMonth(bill.month + '-01')}</span>
                     </div>
                 </div>
 
@@ -151,19 +183,40 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                             </tr>
                         )}
                     </tbody>
-                    <tfoot>
-                        <tr className="invoice-total-row">
-                            <td colSpan={3} className="invoice-td invoice-total-label">รวมทั้งสิ้น</td>
-                            <td className="invoice-td invoice-total-value text-right mono">
-                                {formatCurrency(bill.total_bill)}
-                            </td>
-                        </tr>
-                    </tfoot>
                 </table>
 
-                {/* Footer */}
-                <div className="invoice-footer">
-                    <p>กรุณาชำระภายในวันที่ 5 ของทุกเดือน</p>
+                {/* Summary Box */}
+                <div className="invoice-summary-box">
+                    <div className="invoice-summary-row total">
+                        <span>รวมทั้งสิ้น</span>
+                        <span className="value">{formatCurrency(bill.total_bill)}</span>
+                    </div>
+                </div>
+
+                {/* QR Code + Footer Section */}
+                <div className="invoice-bottom-section">
+                    {/* QR Code */}
+                    {billCustomization?.promptpay_number && (
+                        <div className="invoice-qr-section">
+                            <div className="invoice-qr-label">สแกนจ่ายผ่าน PromptPay</div>
+                            <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', display: 'inline-block' }}>
+                                <QRCodeSVG 
+                                    value={generatePayload(billCustomization.promptpay_number, { amount: bill.total_bill })}
+                                    size={140}
+                                />
+                            </div>
+                            {billCustomization.promptpay_name && (
+                                <div style={{ fontSize: '13px', marginTop: '8px', textAlign: 'center', color: '#475569', fontWeight: 500 }}>
+                                    {billCustomization.promptpay_name}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="invoice-footer-msg">
+                        {footerText}
+                    </div>
                 </div>
             </div>
         );

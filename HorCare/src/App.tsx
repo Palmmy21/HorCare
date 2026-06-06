@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, Calculator
+  Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
+  Building2, ChevronDown, Plus, Check, Pencil
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
+import { useBuildings } from './hooks/useBuildings';
+import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 import Dashboard from './components/Dashboard/Dashboard';
 import RoomManagement from './components/RoomManagement/RoomManagement';
@@ -14,14 +17,27 @@ import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
+import PricingPage from './components/Pricing/PricingPage';
+import InstallPrompt from './components/PWA/InstallPrompt';
+import { isPaidLicense, isLargePlan, getMaxRooms } from './hooks/useSubscription';
+
 import './index.css';
 
-type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings' | 'admin' | 'calculator';
+type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings' | 'admin' | 'calculator' | 'pricing';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
+  const [buildingMenuOpen, setBuildingMenuOpen] = useState(false);
+  const [addBuildingMode, setAddBuildingMode] = useState(false);
+  const [newBuildingName, setNewBuildingName] = useState('');
+  const [renamingBuildingId, setRenamingBuildingId] = useState<string | null>(null);
+  const [renamingName, setRenamingName] = useState('');
+  const buildingMenuRef = useRef<HTMLDivElement>(null);
+
+  // Theme
+  const { themeId, setTheme, mode, setMode } = useTheme();
 
   // Auth
   const {
@@ -29,7 +45,57 @@ function App() {
     login, register, logout, resetPassword, isTrialExpired, trialDaysLeft, isBanned, setError
   } = useAuth();
 
-  // Firestore (only loads when user is logged in)
+  // Buildings (multi-building support — Large plan)
+  const { buildings, loading: buildingsLoading, addBuilding, renameBuilding } = useBuildings(user?.uid ?? null);
+
+  // Active building — persisted per user in localStorage
+  const buildingStorageKey = user ? `horcare_active_building_${user.uid}` : null;
+  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
+
+  // Sync activeBuildingId when buildings load
+  useEffect(() => {
+    if (buildingsLoading || buildings.length === 0) return;
+    const stored = buildingStorageKey ? localStorage.getItem(buildingStorageKey) : null;
+    const valid = stored && buildings.some(b => b.id === stored);
+    const next = valid ? stored : buildings[0].id;
+    setActiveBuildingId(next);
+  }, [buildingsLoading, buildings, buildingStorageKey]);
+
+  // Close building menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (buildingMenuRef.current && !buildingMenuRef.current.contains(e.target as Node)) {
+        setBuildingMenuOpen(false);
+        setAddBuildingMode(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const handleSwitchBuilding = (id: string) => {
+    setActiveBuildingId(id);
+    if (buildingStorageKey) localStorage.setItem(buildingStorageKey, id);
+    setBuildingMenuOpen(false);
+  };
+
+  const handleAddBuilding = async () => {
+    if (!newBuildingName.trim()) return;
+    const b = await addBuilding(newBuildingName);
+    if (b) handleSwitchBuilding(b.id);
+    setNewBuildingName('');
+    setAddBuildingMode(false);
+    setBuildingMenuOpen(false);
+  };
+
+  const handleRenameBuilding = async (id: string) => {
+    if (!renamingName.trim()) return;
+    await renameBuilding(id, renamingName);
+    setRenamingBuildingId(null);
+    setRenamingName('');
+  };
+
+  // Firestore — scoped to active building
   const {
     config,
     rooms,
@@ -44,8 +110,24 @@ function App() {
     getBillsForMonth,
     getPreviousBill,
     closeMonth,
-    getMonthStats
-  } = useFirestore(user?.uid ?? null);
+    unlockMonth,
+    getMonthStats,
+    deleteBill
+  } = useFirestore(user?.uid ?? null, activeBuildingId);
+
+  // Auto-clean orphaned bills (e.g. from deleted rooms)
+  useEffect(() => {
+    if (dataLoading || !user || bills.length === 0 || rooms.length === 0) return;
+
+    bills.forEach(bill => {
+      // If the room doesn't exist anymore, delete its orphaned bills
+      const roomExists = rooms.some(r => r.id === bill.room_id);
+      if (!roomExists && deleteBill) {
+        console.log(`Auto-deleting orphaned bill: ${bill.id} (Room ${bill.room_number})`);
+        deleteBill(bill.id);
+      }
+    });
+  }, [bills, rooms, dataLoading, user, deleteBill]);
 
   const stats = getMonthStats(currentMonth);
   const monthBills = getBillsForMonth(currentMonth);
@@ -57,6 +139,7 @@ function App() {
     { id: 'summary' as ViewMode, icon: Send, label: 'สรุปยอด' },
     { id: 'calculator' as ViewMode, icon: Calculator, label: 'คำนวณมิเตอร์' },
     { id: 'settings' as ViewMode, icon: SettingsIcon, label: 'ตั้งค่า' },
+    { id: 'pricing' as ViewMode, icon: Zap, label: 'แพ็กเกจ' },
   ];
 
   const isAdmin = profile?.role === 'admin' || user?.email === 'sakdidechneverdie@gmail.com';
@@ -104,7 +187,11 @@ function App() {
         padding: '2rem', textAlign: 'center',
         background: 'linear-gradient(135deg, #1a0a0a 0%, #2d0000 100%)'
       }}>
-        <div style={{ fontSize: '3.5rem' }}>🚫</div>
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: 'rgba(220,38,38,0.15)', border: '2px solid rgba(220,38,38,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}><Ban size={40} color="#F87171" /></div>
         <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.25rem' }}>บัญชีถูกระงับ</h2>
         <p style={{ color: '#9CA3AF', maxWidth: '380px', lineHeight: 1.7 }}>
           บัญชีของคุณถูกระงับโดยผู้ดูแลระบบ
@@ -121,32 +208,76 @@ function App() {
     );
   }
 
-  // Trial expired → block usage
+  // Trial expired → show upgrade wall
   if (user && isTrialExpired) {
     return (
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        gap: '1rem',
-        padding: '2rem',
-        textAlign: 'center'
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', flexDirection: 'column', gap: '1.25rem',
+        padding: '2rem', textAlign: 'center',
+        background: 'linear-gradient(135deg, #0F0C29 0%, #302B63 50%, #24243E 100%)'
       }}>
-        <div style={{ fontSize: '3rem' }}>⏰</div>
-        <h2 style={{ color: '#EF4444', marginBottom: '0.5rem' }}>ทดลองใช้หมดอายุแล้ว</h2>
-        <p style={{ color: '#737373', maxWidth: '400px' }}>
-          ระยะเวลาทดลองใช้งานฟรี 30 วันของคุณหมดอายุแล้ว
-          กรุณาอัปเกรดเพื่อใช้งานต่อ
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%',
+          background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}><Clock size={40} color="#A78BFA" /></div>
+        <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>ทดลองใช้หมดอายุแล้ว</h2>
+        <p style={{ color: '#9CA3AF', maxWidth: '400px', lineHeight: 1.7, margin: 0 }}>
+          ระยะเวลาทดลองใช้งานฟรี 30 วันของคุณหมดอายุแล้ว<br />
+          อัปเกรดแผนเพื่อใช้งานต่อได้เลย
         </p>
-        <button
-          className="btn btn-primary"
-          onClick={logout}
-          style={{ marginTop: '1rem' }}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
+          <button
+            className="btn btn-primary"
+            id="upgrade-from-expired"
+            onClick={() => {
+              // Mount a temporary pricing page overlay
+              const overlay = document.getElementById('expired-pricing-overlay');
+              if (overlay) overlay.style.display = 'block';
+            }}
+            style={{
+              background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+              border: 'none', padding: '0.875rem 2rem',
+              borderRadius: '14px', color: '#fff',
+              fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              boxShadow: '0 4px 24px rgba(139,92,246,0.4)',
+            }}
+          >
+            <Zap size={18} /> ดูแพ็กเกจ
+          </button>
+          <button
+            className="btn"
+            onClick={logout}
+            style={{
+              background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+              color: 'rgba(255,255,255,0.6)', padding: '0.875rem 1.5rem',
+              borderRadius: '14px', cursor: 'pointer',
+            }}
+          >
+            ออกจากระบบ
+          </button>
+        </div>
+        {/* Pricing overlay for expired users */}
+        <div
+          id="expired-pricing-overlay"
+          style={{
+            display: 'none', position: 'fixed', inset: 0,
+            background: '#fff', zIndex: 500, overflowY: 'auto', padding: '2rem',
+          }}
         >
-          ออกจากระบบ
-        </button>
+          <PricingPage
+            profile={profile}
+            onBack={() => {
+              const overlay = document.getElementById('expired-pricing-overlay');
+              if (overlay) overlay.style.display = 'none';
+            }}
+            onSubscribed={() => {
+              window.location.reload();
+            }}
+          />
+        </div>
       </div>
     );
   }
@@ -164,8 +295,8 @@ function App() {
     );
   }
 
-  // Still loading data
-  if (dataLoading) {
+  // Still loading data (buildings must resolve first so we have a valid buildingId)
+  if (buildingsLoading || dataLoading || !activeBuildingId) {
     return (
       <div style={{
         display: 'flex',
@@ -181,16 +312,28 @@ function App() {
     );
   }
 
+  // Check if user has paid subscription / large plan
+  const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
+  const hasLargePlan = profile ? isLargePlan(profile.license) : false;
+  const isTrial = profile?.license === 'trial';
+  const maxRooms = profile ? getMaxRooms(profile.license) : 5;
+  const activeBuilding = buildings.find(b => b.id === activeBuildingId);
+
   return (
     <div className="app-container">
       {/* Trial Banner */}
       {profile?.license === 'trial' && trialDaysLeft !== null && (
-        <div className={`trial-banner ${isTrialExpired ? 'expired' : ''}`}>
+        <div
+          className={`trial-banner ${isTrialExpired ? 'expired' : ''}`}
+          style={{ cursor: 'pointer' }}
+          onClick={() => setCurrentView('pricing')}
+        >
           <Clock size={16} />
           {isTrialExpired
-            ? 'ทดลองใช้หมดอายุแล้ว — กรุณาอัปเกรดเพื่อบันทึกข้อมูลต่อ'
-            : `ทดลองใช้ฟรี เหลือ ${trialDaysLeft} วัน`
+            ? 'ทดลองใช้หมดอายุแล้ว — คลิกเพื่ออัปเกรด'
+            : `ทดลองใช้ฟรี เหลือ ${trialDaysLeft} วัน — คลิกเพื่ออัปเกรด`
           }
+          <Zap size={14} style={{ marginLeft: 'auto' }} />
         </div>
       )}
 
@@ -213,6 +356,113 @@ function App() {
           <span>HorCare</span>
         </div>
 
+        {/* Building Switcher — Large plan only */}
+        {hasLargePlan && (
+          <div ref={buildingMenuRef} style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <button
+              onClick={() => { setBuildingMenuOpen(v => !v); setAddBuildingMode(false); }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px', padding: '0.5rem 0.625rem', cursor: 'pointer',
+                color: 'rgba(255,255,255,0.85)', fontSize: '0.8125rem', fontWeight: 600,
+              }}
+            >
+              <Building2 size={15} style={{ flexShrink: 0, opacity: 0.7 }} />
+              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeBuilding?.name ?? '—'}
+              </span>
+              <ChevronDown size={14} style={{ flexShrink: 0, opacity: 0.5, transform: buildingMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            </button>
+
+            {buildingMenuOpen && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 'var(--space-3)', right: 'var(--space-3)',
+                background: '#1e2535', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '10px', overflow: 'hidden', zIndex: 200,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}>
+                {buildings.map(b => (
+                  <div key={b.id} style={{ display: 'flex', alignItems: 'center' }}>
+                    {renamingBuildingId === b.id ? (
+                      <form
+                        style={{ flex: 1, display: 'flex', gap: '0.25rem', padding: '0.375rem 0.5rem' }}
+                        onSubmit={e => { e.preventDefault(); handleRenameBuilding(b.id); }}
+                      >
+                        <input
+                          autoFocus
+                          value={renamingName}
+                          onChange={e => setRenamingName(e.target.value)}
+                          style={{
+                            flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0.25rem 0.5rem',
+                          }}
+                        />
+                        <button type="submit" style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: '0 0.25rem' }}>
+                          <Check size={14} />
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleSwitchBuilding(b.id)}
+                          style={{
+                            flex: 1, textAlign: 'left', background: 'none', border: 'none',
+                            color: b.id === activeBuildingId ? '#60A5FA' : 'rgba(255,255,255,0.75)',
+                            fontSize: '0.8125rem', fontWeight: b.id === activeBuildingId ? 700 : 400,
+                            padding: '0.5rem 0.75rem', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          }}
+                        >
+                          {b.id === activeBuildingId && <Check size={12} />}
+                          <span style={{ marginLeft: b.id === activeBuildingId ? 0 : '1.25rem' }}>{b.name}</span>
+                        </button>
+                        <button
+                          onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }}
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 0.5rem' }}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0.375rem 0.5rem' }}>
+                  {addBuildingMode ? (
+                    <form style={{ display: 'flex', gap: '0.25rem' }} onSubmit={e => { e.preventDefault(); handleAddBuilding(); }}>
+                      <input
+                        autoFocus
+                        placeholder="ชื่อตึกใหม่"
+                        value={newBuildingName}
+                        onChange={e => setNewBuildingName(e.target.value)}
+                        style={{
+                          flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0.25rem 0.5rem',
+                        }}
+                      />
+                      <button type="submit" style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: '0 0.25rem' }}>
+                        <Check size={14} />
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => setAddBuildingMode(true)}
+                      style={{
+                        width: '100%', background: 'none', border: 'none',
+                        color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.25rem',
+                      }}
+                    >
+                      <Plus size={13} /> เพิ่มตึก
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <nav className="sidebar-nav">
           {navItems.map(item => (
             <button
@@ -225,6 +475,30 @@ function App() {
             </button>
           ))}
         </nav>
+
+        {/* Upgrade nudge for trial users */}
+        {profile?.license === 'trial' && !hasPaidSubscription && (
+          <button
+            onClick={() => handleNavClick('pricing')}
+            style={{
+              margin: 'var(--space-4) var(--space-3) 0',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(236,72,153,0.15))',
+              border: '1px solid rgba(139,92,246,0.35)',
+              borderRadius: '12px',
+              padding: '0.75rem',
+              cursor: 'pointer', textAlign: 'left', width: 'calc(100% - calc(var(--space-3) * 2))',
+              color: '#C4B5FD',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <Zap size={14} color="#A78BFA" />
+              <span style={{ fontWeight: 700, fontSize: '0.8125rem' }}>อัปเกรดแผน</span>
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(196,181,253,0.7)', lineHeight: 1.4 }}>
+              เริ่มต้น ฿79/เดือน
+            </div>
+          </button>
+        )}
 
         {/* User info + logout */}
         <div style={{
@@ -281,6 +555,7 @@ function App() {
             stats={stats}
             currentMonth={currentMonth}
             recentBills={monthBills}
+            uid={user?.uid}
           />
         )}
 
@@ -291,6 +566,9 @@ function App() {
             onAddRoom={addRoom}
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
+            maxRooms={maxRooms}
+            isTrial={isTrial}
+            onUpgrade={() => setCurrentView('pricing')}
           />
         )}
 
@@ -314,6 +592,11 @@ function App() {
             currentMonth={currentMonth}
             stats={stats}
             onCloseMonth={closeMonth}
+            onUnlockMonth={unlockMonth}
+            uid={user?.uid}
+            buildingId={activeBuildingId ?? undefined}
+            isTrial={isTrial}
+            onUpgrade={() => setCurrentView('pricing')}
           />
         )}
 
@@ -325,13 +608,29 @@ function App() {
           <Settings
             config={config}
             onSaveConfig={saveConfig}
+            themeId={themeId}
+            onSetTheme={setTheme}
+            mode={mode}
+            onSetMode={setMode}
           />
         )}
 
         {currentView === 'admin' && profile?.role === 'admin' && (
           <AdminDashboard />
         )}
+
+        {currentView === 'pricing' && (
+          <PricingPage
+            profile={profile}
+            onBack={() => setCurrentView('dashboard')}
+            onSubscribed={() => {
+              // After demo payment: go back to dashboard (Firestore already updated)
+              setCurrentView('dashboard');
+            }}
+          />
+        )}
       </main>
+      <InstallPrompt />
     </div>
   );
 }

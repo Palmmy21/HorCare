@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Zap, Droplets, Settings as SettingsIcon, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Zap, Droplets, Settings as SettingsIcon, ChevronDown, ChevronUp, RotateCcw, Calculator, BarChart3, Save, Banknote } from 'lucide-react';
 
 const LS_KEY = 'horcare_meter_calc_settings';
 
@@ -91,7 +91,7 @@ export default function MeterCalculator() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">🧮 คำนวณมิเตอร์</h1>
+                <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Calculator size={28} /> คำนวณมิเตอร์</h1>
                 <p className="page-subtitle">คำนวณค่าไฟ-ค่าน้ำเร็วๆ — ไม่เกี่ยวกับข้อมูลห้องในระบบ</p>
             </div>
 
@@ -153,14 +153,14 @@ export default function MeterCalculator() {
                                         onClick={() => handleSettingChange('water_mode', 'normal')}
                                         style={{ flex: 1, minWidth: '130px', padding: '0.625rem 0.875rem', fontSize: '0.875rem' }}
                                     >
-                                        📊 บาท/หน่วย
+                                        <BarChart3 size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> บาท/หน่วย
                                     </button>
                                     <button
                                         className={`btn ${settings.water_mode === 'flat_rate_tier' ? 'btn-primary' : 'btn-outline'}`}
                                         onClick={() => handleSettingChange('water_mode', 'flat_rate_tier')}
                                         style={{ flex: 1, minWidth: '130px', padding: '0.625rem 0.875rem', fontSize: '0.875rem' }}
                                     >
-                                        💧 เหมาจ่าย+ส่วนเกิน
+                                        <Droplets size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> เหมาจ่าย+ส่วนเกิน
                                     </button>
                                 </div>
                             </div>
@@ -223,7 +223,7 @@ export default function MeterCalculator() {
                                     onClick={handleSaveSettings}
                                     style={{ padding: '0.625rem 1.5rem', fontSize: '0.9375rem' }}
                                 >
-                                    💾 บันทึกอัตรา
+                                    <Save size={18} style={{ display: 'inline', marginRight: 4 }} /> บันทึกอัตรา
                                 </button>
                                 {settingsSaved && (
                                     <span style={{ color: 'var(--color-success)', fontWeight: 600, alignSelf: 'center', fontSize: '0.875rem' }}>
@@ -401,7 +401,7 @@ export default function MeterCalculator() {
                     <div style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                         <div>
                             <div style={{ fontWeight: 700, fontSize: '1rem', color: '#4C1D95', marginBottom: '0.25rem' }}>
-                                💜 ยอดรวมทั้งหมด
+                                <Banknote size={18} style={{ display: 'inline', marginRight: 4 }} /> ยอดรวมทั้งหมด
                             </div>
                             <div style={{ fontSize: '0.8125rem', color: '#7C3AED', opacity: 0.8 }}>
                                 ค่าไฟ {elecBill.toFixed(2)} + ค่าน้ำ {waterResult.bill.toFixed(2)}
