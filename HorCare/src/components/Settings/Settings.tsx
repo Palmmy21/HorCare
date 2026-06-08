@@ -622,8 +622,11 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 {/* Invite Link Card */}
                 {dormCode && (() => {
                     const lineOaId = import.meta.env.VITE_LINE_OA_ID as string | undefined;
+                    // LINE URL scheme: https://line.me/R/oaMessage/{OA ID}/?{text}
+                    // The OA ID ("@xxxx") and the message must both be URL-encoded,
+                    // otherwise LINE can't resolve the account ("ไม่พบผู้ใช้").
                     const inviteLink = lineOaId
-                        ? `https://line.me/R/oaMessage/${lineOaId}?text=${encodeURIComponent(dormCode)}`
+                        ? `https://line.me/R/oaMessage/${encodeURIComponent(lineOaId)}/?${encodeURIComponent(dormCode)}`
                         : null;
 
                     return (
