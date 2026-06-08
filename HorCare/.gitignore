@@ -31,3 +31,5 @@ dev-dist
 functions/.env
 functions/.env.*
 .firebase 
+
+.vercel
