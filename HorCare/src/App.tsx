@@ -46,7 +46,7 @@ function App() {
     user, profile, loading: authLoading, error: authError,
     emailVerified, login, register, logout, resetPassword,
     resendVerification, refreshEmailVerified,
-    isTrialExpired, trialDaysLeft, isBanned, setError
+    isTrialExpired, isPaidExpired, trialDaysLeft, licenseDaysLeft, isBanned, setError
   } = useAuth();
 
   // Buildings (multi-building support — Large plan)
@@ -214,8 +214,10 @@ function App() {
     );
   }
 
-  // Trial expired → show upgrade wall
-  if (user && isTrialExpired) {
+  // Trial OR paid plan expired → show upgrade/renewal wall.
+  // Paid plans are one-time payments that don't auto-renew, so once the period
+  // lapses the user must pay again to keep using the app.
+  if (user && (isTrialExpired || isPaidExpired)) {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -228,10 +230,15 @@ function App() {
           background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}><Clock size={40} color="#A78BFA" /></div>
-        <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>ทดลองใช้หมดอายุแล้ว</h2>
+        <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>
+          {isPaidExpired ? 'แพ็กเกจหมดอายุแล้ว' : 'ทดลองใช้หมดอายุแล้ว'}
+        </h2>
         <p style={{ color: '#9CA3AF', maxWidth: '400px', lineHeight: 1.7, margin: 0 }}>
-          ระยะเวลาทดลองใช้งานฟรี 30 วันของคุณหมดอายุแล้ว<br />
-          อัปเกรดแผนเพื่อใช้งานต่อได้เลย
+          {isPaidExpired ? (
+            <>แพ็กเกจของคุณครบรอบการใช้งานแล้ว<br />ต่ออายุเพื่อใช้งานต่อได้เลย</>
+          ) : (
+            <>ระยะเวลาทดลองใช้งานฟรี 30 วันของคุณหมดอายุแล้ว<br />อัปเกรดแผนเพื่อใช้งานต่อได้เลย</>
+          )}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
           <button
@@ -351,6 +358,22 @@ function App() {
           {isTrialExpired
             ? 'ทดลองใช้หมดอายุแล้ว — คลิกเพื่ออัปเกรด'
             : `ทดลองใช้ฟรี เหลือ ${trialDaysLeft} วัน — คลิกเพื่ออัปเกรด`
+          }
+          <Zap size={14} style={{ marginLeft: 'auto' }} />
+        </div>
+      )}
+
+      {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
+      {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (
+        <div
+          className="trial-banner"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setCurrentView('pricing')}
+        >
+          <Clock size={16} />
+          {licenseDaysLeft === 0
+            ? 'แพ็กเกจครบรอบวันนี้ — คลิกเพื่อต่ออายุ'
+            : `แพ็กเกจใกล้ครบรอบ เหลือ ${licenseDaysLeft} วัน — คลิกเพื่อต่ออายุ`
           }
           <Zap size={14} style={{ marginLeft: 'auto' }} />
         </div>

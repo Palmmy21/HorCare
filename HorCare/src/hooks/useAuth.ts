@@ -93,6 +93,7 @@ export function useAuth() {
                 display_name: displayName,
                 license: 'trial',
                 trial_expires_at: trialExpires.toISOString(),
+                access_until: trialExpires.getTime(), // server-enforced expiry (Firestore rules)
                 created_at: new Date().toISOString()
             };
 
@@ -187,10 +188,25 @@ export function useAuth() {
     const isTrialExpired = profile?.license === 'trial' &&
         (!profile.trial_expires_at || new Date(profile.trial_expires_at) < new Date());
 
+    // Paid plans (monthly_*/yearly_*) are time-boxed by current_period_end.
+    // One-time PromptPay payments don't auto-renew, so once the period passes the
+    // license MUST lapse — otherwise a single 79฿ payment buys lifetime access.
+    // Missing current_period_end on a paid plan is treated as expired (safe default).
+    const isPaidPlan = Boolean(
+        profile?.license?.startsWith('monthly_') || profile?.license?.startsWith('yearly_')
+    );
+    const isPaidExpired = isPaidPlan &&
+        (!profile?.current_period_end || new Date(profile.current_period_end) < new Date());
+
     const isLicenseActive =
         profile?.license === 'active' ||
         (profile?.license === 'trial' && !isTrialExpired) ||
-        Boolean(profile?.license?.startsWith('monthly_') || profile?.license?.startsWith('yearly_'));
+        (isPaidPlan && !isPaidExpired);
+
+    // Days left on a paid plan (null when not on a paid plan) — drives the renewal banner
+    const licenseDaysLeft = isPaidPlan && profile?.current_period_end
+        ? Math.max(0, Math.ceil((new Date(profile.current_period_end).getTime() - Date.now()) / 86400000))
+        : null;
 
     // Days remaining in trial
     const trialDaysLeft = profile?.license === 'trial'
@@ -213,8 +229,10 @@ export function useAuth() {
         resendVerification,
         refreshEmailVerified,
         isTrialExpired,
+        isPaidExpired,
         isLicenseActive,
         trialDaysLeft,
+        licenseDaysLeft,
         isBanned,
         setError
     };

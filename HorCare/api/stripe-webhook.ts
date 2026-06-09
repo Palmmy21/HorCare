@@ -98,6 +98,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         billing_cycle: cycle,
         subscription_status: 'active',
         current_period_end: periodEnd.toISOString(),
+        access_until: periodEnd.getTime(), // server-enforced expiry (Firestore rules)
         last_payment_intent: paymentIntentId,
     });
 }

@@ -25,6 +25,7 @@ export interface UserProfile {
   subscription_id?: string;
   subscription_status?: 'active' | 'past_due' | 'canceled' | 'incomplete';
   current_period_end?: string; // ISO date
+  access_until?: number; // epoch millis — single source of truth for expiry (enforced in Firestore rules)
   plan_name?: PlanName;
   billing_cycle?: BillingCycle;
   stripe_customer_id?: string;

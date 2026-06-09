@@ -497,13 +497,16 @@ export default function AdminDashboard() {
                 updates.billing_cycle = cycle;
                 updates.subscription_status = 'active';
                 updates.current_period_end = periodEnd.toISOString();
+                updates.access_until = periodEnd.getTime(); // server-enforced expiry
                 updates.subscription_id = `admin_demo_${Date.now()}`;
             }
-            // If switching to active (lifetime), clear subscription fields
+            // If switching to active (lifetime), clear subscription fields.
+            // access_until is cleared too — rules grant 'active' unconditionally.
             if (license === 'active') {
                 updates.subscription_id = undefined;
                 updates.subscription_status = undefined;
                 updates.current_period_end = undefined;
+                updates.access_until = undefined;
             }
             await updateUserLicense(uid, updates);
             await loadUsers(true);

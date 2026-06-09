@@ -25,10 +25,25 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') != 'banned';
     }
 
+    // ── License enforcement (server-side) ────────────────────────────────
+    // Block data WRITES once the plan lapses so limits can't be bypassed by
+    // hitting Firestore directly (outside the app UI). Reads stay open so an
+    // expired user never loses access to their own data.
+    //   • 'active'            → lifetime, always allowed
+    //   • access_until == 0   → legacy doc without the field → grace (allow)
+    //   • access_until > now  → still within the paid/trial period
+    function licenseActive(userId) {
+      let u = get(/databases/$(database)/documents/users/$(userId)).data;
+      let au = u.get('access_until', 0);
+      return u.get('license', 'trial') == 'active'
+             || au == 0
+             || au > request.time.toMillis();
+    }
+
     // Fields only the backend (or admin) should write — never the user directly
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
-                             'current_period_end', 'plan_name', 'billing_cycle',
+                             'current_period_end', 'access_until', 'plan_name', 'billing_cycle',
                              'stripe_customer_id', 'trial_expires_at', 'role', 'status'];
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields);
     }
@@ -43,17 +58,22 @@ service cloud.firestore {
       allow create: if isOwner(userId) && !isWritingProtectedFields();
 
       // ── Buildings ───────────────────────────────────────────────────────
+      // read: any non-banned owner. write: also requires a non-expired license.
       match /buildings/{buildingId} {
-        allow read, write: if isOwner(userId) && isNotBanned();
+        allow read: if isOwner(userId) && isNotBanned();
+        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
 
         match /rooms/{roomId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read: if isOwner(userId) && isNotBanned();
+          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         match /bills/{billId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read: if isOwner(userId) && isNotBanned();
+          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         match /data/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read: if isOwner(userId) && isNotBanned();
+          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         // Slip images stored as base64 by the LINE webhook (Admin SDK bypasses rules).
         // Owner may read to view slips on the web; clients may not write.
@@ -65,16 +85,20 @@ service cloud.firestore {
 
       // ── Legacy flat paths ──────────────────────────────────────────────
       match /rooms/{roomId} {
-        allow read, write: if isOwner(userId) && isNotBanned();
+        allow read: if isOwner(userId) && isNotBanned();
+        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
       }
       match /bills/{billId} {
-        allow read, write: if isOwner(userId) && isNotBanned();
+        allow read: if isOwner(userId) && isNotBanned();
+        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
       }
       match /data/{docId} {
-        allow read, write: if isOwner(userId) && isNotBanned();
+        allow read: if isOwner(userId) && isNotBanned();
+        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
       }
       match /{subCol}/{docId} {
-        allow read, write: if isOwner(userId) && isNotBanned();
+        allow read: if isOwner(userId) && isNotBanned();
+        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
       }
     }
 
