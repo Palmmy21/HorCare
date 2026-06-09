@@ -7,7 +7,7 @@ import {
 import type { MonthlyBill, Room, DormConfig, PaymentStatus } from '../../types';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc } from 'firebase/firestore';
-import { storage, db } from '../../firebase/config';
+import { storage, db, auth } from '../../firebase/config';
 
 interface PaymentsPageProps {
     bills: MonthlyBill[];
@@ -70,10 +70,29 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         return true;
     });
 
+    // แจ้งลูกหอทาง LINE ว่าเจ้าของยืนยันการจ่ายแล้ว — best-effort, ไม่ให้กระทบการยืนยัน
+    // ถ้าส่งไม่สำเร็จ (ห้องยังไม่ผูก LINE / token หมด) ก็เงียบไว้ ไม่ขึ้น error ให้เจ้าของ
+    const notifyTenantPaid = async (b: MonthlyBill) => {
+        if (!uid || !buildingId) return;
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+            await fetch('/api/notify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ building_id: buildingId, bill_id: b.id }),
+            });
+        } catch (err) {
+            console.warn('notify-payment failed:', err);
+        }
+    };
+
     const confirmPaid = async (b: MonthlyBill) => {
         setProcessingId(b.id);
         try {
             await onUpdatePayment(b.id, { payment_status: 'paid', paid_at: new Date().toISOString(), paid_method: 'manual' });
+            // ยืนยันใน Firestore สำเร็จแล้วค่อยแจ้ง LINE — ไม่ await แบบบล็อก UI
+            void notifyTenantPaid(b);
         } finally { setProcessingId(null); }
     };
     const undoPaid = async (b: MonthlyBill) => {
