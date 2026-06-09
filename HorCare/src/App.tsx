@@ -15,6 +15,7 @@ import MeterRecording from './components/MeterRecording/MeterRecording';
 import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
+import VerifyEmailWall from './components/Auth/VerifyEmailWall';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import PaymentsPage from './components/Payments/PaymentsPage';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
@@ -43,7 +44,9 @@ function App() {
   // Auth
   const {
     user, profile, loading: authLoading, error: authError,
-    login, register, logout, resetPassword, isTrialExpired, trialDaysLeft, isBanned, setError
+    emailVerified, login, register, logout, resetPassword,
+    resendVerification, refreshEmailVerified,
+    isTrialExpired, trialDaysLeft, isBanned, setError
   } = useAuth();
 
   // Buildings (multi-building support — Large plan)
@@ -294,6 +297,19 @@ function App() {
         onResetPassword={resetPassword}
         error={authError}
         clearError={() => setError(null)}
+      />
+    );
+  }
+
+  // Email not verified → block usage until verified (admin exempt to avoid lockout).
+  // Stops fake-email signups and unlimited free-trial farming via throwaway emails.
+  if (!emailVerified && user.email !== 'sakdidechneverdie@gmail.com') {
+    return (
+      <VerifyEmailWall
+        email={user.email ?? ''}
+        onResend={resendVerification}
+        onRefresh={refreshEmailVerified}
+        onLogout={logout}
       />
     );
   }

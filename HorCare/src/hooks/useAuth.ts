@@ -6,6 +6,7 @@ import {
     signOut,
     updateProfile,
     sendPasswordResetEmail,
+    sendEmailVerification,
     setPersistence,
     browserLocalPersistence,
     type User
@@ -21,6 +22,9 @@ export function useAuth() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    // Tracked in state (not read off `user` directly) so a manual reload() after
+    // the tenant clicks the verify link can flip the gate without a full reload.
+    const [emailVerified, setEmailVerified] = useState(false);
 
     // Listen to auth state
     useEffect(() => {
@@ -28,6 +32,7 @@ export function useAuth() {
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
+            setEmailVerified(firebaseUser?.emailVerified ?? false);
             // Always unsubscribe old profile listener first to prevent leaks
             if (profileUnsubscribe) {
                 profileUnsubscribe();
@@ -69,6 +74,14 @@ export function useAuth() {
             await setPersistence(auth, browserLocalPersistence);
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(cred.user, { displayName });
+
+            // ส่งอีเมลยืนยันตัวตน — กันสมัครด้วยอีเมลปลอม + กันเปิดหลายบัญชีรับ trial ฟรี.
+            // best-effort: ถ้าส่งพลาด (เช่นโดน rate-limit) ก็ยังให้สมัครต่อได้ แล้วกดส่งซ้ำที่หน้า gate
+            try {
+                await sendEmailVerification(cred.user);
+            } catch (e) {
+                console.warn('sendEmailVerification on register failed:', (e as Error).message);
+            }
 
             // Create user profile in Firestore
             const trialExpires = new Date();
@@ -135,6 +148,23 @@ export function useAuth() {
         setProfile(null);
     }, []);
 
+    // ส่งอีเมลยืนยันซ้ำ (เรียกจากหน้า gate) — โยน error code ให้ผู้เรียกแสดงข้อความเอง
+    const resendVerification = useCallback(async () => {
+        if (!auth.currentUser) throw new Error('not-signed-in');
+        await sendEmailVerification(auth.currentUser);
+    }, []);
+
+    // เช็คสถานะยืนยันอีเมลใหม่หลังผู้ใช้กดลิงก์ในอีเมล — reload() จาก Firebase
+    // แล้วอัปเดต state เพื่อปลดล็อก gate โดยไม่ต้องล็อกอินใหม่. คืน true ถ้ายืนยันแล้ว
+    const refreshEmailVerified = useCallback(async (): Promise<boolean> => {
+        if (!auth.currentUser) return false;
+        await auth.currentUser.reload();
+        const verified = auth.currentUser.emailVerified;
+        setEmailVerified(verified);
+        setUser(auth.currentUser);
+        return verified;
+    }, []);
+
     // Reset Password (Forgot Password)
     const resetPassword = useCallback(async (email: string) => {
         setError(null);
@@ -175,10 +205,13 @@ export function useAuth() {
         profile,
         loading,
         error,
+        emailVerified,
         register,
         login,
         logout,
         resetPassword,
+        resendVerification,
+        refreshEmailVerified,
         isTrialExpired,
         isLicenseActive,
         trialDaysLeft,
