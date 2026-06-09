@@ -115,7 +115,7 @@ function App() {
     getMonthStats,
     deleteBill,
     updateBillPayment
-  } = useFirestore(user?.uid ?? null, activeBuildingId);
+  } = useFirestore(user?.uid ?? null, activeBuildingId, currentMonth);
 
   // Auto-clean orphaned bills (e.g. from deleted rooms)
   useEffect(() => {
@@ -558,7 +558,9 @@ function App() {
             stats={stats}
             currentMonth={currentMonth}
             recentBills={monthBills}
+            allBills={bills}
             uid={user?.uid}
+            onGoToPayments={() => setCurrentView('payments')}
           />
         )}
 
@@ -611,6 +613,8 @@ function App() {
             currentMonth={currentMonth}
             onMonthChange={setCurrentMonth}
             onUpdatePayment={updateBillPayment}
+            uid={user?.uid}
+            buildingId={activeBuildingId ?? undefined}
           />
         )}
 

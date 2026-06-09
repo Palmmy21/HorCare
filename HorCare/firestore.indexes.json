@@ -10,5 +10,22 @@
             ]
         }
     ],
-    "fieldOverrides": []
+    "fieldOverrides": [
+        {
+            "collectionGroup": "slip_images",
+            "fieldPath": "created_at",
+            "indexes": [
+                { "order": "ASCENDING", "queryScope": "COLLECTION" },
+                { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+            ]
+        },
+        {
+            "collectionGroup": "slip_refs",
+            "fieldPath": "created_at",
+            "indexes": [
+                { "order": "ASCENDING", "queryScope": "COLLECTION" },
+                { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+            ]
+        }
+    ]
 }

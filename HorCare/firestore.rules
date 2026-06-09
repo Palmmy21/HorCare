@@ -55,6 +55,12 @@ service cloud.firestore {
         match /data/{docId} {
           allow read, write: if isOwner(userId) && isNotBanned();
         }
+        // Slip images stored as base64 by the LINE webhook (Admin SDK bypasses rules).
+        // Owner may read to view slips on the web; clients may not write.
+        match /slip_images/{slipId} {
+          allow read: if isOwner(userId) && isNotBanned();
+          allow write: if false; // backend only via admin SDK
+        }
       }
 
       // ── Legacy flat paths ──────────────────────────────────────────────

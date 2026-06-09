@@ -1,119 +1,106 @@
 import { admin } from './_firebase.js';
+import { createHash } from 'crypto';
+import { Jimp } from 'jimp';
+import * as jsQRns from 'jsqr';
+
+// jsqr ships a CJS `module.exports = jsQR` with an ESM-style `export default`
+// in its .d.ts — normalize so it resolves to the callable under any bundler.
+const jsQR = ((jsQRns as any).default ?? jsQRns) as
+    (data: Uint8ClampedArray, width: number, height: number) => { data: string } | null;
 
 /**
- * SlipOK slip-verification helpers.
+ * Free, unlimited slip handling — no third-party verification API.
  *
- * Free tier: 100 verifications/month — enough for a single dorm.
- * Sign up at https://slipok.com to get a Branch ID + API key, then set:
- *   SLIPOK_BRANCH_ID, SLIPOK_API_KEY   (Vercel env)
+ * Every Thai bank transfer slip carries a QR code whose payload is unique to
+ * that transaction (it embeds the sending bank + a transaction reference). We
+ * decode it locally (pure-JS, runs in the serverless function) and use the
+ * payload as a fingerprint to reject duplicate / reused slips — the single most
+ * common cheat. The owner confirms the amount from the slip image in the app.
  *
- * Docs: https://slipok.com/api-documentation/
+ * This is NOT bank-grade verification (a photoshopped slip with a novel QR could
+ * pass), but it is free and scales to any dorm size, and it blocks slip reuse.
  */
 
-export interface SlipVerifyResult {
-    /** true = SlipOK confirmed the slip is a real, successful transfer */
-    verified: boolean;
-    amount?: number;        // THB transferred
-    transRef?: string;      // bank transaction ref (SlipOK also rejects duplicates itself)
-    senderName?: string;
-    receiverName?: string;
-    receiverAcc?: string;   // masked receiver account / proxy value
-    sendingBank?: string;
-    /** machine reason when not verified: 'no_config' | 'duplicate' | 'unreadable' | 'api_error' | 'quota' */
-    reason?: string;
-    /** human-readable note (Thai) for the owner / tenant */
-    message?: string;
+export interface SlipQR {
+    payload: string | null;   // decoded QR text, or null if no QR was found
+    looksLikeSlip: boolean;    // loose heuristic — used only for the status note
 }
 
-const SLIPOK_BASE = 'https://api.slipok.com/api/line/apikey';
-
-/** Verify a slip image buffer through SlipOK. Never throws — returns reason on failure. */
-export async function verifySlip(image: Buffer, contentType = 'image/jpeg'): Promise<SlipVerifyResult> {
-    const branchId = process.env.SLIPOK_BRANCH_ID;
-    const apiKey = process.env.SLIPOK_API_KEY;
-    if (!branchId || !apiKey) {
-        return { verified: false, reason: 'no_config', message: 'ยังไม่ได้ตั้งค่าระบบตรวจสลิปอัตโนมัติ' };
-    }
-
+/** Decode the QR embedded in a slip image. Never throws. */
+export async function decodeSlipQR(image: Buffer): Promise<SlipQR> {
     try {
-        const form = new FormData();
-        // SlipOK accepts the slip image via the `files` field (multipart)
-        form.append('files', new Blob([new Uint8Array(image)], { type: contentType }), 'slip.jpg');
-        form.append('log', 'true');
-
-        const res = await fetch(`${SLIPOK_BASE}/${branchId}`, {
-            method: 'POST',
-            headers: { 'x-authorization': apiKey },
-            body: form,
-        });
-
-        const json: any = await res.json().catch(() => ({}));
-
-        // SlipOK error envelope: { success:false, code, message }
-        if (!res.ok || json?.success === false) {
-            const code = json?.code;
-            // 1012 = slip already used (duplicate); 1013/1014 = invalid/unreadable; 1xxx quota etc.
-            if (code === 1012) return { verified: false, reason: 'duplicate', message: 'สลิปนี้ถูกใช้ไปแล้ว' };
-            if (code === 1010 || code === 1011) return { verified: false, reason: 'unreadable', message: 'อ่านสลิปไม่ได้ กรุณาส่งภาพให้ชัดขึ้น' };
-            return {
-                verified: false,
-                reason: res.status === 429 ? 'quota' : 'api_error',
-                message: json?.message || 'ตรวจสลิปไม่สำเร็จ',
-            };
+        const img = await Jimp.read(image);
+        // Cap very large images so jsQR stays fast; keep aspect ratio.
+        if (img.bitmap.width > 1400) {
+            img.resize({ w: 1400 });
         }
-
-        const d = json?.data ?? {};
-        const amount = typeof d.amount === 'number' ? d.amount : Number(d.amount);
-        return {
-            verified: true,
-            amount: Number.isFinite(amount) ? amount : undefined,
-            transRef: d.transRef || d.transRefId || undefined,
-            senderName: d.sender?.displayName || d.sender?.name || undefined,
-            receiverName: d.receiver?.displayName || d.receiver?.name || undefined,
-            receiverAcc: d.receiver?.account?.value || d.receiver?.proxy?.value || undefined,
-            sendingBank: d.sendingBank || d.sender?.bank?.name || undefined,
-        };
-    } catch (err: any) {
-        return { verified: false, reason: 'api_error', message: err?.message || 'เชื่อมต่อระบบตรวจสลิปไม่ได้' };
+        const { data, width, height } = img.bitmap;
+        const code = jsQR(
+            new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
+            width,
+            height,
+        );
+        const payload = code?.data?.trim() || null;
+        return { payload, looksLikeSlip: payload ? isThaiSlipQR(payload) : false };
+    } catch {
+        return { payload: null, looksLikeSlip: false };
     }
 }
 
-/** last 4 significant digits of an account / promptpay number */
-function last4(s?: string): string | null {
-    if (!s) return null;
-    const digits = s.replace(/\D/g, '');
-    return digits.length >= 4 ? digits.slice(-4) : null;
-}
-
 /**
- * Decide whether a verified slip should auto-confirm the bill.
- * Returns { ok, note } — ok=false means keep it 'pending' for the owner to review.
+ * Loose sanity check that a decoded QR is a Thai bank slip rather than some
+ * random QR (e.g. a website link). Slip-verify payloads are EMVCo TLV strings
+ * starting with the "00" version tag and contain a long numeric reference.
+ * Intentionally lenient — it only flavours the status note, never rejects.
  */
-export function matchSlipToBill(
-    slip: SlipVerifyResult,
-    billTotal: number,
-    ownerPromptpay?: string,
-): { ok: boolean; note?: string } {
-    if (!slip.verified) return { ok: false, note: slip.message };
+export function isThaiSlipQR(payload: string): boolean {
+    const digits = payload.replace(/\D/g, '');
+    return /^00\d{2}/.test(payload) && digits.length >= 18;
+}
 
-    // Amount must cover the bill (allow 1 baht rounding tolerance)
-    if (typeof slip.amount === 'number' && slip.amount + 1 < billTotal) {
-        return { ok: false, note: `ยอดในสลิป ฿${slip.amount.toLocaleString()} น้อยกว่ายอดบิล ฿${billTotal.toLocaleString()}` };
-    }
-
-    // Soft receiver check: only reject if we can read a receiver number AND its last 4 differ
-    const want = last4(ownerPromptpay);
-    const got = last4(slip.receiverAcc);
-    if (want && got && want !== got) {
-        return { ok: false, note: `บัญชีผู้รับในสลิปไม่ตรงกับบัญชีหอ (ลงท้าย ${got})` };
-    }
-
-    return { ok: true };
+/** Stable fingerprint of a slip's QR payload — used as the dedup key. */
+export function slipFingerprint(payload: string): string {
+    return createHash('sha256').update(payload.trim()).digest('hex').slice(0, 32);
 }
 
 /**
- * Best-effort upload of the slip image to Firebase Storage so the owner can view it.
- * Returns the storage path, or null if Storage isn't enabled (core flow still works).
+ * ย่อ + บีบอัดสลิปเป็น data URL (base64 JPEG) เพื่อเก็บลง Firestore โดยตรง.
+ *
+ * ทำไมไม่ใช้ Firebase Storage: ตอนนี้ Storage บังคับแพลน Blaze (ผูกบัตร) สำหรับ
+ * bucket ใหม่ ซึ่งขัดกับเป้าหมาย "ฟรี". การเก็บภาพที่ย่อแล้วเป็น base64 ใน Firestore
+ * (Spark ฟรี 1GB) ทำให้เจ้าของเปิดดูสลิปบนเว็บได้ทันทีโดยไม่ต้องเปิดบริการเสริมใดๆ.
+ *
+ * คุมขนาดให้ต่ำกว่าลิมิตเอกสาร Firestore (~1MB) ด้วยการลดความกว้าง/คุณภาพเป็นชั้นๆ.
+ * คืน null ถ้าบีบแล้วยังใหญ่เกินหรืออ่านภาพไม่ได้ (flow ที่เหลือยังทำงาน — แค่ไม่มีรูป).
+ */
+export async function compressSlipToDataUrl(image: Buffer): Promise<string | null> {
+    try {
+        const img = await Jimp.read(image);
+        // ไล่จากใหญ่/คมไปเล็ก/บีบ — resize ลดขนาดอย่างเดียวจึงทำต่อเนื่องได้
+        const attempts = [
+            { w: 800, q: 62 },
+            { w: 640, q: 52 },
+            { w: 520, q: 42 },
+        ];
+        for (const { w, q } of attempts) {
+            if (img.bitmap.width > w) img.resize({ w });
+            const buf = await img.getBuffer('image/jpeg', { quality: q });
+            const dataUrl = `data:image/jpeg;base64,${buf.toString('base64')}`;
+            if (dataUrl.length < 950_000) return dataUrl;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Best-effort upload of the slip image to Firebase Storage so the owner can view
+ * it. Returns the storage path, or null if Storage isn't enabled (the rest of
+ * the flow still works — the owner just can't see the picture).
+ *
+ * NOTE: kept for backward compatibility with slips stored before the switch to
+ * inline base64 (see compressSlipToDataUrl). New slips no longer use Storage.
  */
 export async function uploadSlipImage(
     uid: string,

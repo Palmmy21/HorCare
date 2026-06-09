@@ -117,7 +117,8 @@ export interface MonthlyBill {
   // ── Payment tracking (tenant sends slip via LINE) ──
   // undefined is treated as 'unpaid' for legacy bills
   payment_status?: PaymentStatus;
-  slip_path?: string;          // Firebase Storage path of the uploaded slip image
+  slip_path?: string;          // legacy: Firebase Storage path of the uploaded slip image
+  slip_image?: boolean;        // true = compressed slip image stored as base64 in slip_images/{billId}
   slip_amount?: number;        // amount read from the verified slip (THB)
   slip_ref?: string;           // bank transaction reference — used to reject duplicate slips
   slip_sender?: string;        // payer display name from the slip

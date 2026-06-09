@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } from './_line.js';
-import { verifySlip, matchSlipToBill, uploadSlipImage } from './_slip.js';
+import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl } from './_slip.js';
 
 export const config = {
     api: {
@@ -55,6 +55,21 @@ async function handleEvent(event: any) {
     const replyToken: string = event.replyToken;
     if (!lineUserId || !replyToken) return;
 
+    // กันทั้ง webhook ล้มเพราะ event เดียว — log แล้วตอบข้อความสุภาพแทนการเงียบหาย
+    try {
+        await dispatchEvent(event, lineUserId, replyToken);
+    } catch (err) {
+        console.error('LINE event handler failed:', (err as Error).message, err);
+        try {
+            await lineReply(replyToken, [{
+                type: 'text',
+                text: 'ขออภัยค่ะ ระบบขัดข้องชั่วคราว 🙏 กรุณาลองใหม่อีกครั้งในอีกสักครู่นะคะ',
+            }]);
+        } catch { /* reply token อาจหมดอายุ — ปล่อยผ่าน */ }
+    }
+}
+
+async function dispatchEvent(event: any, lineUserId: string, replyToken: string) {
     // ── Slip image: tenant sends a payment slip photo ─────────────
     if (event.message?.type === 'image') {
         await handleSlipImage(lineUserId, replyToken, event.message.id);
@@ -131,6 +146,29 @@ async function handleEvent(event: any) {
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
+
+/**
+ * หาบิลล่าสุดที่ "บันทึกแล้ว" ของห้อง.
+ *
+ * จงใจ query ด้วย field เดียว (room_id) แล้วกรอง is_saved + เรียง month ใน memory
+ * แทนการใช้ .where('is_saved').orderBy('month') ซึ่งต้องมี composite index —
+ * ถ้า index ยังไม่ถูก deploy บน Firebase, query นั้นจะ throw และลูกหอจะพิมพ์ "บิล"
+ * แล้วไม่ได้อะไรกลับเลย. ห้องหนึ่งมีบิลไม่กี่สิบรอบ การเรียงใน memory จึงถูกและชัวร์.
+ */
+async function getLatestSavedBill(
+    uid: string,
+    buildingId: string,
+    roomId: string,
+): Promise<FirebaseFirestore.QueryDocumentSnapshot | null> {
+    const snap = await db
+        .collection(`users/${uid}/buildings/${buildingId}/bills`)
+        .where('room_id', '==', roomId)
+        .get();
+    const saved = snap.docs
+        .filter(d => d.data().is_saved === true)
+        .sort((a, b) => String(b.data().month).localeCompare(String(a.data().month)));
+    return saved[0] ?? null;
+}
 
 /** รับรหัสหอ HC-XXXXXX แล้วย้ายไป step รอเลขห้อง */
 async function handleDormCode(lineUserId: string, replyToken: string, dormCode: string) {
@@ -225,15 +263,9 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
 
     const { uid, building_id, room_id, room_number, dorm_name, due_day } = lineRoomSnap.data()!;
 
-    const billsSnap = await db
-        .collection(`users/${uid}/buildings/${building_id}/bills`)
-        .where('room_id', '==', room_id)
-        .where('is_saved', '==', true)
-        .orderBy('month', 'desc')
-        .limit(1)
-        .get();
+    const billDoc = await getLatestSavedBill(uid, building_id, room_id);
 
-    if (billsSnap.empty) {
+    if (!billDoc) {
         await lineReply(replyToken, [{
             type: 'text',
             text: `📋 ยังไม่มีบิลสำหรับห้อง ${room_number} ค่ะ\nรอเจ้าของหอออกบิลประจำเดือนได้เลย`,
@@ -241,11 +273,14 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
         return;
     }
 
-    const bill = billsSnap.docs[0].data();
+    const bill = billDoc.data();
     await lineReply(replyToken, [buildBillFlex(bill, dorm_name || '-', due_day ?? 5, bill.month as string)]);
 }
 
-/** รับสลิปจากลูกหอ → ตรวจอัตโนมัติด้วย SlipOK → ผูกกับบิลล่าสุด */
+/**
+ * รับสลิปจากลูกหอ → decode QR กันสลิปซ้ำ (ฟรี ไม่จำกัด) → ตั้งเป็น "รอตรวจสอบ"
+ * ให้เจ้าของยืนยันยอดในแอป. สลิปซ้ำ/เคยใช้แล้วจะถูกปฏิเสธทันที.
+ */
 async function handleSlipImage(lineUserId: string, replyToken: string, messageId: string) {
     // 1. ต้องลงทะเบียนก่อน
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
@@ -259,15 +294,9 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     const { uid, building_id, room_id, room_number } = lineRoomSnap.data()!;
 
     // 2. หาบิลล่าสุดของห้อง
-    const billsSnap = await db
-        .collection(`users/${uid}/buildings/${building_id}/bills`)
-        .where('room_id', '==', room_id)
-        .where('is_saved', '==', true)
-        .orderBy('month', 'desc')
-        .limit(1)
-        .get();
+    const billDoc = await getLatestSavedBill(uid, building_id, room_id);
 
-    if (billsSnap.empty) {
+    if (!billDoc) {
         await lineReply(replyToken, [{
             type: 'text',
             text: `📋 ยังไม่มีบิลสำหรับห้อง ${room_number} ค่ะ\nรอเจ้าของหอออกบิลก่อนนะคะ`,
@@ -275,7 +304,6 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
         return;
     }
 
-    const billDoc = billsSnap.docs[0];
     const bill = billDoc.data();
 
     if (bill.payment_status === 'paid') {
@@ -296,47 +324,64 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
         return;
     }
 
-    // 4. บัญชีรับเงินของเจ้าของหอ (ไว้เทียบผู้รับ)
-    const configSnap = await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get();
-    const ownerPromptpay = configSnap.data()?.bill_customization?.promptpay_number as string | undefined;
+    // 4. decode QR ในสลิป (ฟรี ไม่จำกัด)
+    const qr = await decodeSlipQR(img.buffer);
 
-    // 5. ตรวจสลิป + อัปโหลดเก็บภาพ (best-effort)
-    const slip = await verifySlip(img.buffer, img.contentType);
-    const slipPath = await uploadSlipImage(uid, building_id, billDoc.id, img.buffer, img.contentType);
-
-    const now = new Date().toISOString();
-    const slipFields: Record<string, unknown> = {
-        slip_submitted_at: now,
-        ...(slipPath ? { slip_path: slipPath } : {}),
-        ...(slip.amount != null ? { slip_amount: slip.amount } : {}),
-        ...(slip.transRef ? { slip_ref: slip.transRef } : {}),
-        ...(slip.senderName ? { slip_sender: slip.senderName } : {}),
-        ...(slip.sendingBank ? { slip_bank: slip.sendingBank } : {}),
-    };
-
-    const match = matchSlipToBill(slip, bill.total_bill as number, ownerPromptpay);
-
-    if (match.ok) {
-        await billDoc.ref.update({
-            ...slipFields,
-            payment_status: 'paid',
-            paid_at: now,
-            paid_method: 'auto',
-            verify_note: admin.firestore.FieldValue.delete(),
-        });
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `✅ ตรวจสลิปผ่านแล้วค่ะ!\n\n🏠 ห้อง ${room_number}\n💰 ยอด ฿${(slip.amount ?? bill.total_bill).toLocaleString()}\n\nชำระเรียบร้อย ขอบคุณค่ะ 🙏`,
-        }]);
-    } else {
-        await billDoc.ref.update({
-            ...slipFields,
-            payment_status: 'pending',
-            ...(match.note ? { verify_note: match.note } : {}),
-        });
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n⏳ ${match.note || 'อยู่ระหว่างตรวจสอบ'}\nเจ้าของหอจะตรวจสอบและยืนยันให้อีกครั้งค่ะ`,
-        }]);
+    // 5. กันสลิปซ้ำ — claim fingerprint แบบ atomic ด้วย create()
+    let duplicate = false;
+    let fingerprint: string | null = null;
+    if (qr.payload) {
+        fingerprint = slipFingerprint(qr.payload);
+        const refDoc = db.doc(`users/${uid}/buildings/${building_id}/slip_refs/${fingerprint}`);
+        try {
+            await refDoc.create({
+                bill_id: billDoc.id,
+                room_id,
+                room_number,
+                created_at: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        } catch {
+            duplicate = true; // เอกสารมีอยู่แล้ว = สลิปนี้ถูกใช้ไปแล้ว
+        }
     }
+
+    if (duplicate) {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: `⚠️ สลิปนี้ถูกใช้ไปแล้วค่ะ\n\nหากเพิ่งโอนสำหรับห้อง ${room_number} กรุณาส่ง "สลิปจริงของรอบนี้" นะคะ`,
+        }]);
+        return;
+    }
+
+    // 6. ย่อ+เก็บภาพสลิปเป็น base64 ใน Firestore (ฟรี ไม่ต้องเปิด Storage) ให้เจ้าของเปิดดูบนเว็บ
+    const dataUrl = await compressSlipToDataUrl(img.buffer);
+    if (dataUrl) {
+        await db.doc(`users/${uid}/buildings/${building_id}/slip_images/${billDoc.id}`).set({
+            data_url: dataUrl,
+            room_number,
+            bill_id: billDoc.id,
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+
+    // 7. ตั้งเป็น "รอตรวจสอบ" ให้เจ้าของยืนยันยอด
+    const now = new Date().toISOString();
+    const qrPassed = !!qr.payload;
+
+    await billDoc.ref.update({
+        payment_status: 'pending',
+        slip_submitted_at: now,
+        ...(dataUrl ? { slip_image: true } : {}),
+        ...(fingerprint ? { slip_ref: fingerprint.slice(0, 12) } : {}),
+        verify_note: qrPassed
+            ? 'ตรวจ QR ผ่าน (ไม่ซ้ำ) — รอเจ้าของยืนยันยอด'
+            : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา',
+    });
+
+    await lineReply(replyToken, [{
+        type: 'text',
+        text: qrPassed
+            ? `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n✅ ตรวจ QR ผ่าน (ไม่ซ้ำ)\nเจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ 🙏`
+            : `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n⏳ ระบบอ่าน QR ไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`,
+    }]);
 }

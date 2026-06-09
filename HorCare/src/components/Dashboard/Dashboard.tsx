@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     Home, Zap, Droplets,
     TrendingUp, CheckCircle, Clock,
     BarChart3, CheckSquare, FileText, LineChart, Settings, ClipboardList,
-    SlidersHorizontal, X
+    SlidersHorizontal, X, Wallet, CircleDollarSign, AlertCircle, ChevronRight,
 } from 'lucide-react';
-import type { DormConfig, MonthlyBill } from '../../types';
-import { formatCurrency, formatMonthThai } from '../../utils/calculations';
+import type { DormConfig, MonthlyBill, PaymentStatus } from '../../types';
+import { formatCurrency, formatMonthThai, getPreviousMonth } from '../../utils/calculations';
 import { useDashboardPrefs, WIDGET_LABELS, type WidgetId } from '../../hooks/useDashboardPrefs';
 
 interface DashboardProps {
@@ -20,10 +20,16 @@ interface DashboardProps {
     };
     currentMonth: string;
     recentBills: MonthlyBill[];
+    allBills?: MonthlyBill[];
     uid?: string;
+    onGoToPayments?: () => void;
 }
 
-export default function Dashboard({ config, stats, currentMonth, recentBills, uid }: DashboardProps) {
+function statusOf(b: MonthlyBill): PaymentStatus {
+    return b.payment_status ?? 'unpaid';
+}
+
+export default function Dashboard({ config, stats, currentMonth, recentBills, allBills = [], uid, onGoToPayments }: DashboardProps) {
     const [showCustomize, setShowCustomize] = useState(false);
     const { allWidgets, toggle, isEnabled } = useDashboardPrefs(uid);
 
@@ -31,6 +37,39 @@ export default function Dashboard({ config, stats, currentMonth, recentBills, ui
     const totalWaterUnits = recentBills.reduce((sum, b) => sum + b.water_units, 0);
     const totalElecBill = recentBills.reduce((sum, b) => sum + b.elec_bill, 0);
     const totalWaterBill = recentBills.reduce((sum, b) => sum + b.water_bill, 0);
+
+    // ── Collection: projected (saved bills) vs actual (paid bills) for this month ──
+    const collection = useMemo(() => {
+        const saved = recentBills.filter(b => b.is_saved);
+        let projected = 0, collected = 0, paid = 0, pending = 0, unpaid = 0;
+        for (const b of saved) {
+            projected += b.total_bill;
+            const s = statusOf(b);
+            if (s === 'paid') { collected += b.total_bill; paid++; }
+            else if (s === 'pending') pending++;
+            else unpaid++;
+        }
+        const outstanding = projected - collected;
+        const rate = projected > 0 ? Math.round((collected / projected) * 100) : 0;
+        return { projected, collected, outstanding, paid, pending, unpaid, rate, total: saved.length };
+    }, [recentBills]);
+
+    // ── 6-month revenue trend (projected vs collected per month) ──
+    const trend = useMemo(() => {
+        const months: string[] = [];
+        let m = currentMonth;
+        for (let i = 0; i < 6; i++) { months.unshift(m); m = getPreviousMonth(m); }
+        const rows = months.map(month => {
+            const saved = allBills.filter(b => b.month === month && b.is_saved);
+            const projected = saved.reduce((s, b) => s + b.total_bill, 0);
+            const collected = saved.filter(b => statusOf(b) === 'paid').reduce((s, b) => s + b.total_bill, 0);
+            return { month, projected, collected };
+        });
+        const peak = Math.max(1, ...rows.map(r => r.projected));
+        return { rows, peak };
+    }, [allBills, currentMonth]);
+
+    const hasTrend = trend.rows.some(r => r.projected > 0);
 
     return (
         <div>
@@ -52,6 +91,71 @@ export default function Dashboard({ config, stats, currentMonth, recentBills, ui
                     ปรับแต่ง
                 </button>
             </div>
+
+            {/* ── Collection overview (projected vs actual income) ── */}
+            {isEnabled('collection') && (
+                <div className="collection-panel card mb-6">
+                    <div className="collection-head">
+                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <CircleDollarSign size={18} /> การเก็บเงินรอบนี้
+                        </span>
+                        {onGoToPayments && (
+                            <button className="collection-link" onClick={onGoToPayments}>
+                                จัดการสลิป <ChevronRight size={14} />
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="collection-body">
+                        {/* Donut: collection rate */}
+                        <div className="collection-ring-wrap">
+                            <div
+                                className="collection-ring"
+                                style={{ ['--rate' as string]: `${collection.rate}` }}
+                            >
+                                <div className="collection-ring-center">
+                                    <span className="collection-ring-pct">{collection.rate}%</span>
+                                    <span className="collection-ring-cap">เก็บได้</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Figures */}
+                        <div className="collection-figures">
+                            <div className="collection-fig">
+                                <span className="collection-fig-label"><TrendingUp size={14} /> รายได้คาดการณ์</span>
+                                <span className="collection-fig-value">{formatCurrency(collection.projected)}</span>
+                            </div>
+                            <div className="collection-fig">
+                                <span className="collection-fig-label" style={{ color: 'var(--color-success)' }}><CheckCircle size={14} /> รายได้จริง (เก็บแล้ว)</span>
+                                <span className="collection-fig-value" style={{ color: 'var(--color-success)' }}>{formatCurrency(collection.collected)}</span>
+                            </div>
+                            <div className="collection-fig">
+                                <span className="collection-fig-label" style={{ color: 'var(--color-danger)' }}><AlertCircle size={14} /> ค้างชำระ</span>
+                                <span className="collection-fig-value" style={{ color: 'var(--color-danger)' }}>{formatCurrency(collection.outstanding)}</span>
+                            </div>
+
+                            {/* Stacked status bar */}
+                            <div className="collection-statusbar">
+                                {collection.total > 0 ? (
+                                    <>
+                                        <div className="collection-seg paid" style={{ flex: collection.paid || 0.0001 }} title={`จ่ายแล้ว ${collection.paid}`} />
+                                        <div className="collection-seg pending" style={{ flex: collection.pending || 0.0001 }} title={`รอตรวจสอบ ${collection.pending}`} />
+                                        <div className="collection-seg unpaid" style={{ flex: collection.unpaid || 0.0001 }} title={`ยังไม่จ่าย ${collection.unpaid}`} />
+                                    </>
+                                ) : (
+                                    <div className="collection-seg empty" style={{ flex: 1 }} />
+                                )}
+                            </div>
+                            <div className="collection-legend">
+                                <span><i className="dot paid" /> จ่ายแล้ว {collection.paid}</span>
+                                <span><i className="dot pending" /> รอตรวจสอบ {collection.pending}</span>
+                                <span><i className="dot unpaid" /> ยังไม่จ่าย {collection.unpaid}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Progress Bar */}
             {isEnabled('progress') && (
@@ -107,6 +211,37 @@ export default function Dashboard({ config, stats, currentMonth, recentBills, ui
                         <div className="stat-label">หน่วยน้ำรวม</div>
                         <div className="stat-value">{totalWaterUnits.toLocaleString()}</div>
                         <div className="stat-subvalue">≈ {formatCurrency(totalWaterBill)}</div>
+                    </div>
+                </div>
+            )}
+
+            {/* Revenue trend — projected vs collected over the last 6 months */}
+            {isEnabled('revenue_trend') && hasTrend && (
+                <div className="card mt-6">
+                    <div className="card-header">
+                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <BarChart3 size={18} /> แนวโน้มรายได้ย้อนหลัง 6 เดือน
+                        </span>
+                        <div className="trend-legend">
+                            <span><i className="dot projected" /> คาดการณ์</span>
+                            <span><i className="dot collected" /> เก็บได้จริง</span>
+                        </div>
+                    </div>
+                    <div className="trend-chart">
+                        {trend.rows.map(r => {
+                            const ph = Math.round((r.projected / trend.peak) * 100);
+                            return (
+                                <div key={r.month} className={`trend-col ${r.month === currentMonth ? 'current' : ''}`}>
+                                    <div className="trend-bars" title={`${formatMonthThai(r.month)} · คาดการณ์ ${formatCurrency(r.projected)} · เก็บได้ ${formatCurrency(r.collected)}`}>
+                                        <div className="trend-bar projected" style={{ height: `${ph}%` }}>
+                                            <div className="trend-bar collected" style={{ height: `${r.projected > 0 ? (r.collected / r.projected) * 100 : 0}%` }} />
+                                        </div>
+                                    </div>
+                                    <div className="trend-amount">{r.projected > 0 ? `฿${Math.round(r.projected / 1000)}k` : '–'}</div>
+                                    <div className="trend-month">{formatMonthThai(r.month)}</div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -193,25 +328,32 @@ export default function Dashboard({ config, stats, currentMonth, recentBills, ui
                                     <th className="text-right">ค่าไฟ</th>
                                     <th className="text-right">ค่าน้ำ</th>
                                     <th className="text-right">ยอดรวม</th>
-                                    <th className="text-center">สถานะ</th>
+                                    <th className="text-center">การชำระ</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {recentBills.slice(0, 5).map(bill => (
-                                    <tr key={bill.id}>
-                                        <td className="mono">{bill.room_number}</td>
-                                        <td className="text-right mono">{formatCurrency(bill.elec_bill)}</td>
-                                        <td className="text-right mono">{formatCurrency(bill.water_bill)}</td>
-                                        <td className="text-right mono font-bold">{formatCurrency(bill.total_bill)}</td>
-                                        <td className="text-center">
-                                            {bill.is_saved ? (
-                                                <span className="badge badge-success"><CheckCircle size={12} /> บันทึกแล้ว</span>
-                                            ) : (
-                                                <span className="badge badge-gray"><Clock size={12} /> รอบันทึก</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
+                                {recentBills.slice(0, 5).map(bill => {
+                                    const s = statusOf(bill);
+                                    return (
+                                        <tr key={bill.id}>
+                                            <td className="mono">{bill.room_number}</td>
+                                            <td className="text-right mono">{formatCurrency(bill.elec_bill)}</td>
+                                            <td className="text-right mono">{formatCurrency(bill.water_bill)}</td>
+                                            <td className="text-right mono font-bold">{formatCurrency(bill.total_bill)}</td>
+                                            <td className="text-center">
+                                                {!bill.is_saved ? (
+                                                    <span className="badge badge-gray"><Clock size={12} /> รอบันทึก</span>
+                                                ) : s === 'paid' ? (
+                                                    <span className="badge badge-success"><CheckCircle size={12} /> จ่ายแล้ว</span>
+                                                ) : s === 'pending' ? (
+                                                    <span className="badge badge-warning"><Clock size={12} /> รอตรวจสอบ</span>
+                                                ) : (
+                                                    <span className="badge badge-danger"><Wallet size={12} /> ยังไม่จ่าย</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

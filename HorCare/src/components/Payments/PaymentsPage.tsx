@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import type { MonthlyBill, Room, DormConfig, PaymentStatus } from '../../types';
 import { ref, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
+import { storage, db } from '../../firebase/config';
 
 interface PaymentsPageProps {
     bills: MonthlyBill[];
@@ -15,6 +16,8 @@ interface PaymentsPageProps {
     currentMonth: string;             // 'YYYY-MM'
     onMonthChange: (month: string) => void;
     onUpdatePayment: (billId: string, fields: Partial<MonthlyBill>) => Promise<void>;
+    uid?: string;
+    buildingId?: string;
 }
 
 const THAI_MONTHS = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -33,7 +36,7 @@ const STATUS_META: Record<PaymentStatus, { label: string; color: string; bg: str
 
 type FilterKey = 'all' | PaymentStatus;
 
-export default function PaymentsPage({ bills, rooms, config, currentMonth, onMonthChange, onUpdatePayment }: PaymentsPageProps) {
+export default function PaymentsPage({ bills, rooms, config, currentMonth, onMonthChange, onUpdatePayment, uid, buildingId }: PaymentsPageProps) {
     const [filter, setFilter] = useState<FilterKey>('all');
     const [search, setSearch] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
@@ -82,13 +85,24 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     };
 
     const openSlip = async (b: MonthlyBill) => {
-        if (!b.slip_path) return;
+        if (!b.slip_image && !b.slip_path) return;
         setSlipView({ loading: true, bill: b });
         try {
-            const url = await getDownloadURL(ref(storage, b.slip_path));
-            setSlipView({ url, loading: false, bill: b });
+            // New slips: base64 image stored inline in Firestore (free, no Storage needed)
+            if (b.slip_image && uid && buildingId) {
+                const snap = await getDoc(doc(db, `users/${uid}/buildings/${buildingId}/slip_images/${b.id}`));
+                const url = snap.data()?.data_url as string | undefined;
+                if (url) { setSlipView({ url, loading: false, bill: b }); return; }
+            }
+            // Legacy slips: image in Firebase Storage
+            if (b.slip_path) {
+                const url = await getDownloadURL(ref(storage, b.slip_path));
+                setSlipView({ url, loading: false, bill: b });
+                return;
+            }
+            setSlipView({ loading: false, error: 'ไม่พบรูปสลิป', bill: b });
         } catch {
-            setSlipView({ loading: false, error: 'โหลดรูปสลิปไม่ได้ (อาจยังไม่ได้เปิด Firebase Storage)', bill: b });
+            setSlipView({ loading: false, error: 'โหลดรูปสลิปไม่ได้', bill: b });
         }
     };
 
@@ -200,14 +214,16 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                         {/* Slip meta */}
                                         {b.slip_submitted_at && (
                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 2, fontSize: '0.72rem', color: 'var(--color-gray-500)' }}>
-                                                {b.slip_sender && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><User size={11} />{b.slip_sender}</span>}
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Receipt size={11} />ส่งสลิปแล้ว</span>
+                                                {b.slip_ref && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#059669', fontWeight: 700 }}><CheckCircle2 size={11} />QR ✓ ไม่ซ้ำ</span>}
                                                 {b.slip_amount != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Banknote size={11} />฿{b.slip_amount.toLocaleString()}</span>}
-                                                {b.paid_method === 'auto' && <span style={{ color: '#059669', fontWeight: 700 }}>ตรวจอัตโนมัติ</span>}
+                                                {b.slip_sender && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><User size={11} />{b.slip_sender}</span>}
                                             </div>
                                         )}
-                                        {s === 'pending' && b.verify_note && (
-                                            <div style={{ fontSize: '0.72rem', color: '#D97706', marginTop: 2 }}>⚠ {b.verify_note}</div>
-                                        )}
+                                        {s === 'pending' && b.verify_note && (() => {
+                                            const good = b.verify_note.startsWith('ตรวจ QR ผ่าน');
+                                            return <div style={{ fontSize: '0.72rem', color: good ? '#059669' : '#D97706', marginTop: 2 }}>{good ? '✓' : '⚠'} {b.verify_note}</div>;
+                                        })()}
                                     </div>
                                 </div>
 
@@ -218,7 +234,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
 
                                 {/* Actions */}
                                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                    {b.slip_path && (
+                                    {(b.slip_image || b.slip_path) && (
                                         <button className="btn btn-outline btn-sm" onClick={() => openSlip(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                             <ImageIcon size={14} /> ดูสลิป
                                         </button>

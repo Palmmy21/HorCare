@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp
+    collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { DormConfig, Room, MonthlyBill, UserProfile } from '../types';
-import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth } from '../utils/calculations';
+import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth } from '../utils/calculations';
+
+// How many months of bills the realtime listener keeps in memory, anchored on the
+// selected month. Bounds reads + memory regardless of how long a dorm has existed —
+// the single most important change for supporting many dorms. Older months load
+// automatically when the user navigates to them (the window re-anchors).
+const BILLS_WINDOW_MONTHS = 12;
 
 const DEFAULT_CONFIG: DormConfig = {
     building_type: 'dormitory',
@@ -22,7 +28,7 @@ const DEFAULT_CONFIG: DormConfig = {
     room_rent: 3500
 };
 
-export function useFirestore(userId: string | null, buildingId: string | null) {
+export function useFirestore(userId: string | null, buildingId: string | null, anchorMonth?: string) {
     const [config, setConfigState] = useState<DormConfig>(DEFAULT_CONFIG);
     const [rooms, setRoomsState] = useState<Room[]>([]);
     const [bills, setBillsState] = useState<MonthlyBill[]>([]);
@@ -33,60 +39,80 @@ export function useFirestore(userId: string | null, buildingId: string | null) {
         ? `users/${userId}/buildings/${buildingId}`
         : null;
 
-    // Load data with realtime listeners
+    // Month window the bills listener subscribes to, anchored on the selected month.
+    // 'YYYY-MM' strings compare lexicographically, so a range query on `month` works
+    // with the automatic single-field index — no composite index needed.
+    const { windowStart, windowEnd } = useMemo(() => {
+        const anchor = anchorMonth || getCurrentMonth();
+        let start = anchor;
+        for (let i = 0; i < BILLS_WINDOW_MONTHS; i++) start = getPreviousMonth(start);
+        return { windowStart: start, windowEnd: getNextMonth(anchor) };
+    }, [anchorMonth]);
+
+    // Loading coordination across config/rooms (per building) and bills (per window).
+    const loadedRef = useRef({ config: false, rooms: false, bills: false });
+    const settle = () => {
+        const l = loadedRef.current;
+        if (l.config && l.rooms && l.bills) setLoading(false);
+    };
+
+    // Config + rooms — re-subscribe only when the active building changes.
     useEffect(() => {
         if (!userPath) {
             setLoading(false);
             return;
         }
 
+        // New building → show the loading screen until its data arrives.
         setLoading(true);
-        let configLoaded = false;
-        let roomsLoaded = false;
-        let billsLoaded = false;
+        loadedRef.current = { config: false, rooms: false, bills: false };
 
-        const checkDone = () => {
-            if (configLoaded && roomsLoaded && billsLoaded) setLoading(false);
-        };
-
-        // Listen to config
         const unsubConfig = onSnapshot(doc(db, userPath, 'data', 'config'), (snap) => {
             if (snap.exists()) {
                 setConfigState(snap.data() as DormConfig);
             } else {
-                // Initialize default config
                 setDoc(doc(db, userPath, 'data', 'config'), DEFAULT_CONFIG);
                 setConfigState(DEFAULT_CONFIG);
             }
-            configLoaded = true;
-            checkDone();
+            loadedRef.current.config = true;
+            settle();
         });
 
-        // Listen to rooms
         const roomsRef = collection(db, userPath, 'rooms');
         const roomsQuery = query(roomsRef, orderBy('room_number'));
         const unsubRooms = onSnapshot(roomsQuery, (snap) => {
             const roomList: Room[] = snap.docs.map(d => ({ ...d.data(), id: d.id } as Room));
             setRoomsState(roomList);
-            roomsLoaded = true;
-            checkDone();
-        });
-
-        // Listen to bills
-        const billsRef = collection(db, userPath, 'bills');
-        const unsubBills = onSnapshot(billsRef, (snap) => {
-            const billList: MonthlyBill[] = snap.docs.map(d => ({ ...d.data(), id: d.id } as MonthlyBill));
-            setBillsState(billList);
-            billsLoaded = true;
-            checkDone();
+            loadedRef.current.rooms = true;
+            settle();
         });
 
         return () => {
             unsubConfig();
             unsubRooms();
-            unsubBills();
         };
     }, [userPath]);
+
+    // Bills — re-subscribe when the building OR the month window changes. Navigating
+    // to an older month re-anchors the window silently (no full-screen reload).
+    useEffect(() => {
+        if (!userPath) return;
+
+        const billsRef = collection(db, userPath, 'bills');
+        const billsQuery = query(
+            billsRef,
+            where('month', '>=', windowStart),
+            where('month', '<=', windowEnd),
+        );
+        const unsubBills = onSnapshot(billsQuery, (snap) => {
+            const billList: MonthlyBill[] = snap.docs.map(d => ({ ...d.data(), id: d.id } as MonthlyBill));
+            setBillsState(billList);
+            loadedRef.current.bills = true;
+            settle();
+        });
+
+        return () => unsubBills();
+    }, [userPath, windowStart, windowEnd]);
 
     // Save config
     const saveConfig = useCallback(async (newConfig: DormConfig) => {
