@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Payment slips are uploaded by the backend (Firebase Admin SDK, which
+// bypasses these rules). Clients may only READ slips that belong to their
+// own account; no client may write.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // slips/{ownerUid}/{buildingId}/{file}
+    match /slips/{ownerUid}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == ownerUid;
+      allow write: if false; // backend only
+    }
+
+    // Deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

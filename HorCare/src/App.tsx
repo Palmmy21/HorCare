@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil
+  Building2, ChevronDown, Plus, Check, Pencil, Wallet
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -16,6 +16,7 @@ import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
 import AdminDashboard from './components/Admin/AdminDashboard';
+import PaymentsPage from './components/Payments/PaymentsPage';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
 import PricingPage from './components/Pricing/PricingPage';
 import InstallPrompt from './components/PWA/InstallPrompt';
@@ -23,7 +24,7 @@ import { isPaidLicense, isLargePlan, getMaxRooms } from './hooks/useSubscription
 
 import './index.css';
 
-type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings' | 'admin' | 'calculator' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'payments' | 'settings' | 'admin' | 'calculator' | 'pricing';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
@@ -112,7 +113,8 @@ function App() {
     closeMonth,
     unlockMonth,
     getMonthStats,
-    deleteBill
+    deleteBill,
+    updateBillPayment
   } = useFirestore(user?.uid ?? null, activeBuildingId);
 
   // Auto-clean orphaned bills (e.g. from deleted rooms)
@@ -137,6 +139,7 @@ function App() {
     { id: 'rooms' as ViewMode, icon: Home, label: 'จัดการห้อง' },
     { id: 'recording' as ViewMode, icon: FileText, label: 'จดมิเตอร์' },
     { id: 'summary' as ViewMode, icon: Send, label: 'สรุปยอด' },
+    { id: 'payments' as ViewMode, icon: Wallet, label: 'การชำระเงิน' },
     { id: 'calculator' as ViewMode, icon: Calculator, label: 'คำนวณมิเตอร์' },
     { id: 'settings' as ViewMode, icon: SettingsIcon, label: 'ตั้งค่า' },
     { id: 'pricing' as ViewMode, icon: Zap, label: 'แพ็กเกจ' },
@@ -597,6 +600,17 @@ function App() {
             buildingId={activeBuildingId ?? undefined}
             isTrial={isTrial}
             onUpgrade={() => setCurrentView('pricing')}
+          />
+        )}
+
+        {currentView === 'payments' && (
+          <PaymentsPage
+            bills={bills}
+            rooms={rooms}
+            config={config}
+            currentMonth={currentMonth}
+            onMonthChange={setCurrentMonth}
+            onUpdatePayment={updateBillPayment}
           />
         )}
 

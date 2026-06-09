@@ -16,6 +16,19 @@ export async function lineReply(replyToken: string, messages: object[]): Promise
     });
 }
 
+/** Download the binary content of an image/file message the user sent. */
+export async function getLineImageContent(messageId: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (!token) return null;
+    const res = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { buffer, contentType };
+}
+
 export async function linePush(to: string, messages: object[]): Promise<void> {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) return;

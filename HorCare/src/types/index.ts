@@ -113,7 +113,26 @@ export interface MonthlyBill {
   created_at: string;
   updated_at: string;
   tenant_count?: number; // Snapshot of tenant count at time of billing
+
+  // ── Payment tracking (tenant sends slip via LINE) ──
+  // undefined is treated as 'unpaid' for legacy bills
+  payment_status?: PaymentStatus;
+  slip_path?: string;          // Firebase Storage path of the uploaded slip image
+  slip_amount?: number;        // amount read from the verified slip (THB)
+  slip_ref?: string;           // bank transaction reference — used to reject duplicate slips
+  slip_sender?: string;        // payer display name from the slip
+  slip_bank?: string;          // sending bank short name, if available
+  slip_submitted_at?: string;  // ISO timestamp when the tenant sent the slip
+  verify_note?: string;        // why auto-verify failed (shown to owner for manual review)
+  paid_at?: string;            // ISO timestamp when the bill was marked paid
+  paid_method?: 'auto' | 'manual'; // how the payment was confirmed
 }
+
+// 'unpaid'  — no slip yet
+// 'pending' — slip received but needs the owner's manual confirmation
+//             (auto-verify failed, quota exhausted, or amount mismatch)
+// 'paid'    — confirmed (auto by SlipOK, or manually by the owner)
+export type PaymentStatus = 'unpaid' | 'pending' | 'paid';
 
 export interface BillCalculation {
   elec_units: number;

@@ -184,6 +184,12 @@ export function useFirestore(userId: string | null, buildingId: string | null) {
         await deleteDoc(doc(db, userPath, 'bills', billId));
     }, [userPath]);
 
+    // Partial update of payment fields (manual confirm / undo from PaymentsPage)
+    const updateBillPayment = useCallback(async (billId: string, fields: Partial<MonthlyBill>) => {
+        if (!userPath) return;
+        await updateDoc(doc(db, userPath, 'bills', billId), fields);
+    }, [userPath]);
+
     // Bill operations
     const saveBill = useCallback(async (bill: MonthlyBill) => {
         if (!userPath) return bill;
@@ -342,6 +348,7 @@ export function useFirestore(userId: string | null, buildingId: string | null) {
         deleteRoom,
         saveBill,
         deleteBill,
+        updateBillPayment,
         getBillForRoom,
         getBillsForMonth,
         getPreviousBill,

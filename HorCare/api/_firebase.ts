@@ -17,10 +17,13 @@ if (!admin.apps.length) {
         );
     }
 
+    const projectId = (serviceAccount as { project_id?: string }).project_id;
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
+        // Needed for slip-image uploads via admin.storage().bucket()
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
     });
-    console.log('Firebase Admin initialized for project:', (serviceAccount as { project_id?: string }).project_id);
+    console.log('Firebase Admin initialized for project:', projectId);
 }
 
 export const db = admin.firestore();
