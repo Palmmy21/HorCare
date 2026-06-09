@@ -7,6 +7,9 @@ export const config = {
     api: {
         bodyParser: false,
     },
+    // decode QR + บีบอัดรูปสลิป (Jimp) อาจใช้เวลาหลายวินาทีตอน cold start —
+    // เผื่อเวลาไว้ไม่ให้ webhook timeout แล้ว LINE retry ซ้ำ (กันสลิปเด้งซ้ำ)
+    maxDuration: 30,
 };
 
 async function getRawBody(req: VercelRequest): Promise<Buffer> {

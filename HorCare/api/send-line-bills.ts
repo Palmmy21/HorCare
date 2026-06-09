@@ -2,6 +2,20 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildBillFlex, linePush } from './_line.js';
 
+// หอใหญ่อาจมี 100-200 ห้อง การยิง LINE push พร้อมกันทั้งหมดจะโดน rate-limit (429)
+// และเปิด socket จำนวนมากพร้อมกัน — คุมให้ส่งทีละชุดเพื่อให้ scale ถึง 1000 หอได้นิ่ง
+const PUSH_CONCURRENCY = 8;
+
+// เผื่อเวลาให้หอใหญ่ส่งครบในครั้งเดียว (ค่า default 10s ของ Vercel ไม่พอสำหรับ 200 ห้อง)
+export const config = { maxDuration: 60 };
+
+/** รันงาน async เป็นชุดละ `limit` ตัว — กัน fan-out ระเบิดตอนหอใหญ่ */
+async function runPooled<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+    for (let i = 0; i < items.length; i += limit) {
+        await Promise.all(items.slice(i, i + limit).map(worker));
+    }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -59,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let skipped = 0;
         const results: string[] = [];
 
-        const pushPromises = billsSnap.docs.map(async (billDoc) => {
+        await runPooled(billsSnap.docs, PUSH_CONCURRENCY, async (billDoc) => {
             const bill = billDoc.data();
             const roomData = roomsMap.get(bill.room_id);
             const lineUserId = roomData?.line_user_id as string | undefined;
@@ -79,8 +93,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 results.push(`❌ ห้อง ${bill.room_number}: ${err.message}`);
             }
         });
-
-        await Promise.all(pushPromises);
 
         console.log(`sendLineBills uid=${uid} building=${building_id} month=${month} sent=${sent} skipped=${skipped}`);
         res.status(200).json({ data: { sent, skipped, results } });

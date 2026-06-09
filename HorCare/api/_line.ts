@@ -32,11 +32,27 @@ export async function getLineImageContent(messageId: string): Promise<{ buffer: 
 export async function linePush(to: string, messages: object[]): Promise<void> {
     const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!token) return;
-    await fetch('https://api.line.me/v2/bot/message/push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ to, messages }),
-    });
+
+    // ยิงพร้อม retry สั้นๆ เมื่อโดน rate-limit (429) — ตอน 1000 หอบิลจะไม่หายเงียบ.
+    // throw เมื่อส่งไม่สำเร็จ เพื่อให้ผู้เรียก (send-line-bills) ไม่ mark is_notified
+    // และเจ้าของกดส่งซ้ำได้
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ to, messages }),
+        });
+        if (res.ok) return;
+
+        // 429 = rate-limit, 5xx = LINE ขัดข้องชั่วคราว → รอแล้วลองใหม่
+        const retryable = res.status === 429 || res.status >= 500;
+        if (!retryable || attempt === 2) {
+            const detail = await res.text().catch(() => '');
+            throw new Error(`LINE push ${res.status}${detail ? `: ${detail.slice(0, 120)}` : ''}`);
+        }
+        const wait = Number(res.headers.get('retry-after')) * 1000 || 400 * (attempt + 1);
+        await new Promise(r => setTimeout(r, wait));
+    }
 }
 
 export function buildBillFlex(
