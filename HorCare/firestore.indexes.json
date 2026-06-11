@@ -8,6 +8,14 @@
                 { "fieldPath": "is_saved", "order": "ASCENDING" },
                 { "fieldPath": "month", "order": "DESCENDING" }
             ]
+        },
+        {
+            "collectionGroup": "bills",
+            "queryScope": "COLLECTION_GROUP",
+            "fields": [
+                { "fieldPath": "month", "order": "ASCENDING" },
+                { "fieldPath": "is_saved", "order": "ASCENDING" }
+            ]
         }
     ],
     "fieldOverrides": [

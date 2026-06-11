@@ -1,19 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { linePush } from './_line.js';
+import { linePush, buildReceiptFlex } from './_line.js';
 
-// แจ้งลูกหอทาง LINE เมื่อเจ้าของกด "ยืนยันจ่าย" ในหน้า Payments.
-// เจ้าของยืนยันใน Firestore ฝั่ง client ไปแล้ว — endpoint นี้แค่ push ข้อความ
+// ส่งใบเสร็จรับเงินให้ลูกหอทาง LINE เมื่อเจ้าของกด "ยืนยันจ่าย" ในหน้า Payments.
+// เจ้าของยืนยันใน Firestore ฝั่ง client ไปแล้ว — endpoint นี้แค่ push ใบเสร็จ
 // (LINE token อยู่ฝั่ง server เท่านั้น). best-effort: ถ้าห้องยังไม่ผูก LINE ก็ข้ามไป.
-
-const THAI_MONTHS = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-
-function monthLabel(m: string): string {
-    const [y, mo] = (m || '').split('-');
-    if (!y || !mo) return m || '';
-    return `${THAI_MONTHS[parseInt(mo)]} ${parseInt(y) + 543}`;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -65,15 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const cfgSnap = await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get();
         const dormName = cfgSnap.data()?.bill_customization?.dorm_name || 'หอพัก';
 
-        const text =
-            `✅ ยืนยันการชำระเรียบร้อยแล้วค่ะ\n\n` +
-            `🏠 ${dormName}\n` +
-            `🚪 ห้อง ${bill.room_number}\n` +
-            `💰 ยอด ฿${Number(bill.total_bill || 0).toLocaleString()}\n` +
-            `📅 รอบ ${monthLabel(bill.month as string)}\n\n` +
-            `ขอบคุณที่ชำระค่ะ 🙏`;
-
-        await linePush(lineUserId, [{ type: 'text', text }]);
+        // ใช้เวลาที่เจ้าของกดยืนยัน (paid_at) ถ้ามี — ไม่งั้นใช้เวลาปัจจุบัน
+        const paidAt = bill.paid_at ? new Date(bill.paid_at as string) : new Date();
+        await linePush(lineUserId, [buildReceiptFlex(bill, dormName, paidAt)]);
         res.status(200).json({ data: { notified: true } });
 
     } catch (error: any) {

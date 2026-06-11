@@ -343,8 +343,14 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
                 room_number,
                 created_at: admin.firestore.FieldValue.serverTimestamp(),
             });
-        } catch {
-            duplicate = true; // เอกสารมีอยู่แล้ว = สลิปนี้ถูกใช้ไปแล้ว
+        } catch (e: any) {
+            // ซ้ำจริงเฉพาะ ALREADY_EXISTS (gRPC code 6) — error อื่น (network/quota)
+            // ต้อง throw ให้ handler ชั้นนอกตอบ "ระบบขัดข้อง" ไม่ใช่หลอกว่าสลิปซ้ำ
+            if (e?.code === 6 || e?.code === 'already-exists') {
+                duplicate = true;
+            } else {
+                throw e;
+            }
         }
     }
 

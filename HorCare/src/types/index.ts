@@ -128,6 +128,10 @@ export interface MonthlyBill {
   verify_note?: string;        // why auto-verify failed (shown to owner for manual review)
   paid_at?: string;            // ISO timestamp when the bill was marked paid
   paid_method?: 'auto' | 'manual'; // how the payment was confirmed
+
+  // ── Auto reminders (written by /api/remind-bills cron) ──
+  last_reminded_at?: string;   // ISO timestamp of the latest LINE reminder
+  reminder_count?: number;     // total reminders sent for this bill (spam cap)
 }
 
 // 'unpaid'  — no slip yet

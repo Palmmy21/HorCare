@@ -35,8 +35,9 @@ async function pruneCollection(group: string, cutoff: FirebaseFirestore.Timestam
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // fail closed: ถ้า CRON_SECRET ไม่ถูกตั้ง ต้องปฏิเสธทุก request — ไม่ใช่เปิดให้ใครก็เรียกลบข้อมูลได้
     const secret = process.env.CRON_SECRET;
-    if (secret && req.headers['authorization'] !== `Bearer ${secret}`) {
+    if (!secret || req.headers['authorization'] !== `Bearer ${secret}`) {
         res.status(401).send('Unauthorized');
         return;
     }

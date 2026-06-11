@@ -1,6 +1,3 @@
-import { useCallback } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
 import type { PlanName, BillingCycle, LicenseType } from '../types';
 
 /* ── Plan config ── */
@@ -52,57 +49,6 @@ export function isLargePlan(license: LicenseType): boolean {
     return parsed?.plan === 'large';
 }
 
-export function useSubscription(uid: string | null) {
-    /**
-     * Demo mode: simulate payment and write license to Firestore.
-     * Replace the body of this function with Stripe Checkout redirect when ready.
-     */
-    const startCheckout = useCallback(
-        async (plan: PlanName, cycle: BillingCycle): Promise<void> => {
-            if (!uid) throw new Error('ไม่ได้เข้าสู่ระบบ');
-
-            // ── TODO: Replace with real Stripe checkout ──
-            // import { getFunctions, httpsCallable } from 'firebase/functions';
-            // const functions = getFunctions();
-            // const createSession = httpsCallable(functions, 'createCheckoutSession');
-            // const { data } = await createSession({ plan, cycle, uid });
-            // window.location.href = (data as { url: string }).url;
-            // ─────────────────────────────────────────────
-
-            // Demo mode: write license directly to Firestore
-            const licenseType = toLicenseType(plan, cycle);
-            const periodEnd = new Date();
-            if (cycle === 'monthly') {
-                periodEnd.setMonth(periodEnd.getMonth() + 1);
-            } else {
-                periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-            }
-
-            await updateDoc(doc(db, 'users', uid), {
-                license: licenseType,
-                plan_name: plan,
-                billing_cycle: cycle,
-                subscription_status: 'active',
-                current_period_end: periodEnd.toISOString(),
-                // Demo: no real subscription_id
-                subscription_id: `demo_${Date.now()}`,
-            });
-        },
-        [uid],
-    );
-
-    /**
-     * Check if a user with this license can manage `roomCount` rooms.
-     */
-    const isRoomCountAllowed = useCallback(
-        (license: LicenseType, roomCount: number): boolean => {
-            if (license === 'active') return true; // legacy lifetime
-            const parsed = parseLicense(license);
-            if (!parsed) return false;
-            return roomCount <= PLAN_CONFIG[parsed.plan].maxRooms;
-        },
-        [],
-    );
-
-    return { startCheckout, isRoomCountAllowed, PLAN_CONFIG, PLAN_PRICES };
-}
+// NOTE: ตัว hook useSubscription (mock checkout เขียน license ตรงจาก client) ถูกลบแล้ว —
+// การจ่ายเงินจริงไปทาง PricingPage → /api/create-checkout → stripe-webhook เท่านั้น
+// ไฟล์นี้เหลือเฉพาะ plan config + pure helpers ที่ App ใช้
