@@ -64,7 +64,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
             <div className="login-page">
                 <div className="login-card">
                     <div className="login-logo">
-                        <img src="/logo.png" alt="HorCare" style={{ width: 80, height: 80, objectFit: 'contain', marginBottom: '0.5rem' }} />
+                        <img src="/logo.png" alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain', marginBottom: '0.25rem' }} />
                         <p className="login-subtitle">รีเซ็ตรหัสผ่าน</p>
                     </div>
 
@@ -164,7 +164,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
             <div className="login-card">
                 {/* Logo */}
                 <div className="login-logo">
-                    <img src="/logo.png" alt="HorCare" style={{ width: 80, height: 80, objectFit: 'contain', marginBottom: '0.5rem' }} />
+                    <img src="/logo.png" alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain', marginBottom: '0.25rem' }} />
                     <p className="login-subtitle">ระบบจัดการหอพักอัจฉริยะ</p>
                 </div>
 

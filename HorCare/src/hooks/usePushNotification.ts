@@ -45,8 +45,8 @@ export function usePushNotification() {
         if (permission !== 'granted' || !enabled) return;
         try {
             new Notification(title, {
-                icon: '/logo.png',
-                badge: '/logo.png',
+                icon: '/logo-icon.png',
+                badge: '/logo-icon.png',
                 lang: 'th',
                 ...options
             });

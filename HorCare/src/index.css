@@ -194,6 +194,12 @@ body {
   flex-direction: column;
   gap: var(--space-2);
   flex: 1;
+  /* On short viewports the nav scrolls instead of pushing the
+     user info + logout footer below the fold */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 .nav-item {

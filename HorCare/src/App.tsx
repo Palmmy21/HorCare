@@ -37,6 +37,7 @@ function App() {
   const [renamingBuildingId, setRenamingBuildingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState('');
   const buildingMenuRef = useRef<HTMLDivElement>(null);
+  const [paymentToast, setPaymentToast] = useState<'success' | 'cancel' | null>(null);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -64,6 +65,17 @@ function App() {
     const next = valid ? stored : buildings[0].id;
     setActiveBuildingId(next);
   }, [buildingsLoading, buildings, buildingStorageKey]);
+
+  // Handle Stripe redirect: ?payment=success|cancel
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('payment');
+    if (result === 'success' || result === 'cancel') {
+      setPaymentToast(result as 'success' | 'cancel');
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setPaymentToast(null), result === 'success' ? 6000 : 3000);
+    }
+  }, []);
 
   // Close building menu on outside click
   useEffect(() => {
@@ -148,7 +160,7 @@ function App() {
     { id: 'pricing' as ViewMode, icon: Zap, label: 'แพ็กเกจ' },
   ];
 
-  const isAdmin = profile?.role === 'admin' || user?.email === 'sakdidechneverdie@gmail.com';
+  const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
 
   if (isAdmin) {
     navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
@@ -310,7 +322,7 @@ function App() {
 
   // Email not verified → block usage until verified (admin exempt to avoid lockout).
   // Stops fake-email signups and unlimited free-trial farming via throwaway emails.
-  if (!emailVerified && user.email !== 'sakdidechneverdie@gmail.com') {
+  if (!emailVerified && user.email !== 'horcare.admin@gmail.com') {
     return (
       <VerifyEmailWall
         email={user.email ?? ''}
@@ -394,7 +406,7 @@ function App() {
       {/* Sidebar */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <img src="/logo.png" alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+          <img src="/logo-icon.png" alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain' }} />
           <span>HorCare</span>
         </div>
 
@@ -625,6 +637,7 @@ function App() {
             getBillForRoom={getBillForRoom}
             getPreviousBill={getPreviousBill}
             onMonthChange={setCurrentMonth}
+            buildingId={activeBuildingId ?? undefined}
           />
         )}
 
@@ -672,7 +685,7 @@ function App() {
           />
         )}
 
-        {currentView === 'admin' && profile?.role === 'admin' && (
+        {currentView === 'admin' && isAdmin && (
           <AdminDashboard />
         )}
 
@@ -688,6 +701,45 @@ function App() {
         )}
       </main>
       <InstallPrompt />
+
+      {/* Payment result toast */}
+      {paymentToast === 'success' && (
+        <div style={{
+          position: 'fixed', top: '1.25rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #059669, #10B981)',
+          color: '#fff', padding: '0.875rem 1.5rem',
+          borderRadius: '14px', boxShadow: '0 4px 24px rgba(16,185,129,0.4)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', gap: '0.625rem',
+          fontWeight: 600, fontSize: '0.9375rem', whiteSpace: 'nowrap',
+        }}>
+          <Check size={18} />
+          ชำระเงินสำเร็จ! แพ็กเกจของคุณเปิดใช้งานแล้ว
+          <button
+            onClick={() => setPaymentToast(null)}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', marginLeft: '0.25rem', padding: 0, display: 'flex' }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {paymentToast === 'cancel' && (
+        <div style={{
+          position: 'fixed', top: '1.25rem', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(30,37,53,0.96)', border: '1px solid rgba(255,255,255,0.12)',
+          color: 'rgba(255,255,255,0.8)', padding: '0.875rem 1.5rem',
+          borderRadius: '14px', boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', gap: '0.625rem',
+          fontWeight: 500, fontSize: '0.9rem', whiteSpace: 'nowrap',
+        }}>
+          ยกเลิกการชำระเงินแล้ว
+          <button
+            onClick={() => setPaymentToast(null)}
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', marginLeft: '0.25rem', padding: 0, display: 'flex' }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

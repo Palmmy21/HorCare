@@ -154,19 +154,23 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         // 1. Update the room
         await updateDoc(doc(db, userPath, 'rooms', roomId), updates);
 
-        // 2. Check for active bill in current month
-        const currentMonth = getCurrentMonth();
-        const existingBill = bills.find(b => b.room_id === roomId && b.month === currentMonth);
+        // 2. Recalculate this room's bills for the months the owner can be working
+        // in: the current calendar month AND the month selected in the UI. Meter
+        // readings are kept from the bill snapshot — only the amounts are repriced
+        // with the new room settings. Locked (closed) months are never touched.
+        const currentRoom = rooms.find(r => r.id === roomId);
+        if (!currentRoom) return;
 
-        // 3. If bill exists and is not locked, recalculate it using new room settings + old meter readings
-        if (existingBill) {
-            const currentRoom = rooms.find(r => r.id === roomId);
-            if (!currentRoom) return;
+        const newRoom = { ...currentRoom, ...updates };
 
-            const newRoom = { ...currentRoom, ...updates };
+        const effectiveRent = newRoom.rent_type === 'semester' ? 0 : (newRoom.rent_amount ?? config.room_rent);
+        const { electricityRate, waterConfig } = getEffectiveRates(newRoom, config);
 
-            const effectiveRent = newRoom.rent_type === 'semester' ? 0 : (newRoom.rent_amount ?? config.room_rent);
-            const { electricityRate, waterConfig } = getEffectiveRates(newRoom, config);
+        const monthsToRecalc = [...new Set([getCurrentMonth(), anchorMonth].filter(Boolean))] as string[];
+
+        for (const month of monthsToRecalc) {
+            const existingBill = bills.find(b => b.room_id === roomId && b.month === month);
+            if (!existingBill || existingBill.is_locked) continue;
 
             // Use meter readings from the existing bill (snapshot)
             const calculation = calculateFullBill(
@@ -181,7 +185,6 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 waterConfig
             );
 
-            // Update the bill
             const updatedBill: Partial<MonthlyBill> = {
                 elec_units: calculation.elec_units,
                 elec_bill: calculation.elec_bill,
@@ -198,7 +201,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
             await updateDoc(doc(db, userPath, 'bills', existingBill.id), updatedBill);
         }
-    }, [userPath, bills, rooms, config]);
+    }, [userPath, bills, rooms, config, anchorMonth]);
 
     const deleteRoom = useCallback(async (roomId: string) => {
         if (!userPath) return;

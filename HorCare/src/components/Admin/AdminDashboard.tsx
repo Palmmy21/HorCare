@@ -519,7 +519,7 @@ export default function AdminDashboard() {
         u.display_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const isAdmin = profile?.role === 'admin' || user?.email === 'sakdidechneverdie@gmail.com';
+    const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
 
     if (!isAdmin) {
         return (

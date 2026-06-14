@@ -8,3 +8,4 @@
 unzip.bat
 
 .vercel
+.env*

@@ -22,6 +22,7 @@ interface MeterRecordingProps {
     getBillForRoom: (roomId: string, month: string) => MonthlyBill | undefined;
     getPreviousBill: (roomId: string, month: string) => MonthlyBill | undefined;
     onMonthChange: (month: string) => void;
+    buildingId?: string;
 }
 
 interface RoomRecordingState {
@@ -33,6 +34,44 @@ interface RoomRecordingState {
     isLocked: boolean;
 }
 
+// Unsaved (draft) meter readings, persisted per building+month so typed values
+// survive switching pages (e.g. ไปแก้ข้อมูลห้อง), room edits, and reloads.
+interface MeterDraft {
+    prevElec: string;
+    prevWater: string;
+    currElec: string;
+    currWater: string;
+}
+
+const DRAFT_PREFIX = 'horcare_meter_drafts_';
+
+function readDrafts(key: string): Record<string, MeterDraft> {
+    try {
+        return JSON.parse(localStorage.getItem(key) || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function writeDraft(key: string, roomId: string, draft: MeterDraft) {
+    const drafts = readDrafts(key);
+    drafts[roomId] = draft;
+    try { localStorage.setItem(key, JSON.stringify(drafts)); } catch { /* quota full — drafts are best-effort */ }
+}
+
+function removeDraft(key: string, roomId: string) {
+    const drafts = readDrafts(key);
+    if (!(roomId in drafts)) return;
+    delete drafts[roomId];
+    try {
+        if (Object.keys(drafts).length === 0) {
+            localStorage.removeItem(key);
+        } else {
+            localStorage.setItem(key, JSON.stringify(drafts));
+        }
+    } catch { /* best-effort */ }
+}
+
 export default function MeterRecording({
     rooms,
     config,
@@ -40,11 +79,28 @@ export default function MeterRecording({
     onSaveBill,
     getBillForRoom,
     getPreviousBill,
-    onMonthChange
+    onMonthChange,
+    buildingId
 }: MeterRecordingProps) {
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
 
+    const draftKey = `${DRAFT_PREFIX}${buildingId || 'local'}_${currentMonth}`;
+
+    // Drop drafts older than ~3 months so localStorage doesn't accumulate forever
     useEffect(() => {
+        let cutoff = currentMonth;
+        for (let i = 0; i < 3; i++) cutoff = getPreviousMonth(cutoff);
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith(DRAFT_PREFIX)) continue;
+            const month = key.slice(-7); // trailing YYYY-MM
+            if (/^\d{4}-\d{2}$/.test(month) && month < cutoff) localStorage.removeItem(key);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        const drafts = readDrafts(draftKey);
         const initialState: Record<string, RoomRecordingState> = {};
 
         rooms.forEach(room => {
@@ -54,7 +110,14 @@ export default function MeterRecording({
             const defaultPrevElec = prevBill?.curr_elec ?? room.current_meter_elec ?? 0;
             const defaultPrevWater = prevBill?.curr_water ?? room.current_meter_water ?? 0;
 
-            if (existingBill) {
+            const isLocked = existingBill?.is_locked ?? false;
+            const draft = drafts[room.id];
+
+            if (draft && !isLocked) {
+                // Unsaved typing wins over bill/defaults — survives page switches
+                // and room edits (tenant count, rent type, ...) until saved/cleared
+                initialState[room.id] = { ...draft, isSaved: false, isLocked };
+            } else if (existingBill) {
                 initialState[room.id] = {
                     prevElec: existingBill.prev_elec === 0 ? '' : existingBill.prev_elec.toString(),
                     prevWater: existingBill.prev_water === 0 ? '' : existingBill.prev_water.toString(),
@@ -76,26 +139,30 @@ export default function MeterRecording({
         });
 
         setRecordingState(initialState);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rooms, currentMonth]);
+    }, [rooms, currentMonth, draftKey, getBillForRoom, getPreviousBill]);
 
     const handleInputChange = (roomId: string, field: 'prevElec' | 'prevWater' | 'currElec' | 'currWater', value: string) => {
         // Only allow numbers
         if (value && !/^\d*$/.test(value)) return;
 
-        setRecordingState(prev => ({
-            ...prev,
-            [roomId]: {
-                ...prev[roomId],
-                [field]: value,
-                isSaved: false // Reset saved status on change
-            }
-        }));
+        const updated: RoomRecordingState = {
+            ...recordingState[roomId],
+            [field]: value,
+            isSaved: false // Reset saved status on change
+        };
+        writeDraft(draftKey, roomId, {
+            prevElec: updated.prevElec,
+            prevWater: updated.prevWater,
+            currElec: updated.currElec,
+            currWater: updated.currWater
+        });
+        setRecordingState(prev => ({ ...prev, [roomId]: updated }));
     };
 
 
 
     const handleClear = (roomId: string) => {
+        removeDraft(draftKey, roomId);
         setRecordingState(prev => ({
             ...prev,
             [roomId]: {
@@ -160,6 +227,7 @@ export default function MeterRecording({
         };
 
         onSaveBill(bill);
+        removeDraft(draftKey, roomId); // saved to Firestore — draft no longer needed
 
         setRecordingState(prev => ({
             ...prev,

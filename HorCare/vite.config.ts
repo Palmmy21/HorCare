@@ -3,12 +3,22 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  server: {
+    proxy: {
+      // Vite has no runtime for the Vercel functions in api/, so local dev
+      // forwards API calls to the deployed production functions instead.
+      '/api': {
+        target: 'https://hor-care.vercel.app',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
-      includeAssets: ['favicon.svg', 'logo.png'],
+      includeAssets: ['favicon.svg', 'logo.png', 'logo-icon.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'HorCare - ระบบจัดการหอพัก',
         short_name: 'HorCare',
@@ -23,13 +33,19 @@ export default defineConfig({
         lang: 'th',
         icons: [
           {
-            src: '/logo.png',
+            src: '/pwa-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/logo.png',
+            src: '/pwa-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/pwa-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
