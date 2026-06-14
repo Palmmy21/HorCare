@@ -68,6 +68,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const userData = userDoc.data() ?? {};
         let customerId: string = userData.stripe_customer_id ?? '';
 
+        // Verify existing customer is valid in current mode (test vs live IDs differ)
+        if (customerId) {
+            try {
+                await stripe.customers.retrieve(customerId);
+            } catch {
+                customerId = '';
+            }
+        }
+
         if (!customerId) {
             const customer = await stripe.customers.create({
                 email: userData.email,
