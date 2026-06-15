@@ -95,6 +95,33 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
         return;
     }
 
+    // ── 2b. Rich Menu — ระบบทำงานยังไง? ───────────────────────────
+    if (text === 'ระบบทำงานยังไง?') {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: '🏠 HorCare ทำงานอย่างไร?\n\n1️⃣ เจ้าของหอสร้างห้องพักในแอป\n2️⃣ กรอกมิเตอร์น้ำ-ไฟรายเดือน\n3️⃣ ระบบคำนวณค่าใช้จ่ายและออกบิลอัตโนมัติ\n4️⃣ ลูกหอรับบิลทาง LINE ได้เลย\n5️⃣ ส่งสลิปยืนยันการชำระผ่าน LINE\n\n📲 เจ้าของหอดูสรุปรายรับ-รายจ่ายได้แบบ Real-time ค่ะ',
+        }]);
+        return;
+    }
+
+    // ── 2c. Rich Menu — ราคาเท่าไหร่? ─────────────────────────────
+    if (text === 'ราคาเท่าไหร่?') {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: '💰 แพ็กเกจ HorCare\n\n🆓 ฟรี — ทดลองใช้ได้เลย\n   • จัดการหอได้ 1 หลัง\n   • ห้องพักไม่จำกัด\n   • ออกบิลและแจ้งเตือนผ่าน LINE\n\n✨ Pro — สำหรับมืออาชีพ\n   • หอพักไม่จำกัด\n   • รายงานสรุปรายรับรายเดือน\n   • ฟีเจอร์ครบทุกอย่าง\n\nดูรายละเอียดเพิ่มเติมได้ที่แอป HorCare ค่ะ 😊',
+        }]);
+        return;
+    }
+
+    // ── 2d. Rich Menu — ติดต่อแอดมิน ──────────────────────────────
+    if (text === 'ติดต่อแอดมิน') {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: '📞 ติดต่อทีมงาน HorCare\n\n💬 LINE Official: @060iuutx\n⏰ เวลาทำการ: จ-ศ 9:00–18:00 น.\n\nหากมีปัญหาการใช้งานหรือต้องการความช่วยเหลือ พิมพ์มาได้เลยค่ะ เราพร้อมช่วยเสมอ 🙏',
+        }]);
+        return;
+    }
+
     // ── 3. Invite Link: HC-XXXXXX pattern ─────────────────────────
     //    ลูกหอกดลิ้งก์ → LINE pre-fills รหัสหอ → กด Send
     if (DORM_CODE_RE.test(text.toUpperCase())) {

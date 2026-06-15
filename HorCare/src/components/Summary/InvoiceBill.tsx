@@ -72,7 +72,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                         )}
                     </div>
                     <div className="invoice-details">
-                        <h2 className="invoice-title">INVOICE</h2>
+                        <h2 className="invoice-title">ใบแจ้งหนี้</h2>
                         <div className="invoice-meta">
                             <div>วันที่ออกบิล: {formatThaiDate(billDate)}</div>
                         </div>
@@ -82,11 +82,11 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 {/* Room & Month Tags */}
                 <div style={{ marginBottom: '32px' }}>
                     <div className="invoice-number-box">
-                        <span className="invoice-number-label">ห้องพัก / ROOM</span>
+                        <span className="invoice-number-label">ห้องพัก</span>
                         <span className="invoice-number-value">{bill.room_number}</span>
                     </div>
                     <div className="invoice-number-box" style={{ marginLeft: '12px' }}>
-                        <span className="invoice-number-label">ประจำเดือน / MONTH</span>
+                        <span className="invoice-number-label">ประจำเดือน</span>
                         <span className="invoice-number-value">{formatThaiMonth(bill.month + '-01')}</span>
                     </div>
                 </div>

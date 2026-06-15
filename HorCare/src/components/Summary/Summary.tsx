@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import {
     CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer, BarChart3,
@@ -11,7 +11,7 @@ import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/
 import InvoiceBill from './InvoiceBill';
 import MonthlyReport from './MonthlyReport';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 
 interface SummaryProps {
     bills: MonthlyBill[];
@@ -57,13 +57,15 @@ export default function Summary({
     });
     const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
     const [showAllInvoices, setShowAllInvoices] = useState(false);
-    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
+    const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+    const [downloadAllProgress, setDownloadAllProgress] = useState(0);
+    const [captureTarget, setCaptureTarget] = useState<MonthlyBill | null>(null);
     const [showMonthlyReport, setShowMonthlyReport] = useState(false);
     const [isExportingReport, setIsExportingReport] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
-    const invoiceRef = useRef<HTMLDivElement>(null);
+    const captureRef = useRef<HTMLDivElement>(null);
     const monthlyReportRef = useRef<HTMLDivElement>(null);
-    const hiddenReportRef = useRef<HTMLDivElement>(null);
 
     const billCustomization = config.bill_customization;
 
@@ -122,29 +124,31 @@ export default function Summary({
 
 
     const generatePDFFromElement = async (element: HTMLElement, filename: string) => {
-        const canvas = await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff'
+        const dataUrl = await toPng(element, {
+            pixelRatio: 2,
+            backgroundColor: '#ffffff',
         });
 
-        const imgData = canvas.toDataURL('image/png');
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise<void>(resolve => { img.onload = () => resolve(); });
+
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         const imgWidth = pdfWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const imgHeight = (img.height * imgWidth) / img.width;
 
         let heightLeft = imgHeight;
         let position = 0;
 
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
 
         while (heightLeft >= 0) {
             position = heightLeft - imgHeight;
             pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
             heightLeft -= pdfHeight;
         }
 
@@ -176,36 +180,61 @@ export default function Summary({
         }, 300);
     };
 
-    const handleDownloadBill = useCallback(async (bill: MonthlyBill) => {
+    const captureAndDownload = async (bill: MonthlyBill): Promise<void> => {
+        setCaptureTarget(bill);
+        await new Promise(resolve => setTimeout(resolve, 700));
+
+        const el = captureRef.current;
+        if (!el) throw new Error('Capture element not mounted');
+
+        const dataUrl = await toPng(el, {
+            pixelRatio: 2,
+            backgroundColor: '#ffffff',
+        });
+
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `bill_${bill.room_number}_${currentMonth}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    const handleDownloadBill = async (bill: MonthlyBill) => {
         if (isTrial) { onUpgrade?.(); return; }
-        setIsDownloading(true);
-        // Briefly show the bill in the modal so we can capture it
-        setSelectedBill(bill);
-        // Wait for render
-        await new Promise(resolve => setTimeout(resolve, 400));
-
-        const el = invoiceRef.current;
-        if (!el) {
-            setIsDownloading(false);
-            return;
-        }
-
+        setDownloadingBillId(bill.id);
         try {
-            const canvas = await html2canvas(el, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff'
-            });
-            const link = document.createElement('a');
-            link.download = `bill_${bill.room_number}_${currentMonth}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            await captureAndDownload(bill);
         } catch (err) {
             console.error('Download failed:', err);
+            alert('ดาวน์โหลดไม่สำเร็จ กรุณาลองใช้ปุ่มพิมพ์แทน');
         } finally {
-            setIsDownloading(false);
+            setDownloadingBillId(null);
+            setCaptureTarget(null);
         }
-    }, [currentMonth, isTrial, onUpgrade]);
+    };
+
+    const handleDownloadAllBills = async () => {
+        if (isTrial) { onUpgrade?.(); return; }
+        if (monthBills.length === 0) return;
+        setIsDownloadingAll(true);
+        setDownloadAllProgress(0);
+        try {
+            for (let i = 0; i < monthBills.length; i++) {
+                await captureAndDownload(monthBills[i]);
+                setCaptureTarget(null);
+                setDownloadAllProgress(i + 1);
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        } catch (err) {
+            console.error('Download all failed:', err);
+            alert('เกิดข้อผิดพลาดในการดาวน์โหลด');
+        } finally {
+            setIsDownloadingAll(false);
+            setCaptureTarget(null);
+            setDownloadAllProgress(0);
+        }
+    };
 
     return (
         <div>
@@ -249,6 +278,18 @@ export default function Summary({
                             <button className="btn btn-outline" onClick={handlePrintAll}>
                                 <Printer size={18} />
                                 พิมพ์ใบแจ้งยอดทั้งหมด
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={handleDownloadAllBills}
+                                disabled={isDownloadingAll || !!downloadingBillId}
+                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : 'ดาวน์โหลดบิลทุกห้องแบบแยกรูป'}
+                                style={isTrial ? { opacity: 0.55 } : undefined}
+                            >
+                                {isTrial ? <Lock size={18} /> : <Download size={18} />}
+                                {isDownloadingAll
+                                    ? `ดาวน์โหลด ${downloadAllProgress}/${monthBills.length}...`
+                                    : 'ดาวน์โหลดทุกห้อง'}
                             </button>
                             {uid && buildingId && config.dorm_code && (
                                 <button
@@ -407,11 +448,14 @@ export default function Summary({
                                                     <button
                                                         className="btn btn-outline btn-sm"
                                                         onClick={() => bill && handleDownloadBill(bill)}
-                                                        title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด PDF' : 'ดาวน์โหลดใบแจ้งยอด'}
-                                                        disabled={isDownloading || !hasBill}
+                                                        title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : 'ดาวน์โหลดรูปบิล'}
+                                                        disabled={!!downloadingBillId || isDownloadingAll || !hasBill}
                                                         style={isTrial ? { opacity: 0.55 } : undefined}
                                                     >
-                                                        {isTrial ? <Lock size={14} /> : <Download size={14} />}
+                                                        {isTrial ? <Lock size={14} /> :
+                                                            downloadingBillId === bill?.id
+                                                                ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
+                                                                : <Download size={14} />}
                                                     </button>
                                                 </div>
                                             </td>
@@ -492,11 +536,14 @@ export default function Summary({
                                             <button
                                                 className="btn btn-outline btn-sm flex-1"
                                                 onClick={() => bill && handleDownloadBill(bill)}
-                                                disabled={isDownloading || !hasBill}
-                                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด PDF' : undefined}
+                                                disabled={!!downloadingBillId || isDownloadingAll || !hasBill}
+                                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : undefined}
                                                 style={isTrial ? { opacity: 0.55 } : undefined}
                                             >
-                                                {isTrial ? <Lock size={14} /> : <Download size={14} />}
+                                                {isTrial ? <Lock size={14} /> :
+                                                    downloadingBillId === bill?.id
+                                                        ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
+                                                        : <Download size={14} />}
                                             </button>
                                         </div>
                                     </div>
@@ -629,7 +676,6 @@ export default function Summary({
                                 const rates = room ? getEffectiveRates(room, config) : null;
                                 return (
                                     <InvoiceBill
-                                        ref={invoiceRef}
                                         bill={selectedBill}
                                         config={config}
                                         billDate={billDate}
@@ -647,12 +693,14 @@ export default function Summary({
                             <button
                                 className="btn btn-outline"
                                 onClick={() => handleDownloadBill(selectedBill)}
-                                disabled={isDownloading}
-                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด PDF' : undefined}
+                                disabled={!!downloadingBillId || isDownloadingAll}
+                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : undefined}
                                 style={isTrial ? { opacity: 0.6 } : undefined}
                             >
                                 {isTrial ? <Lock size={18} /> : <Download size={18} />}
-                                {isDownloading ? 'กำลังดาวน์โหลด...' : (isTrial ? 'ล็อก — อัปเกรด' : 'ดาวน์โหลด')}
+                                {downloadingBillId === selectedBill.id
+                                    ? 'กำลังดาวน์โหลด...'
+                                    : (isTrial ? 'ล็อก — อัปเกรด' : 'ดาวน์โหลด')}
                             </button>
                             <button className="btn btn-primary" onClick={() => {
                                 setShowAllInvoices(false);
@@ -724,16 +772,23 @@ export default function Summary({
             )}
 
 
-            {/* Hidden Monthly Report for PDF Generation */}
-            <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
-                <div ref={hiddenReportRef} style={{ width: '900px', padding: '2rem', background: '#fff' }}>
-                    <MonthlyReport
-                        bills={bills}
-                        currentMonth={currentMonth}
-                        config={config}
-                        billCustomization={billCustomization}
-                    />
-                </div>
+            {/* Hidden capture area for bill image downloads */}
+            <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '680px', pointerEvents: 'none', zIndex: -1 }}>
+                {captureTarget && (() => {
+                    const room = rooms.find(r => r.id === captureTarget.room_id);
+                    const rates = room ? getEffectiveRates(room, config) : null;
+                    return (
+                        <InvoiceBill
+                            ref={captureRef}
+                            bill={captureTarget}
+                            config={config}
+                            billDate={billDate}
+                            effectiveElecRate={rates?.electricityRate}
+                            effectiveWaterConfig={rates?.waterConfig}
+                            billCustomization={billCustomization}
+                        />
+                    );
+                })()}
             </div>
 
             {/* Monthly Report Modal */}

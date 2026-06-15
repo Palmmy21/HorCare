@@ -2152,6 +2152,41 @@ body {
   .invoice-modal {
     max-width: 95vw;
   }
+
+  /* Invoice header: stack dorm info + bill title vertically */
+  .invoice-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .invoice-details {
+    text-align: left;
+  }
+
+  /* Invoice table: hide units and rate columns — already shown in row description */
+  .invoice-table th:nth-child(2),
+  .invoice-table th:nth-child(3),
+  .invoice-table td:nth-child(2),
+  .invoice-table td:nth-child(3) {
+    display: none;
+  }
+
+  /* Invoice summary box: stretch full width on mobile */
+  .invoice-summary-box {
+    width: 100%;
+  }
+
+  /* Invoice bottom section: stack QR code above footer text */
+  .invoice-bottom-section {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .invoice-qr-section {
+    width: 100%;
+    text-align: center;
+  }
 }
 
 /* Small phones (480px and below) */

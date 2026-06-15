@@ -18,7 +18,7 @@ interface MeterRecordingProps {
     rooms: Room[];
     config: DormConfig;
     currentMonth: string;
-    onSaveBill: (bill: MonthlyBill) => void;
+    onSaveBill: (bill: MonthlyBill) => Promise<MonthlyBill | void> | void;
     getBillForRoom: (roomId: string, month: string) => MonthlyBill | undefined;
     getPreviousBill: (roomId: string, month: string) => MonthlyBill | undefined;
     onMonthChange: (month: string) => void;
@@ -83,6 +83,8 @@ export default function MeterRecording({
     buildingId
 }: MeterRecordingProps) {
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
+    const [savingRooms, setSavingRooms] = useState<Record<string, boolean>>({});
+    const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
 
     const draftKey = `${DRAFT_PREFIX}${buildingId || 'local'}_${currentMonth}`;
 
@@ -176,7 +178,7 @@ export default function MeterRecording({
         }));
     };
 
-    const handleSave = (roomId: string) => {
+    const handleSave = async (roomId: string) => {
         const state = recordingState[roomId];
         const room = rooms.find(r => r.id === roomId);
         if (!state || !room) return;
@@ -226,20 +228,30 @@ export default function MeterRecording({
             updated_at: new Date().toISOString()
         };
 
-        onSaveBill(bill);
-        removeDraft(draftKey, roomId); // saved to Firestore — draft no longer needed
+        // แสดง loading
+        setSavingRooms(prev => ({ ...prev, [roomId]: true }));
+        setSaveErrors(prev => ({ ...prev, [roomId]: '' }));
 
-        setRecordingState(prev => ({
-            ...prev,
-            [roomId]: {
-                ...prev[roomId],
-                isSaved: true
-            }
-        }));
+        try {
+            await onSaveBill(bill);
+            removeDraft(draftKey, roomId);
+            setRecordingState(prev => ({
+                ...prev,
+                [roomId]: { ...prev[roomId], isSaved: true }
+            }));
+        } catch (err) {
+            console.error('บันทึกบิลล้มเหลว:', err);
+            const msg = err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ';
+            setSaveErrors(prev => ({ ...prev, [roomId]: msg }));
+        } finally {
+            setSavingRooms(prev => ({ ...prev, [roomId]: false }));
+        }
     };
 
     const renderRoomCard = (room: Room) => {
-        const state = recordingState[room.id] || { prevElec: '0', prevWater: '0', currElec: '', currWater: '', isSaved: false };
+        const state = recordingState[room.id] || { prevElec: '0', prevWater: '0', currElec: '', currWater: '', isSaved: false, isLocked: false };
+        const isSaving = savingRooms[room.id] || false;
+        const saveError = saveErrors[room.id] || '';
 
         const prevElec = parseInt(state.prevElec) || 0;
         const prevWater = parseInt(state.prevWater) || 0;
@@ -260,7 +272,8 @@ export default function MeterRecording({
             ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg)
             : null;
 
-        const canSave = state.prevElec && state.prevWater && state.currElec && state.currWater && elecValidation.valid && waterValidation.valid;
+        // prevElec/prevWater อาจเป็น '' (แทน 0) ถือว่า valid — ตรวจแค่ currElec/currWater ต้องกรอก
+        const canSave = state.currElec !== '' && state.currWater !== '' && elecValidation.valid && waterValidation.valid;
 
         return (
             <div key={room.id} className={`room-card ${state.isSaved ? 'saved' : ''}`}>
@@ -420,17 +433,22 @@ export default function MeterRecording({
                         onClick={() => handleClear(room.id)}
                         title="ล้างข้อมูล"
                         style={{ padding: '0.5rem' }}
-                        disabled={state.isLocked}
+                        disabled={state.isLocked || isSaving}
                     >
                         <AlertTriangle size={18} />
                     </button>
                     <button
                         className={`btn ${state.isSaved ? 'btn-success' : 'btn-primary'}`}
                         onClick={() => handleSave(room.id)}
-                        disabled={!canSave || state.isLocked}
+                        disabled={!canSave || state.isLocked || isSaving}
                         style={{ flex: 1 }}
                     >
-                        {state.isSaved ? (
+                        {isSaving ? (
+                            <>
+                                <span className="loading-spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                                กำลังบันทึก...
+                            </>
+                        ) : state.isSaved ? (
                             <>
                                 <CheckCircle size={18} />
                                 บันทึกแล้ว ✓
@@ -443,6 +461,13 @@ export default function MeterRecording({
                         )}
                     </button>
                 </div>
+                {/* แสดง error ถ้า Firestore fail */}
+                {saveError && (
+                    <div className="form-error flex items-center gap-2 mt-2" style={{ fontSize: '0.8rem' }}>
+                        <AlertTriangle size={14} />
+                        บันทึกไม่สำเร็จ: {saveError}
+                    </div>
+                )}
             </div>
         );
     };
