@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2, AlertTriangle, Smartphone, Receipt, Cloud } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2, AlertTriangle, Smartphone, Receipt, Cloud, Zap } from 'lucide-react';
+import PricingPage from '../Pricing/PricingPage';
 
 interface LoginPageProps {
     onLogin: (email: string, password: string) => Promise<void>;
@@ -9,7 +10,7 @@ interface LoginPageProps {
     clearError: () => void;
 }
 
-type PageMode = 'login' | 'register' | 'forgot';
+type PageMode = 'login' | 'register' | 'forgot' | 'pricing';
 
 export default function LoginPage({ onLogin, onRegister, onResetPassword, error, clearError }: LoginPageProps) {
     const [mode, setMode] = useState<PageMode>('login');
@@ -57,6 +58,23 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
         setName('');
         setResetSent(false);
     };
+
+    const handleGuestSelectPlan = (planId: string, cycle: string) => {
+        localStorage.setItem('horcare_pending_plan', JSON.stringify({ planId, cycle }));
+        switchMode('register');
+    };
+
+    // ─── Pricing (guest) View ────────────────────────────────────────────────
+    if (mode === 'pricing') {
+        return (
+            <PricingPage
+                profile={null}
+                isGuest
+                onNeedAuth={handleGuestSelectPlan}
+                onBack={() => switchMode('login')}
+            />
+        );
+    }
 
     // ─── Forgot Password View ────────────────────────────────────────────────
     if (mode === 'forgot') {
@@ -293,9 +311,50 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                         onClick={() => switchMode(mode === 'register' ? 'login' : 'register')}
                         type="button"
                     >
-                        {mode === 'register' ? 'เข้าสู่ระบบ' : 'สมัครฟรี — ทดลองใช้ 30 วัน'}
+                        {mode === 'register' ? 'เข้าสู่ระบบ' : 'สมัครฟรี — ทดลองใช้ 60 วัน'}
                     </button>
                 </div>
+                {mode === 'login' && (
+                    <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => switchMode('pricing')}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--primary)',
+                                fontSize: '0.875rem',
+                                padding: '0.25rem 0.5rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                opacity: 0.9,
+                                fontWeight: 600,
+                            }}
+                        >
+                            <Zap size={15} />
+                            ดูแพ็กเกจและราคา
+                        </button>
+                    </div>
+                )}
+                {mode === 'register' && localStorage.getItem('horcare_pending_plan') && (
+                    <div style={{
+                        marginTop: '0.75rem',
+                        background: 'rgba(139,92,246,0.12)',
+                        border: '1px solid rgba(139,92,246,0.35)',
+                        borderRadius: '10px',
+                        padding: '0.6rem 0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.82rem',
+                        color: '#C4B5FD',
+                    }}>
+                        <Zap size={14} style={{ flexShrink: 0 }} />
+                        สมัครแล้วจะพาไปหน้าชำระเงินทันที
+                    </div>
+                )}
 
                 {/* Features */}
                 {mode === 'login' && (

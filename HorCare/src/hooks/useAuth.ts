@@ -15,7 +15,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import type { UserProfile } from '../types';
 
-const TRIAL_DAYS = 30;
+const TRIAL_DAYS = 60;
 
 export function useAuth() {
     const [user, setUser] = useState<User | null>(null);

@@ -568,15 +568,27 @@ interface PricingPageProps {
     profile?: UserProfile | null;
     onSubscribed?: (planId: PlanName, cycle: BillingCycle) => void;
     onBack?: () => void;
+    /** ผู้ใช้ยังไม่ได้ล็อกอิน — แสดงแผนได้ แต่คลิกซื้อ → เรียก onNeedAuth แทน checkout */
+    isGuest?: boolean;
+    onNeedAuth?: (planId: string, cycle: BillingCycle) => void;
 }
 
-export default function PricingPage({ profile, onBack }: Omit<PricingPageProps, 'onSubscribed'> & { onSubscribed?: () => void }) {
+export default function PricingPage({ profile, onBack, isGuest, onNeedAuth }: Omit<PricingPageProps, 'onSubscribed'> & { onSubscribed?: () => void }) {
     injectCSS(); // idempotent
 
     const [cycle, setCycle] = useState<BillingCycle>('monthly');
     const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
     const [processing, setProcessing] = useState(false);
     const [successPlan] = useState<Plan | null>(null);
+
+    // เมื่อ guest เลือกแผน → ข้าม modal ไปเรียก onNeedAuth ทันที
+    const handlePlanSelect = (plan: Plan) => {
+        if (isGuest) {
+            onNeedAuth?.(plan.id, cycle);
+        } else {
+            setSelectedPlan(plan);
+        }
+    };
 
     const handleConfirmPayment = async () => {
         if (!selectedPlan) return;
@@ -742,7 +754,7 @@ export default function PricingPage({ profile, onBack }: Omit<PricingPageProps, 
                                             plan={currentPlan}
                                             cycle={cycle}
                                             currentPlanId={currentPlanId}
-                                            onSelect={setSelectedPlan}
+                                            onSelect={handlePlanSelect}
                                         />
                                     </div>
                                 </div>
@@ -758,7 +770,7 @@ export default function PricingPage({ profile, onBack }: Omit<PricingPageProps, 
                                                 plan={plan}
                                                 cycle={cycle}
                                                 currentPlanId={currentPlanId}
-                                                onSelect={setSelectedPlan}
+                                                onSelect={handlePlanSelect}
                                             />
                                         ))}
                                     </div>
@@ -771,7 +783,7 @@ export default function PricingPage({ profile, onBack }: Omit<PricingPageProps, 
                                         key={plan.id}
                                         plan={plan}
                                         cycle={cycle}
-                                        onSelect={setSelectedPlan}
+                                        onSelect={handlePlanSelect}
                                     />
                                 ))}
                             </div>

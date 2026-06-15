@@ -77,6 +77,16 @@ function App() {
     }
   }, []);
 
+  // After login+verify, redirect to pricing if user selected a plan as guest
+  useEffect(() => {
+    if (!user || !emailVerified) return;
+    const pending = localStorage.getItem('horcare_pending_plan');
+    if (pending) {
+      localStorage.removeItem('horcare_pending_plan');
+      setCurrentView('pricing');
+    }
+  }, [user, emailVerified]);
+
   // Close building menu on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -249,7 +259,7 @@ function App() {
           {isPaidExpired ? (
             <>แพ็กเกจของคุณครบรอบการใช้งานแล้ว<br />ต่ออายุเพื่อใช้งานต่อได้เลย</>
           ) : (
-            <>ระยะเวลาทดลองใช้งานฟรี 30 วันของคุณหมดอายุแล้ว<br />อัปเกรดแผนเพื่อใช้งานต่อได้เลย</>
+            <>ระยะเวลาทดลองใช้งานฟรี 60 วันของคุณหมดอายุแล้ว<br />อัปเกรดแผนเพื่อใช้งานต่อได้เลย</>
           )}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
