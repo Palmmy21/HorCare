@@ -571,13 +571,18 @@ interface PricingPageProps {
     /** ผู้ใช้ยังไม่ได้ล็อกอิน — แสดงแผนได้ แต่คลิกซื้อ → เรียก onNeedAuth แทน checkout */
     isGuest?: boolean;
     onNeedAuth?: (planId: string, cycle: BillingCycle) => void;
+    /** Pre-select a plan from the guest flow after login */
+    initialPlanId?: string;
+    initialCycle?: BillingCycle;
 }
 
-export default function PricingPage({ profile, onBack, isGuest, onNeedAuth }: Omit<PricingPageProps, 'onSubscribed'> & { onSubscribed?: () => void }) {
+export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, initialPlanId, initialCycle }: Omit<PricingPageProps, 'onSubscribed'> & { onSubscribed?: () => void }) {
     injectCSS(); // idempotent
 
-    const [cycle, setCycle] = useState<BillingCycle>('monthly');
-    const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+    const [cycle, setCycle] = useState<BillingCycle>(initialCycle ?? 'monthly');
+    const [selectedPlan, setSelectedPlan] = useState<Plan | null>(() =>
+        initialPlanId ? PLANS.find(p => p.id === initialPlanId) ?? null : null
+    );
     const [processing, setProcessing] = useState(false);
     const [successPlan] = useState<Plan | null>(null);
 

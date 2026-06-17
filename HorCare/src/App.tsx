@@ -38,6 +38,7 @@ function App() {
   const [renamingName, setRenamingName] = useState('');
   const buildingMenuRef = useRef<HTMLDivElement>(null);
   const [paymentToast, setPaymentToast] = useState<'success' | 'cancel' | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<{ planId: string; cycle: string } | null>(null);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -77,12 +78,15 @@ function App() {
     }
   }, []);
 
-  // After login+verify, redirect to pricing if user selected a plan as guest
+  // After login+verify, redirect to pricing and pre-select the plan chosen as guest
   useEffect(() => {
     if (!user || !emailVerified) return;
     const pending = localStorage.getItem('horcare_pending_plan');
     if (pending) {
       localStorage.removeItem('horcare_pending_plan');
+      try {
+        setPendingPlan(JSON.parse(pending));
+      } catch {}
       setCurrentView('pricing');
     }
   }, [user, emailVerified]);
@@ -703,8 +707,10 @@ function App() {
           <PricingPage
             profile={profile}
             onBack={() => setCurrentView('dashboard')}
+            initialPlanId={pendingPlan?.planId}
+            initialCycle={pendingPlan?.cycle as 'monthly' | 'yearly' | undefined}
             onSubscribed={() => {
-              // After demo payment: go back to dashboard (Firestore already updated)
+              setPendingPlan(null);
               setCurrentView('dashboard');
             }}
           />

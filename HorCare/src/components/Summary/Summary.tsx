@@ -66,6 +66,7 @@ export default function Summary({
     const printRef = useRef<HTMLDivElement>(null);
     const captureRef = useRef<HTMLDivElement>(null);
     const monthlyReportRef = useRef<HTMLDivElement>(null);
+    const hiddenReportRef = useRef<HTMLDivElement>(null);
 
     const billCustomization = config.bill_customization;
 
@@ -158,11 +159,12 @@ export default function Summary({
 
     const generateMonthlyReportPDF = async () => {
         if (isTrial) { onUpgrade?.(); return; }
-        if (!monthlyReportRef.current) return;
+        // Use the off-screen unconstrained copy — not the one inside the scrollable modal
+        if (!hiddenReportRef.current) return;
         setIsExportingReport(true);
         try {
             await generatePDFFromElement(
-                monthlyReportRef.current,
+                hiddenReportRef.current,
                 `HorCare_MonthlyReport_${currentMonth}.pdf`
             );
         } catch (error) {
@@ -182,7 +184,21 @@ export default function Summary({
 
     const captureAndDownload = async (bill: MonthlyBill): Promise<void> => {
         setCaptureTarget(bill);
-        await new Promise(resolve => setTimeout(resolve, 700));
+
+        // Poll via rAF until React commits the hidden InvoiceBill, with a 3-second timeout
+        await new Promise<void>((resolve, reject) => {
+            const deadline = Date.now() + 3000;
+            const check = () => {
+                if (captureRef.current) {
+                    resolve();
+                } else if (Date.now() > deadline) {
+                    reject(new Error('Capture element not mounted'));
+                } else {
+                    requestAnimationFrame(check);
+                }
+            };
+            requestAnimationFrame(check);
+        });
 
         const el = captureRef.current;
         if (!el) throw new Error('Capture element not mounted');
@@ -219,20 +235,26 @@ export default function Summary({
         if (monthBills.length === 0) return;
         setIsDownloadingAll(true);
         setDownloadAllProgress(0);
+        const failed: string[] = [];
         try {
             for (let i = 0; i < monthBills.length; i++) {
-                await captureAndDownload(monthBills[i]);
+                try {
+                    await captureAndDownload(monthBills[i]);
+                } catch (err) {
+                    console.error(`Download failed for room ${monthBills[i].room_number}:`, err);
+                    failed.push(monthBills[i].room_number);
+                }
                 setCaptureTarget(null);
                 setDownloadAllProgress(i + 1);
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
-        } catch (err) {
-            console.error('Download all failed:', err);
-            alert('เกิดข้อผิดพลาดในการดาวน์โหลด');
         } finally {
             setIsDownloadingAll(false);
             setCaptureTarget(null);
             setDownloadAllProgress(0);
+            if (failed.length > 0) {
+                alert(`ดาวน์โหลดไม่สำเร็จ ${failed.length} ห้อง: ${failed.join(', ')}`);
+            }
         }
     };
 
@@ -790,6 +812,19 @@ export default function Summary({
                     );
                 })()}
             </div>
+
+            {/* Off-screen MonthlyReport for unconstrained PDF capture (no scroll/clip) */}
+            {showMonthlyReport && (
+                <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '900px', padding: '2rem', background: '#fff', pointerEvents: 'none', zIndex: -1 }}>
+                    <MonthlyReport
+                        ref={hiddenReportRef}
+                        bills={bills}
+                        currentMonth={currentMonth}
+                        config={config}
+                        billCustomization={billCustomization}
+                    />
+                </div>
+            )}
 
             {/* Monthly Report Modal */}
             {showMonthlyReport && (

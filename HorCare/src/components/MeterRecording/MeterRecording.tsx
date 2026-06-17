@@ -121,8 +121,8 @@ export default function MeterRecording({
                 initialState[room.id] = { ...draft, isSaved: false, isLocked };
             } else if (existingBill) {
                 initialState[room.id] = {
-                    prevElec: existingBill.prev_elec === 0 ? '' : existingBill.prev_elec.toString(),
-                    prevWater: existingBill.prev_water === 0 ? '' : existingBill.prev_water.toString(),
+                    prevElec: existingBill.prev_elec.toString(),
+                    prevWater: existingBill.prev_water.toString(),
                     currElec: existingBill.curr_elec === 0 ? '' : existingBill.curr_elec.toString(),
                     currWater: existingBill.curr_water === 0 ? '' : existingBill.curr_water.toString(),
                     isSaved: existingBill.is_saved,
@@ -130,8 +130,9 @@ export default function MeterRecording({
                 };
             } else {
                 initialState[room.id] = {
-                    prevElec: defaultPrevElec === 0 ? '' : defaultPrevElec.toString(),
-                    prevWater: defaultPrevWater === 0 ? '' : defaultPrevWater.toString(),
+                    // Always show '0' explicitly so users notice and can correct the starting point
+                    prevElec: defaultPrevElec.toString(),
+                    prevWater: defaultPrevWater.toString(),
                     currElec: '',
                     currWater: '',
                     isSaved: false,

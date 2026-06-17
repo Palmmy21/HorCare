@@ -68,12 +68,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const userData = userDoc.data() ?? {};
         let customerId: string = userData.stripe_customer_id ?? '';
 
-        // Verify existing customer is valid in current mode (test vs live IDs differ)
+        // Verify existing customer is valid in current mode (test vs live IDs differ).
+        // Only reset on 404/resource_missing — re-throw network errors, rate-limits, etc.
         if (customerId) {
             try {
                 await stripe.customers.retrieve(customerId);
-            } catch {
-                customerId = '';
+            } catch (err: any) {
+                if (err?.statusCode === 404 || err?.code === 'resource_missing') {
+                    customerId = '';
+                } else {
+                    throw err;
+                }
             }
         }
 
