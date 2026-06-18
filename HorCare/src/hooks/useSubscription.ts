@@ -42,14 +42,25 @@ export function isPaidLicense(license: LicenseType): boolean {
     return parseLicense(license) !== null || license === 'active';
 }
 
-/** Whether this license can send bills via LINE (medium, large, or active — not small) */
+/** Whether this license can send bills via LINE (large or active only) */
 export function canSendLine(license: LicenseType): boolean {
     if (license === 'active' || license === 'trial') return true;
     const parsed = parseLicense(license);
-    return parsed?.plan === 'medium' || parsed?.plan === 'large';
+    return parsed?.plan === 'large';
 }
 
-/** Whether this license includes multi-building (Large plan only) */
+/** Max buildings allowed for a given license */
+export function getMaxBuildings(license: LicenseType): number {
+    if (license === 'trial') return 1;
+    if (license === 'active') return Infinity;
+    const parsed = parseLicense(license);
+    if (!parsed) return 1;
+    if (parsed.plan === 'small')  return 5;
+    if (parsed.plan === 'medium') return 20;
+    return Infinity; // large
+}
+
+/** Whether this license includes multi-building (all paid plans) */
 export function isLargePlan(license: LicenseType): boolean {
     if (license === 'active') return true;
     const parsed = parseLicense(license);

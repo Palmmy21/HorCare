@@ -21,7 +21,7 @@ import PaymentsPage from './components/Payments/PaymentsPage';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
 import PricingPage from './components/Pricing/PricingPage';
 import InstallPrompt from './components/PWA/InstallPrompt';
-import { isPaidLicense, isLargePlan, getMaxRooms, canSendLine } from './hooks/useSubscription';
+import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine } from './hooks/useSubscription';
 
 import './index.css';
 
@@ -366,7 +366,8 @@ function App() {
 
   // Check if user has paid subscription / large plan
   const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
-  const hasLargePlan = profile ? isLargePlan(profile.license) : false;
+  const maxBuildings = profile ? getMaxBuildings(profile.license) : 1;
+  const canAddBuilding = maxBuildings > 1;
   const isTrial = profile?.license === 'trial';
   const lineEnabled = profile?.license ? canSendLine(profile.license) : true;
   const maxRooms = profile ? getMaxRooms(profile.license) : 5;
@@ -425,8 +426,8 @@ function App() {
           <span>HorCare</span>
         </div>
 
-        {/* Building Switcher — Large plan only */}
-        {hasLargePlan && (
+        {/* Building Switcher — all paid plans (small=5, medium=20, large=∞) */}
+        {canAddBuilding && (
           <div ref={buildingMenuRef} style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
             <button
               onClick={() => { setBuildingMenuOpen(v => !v); setAddBuildingMode(false); }}
@@ -514,6 +515,10 @@ function App() {
                         <Check size={14} />
                       </button>
                     </form>
+                  ) : buildings.length >= maxBuildings ? (
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', padding: '0.25rem 0.25rem', display: 'block' }}>
+                      ครบ {maxBuildings} หอแล้ว
+                    </span>
                   ) : (
                     <button
                       onClick={() => setAddBuildingMode(true)}
