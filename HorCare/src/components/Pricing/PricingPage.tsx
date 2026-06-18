@@ -341,7 +341,7 @@ const PLANS: Plan[] = [
         features: [
             'ห้องไม่จำกัด', 'จัดการหอพักไม่จำกัด',
             'จดมิเตอร์ไฟ / น้ำ รายเดือน', 'ออกบิลอัตโนมัติ',
-            'QR PromptPay ในบิล', 'ส่งบิลผ่าน LINE ปุ่มเดียว ✅',
+            'QR PromptPay ในบิล', 'ส่งบิลผ่าน LINE ปุ่มเดียว',
             'Export PDF / Excel', 'ตั้งค่าราคาแต่ละห้องได้',
             'รองรับหอพักพาณิชย์', 'Dashboard วิเคราะห์ขั้นสูง',
             'Priority Support',
@@ -436,17 +436,32 @@ const PlanCard = memo(function PlanCard({
                 listStyle: 'none', padding: 0, margin: '0 0 1.75rem',
                 flex: 1, display: 'flex', flexDirection: 'column', gap: '0.6rem',
             }}>
-                {plan.features.map(f => (
-                    <li key={f} style={{
-                        display: 'flex', alignItems: 'flex-start',
-                        gap: '0.6rem', fontSize: '0.86rem', color: 'rgba(255,255,255,0.72)',
-                    }}>
-                        <div className={`feat-check ${plan.id}`}>
-                            <Check size={10} color="#fff" strokeWidth={3} />
-                        </div>
-                        {f}
-                    </li>
-                ))}
+                {plan.features.map(f => {
+                    const unavailable = f.startsWith('❌');
+                    const label = unavailable ? f.slice(2) : f;
+                    return (
+                        <li key={f} style={{
+                            display: 'flex', alignItems: 'flex-start',
+                            gap: '0.6rem', fontSize: '0.86rem',
+                            color: unavailable ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.72)',
+                        }}>
+                            {unavailable ? (
+                                <div className="feat-check unavailable" style={{
+                                    background: 'rgba(255,255,255,0.08)',
+                                    borderRadius: '50%', width: 18, height: 18,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                }}>
+                                    <X size={10} color="rgba(255,255,255,0.4)" strokeWidth={3} />
+                                </div>
+                            ) : (
+                                <div className={`feat-check ${plan.id}`}>
+                                    <Check size={10} color="#fff" strokeWidth={3} />
+                                </div>
+                            )}
+                            {label}
+                        </li>
+                    );
+                })}
             </ul>
 
             {/* CTA, purely CSS hover, no JS state */}
