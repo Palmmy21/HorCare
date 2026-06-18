@@ -308,18 +308,19 @@ interface Plan {
 
 const PLANS: Plan[] = [
     {
-        id: 'small', name: 'หอเล็ก', icon: Home, roomRange: '1–20 ห้อง',
+        id: 'small', name: 'หอเล็ก', icon: Home, roomRange: '1–40 ห้อง',
         monthlyPrice: 79, yearlyPrice: 790, originalYearlyPrice: 948,
         gradient: 'linear-gradient(135deg,#3B82F6,#6366F1)',
         glowColor: 'rgba(99,102,241,0.45)',
         features: [
-            'ห้องสูงสุด 20 ห้อง', 'จดมิเตอร์ไฟ / น้ำ รายเดือน',
+            'ห้องสูงสุด 40 ห้อง', 'จดมิเตอร์ไฟ / น้ำ รายเดือน',
             'ออกบิลอัตโนมัติ', 'QR PromptPay ในบิล',
             'สรุปยอดรายเดือน', 'รองรับ 1 หอพัก',
+            '❌ ไม่รองรับส่งบิลผ่าน LINE',
         ],
     },
     {
-        id: 'medium', name: 'หอกลาง', icon: Building, roomRange: '21–100 ห้อง',
+        id: 'medium', name: 'หอกลาง', icon: Building, roomRange: '41–100 ห้อง',
         monthlyPrice: 259, yearlyPrice: 1590, originalYearlyPrice: 3108,
         gradient: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
         glowColor: 'rgba(139,92,246,0.45)',
@@ -327,8 +328,9 @@ const PLANS: Plan[] = [
         features: [
             'ห้องสูงสุด 100 ห้อง', 'จดมิเตอร์ไฟ / น้ำ รายเดือน',
             'ออกบิลอัตโนมัติ', 'QR PromptPay ในบิล',
-            'Export PDF / Excel', 'ตั้งค่าราคาแต่ละห้องได้',
-            'รองรับหอพักพาณิชย์', 'สรุปยอดรายเดือน',
+            'ส่งบิลผ่าน LINE ปุ่มเดียว ✅', 'Export PDF / Excel',
+            'ตั้งค่าราคาแต่ละห้องได้', 'รองรับหอพักพาณิชย์',
+            'สรุปยอดรายเดือน',
         ],
     },
     {

@@ -30,6 +30,7 @@ interface SummaryProps {
     uid?: string;
     buildingId?: string;
     isTrial?: boolean;
+    canSendLine?: boolean;
     onUpgrade?: () => void;
 }
 
@@ -44,6 +45,7 @@ export default function Summary({
     uid,
     buildingId,
     isTrial = false,
+    canSendLine = true,
     onUpgrade,
 }: SummaryProps) {
     const [showConfirm, setShowConfirm] = useState(false);
@@ -315,12 +317,16 @@ export default function Summary({
                             </button>
                             {uid && buildingId && config.dorm_code && (
                                 <button
-                                    className="btn btn-line"
-                                    onClick={handleSendLineBills}
-                                    disabled={lineStatus === 'sending'}
+                                    className={`btn ${canSendLine ? 'btn-line' : 'btn-outline'}`}
+                                    onClick={canSendLine ? handleSendLineBills : onUpgrade}
+                                    disabled={canSendLine && lineStatus === 'sending'}
+                                    title={canSendLine ? undefined : 'อัปเกรดเป็นแพ็กเกจหอกลางขึ้นไปเพื่อส่งบิลผ่าน LINE'}
+                                    style={canSendLine ? undefined : { opacity: 0.6 }}
                                 >
-                                    <MessageCircle size={18} />
-                                    {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
+                                    {canSendLine ? <MessageCircle size={18} /> : <Lock size={18} />}
+                                    {canSendLine
+                                        ? (lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE')
+                                        : 'LINE — อัปเกรด'}
                                 </button>
                             )}
                             <button className="btn btn-primary" onClick={() => setShowMonthlyReport(true)}>

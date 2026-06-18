@@ -21,7 +21,7 @@ import PaymentsPage from './components/Payments/PaymentsPage';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
 import PricingPage from './components/Pricing/PricingPage';
 import InstallPrompt from './components/PWA/InstallPrompt';
-import { isPaidLicense, isLargePlan, getMaxRooms } from './hooks/useSubscription';
+import { isPaidLicense, isLargePlan, getMaxRooms, canSendLine } from './hooks/useSubscription';
 
 import './index.css';
 
@@ -368,6 +368,7 @@ function App() {
   const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
   const hasLargePlan = profile ? isLargePlan(profile.license) : false;
   const isTrial = profile?.license === 'trial';
+  const lineEnabled = profile?.license ? canSendLine(profile.license) : true;
   const maxRooms = profile ? getMaxRooms(profile.license) : 5;
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
 
@@ -667,6 +668,7 @@ function App() {
             uid={user?.uid}
             buildingId={activeBuildingId ?? undefined}
             isTrial={isTrial}
+            canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
           />
         )}
