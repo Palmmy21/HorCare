@@ -755,7 +755,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                 }}>HorCare</span>
                             </h1>
                             <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '1.0625rem', maxWidth: 480, margin: '0 auto', lineHeight: 1.65 }}>
-                                {currentPlanId ? 'ต่ออายุแพ็กเกจปัจจุบันของคุณ หรืออัปเกรดเพื่อรับฟีเจอร์ที่มากขึ้น' : 'ครบทุกฟีเจอร์สำหรับจัดการหอพัก ไม่ว่าจะเล็กหรือใหญ่'}
+                                {currentPlanId ? 'ต่ออายุแพ็กเกจปัจจุบันของคุณ หรืออัปเกรดเพื่อรับฟีเจอร์ที่มากขึ้น' : 'เริ่มต้นฟรี — อัปเกรดรับ LINE ส่งบิลอัตโนมัติและฟีเจอร์ครบครัน'}
                             </p>
                             {currentPlanId && currentPlan && (
                                 <div style={{
@@ -792,6 +792,55 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                 ))}
                             </div>
                         </div>
+
+                        {/* Free tier banner */}
+                        {!currentPlanId && (
+                            <div className="p-anim-2" style={{ marginBottom: '2rem' }}>
+                                <div style={{
+                                    border: '1px solid rgba(16,185,129,0.25)',
+                                    borderRadius: '16px',
+                                    padding: '1.1rem 1.5rem',
+                                    background: 'rgba(16,185,129,0.05)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: '1rem',
+                                }}>
+                                    <div>
+                                        <div style={{ color: '#34D399', fontWeight: 700, fontSize: '1rem', marginBottom: '0.25rem' }}>
+                                            ฟรี — ไม่มีค่าใช้จ่าย
+                                        </div>
+                                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem' }}>
+                                            จดมิเตอร์ · ออกบิล · ดาวน์โหลด PDF · Dashboard · ข้อมูลบน Cloud
+                                        </div>
+                                    </div>
+                                    {profile?.license === 'free' ? (
+                                        <div style={{
+                                            background: 'rgba(16,185,129,0.15)',
+                                            border: '1px solid rgba(16,185,129,0.3)',
+                                            color: '#34D399', borderRadius: '999px',
+                                            padding: '0.375rem 1rem', fontSize: '0.8rem', fontWeight: 700,
+                                        }}>
+                                            แผนของคุณ
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => isGuest ? onNeedAuth?.('free', cycle) : onBack?.()}
+                                            style={{
+                                                background: 'rgba(16,185,129,0.08)',
+                                                border: '1px solid rgba(16,185,129,0.22)',
+                                                color: '#34D399', borderRadius: '12px',
+                                                padding: '0.6rem 1.25rem', fontSize: '0.875rem', fontWeight: 600,
+                                                cursor: 'pointer', whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            เริ่มใช้งานฟรี →
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Cards grid, align-items:stretch = equal height */}
                         {currentPlanId && currentPlan ? (
