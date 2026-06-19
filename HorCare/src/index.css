@@ -3415,17 +3415,21 @@ html.dark .invoice-footer-msg {
 
 /* ── Sidebar nav active state ─────────────────── */
 html.dark .nav-item {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.70);
 }
 
 html.dark .nav-item:hover {
-  color: rgba(255, 255, 255, 0.80);
-  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 html.dark .nav-item.active {
   color: #fff;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+html.dark .nav-item svg {
+  opacity: 1;
 }
 
 /* ── Cards with hardcoded bg ──────────────────── */
@@ -3474,6 +3478,21 @@ html.dark .building-type-card-bg {
 html.dark .mobile-header {
   background: var(--color-gray-50);
   border-bottom-color: var(--color-gray-200);
+  /* mobile-header is always dark — keep text/icons white */
+  color: #fff;
+}
+
+html.dark .mobile-header span {
+  color: #fff;
+}
+
+html.dark .mobile-menu-btn {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+html.dark .mobile-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 /* ── Trial / subscription banner inline fix ───── */
