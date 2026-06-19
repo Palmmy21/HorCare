@@ -61,19 +61,28 @@ service cloud.firestore {
       // ── Buildings ───────────────────────────────────────────────────────
       // read: any non-banned owner. write: also requires a non-expired license.
       match /buildings/{buildingId} {
-        allow read: if isOwner(userId) && isNotBanned();
+        // Owner: full access. Public: read building doc (tenant portal needs building name)
+        allow read: if isOwner(userId) && isNotBanned() || true;
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
 
         match /rooms/{roomId} {
-          allow read: if isOwner(userId) && isNotBanned();
+          // Public read — tenant portal shows room number & rent
+          allow read: if isOwner(userId) && isNotBanned() || true;
           allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         match /bills/{billId} {
-          allow read: if isOwner(userId) && isNotBanned();
+          // Public read — tenant portal shows bills
+          allow read: if isOwner(userId) && isNotBanned() || true;
           allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         match /data/{docId} {
-          allow read: if isOwner(userId) && isNotBanned();
+          // Public read — tenant portal reads config (promptpay, rates)
+          allow read: if isOwner(userId) && isNotBanned() || true;
+          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+        }
+        // Tenant profiles — read by owner OR public (tenant portal shows name/phone)
+        match /tenants/{roomId} {
+          allow read: if isOwner(userId) && isNotBanned() || true;
           allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         // Slip images stored as base64 by the LINE webhook (Admin SDK bypasses rules).
