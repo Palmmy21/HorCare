@@ -152,3 +152,147 @@ export interface BillCalculation {
 }
 
 export type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'settings';
+
+// ─── Tenant Profile ───────────────────────────────────────────────────────────
+
+/**
+ * ข้อมูลผู้เช่าแบบละเอียด — เก็บเป็น sub-document ใน
+ * users/{uid}/buildings/{buildingId}/rooms/{roomId}/profile/{roomId}
+ */
+export interface TenantProfile {
+  id: string;        // = room_id
+  room_id: string;
+  building_id: string;
+
+  // ── Basic (ฟรี) ──
+  full_name: string;
+  nickname?: string;
+  phone: string;
+  line_display_name?: string;   // ชื่อใน LINE (sync จาก webhook)
+
+  // ── สัญญา / วันที่ (ฟรี) ──
+  move_in_date?: string;         // ISO date "YYYY-MM-DD"
+  contract_end_date?: string;    // ISO date
+  expected_move_out?: string;    // ISO date — ใช้กับ Churn prediction
+
+  // ── มัดจำ (ฟรี) ──
+  deposit_amount?: number;
+  deposit_status?: 'held' | 'returned' | 'deducted';
+  deposit_note?: string;
+  deposit_returned_at?: string;  // ISO date
+
+  // ── Extended (Paid) ──
+  birthdate?: string;            // ISO date — ⚠️ PDPA sensitive
+  id_card_number?: string;       // ⚠️ PDPA sensitive
+  occupation?: string;
+  university?: string;
+  year_of_study?: number;        // ใช้กับ Churn prediction (นักศึกษาปี 4)
+
+  // ── ผู้ติดต่อฉุกเฉิน (Paid) ──
+  emergency_name?: string;
+  emergency_phone?: string;
+  emergency_relation?: string;   // "พ่อ" | "แม่" | "พี่น้อง" | ฯลฯ
+
+  // ── Metadata ──
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Log การเข้า-ออก / เหตุการณ์สำคัญของผู้เช่า
+ * เก็บเป็น sub-collection: ...rooms/{roomId}/events/{eventId}
+ */
+export interface TenantEvent {
+  id: string;
+  room_id: string;
+  type: 'move_in' | 'move_out' | 'contract_renewed' | 'deposit_returned' | 'note';
+  date: string;       // ISO date
+  note?: string;
+  created_by?: string; // uid (เตรียมสำหรับ RBAC)
+  created_at: string;
+}
+
+// ─── Maintenance Requests (แจ้งซ่อม) ──────────────────────────────────────────
+export type MaintenanceCategory =
+  | 'electric' | 'plumbing' | 'appliance' | 'door_window'
+  | 'bathroom' | 'ac' | 'furniture' | 'other';
+
+export type MaintenanceUrgency = 'urgent' | 'normal';
+export type MaintenanceStatus = 'open' | 'in_progress' | 'done' | 'rejected';
+
+export interface MaintenancePartUsed {
+  stock_id: string;
+  stock_name: string;
+  qty: number;
+  unit: string;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  room_id: string;
+  room_number: string;
+  category: MaintenanceCategory;
+  description: string;
+  urgency: MaintenanceUrgency;
+  status: MaintenanceStatus;
+  created_at: string;   // ISO
+  updated_at?: string;  // ISO
+  admin_note?: string;
+  // Completion data
+  parts_used?: MaintenancePartUsed[];
+  asset_id?: string;
+  asset_name?: string;
+  asset_condition_after?: AssetCondition;
+}
+
+// ─── Vendors (ผู้รับเหมา/ช่าง) ────────────────────────────────────────────────
+export interface Vendor {
+  id: string;
+  name: string;
+  phone: string;
+  specialty: string;
+  note?: string;
+  created_at: string;
+}
+
+// ─── Stock (สต็อกวัสดุ) ────────────────────────────────────────────────────────
+export interface StockItem {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  min_quantity: number;
+  note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Assets (ทรัพย์สิน) ────────────────────────────────────────────────────────
+export type AssetCondition = 'good' | 'fair' | 'poor' | 'broken';
+export interface Asset {
+  id: string;
+  name: string;
+  category: string;
+  room_id?: string;
+  room_number?: string;
+  condition: AssetCondition;
+  purchase_date?: string;
+  purchase_price?: number;
+  note?: string;
+  created_at: string;
+}
+
+// ─── Expenses (ค่าใช้จ่าย) ────────────────────────────────────────────────────
+export interface Expense {
+  id: string;
+  date: string;
+  amount: number;
+  category: string;
+  description: string;
+  vendor_id?: string;
+  vendor_name?: string;
+  note?: string;
+  created_at: string;
+}
+

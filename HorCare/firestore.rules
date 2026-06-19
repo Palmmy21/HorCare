@@ -82,6 +82,38 @@ service cloud.firestore {
           allow read: if isOwner(userId) && isNotBanned();
           allow write: if false; // backend only via admin SDK
         }
+
+        // ── Maintenance requests (แจ้งซ่อม) ─────────────────────────────
+        // Tenants submit via public portal (no auth). Owner can read/update/delete.
+        match /maintenance/{reqId} {
+          // Owner: full access. Public: read (for tenant portal to show request status)
+          allow read: if isOwner(userId) && isNotBanned() || true;
+          allow update, delete: if isOwner(userId) && isNotBanned();
+
+          // Anyone (tenant portal — no sign-in) can create, with field validation
+          allow create: if
+            request.resource.data.keys().hasAll(['room_id','room_number','category','description','urgency','status','created_at']) &&
+            request.resource.data.status == 'open' &&
+            request.resource.data.urgency in ['urgent', 'normal'] &&
+            request.resource.data.category in ['electric','plumbing','appliance','door_window','bathroom','ac','furniture','other'] &&
+            request.resource.data.description is string &&
+            request.resource.data.description.size() > 0 &&
+            request.resource.data.description.size() <= 1000;
+        }
+
+        // ── Operations collections (owner only) ──────────────────────────
+        match /vendors/{docId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
+        match /stock/{docId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
+        match /assets/{docId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
+        match /expenses/{docId} {
+          allow read, write: if isOwner(userId) && isNotBanned();
+        }
       }
 
       // ── Legacy flat paths ──────────────────────────────────────────────

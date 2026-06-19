@@ -53,6 +53,7 @@ export default function Summary({
     const [sendComplete, setSendComplete] = useState(false);
     const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
     const [lineResult, setLineResult] = useState<{ sent: number; skipped: number } | null>(null);
+    const [showLineUpgradeModal, setShowLineUpgradeModal] = useState(false);
     const [billDate, setBillDate] = useState(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -318,15 +319,15 @@ export default function Summary({
                             {uid && buildingId && config.dorm_code && (
                                 <button
                                     className={`btn ${canSendLine ? 'btn-line' : 'btn-outline'}`}
-                                    onClick={canSendLine ? handleSendLineBills : onUpgrade}
+                                    onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
                                     disabled={canSendLine && lineStatus === 'sending'}
-                                    title={canSendLine ? undefined : 'อัปเกรดเป็นแพ็กเกจหอกลางขึ้นไปเพื่อส่งบิลผ่าน LINE'}
-                                    style={canSendLine ? undefined : { opacity: 0.6 }}
+                                    title={canSendLine ? undefined : 'ฟีเจอร์นี้สำหรับผู้ใช้แพ็กเกจที่ชำระเงินแล้ว'}
+                                    style={canSendLine ? undefined : { opacity: 0.75 }}
                                 >
                                     {canSendLine ? <MessageCircle size={18} /> : <Lock size={18} />}
                                     {canSendLine
                                         ? (lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE')
-                                        : 'LINE — อัปเกรด'}
+                                        : 'ส่งบิลผ่าน LINE'}
                                 </button>
                             )}
                             <button className="btn btn-primary" onClick={() => setShowMonthlyReport(true)}>
@@ -870,6 +871,133 @@ export default function Summary({
                                 <Printer size={18} />
                                 พิมพ์
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* LINE Upgrade Modal — shown when free plan user clicks "ส่งบิลผ่าน LINE" */}
+            {showLineUpgradeModal && (
+                <div
+                    className="modal-overlay"
+                    onClick={() => setShowLineUpgradeModal(false)}
+                    style={{ zIndex: 600 }}
+                >
+                    <div
+                        className="modal"
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            maxWidth: '420px',
+                            width: '92vw',
+                            borderRadius: '20px',
+                            overflow: 'hidden',
+                            padding: 0,
+                            border: 'none',
+                        }}
+                    >
+                        {/* Modal Header — LINE green gradient */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, #00B900 0%, #00C300 50%, #06D6A0 100%)',
+                            padding: '2rem 1.75rem 1.5rem',
+                            textAlign: 'center',
+                            position: 'relative',
+                        }}>
+                            <button
+                                onClick={() => setShowLineUpgradeModal(false)}
+                                style={{
+                                    position: 'absolute', top: '1rem', right: '1rem',
+                                    background: 'rgba(255,255,255,0.2)', border: 'none',
+                                    borderRadius: '50%', width: 32, height: 32,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: 'pointer', color: '#fff',
+                                }}
+                            >
+                                <XCircle size={18} />
+                            </button>
+                            <div style={{
+                                width: 72, height: 72, borderRadius: '50%',
+                                background: 'rgba(255,255,255,0.2)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto 1rem',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                            }}>
+                                <MessageCircle size={36} color="#fff" />
+                            </div>
+                            <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 0.375rem' }}>
+                                ส่งบิลผ่าน LINE
+                            </h3>
+                            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.875rem', margin: 0 }}>
+                                ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงินแล้วเท่านั้น
+                            </p>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div style={{ padding: '1.5rem 1.75rem', background: 'var(--color-surface, #fff)' }}>
+                            <p style={{ color: 'var(--color-text-muted, #6B7280)', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
+                                การส่งบิลอัตโนมัติผ่าน LINE ช่วยให้คุณแจ้งยอดให้ผู้เช่าได้ง่าย ๆ เพียงปลายนิ้ว ไม่ต้องส่งทีละห้อง
+                            </p>
+
+                            {/* Feature list */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.5rem' }}>
+                                {[
+                                    'ส่งบิลหาผู้เช่าทุกห้องพร้อมกันในคลิกเดียว',
+                                    'แสดงรายละเอียดค่าน้ำ-ไฟ-ค่าห้องในข้อความ LINE',
+                                    'ติดตามสถานะ "ส่งแล้ว" ในระบบได้ทันที',
+                                ].map((feat, i) => (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
+                                        <div style={{
+                                            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                                            background: 'linear-gradient(135deg, #00B900, #06D6A0)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            marginTop: '0.1rem',
+                                        }}>
+                                            <CheckCircle size={12} color="#fff" />
+                                        </div>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text, #111827)', lineHeight: 1.5 }}>{feat}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Pricing hint */}
+                            <div style={{
+                                background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.06))',
+                                border: '1px solid rgba(139,92,246,0.2)',
+                                borderRadius: '12px', padding: '0.875rem 1rem',
+                                marginBottom: '1.25rem',
+                                display: 'flex', alignItems: 'center', gap: '0.625rem',
+                            }}>
+                                <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: '0.8125rem', color: 'var(--color-text, #111827)', lineHeight: 1.5 }}>
+                                    เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
+                                </span>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={() => setShowLineUpgradeModal(false)}
+                                    style={{ flex: 1 }}
+                                >
+                                    ปิด
+                                </button>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={() => {
+                                        setShowLineUpgradeModal(false);
+                                        onUpgrade?.();
+                                    }}
+                                    style={{
+                                        flex: 2,
+                                        background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                                    }}
+                                >
+                                    <Zap size={16} />
+                                    ดูแพ็กเกจ
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

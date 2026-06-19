@@ -4,26 +4,29 @@ export type WidgetId =
     | 'collection'
     | 'progress'
     | 'stats'
+    | 'expense_summary'
     | 'revenue_trend'
     | 'revenue_chart'
     | 'rate_config'
     | 'recent_bills';
 
 export const WIDGET_LABELS: Record<WidgetId, string> = {
-    collection: 'การเก็บเงิน (คาดการณ์ / จริง / ค้าง)',
-    progress: 'สถานะการจดมิเตอร์',
-    stats: 'สถิติหลัก (ห้อง / รายได้ / ไฟ / น้ำ)',
-    revenue_trend: 'กราฟแนวโน้มรายได้ย้อนหลัง',
-    revenue_chart: 'กราฟสัดส่วนรายได้',
-    rate_config: 'อัตราค่าบริการปัจจุบัน',
-    recent_bills: 'รายการบิลล่าสุด',
+    collection:      'การเก็บเงิน (คาดการณ์ / จริง / ค้าง)',
+    progress:        'สถานะการจดมิเตอร์',
+    stats:           'สถิติหลัก (ห้อง / รายได้ / ไฟ / น้ำ)',
+    expense_summary: 'ค่าใช้จ่าย & กำไรสุทธิ',
+    revenue_trend:   'กราฟรายได้ vs ค่าใช้จ่าย ย้อนหลัง 6 เดือน',
+    revenue_chart:   'กราฟสัดส่วนรายได้',
+    rate_config:     'อัตราค่าบริการปัจจุบัน',
+    recent_bills:    'รายการบิลล่าสุด',
 };
 
 const ALL_WIDGETS: WidgetId[] = [
-    'collection', 'progress', 'stats', 'revenue_trend', 'revenue_chart', 'rate_config', 'recent_bills',
+    'collection', 'progress', 'stats', 'expense_summary',
+    'revenue_trend', 'revenue_chart', 'rate_config', 'recent_bills',
 ];
-// v2 — added collection + revenue_trend widgets; bump so existing users see them
-const STORAGE_KEY = 'horcare_dashboard_prefs_v2';
+// v3 — added expense_summary; bump so existing users see it
+const STORAGE_KEY = 'horcare_dashboard_prefs_v3';
 
 function loadPrefs(key: string): WidgetId[] {
     try {

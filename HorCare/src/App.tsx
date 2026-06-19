@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Wallet
+  Building2, ChevronDown, Plus, Check, Pencil, Wallet, CheckCircle, Users, Wrench, SlidersHorizontal
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -21,11 +21,14 @@ import PaymentsPage from './components/Payments/PaymentsPage';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
 import PricingPage from './components/Pricing/PricingPage';
 import InstallPrompt from './components/PWA/InstallPrompt';
+import TenantsPage from './components/TenantProfile/TenantsPage';
+import MaintenancePage from './components/Maintenance/MaintenancePage';
+import OperationsPage from './components/Operations/OperationsPage';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine } from './hooks/useSubscription';
 
 import './index.css';
 
-type ViewMode = 'dashboard' | 'rooms' | 'recording' | 'summary' | 'payments' | 'settings' | 'admin' | 'calculator' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'payments' | 'settings' | 'admin' | 'calculator' | 'pricing';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
@@ -39,6 +42,7 @@ function App() {
   const buildingMenuRef = useRef<HTMLDivElement>(null);
   const [paymentToast, setPaymentToast] = useState<'success' | 'cancel' | null>(null);
   const [pendingPlan, setPendingPlan] = useState<{ planId: string; cycle: string } | null>(null);
+  const [showPaymentsUpgradeModal, setShowPaymentsUpgradeModal] = useState(false);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -164,14 +168,17 @@ function App() {
   const monthBills = getBillsForMonth(currentMonth);
 
   const navItems = [
-    { id: 'dashboard' as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'rooms' as ViewMode, icon: Home, label: 'จัดการห้อง' },
-    { id: 'recording' as ViewMode, icon: FileText, label: 'จดมิเตอร์' },
-    { id: 'summary' as ViewMode, icon: Send, label: 'สรุปยอด' },
-    { id: 'payments' as ViewMode, icon: Wallet, label: 'การชำระเงิน' },
-    { id: 'calculator' as ViewMode, icon: Calculator, label: 'คำนวณมิเตอร์' },
-    { id: 'settings' as ViewMode, icon: SettingsIcon, label: 'ตั้งค่า' },
-    { id: 'pricing' as ViewMode, icon: Zap, label: 'แพ็กเกจ' },
+    { id: 'dashboard'  as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'rooms'      as ViewMode, icon: Home,            label: 'จัดการห้อง' },
+    { id: 'tenants'     as ViewMode, icon: Users,           label: 'ผู้เช่า' },
+    { id: 'maintenance'  as ViewMode, icon: Wrench,             label: 'แจ้งซ่อม' },
+    { id: 'operations'   as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
+    { id: 'recording'    as ViewMode, icon: FileText,           label: 'จดมิเตอร์' },
+    { id: 'summary'    as ViewMode, icon: Send,            label: 'สรุปยอด' },
+    { id: 'payments'   as ViewMode, icon: Wallet,          label: 'การชำระเงิน' },
+    { id: 'calculator' as ViewMode, icon: Calculator,      label: 'คำนวณมิเตอร์' },
+    { id: 'settings'   as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
+    { id: 'pricing'    as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
 
   const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
@@ -181,6 +188,12 @@ function App() {
   }
 
   const handleNavClick = (view: ViewMode) => {
+    // Block free plan users from accessing the Payments page
+    if (view === 'payments' && profile?.license === 'free') {
+      setShowPaymentsUpgradeModal(true);
+      setMobileMenuOpen(false);
+      return;
+    }
     setCurrentView(view);
     setMobileMenuOpen(false);
   };
@@ -610,6 +623,7 @@ function App() {
             recentBills={monthBills}
             allBills={bills}
             uid={user?.uid}
+            buildingId={activeBuildingId ?? undefined}
             onGoToPayments={() => setCurrentView('payments')}
           />
         )}
@@ -624,6 +638,34 @@ function App() {
             maxRooms={maxRooms}
             isTrial={profile?.license === 'free'}
             onUpgrade={() => setCurrentView('pricing')}
+            uid={user?.uid}
+            buildingId={activeBuildingId ?? undefined}
+            isPaid={hasPaidSubscription}
+          />
+        )}
+
+        {currentView === 'tenants' && user && activeBuildingId && (
+          <TenantsPage
+            rooms={rooms}
+            uid={user.uid}
+            buildingId={activeBuildingId}
+            isPaid={hasPaidSubscription}
+            onUpgrade={() => setCurrentView('pricing')}
+          />
+        )}
+
+        {currentView === 'maintenance' && user && activeBuildingId && (
+          <MaintenancePage
+            uid={user.uid}
+            buildingId={activeBuildingId}
+          />
+        )}
+
+        {currentView === 'operations' && user && activeBuildingId && (
+          <OperationsPage
+            uid={user.uid}
+            buildingId={activeBuildingId}
+            rooms={rooms}
           />
         )}
 
@@ -740,6 +782,140 @@ function App() {
           >
             <X size={16} />
           </button>
+        </div>
+      )}
+
+      {/* Payments Upgrade Modal — shown when free plan user tries to access Payments page */}
+      {showPaymentsUpgradeModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setShowPaymentsUpgradeModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '420px', width: '100%',
+              borderRadius: '20px', overflow: 'hidden',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+              border: 'none',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 50%, #EC4899 100%)',
+              padding: '2rem 1.75rem 1.5rem',
+              textAlign: 'center',
+              position: 'relative',
+            }}>
+              <button
+                onClick={() => setShowPaymentsUpgradeModal(false)}
+                style={{
+                  position: 'absolute', top: '1rem', right: '1rem',
+                  background: 'rgba(255,255,255,0.2)', border: 'none',
+                  borderRadius: '50%', width: 32, height: 32,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#fff',
+                }}
+              >
+                <X size={18} />
+              </button>
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 1rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              }}>
+                <Wallet size={34} color="#fff" />
+              </div>
+              <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 0.375rem' }}>
+                การชำระเงิน / สลิป
+              </h3>
+              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.875rem', margin: 0 }}>
+                ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงินแล้วเท่านั้น
+              </p>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.5rem 1.75rem', background: '#fff' }}>
+              <p style={{ color: '#6B7280', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
+                ติดตามสถานะการชำระเงินของผู้เช่า บันทึกสลิป และจัดการการชำระเงินทั้งหมดในที่เดียว
+              </p>
+
+              {/* Features */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.5rem' }}>
+                {[
+                  'ดูสถานะ "ชำระแล้ว" และ "ค้างชำระ" ของทุกห้อง',
+                  'บันทึกและตรวจสอบสลิปการโอนเงิน',
+                  'กรองและค้นหาตามเดือนหรือห้องได้ทันที',
+                ].map((feat, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                      background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      marginTop: '0.1rem',
+                    }}>
+                      <CheckCircle size={12} color="#fff" />
+                    </div>
+                    <span style={{ fontSize: '0.85rem', color: '#111827', lineHeight: 1.5 }}>{feat}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pricing hint */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.06))',
+                border: '1px solid rgba(139,92,246,0.2)',
+                borderRadius: '12px', padding: '0.875rem 1rem',
+                marginBottom: '1.25rem',
+                display: 'flex', alignItems: 'center', gap: '0.625rem',
+              }}>
+                <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.8125rem', color: '#111827', lineHeight: 1.5 }}>
+                  เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
+                </span>
+              </div>
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={() => setShowPaymentsUpgradeModal(false)}
+                  style={{
+                    flex: 1, padding: '0.75rem', borderRadius: '10px',
+                    background: 'none', border: '1px solid #E5E7EB',
+                    cursor: 'pointer', fontWeight: 600, color: '#6B7280',
+                  }}
+                >
+                  ปิด
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPaymentsUpgradeModal(false);
+                    setCurrentView('pricing');
+                  }}
+                  style={{
+                    flex: 2, padding: '0.75rem', borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                    border: 'none', cursor: 'pointer',
+                    fontWeight: 700, color: '#fff', fontSize: '0.9rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                  }}
+                >
+                  <Zap size={16} />
+                  ดูแพ็กเกจ
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

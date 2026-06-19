@@ -42,9 +42,10 @@ export function isPaidLicense(license: LicenseType): boolean {
     return parseLicense(license) !== null || license === 'active';
 }
 
-/** Whether this license can send bills via LINE (all paid plans) */
+/** Whether this license can send bills via LINE (paid plans only — free is blocked) */
 export function canSendLine(license: LicenseType): boolean {
-    if (license === 'active' || license === 'free') return true;
+    if (license === 'free') return false;
+    if (license === 'active') return true;
     return parseLicense(license) !== null;
 }
 

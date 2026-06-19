@@ -69,7 +69,16 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
         const unsubConfig = onSnapshot(doc(db, userPath, 'data', 'config'), (snap) => {
             if (snap.exists()) {
-                setConfigState(snap.data() as DormConfig);
+                // Always merge with DEFAULT_CONFIG so missing fields (old data) never crash
+                const raw = snap.data() as Partial<DormConfig>;
+                setConfigState({
+                    ...DEFAULT_CONFIG,
+                    ...raw,
+                    water_config: { ...DEFAULT_CONFIG.water_config, ...raw.water_config },
+                    commercial_water_config: raw.commercial_water_config
+                        ? { ...DEFAULT_CONFIG.water_config, ...raw.commercial_water_config }
+                        : undefined,
+                });
             } else {
                 setDoc(doc(db, userPath, 'data', 'config'), DEFAULT_CONFIG);
                 setConfigState(DEFAULT_CONFIG);

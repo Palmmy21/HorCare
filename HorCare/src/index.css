@@ -3769,4 +3769,32 @@ html.dark .widget-toggle-row:hover   { background: var(--color-gray-300); }
 html.dark .widget-toggle-label       { color: var(--color-gray-800); }
 html.dark .customize-hint            { color: var(--color-gray-600); }
 html.dark .toggle-switch             { background: var(--color-gray-400); }
+
+/* ===== Tenant Page Responsive ===== */
+@keyframes slideUpSheet {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Hide copy-link button text on narrow cards */
+@media (max-width: 480px) {
+  .tenant-link-label { display: none; }
+}
+
+/* Tenant profile modal → bottom sheet on mobile */
+@media (max-width: 640px) {
+  .tenant-profile-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .tenant-profile-modal {
+    max-width: 100% !important;
+    max-height: 92vh !important;
+    border-radius: 20px 20px 0 0 !important;
+    animation: slideUpSheet 0.28s var(--ease-out-expo) !important;
+  }
+  .tenant-modal-alert-badges {
+    display: none !important;
+  }
+}
 html.dark .toggle-switch.active      { background: var(--color-primary); }

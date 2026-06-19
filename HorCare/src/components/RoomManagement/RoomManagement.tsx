@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck } from 'lucide-react';
 import type { Room, DormConfig } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
+import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface RoomManagementProps {
     rooms: Room[];
@@ -12,6 +13,9 @@ interface RoomManagementProps {
     maxRooms?: number;
     isTrial?: boolean;
     onUpgrade?: () => void;
+    uid?: string;
+    buildingId?: string;
+    isPaid?: boolean;
 }
 
 export default function RoomManagement({
@@ -23,6 +27,9 @@ export default function RoomManagement({
     maxRooms = Infinity,
     isTrial = false,
     onUpgrade,
+    uid,
+    buildingId,
+    isPaid = false,
 }: RoomManagementProps) {
     const [newRoomNumber, setNewRoomNumber] = useState('');
     const [editingRoom, setEditingRoom] = useState<string | null>(null);
@@ -36,6 +43,7 @@ export default function RoomManagement({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
     const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+    const [tenantRoomId, setTenantRoomId] = useState<string | null>(null);
 
     const hasAnyCommercial = rooms.some(r => (r.room_type || 'dormitory') === 'commercial');
 
@@ -308,7 +316,7 @@ export default function RoomManagement({
                                     <th className="text-right">มิเตอร์ไฟ</th>
                                     <th className="text-right">มิเตอร์น้ำ</th>
                                     {hasAnyCommercial && <th className="text-center">ค่าน้ำ/ไฟ</th>}
-                                    <th className="text-center" style={{ width: '140px' }}>จัดการ</th>
+                                    <th className="text-center" style={{ width: '180px' }}>จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -521,6 +529,14 @@ export default function RoomManagement({
                                                 <div className="flex gap-2 justify-center">
                                                     <button
                                                         className="btn btn-outline btn-sm btn-icon"
+                                                        onClick={() => uid && buildingId && setTenantRoomId(room.id)}
+                                                        title="ข้อมูลผู้เช่า"
+                                                        style={{ color: 'var(--color-primary)' }}
+                                                    >
+                                                        <UserCheck size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-outline btn-sm btn-icon"
                                                         onClick={() => startEdit(room)}
                                                         title="แก้ไข"
                                                     >
@@ -597,6 +613,22 @@ export default function RoomManagement({
                     </div>
                 </>
             )}
+
+            {/* Tenant Profile Modal */}
+            {tenantRoomId && uid && buildingId && (() => {
+                const room = rooms.find(r => r.id === tenantRoomId);
+                if (!room) return null;
+                return (
+                    <TenantProfilePage
+                        room={room}
+                        uid={uid}
+                        buildingId={buildingId}
+                        isPaid={isPaid}
+                        onUpgrade={onUpgrade}
+                        onClose={() => setTenantRoomId(null)}
+                    />
+                );
+            })()}
         </div>
     );
 }

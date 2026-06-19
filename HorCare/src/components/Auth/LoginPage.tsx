@@ -311,7 +311,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                         onClick={() => switchMode(mode === 'register' ? 'login' : 'register')}
                         type="button"
                     >
-                        {mode === 'register' ? 'เข้าสู่ระบบ' : 'สมัครฟรี — ทดลองใช้ 60 วัน'}
+                        {mode === 'register' ? 'เข้าสู่ระบบ' : 'สมัครใช้งานฟรี'}
                     </button>
                 </div>
                 {mode === 'login' && (
