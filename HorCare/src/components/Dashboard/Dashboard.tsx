@@ -254,24 +254,24 @@ export default function Dashboard({
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: '#059669', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
                                 <ArrowUpRight size={14} /> รายได้จริง
                             </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: '#111827' }}>{formatCurrency(collection_.collected)}</div>
+                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-gray-800)' }}>{formatCurrency(collection_.collected)}</div>
                         </div>
-                        <div style={{ background: '#FEF2F2', borderRadius: '12px', padding: '0.875rem', border: '1px solid #FECACA' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: '#DC2626', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
+                        <div style={{ background: 'var(--color-danger-ultra-light)', borderRadius: '12px', padding: '0.875rem', border: '1px solid var(--color-danger-light)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-danger)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
                                 <ArrowDownRight size={14} /> ค่าใช้จ่าย
                             </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: '#111827' }}>{formatCurrency(totalExpense)}</div>
+                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-gray-800)' }}>{formatCurrency(totalExpense)}</div>
                         </div>
                         <div style={{
-                            background: netProfit >= 0 ? '#EFF6FF' : '#FEF2F2',
+                            background: netProfit >= 0 ? 'var(--color-primary-ultra-light)' : 'var(--color-danger-ultra-light)',
                             borderRadius: '12px', padding: '0.875rem',
-                            border: `1px solid ${netProfit >= 0 ? '#BFDBFE' : '#FECACA'}`,
+                            border: `1px solid ${netProfit >= 0 ? 'var(--color-primary-light)' : 'var(--color-danger-light)'}`,
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: netProfit >= 0 ? '#2563EB' : '#DC2626', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: netProfit >= 0 ? 'var(--color-primary)' : 'var(--color-danger)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
                                 {netProfit >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                                 กำไรสุทธิ
                             </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: netProfit >= 0 ? '#1D4ED8' : '#DC2626' }}>
+                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: netProfit >= 0 ? 'var(--color-primary)' : 'var(--color-danger)' }}>
                                 {netProfit >= 0 ? '' : '−'}{formatCurrency(Math.abs(netProfit))}
                             </div>
                         </div>
@@ -280,7 +280,7 @@ export default function Dashboard({
                     {/* Expense breakdown by category */}
                     {expenseByCategory.length > 0 && (
                         <div>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
                                 ค่าใช้จ่ายตามหมวด
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
@@ -288,11 +288,11 @@ export default function Dashboard({
                                     const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
                                     return (
                                         <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                                            <span style={{ fontSize: '0.8125rem', color: '#374151', width: 120, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat}</span>
-                                            <div style={{ flex: 1, height: 8, background: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
+                                            <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-700)', width: 120, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat}</span>
+                                            <div style={{ flex: 1, height: 8, background: 'var(--color-gray-200)', borderRadius: 4, overflow: 'hidden' }}>
                                                 <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#F87171,#EF4444)', borderRadius: 4, transition: 'width 0.4s' }} />
                                             </div>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', width: 80, textAlign: 'right', flexShrink: 0 }}>{formatCurrency(amount)}</span>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-gray-700)', width: 80, textAlign: 'right', flexShrink: 0 }}>{formatCurrency(amount)}</span>
                                         </div>
                                     );
                                 })}

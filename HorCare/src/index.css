@@ -3324,7 +3324,7 @@ body {
 html.dark .form-input,
 html.dark .meter-input,
 html.dark select {
-  background: var(--color-gray-100);
+  background-color: var(--color-gray-100);
   border-color: var(--color-gray-200);
   color: var(--color-gray-700);
 }
@@ -3798,3 +3798,49 @@ html.dark .toggle-switch             { background: var(--color-gray-400); }
   }
 }
 html.dark .toggle-switch.active      { background: var(--color-primary); }
+/* ============================================================
+   DARK MODE — Maintenance & Operations page overrides
+   ============================================================ */
+
+/* Maintenance status badge fallbacks */
+html.dark .maintenance-card {
+  background: var(--color-white);
+  border-color: var(--color-gray-200);
+}
+
+/* Operations / Vendors table */
+html.dark .operations-table-row:hover {
+  background: var(--color-gray-100);
+}
+
+/* ── Tenant Portal (public page) dark mode ──────────────────
+   TenantPortalPage has inline styles — we patch via structural selectors */
+html.dark .tenant-portal-root {
+  background: var(--color-gray-50);
+  color: var(--color-gray-700);
+}
+
+/* Any white card-like surface inside the portal */
+html.dark .tenant-portal-card {
+  background: var(--color-white) !important;
+  border-color: var(--color-gray-200) !important;
+  color: var(--color-gray-700) !important;
+}
+
+/* Segmented control (filter tabs) in dark mode */
+html.dark .seg-ctrl {
+  background: var(--color-gray-100);
+}
+html.dark .seg-ctrl__item--active {
+  background: var(--color-white);
+  color: var(--color-gray-800);
+}
+html.dark .seg-ctrl__item {
+  color: var(--color-gray-500);
+}
+
+/* Fix modal overlays spawned with hardcoded white bg */
+html.dark [data-modal="true"] {
+  background: var(--color-white) !important;
+  color: var(--color-gray-700) !important;
+}

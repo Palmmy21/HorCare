@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import {
   Wrench, AlertTriangle, Clock, CheckCircle2, XCircle,
   Edit3, Check, Zap, Droplets, Wind, DoorOpen,
@@ -15,23 +15,23 @@ interface CatCfg { label: string; Icon: React.ComponentType<{ size?: number }>; 
 const CATEGORY_CFG: Record<MaintenanceCategory, CatCfg> = {
   electric:    { label: 'ไฟฟ้า',            Icon: Zap,       color: '#F59E0B' },
   plumbing:    { label: 'ประปา',             Icon: Droplets,  color: '#3B82F6' },
-  appliance:   { label: 'เครื่องใช้ไฟฟ้า',  Icon: Package,   color: '#8B5CF6' },
-  door_window: { label: 'ประตู/หน้าต่าง',    Icon: DoorOpen,  color: '#6B7280' },
+  appliance:   { label: 'เครื่องใช้ไฟฟ้า',  Icon: Package,   color: 'var(--color-primary)' },
+  door_window: { label: 'ประตู/หน้าต่าง',    Icon: DoorOpen,  color: 'var(--color-gray-500)' },
   bathroom:    { label: 'ห้องน้ำ',            Icon: ShowerHead, color: '#06B6D4' },
   ac:          { label: 'แอร์',               Icon: Wind,      color: '#0EA5E9' },
   furniture:   { label: 'เฟอร์นิเจอร์',      Icon: Sofa,      color: '#92400E' },
-  other:       { label: 'อื่นๆ',              Icon: Wrench,    color: '#374151' },
+  other:       { label: 'อื่นๆ',              Icon: Wrench,    color: 'var(--color-gray-700)' },
 };
 
 const STATUS_CFG: Record<MaintenanceStatus, { label: string; color: string; bg: string; border: string }> = {
-  open:        { label: 'รอดำเนินการ',      color: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5' },
-  in_progress: { label: 'กำลังดำเนินการ',  color: '#D97706', bg: '#FEF3C7', border: '#FDE68A' },
-  done:        { label: 'เสร็จสิ้น',       color: '#059669', bg: '#D1FAE5', border: '#6EE7B7' },
-  rejected:    { label: 'ปฏิเสธ',          color: '#6B7280', bg: '#F3F4F6', border: '#D1D5DB' },
+  open:        { label: 'รอดำเนินการ',      color: '#DC2626', bg: 'var(--color-danger-ultra-light)', border: 'var(--color-danger-light)' },
+  in_progress: { label: 'กำลังดำเนินการ',  color: '#D97706', bg: 'var(--color-warning-ultra-light)', border: 'var(--color-warning-light)' },
+  done:        { label: 'เสร็จสิ้น',       color: 'var(--color-success)', bg: 'var(--color-success-ultra-light)', border: 'var(--color-success-light)' },
+  rejected:    { label: 'ปฏิเสธ',          color: 'var(--color-gray-500)', bg: 'var(--color-gray-100)', border: 'var(--color-gray-300)' },
 };
 
 const CONDITION_CFG: Record<AssetCondition, { label: string; color: string }> = {
-  good:   { label: 'ดี',         color: '#059669' },
+  good:   { label: 'ดี',         color: 'var(--color-success)' },
   fair:   { label: 'พอใช้',      color: '#D97706' },
   poor:   { label: 'แย่',        color: '#DC2626' },
   broken: { label: 'ชำรุด/เสีย', color: '#7C3AED' },
@@ -188,8 +188,8 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
               {f.id !== 'all' && counts[f.id] > 0 && (
                 <span style={{
                   fontSize: '0.7rem', fontWeight: 700,
-                  background: filter === f.id ? 'var(--color-primary, #8B5CF6)' : '#E5E7EB',
-                  color: filter === f.id ? '#fff' : '#6B7280',
+                  background: filter === f.id ? 'var(--color-primary, #8B5CF6)' : 'var(--color-gray-200)',
+                  color: filter === f.id ? 'var(--color-white)' : 'var(--color-gray-500)',
                   padding: '0.1rem 0.35rem', borderRadius: '4px',
                 }}>
                   {counts[f.id]}
@@ -288,7 +288,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                     borderLeft: '3px solid var(--color-primary, #8B5CF6)',
                     marginBottom: '0.625rem',
                   }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8B5CF6', display: 'block', marginBottom: '0.2rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-primary)', display: 'block', marginBottom: '0.2rem' }}>
                       หมายเหตุผู้ดูแล
                     </span>
                     {req.admin_note}
@@ -298,10 +298,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {/* Parts used (done cards) */}
                 {req.status === 'done' && req.parts_used && req.parts_used.length > 0 && (
                   <div style={{
-                    background: '#F0FDF4', borderRadius: '8px', padding: '0.5rem 0.75rem',
+                    background: 'var(--color-success-ultra-light)', borderRadius: '8px', padding: '0.5rem 0.75rem',
                     border: '1px solid #BBF7D0', marginBottom: '0.625rem',
                   }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#059669', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-success)', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <PackageOpen size={12} /> อะไหล่ที่ใช้
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
@@ -309,7 +309,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                         <span key={i} style={{
                           fontSize: '0.75rem', fontWeight: 600,
                           padding: '0.15rem 0.5rem', borderRadius: '6px',
-                          background: '#D1FAE5', color: '#065F46',
+                          background: 'var(--color-success-ultra-light)', color: 'var(--color-success)',
                         }}>
                           {p.stock_name} × {p.qty} {p.unit}
                         </span>
@@ -321,12 +321,12 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {/* Linked asset (done cards) */}
                 {req.status === 'done' && req.asset_name && (
                   <div style={{
-                    background: '#EFF6FF', borderRadius: '8px', padding: '0.5rem 0.75rem',
+                    background: 'var(--color-primary-ultra-light)', borderRadius: '8px', padding: '0.5rem 0.75rem',
                     border: '1px solid #BFDBFE', marginBottom: '0.625rem',
                     display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem',
                   }}>
                     <Layers size={13} color="#3B82F6" />
-                    <span style={{ fontWeight: 600, color: '#1D4ED8' }}>{req.asset_name}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{req.asset_name}</span>
                     {req.asset_condition_after && (
                       <span style={{ color: CONDITION_CFG[req.asset_condition_after].color, fontWeight: 700, fontSize: '0.75rem' }}>
                         → {CONDITION_CFG[req.asset_condition_after].label}
@@ -359,16 +359,16 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {/* ── Completion Panel ── */}
                 {isCompleting && (
                   <div style={{
-                    background: '#F9FAFB', borderRadius: '12px', padding: '1rem',
-                    border: '1px solid #E5E7EB', marginBottom: '0.75rem',
+                    background: 'var(--color-gray-50)', borderRadius: '12px', padding: '1rem',
+                    border: '1px solid var(--color-gray-200)', marginBottom: '0.75rem',
                   }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111827', marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-gray-800)', marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                       <CheckCircle2 size={15} color="#059669" /> บันทึกการซ่อมเสร็จ
                     </div>
 
                     {/* Note */}
                     <div style={{ marginBottom: '0.875rem' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: '0.3rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.3rem' }}>
                         หมายเหตุ (ไม่จำเป็น)
                       </label>
                       <textarea
@@ -390,10 +390,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                           background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0.3rem',
                         }}
                       >
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                           <PackageOpen size={13} /> อะไหล่ที่ใช้ (สต็อก)
                           {Object.values(completion.partQty).filter(q => q > 0).length > 0 && (
-                            <span style={{ background: '#8B5CF6', color: '#fff', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
+                            <span style={{ background: '#8B5CF6', color: 'var(--color-white)', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
                               {Object.values(completion.partQty).filter(q => q > 0).length} รายการ
                             </span>
                           )}
@@ -402,14 +402,14 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       </button>
 
                       {stockExpanded && (
-                        <div style={{ border: '1px solid #E5E7EB', borderRadius: '10px', background: '#fff', overflow: 'hidden' }}>
+                        <div style={{ border: '1px solid var(--color-gray-200)', borderRadius: '10px', background: 'var(--color-white)', overflow: 'hidden' }}>
                           {stockItems.length === 0 ? (
-                            <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.8rem', color: '#9CA3AF' }}>
+                            <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-gray-400)' }}>
                               ยังไม่มีสต็อกวัสดุ — เพิ่มได้ที่หน้า "ระบบจัดการ"
                             </div>
                           ) : (
                             <>
-                              <div style={{ padding: '0.5rem', borderBottom: '1px solid #F3F4F6' }}>
+                              <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--color-gray-100)' }}>
                                 <input
                                   className="form-input"
                                   placeholder="ค้นหาวัสดุ..."
@@ -426,14 +426,14 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                     <div key={item.id} style={{
                                       display: 'flex', alignItems: 'center', gap: '0.5rem',
                                       padding: '0.5rem 0.75rem',
-                                      borderBottom: '1px solid #F9FAFB',
+                                      borderBottom: '1px solid var(--color-gray-100)',
                                       background: selected ? 'rgba(139,92,246,0.04)' : 'transparent',
                                     }}>
                                       <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-gray-700)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {item.name}
                                         </div>
-                                        <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--color-gray-400)' }}>
                                           คงเหลือ {item.quantity} {item.unit}
                                         </div>
                                       </div>
@@ -449,14 +449,14 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                           disabled={qty === 0}
                                           style={{
                                             width: 26, height: 26, borderRadius: '6px', cursor: qty === 0 ? 'default' : 'pointer',
-                                            border: '1px solid #E5E7EB', background: qty === 0 ? '#F9FAFB' : '#fff',
+                                            border: '1px solid var(--color-gray-200)', background: qty === 0 ? 'var(--color-gray-50)' : 'var(--color-white)',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            color: qty === 0 ? '#D1D5DB' : '#374151',
+                                            color: qty === 0 ? 'var(--color-gray-300)' : 'var(--color-gray-700)',
                                           }}
                                         >
                                           <Minus size={12} />
                                         </button>
-                                        <span style={{ minWidth: 24, textAlign: 'center', fontSize: '0.8125rem', fontWeight: 700, color: selected ? '#7C3AED' : '#9CA3AF' }}>
+                                        <span style={{ minWidth: 24, textAlign: 'center', fontSize: '0.8125rem', fontWeight: 700, color: selected ? '#7C3AED' : 'var(--color-gray-400)' }}>
                                           {qty}
                                         </span>
                                         <button
@@ -467,9 +467,9 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                           disabled={qty >= item.quantity}
                                           style={{
                                             width: 26, height: 26, borderRadius: '6px', cursor: qty >= item.quantity ? 'default' : 'pointer',
-                                            border: '1px solid #E5E7EB', background: qty >= item.quantity ? '#F9FAFB' : '#fff',
+                                            border: '1px solid var(--color-gray-200)', background: qty >= item.quantity ? 'var(--color-gray-50)' : 'var(--color-white)',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            color: qty >= item.quantity ? '#D1D5DB' : '#374151',
+                                            color: qty >= item.quantity ? 'var(--color-gray-300)' : 'var(--color-gray-700)',
                                           }}
                                         >
                                           <Plus size={12} />
@@ -494,10 +494,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                           background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0.3rem',
                         }}
                       >
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                           <Layers size={13} /> ทรัพย์สินที่ซ่อม (ไม่จำเป็น)
                           {completion.assetId && (
-                            <span style={{ background: '#3B82F6', color: '#fff', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
+                            <span style={{ background: '#3B82F6', color: 'var(--color-white)', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
                               เลือกแล้ว
                             </span>
                           )}
@@ -506,14 +506,14 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       </button>
 
                       {assetExpanded && (
-                        <div style={{ border: '1px solid #E5E7EB', borderRadius: '10px', background: '#fff', overflow: 'hidden' }}>
+                        <div style={{ border: '1px solid var(--color-gray-200)', borderRadius: '10px', background: 'var(--color-white)', overflow: 'hidden' }}>
                           {assets.length === 0 ? (
-                            <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.8rem', color: '#9CA3AF' }}>
+                            <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-gray-400)' }}>
                               ยังไม่มีทรัพย์สิน — เพิ่มได้ที่หน้า "ระบบจัดการ"
                             </div>
                           ) : (
                             <>
-                              <div style={{ padding: '0.375rem 0.5rem', borderBottom: '1px solid #F3F4F6' }}>
+                              <div style={{ padding: '0.375rem 0.5rem', borderBottom: '1px solid var(--color-gray-100)' }}>
                                 <select
                                   className="form-input"
                                   value={completion.assetId}
@@ -531,7 +531,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
 
                               {completion.assetId && (
                                 <div style={{ padding: '0.5rem 0.75rem' }}>
-                                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', marginBottom: '0.375rem' }}>
+                                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', marginBottom: '0.375rem' }}>
                                     สภาพหลังซ่อม
                                   </div>
                                   <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
@@ -542,8 +542,8 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                         style={{
                                           padding: '0.3rem 0.7rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem',
                                           border: completion.conditionAfter === key ? `2px solid ${cfg.color}` : '1.5px solid #E5E7EB',
-                                          background: completion.conditionAfter === key ? `${cfg.color}18` : '#fff',
-                                          color: completion.conditionAfter === key ? cfg.color : '#6B7280',
+                                          background: completion.conditionAfter === key ? `${cfg.color}18` : 'var(--color-white)',
+                                          color: completion.conditionAfter === key ? cfg.color : 'var(--color-gray-500)',
                                           fontWeight: completion.conditionAfter === key ? 700 : 500,
                                         }}
                                       >
@@ -565,10 +565,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                         className="btn btn-sm"
                         onClick={() => handleComplete(req)}
                         disabled={isSaving}
-                        style={{ background: '#059669', color: '#fff', border: 'none', flex: 1 }}
+                        style={{ background: '#059669', color: 'var(--color-white)', border: 'none', flex: 1 }}
                       >
                         {isSaving
-                          ? <span className="loading-spinner" style={{ width: 14, height: 14, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: '#fff' }} />
+                          ? <span className="loading-spinner" style={{ width: 14, height: 14, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'var(--color-white)' }} />
                           : <CheckCircle2 size={14} />}
                         บันทึกและปิดงาน
                       </button>
@@ -592,7 +592,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                   }}>
                     <span style={{ flex: 1 }}>ยืนยันลบคำขอนี้?</span>
                     <button className="btn btn-sm" onClick={() => handleDelete(req.id)} disabled={isSaving}
-                      style={{ background: '#DC2626', color: '#fff', border: 'none' }}>
+                      style={{ background: '#DC2626', color: 'var(--color-white)', border: 'none' }}>
                       {isSaving ? '...' : 'ลบ'}
                     </button>
                     <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDeleteId(null)}>ยกเลิก</button>
@@ -617,7 +617,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       className="btn btn-sm"
                       onClick={() => openCompletion(req)}
                       disabled={isSaving}
-                      style={{ background: '#D1FAE5', color: '#059669', border: '1px solid #6EE7B7' }}
+                      style={{ background: 'var(--color-success-ultra-light)', color: 'var(--color-success)', border: '1px solid #6EE7B7' }}
                     >
                       <CheckCircle2 size={14} /> เสร็จสิ้น
                     </button>
@@ -668,3 +668,5 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
     </div>
   );
 }
+
+

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import {
   collection, doc, onSnapshot, query, where, addDoc,
 } from 'firebase/firestore';
@@ -39,17 +39,17 @@ const PORTAL_CATEGORY_OPTIONS: { value: MaintenanceCategory; label: string; Icon
   { value: 'plumbing',    label: 'ประปา',           Icon: Droplets, color: '#3B82F6' },
   { value: 'appliance',   label: 'เครื่องใช้ไฟฟ้า', Icon: Plug,     color: '#8B5CF6' },
   { value: 'ac',          label: 'แอร์',            Icon: Wind,     color: '#06B6D4' },
-  { value: 'door_window', label: 'ประตู/หน้าต่าง',  Icon: DoorOpen, color: '#6B7280' },
+  { value: 'door_window', label: 'ประตู/หน้าต่าง',  Icon: DoorOpen, color: 'var(--color-gray-500)' },
   { value: 'bathroom',    label: 'ห้องน้ำ',          Icon: Bath,     color: '#0EA5E9' },
   { value: 'furniture',   label: 'เฟอร์นิเจอร์',    Icon: Armchair, color: '#92400E' },
-  { value: 'other',       label: 'อื่นๆ',            Icon: Wrench,   color: '#374151' },
+  { value: 'other',       label: 'อื่นๆ',            Icon: Wrench,   color: 'var(--color-gray-700)' },
 ];
 
 const PORTAL_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
   open:        { label: 'รอดำเนินการ',     color: '#DC2626', bg: '#FEE2E2' },
   in_progress: { label: 'กำลังดำเนินการ', color: '#D97706', bg: '#FEF3C7' },
   done:        { label: 'เสร็จสิ้น',      color: '#059669', bg: '#D1FAE5' },
-  rejected:    { label: 'ปฏิเสธ',         color: '#6B7280', bg: '#F3F4F6' },
+  rejected:    { label: 'ปฏิเสธ',         color: 'var(--color-gray-500)', bg: 'var(--color-gray-100)' },
 };
 
 // ── Maintenance hook (room-scoped) ────────────────────────────────────────────
@@ -169,10 +169,10 @@ function PromptPayCard({ number, name, amount }: { number: string; name: string;
         style={{ width: 160, height: 160, borderRadius: '8px', imageRendering: 'pixelated', display: 'block', margin: '0 auto' }}
         onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
       />
-      <div style={{ marginTop: '0.875rem', fontWeight: 800, fontSize: '1.125rem', color: '#111827' }}>
+      <div style={{ marginTop: '0.875rem', fontWeight: 800, fontSize: '1.125rem', color: 'var(--color-gray-800)' }}>
         {fmtCurrency(amount)}
       </div>
-      <div style={{ fontSize: '0.775rem', color: '#6B7280', marginTop: '0.2rem' }}>{name} · {number}</div>
+      <div style={{ fontSize: '0.775rem', color: 'var(--color-gray-500)', marginTop: '0.2rem' }}>{name} · {number}</div>
     </div>
   );
 }
@@ -191,7 +191,7 @@ function BillCard({ bill, defaultOpen, promptpay }: {
 
   return (
     <div style={{
-      background: '#fff', borderRadius: '16px',
+      background: 'var(--color-white)', borderRadius: '16px',
       border: `1.5px solid ${borderColor}`,
       overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
     }}>
@@ -207,9 +207,9 @@ function BillCard({ bill, defaultOpen, promptpay }: {
         <div style={{ textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <CalendarDays size={15} color={accentColor} />
-            <span style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#111827' }}>{fmtMonth(bill.month)}</span>
+            <span style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)' }}>{fmtMonth(bill.month)}</span>
           </div>
-          <div style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '0.2rem' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)', marginTop: '0.2rem' }}>
             รวม {fmtCurrency(bill.total_bill)}
           </div>
         </div>
@@ -221,7 +221,7 @@ function BillCard({ bill, defaultOpen, promptpay }: {
 
       {/* Expanded detail */}
       {open && (
-        <div style={{ padding: '0 1.125rem 1.125rem', borderTop: '1px solid #F3F4F6' }}>
+        <div style={{ padding: '0 1.125rem 1.125rem', borderTop: '1px solid var(--color-gray-100)' }}>
           {/* Cost breakdown */}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.75rem' }}>
             <tbody>
@@ -232,11 +232,11 @@ function BillCard({ bill, defaultOpen, promptpay }: {
                 ...(bill.water_excess_amount ? [{ label: `ค่าน้ำส่วนเกิน (${fmt(bill.water_excess_units)} หน่วย)`, value: bill.water_excess_amount, icon: <Droplets size={13} color="#2563EB" /> }] : []),
                 ...(!bill.water_flat_amount ? [{ label: `ค่าน้ำ (${fmt(bill.water_units)} หน่วย)`, value: bill.water_bill, icon: <Droplets size={13} color="#3B82F6" /> }] : []),
               ].map((row, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #F9FAFB' }}>
-                  <td style={{ padding: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: '#374151' }}>
+                <tr key={i} style={{ borderBottom: '1px solid var(--color-gray-100)' }}>
+                  <td style={{ padding: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>
                     {row.icon} {row.label}
                   </td>
-                  <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+                  <td style={{ padding: '0.5rem 0', textAlign: 'right', fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-gray-800)' }}>
                     {fmtCurrency(row.value)}
                   </td>
                 </tr>
@@ -244,31 +244,31 @@ function BillCard({ bill, defaultOpen, promptpay }: {
             </tbody>
             <tfoot>
               <tr>
-                <td style={{ paddingTop: '0.625rem', fontWeight: 800, fontSize: '0.9375rem', color: '#111827' }}>รวมทั้งหมด</td>
+                <td style={{ paddingTop: '0.625rem', fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)' }}>รวมทั้งหมด</td>
                 <td style={{ paddingTop: '0.625rem', textAlign: 'right', fontWeight: 800, fontSize: '0.9375rem', color: '#7C3AED' }}>{fmtCurrency(bill.total_bill)}</td>
               </tr>
             </tfoot>
           </table>
 
           {/* Meter readings */}
-          <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#F9FAFB', borderRadius: '12px' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9CA3AF', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: 'var(--color-gray-50)', borderRadius: '12px' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-400)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               ค่ามิเตอร์
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: '#374151' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: 'var(--color-gray-700)' }}>
                   <Zap size={13} color="#F59E0B" /> มิเตอร์ไฟ
                 </span>
-                <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: '#111827', fontWeight: 600 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
                   {fmt(bill.prev_elec)} → {fmt(bill.curr_elec)}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: '#374151' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: 'var(--color-gray-700)' }}>
                   <Droplets size={13} color="#3B82F6" /> มิเตอร์น้ำ
                 </span>
-                <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: '#111827', fontWeight: 600 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
                   {fmt(bill.prev_water)} → {fmt(bill.curr_water)}
                 </span>
               </div>
@@ -320,13 +320,13 @@ export default function TenantPortalPage() {
   // ── Invalid link ──
   if (!uid || !buildingId || !roomId) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#F3F4F6' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'var(--color-gray-100)' }}>
         <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 16, marginBottom: '1.25rem' }} />
         <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
           <Link2Off size={24} color="#DC2626" />
         </div>
-        <h2 style={{ fontWeight: 800, color: '#111827', margin: '0 0 0.5rem' }}>ลิงก์ไม่ถูกต้อง</h2>
-        <p style={{ color: '#6B7280', fontSize: '0.9rem', textAlign: 'center' }}>กรุณาใช้ลิงก์ที่ได้รับจากเจ้าของหอพักโดยตรง</p>
+        <h2 style={{ fontWeight: 800, color: 'var(--color-gray-800)', margin: '0 0 0.5rem' }}>ลิงก์ไม่ถูกต้อง</h2>
+        <p style={{ color: 'var(--color-gray-500)', fontSize: '0.9rem', textAlign: 'center' }}>กรุณาใช้ลิงก์ที่ได้รับจากเจ้าของหอพักโดยตรง</p>
       </div>
     );
   }
@@ -336,7 +336,7 @@ export default function TenantPortalPage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)' }}>
         <img src={horcareLogo} alt="HorCare" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
-        <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '1rem' }} />
+        <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,0.25)', borderTopColor: 'var(--color-white)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '1rem' }} />
         <p style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>กำลังโหลด...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -351,8 +351,8 @@ export default function TenantPortalPage() {
         <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
           <AlertCircle size={24} color="#DC2626" />
         </div>
-        <h2 style={{ fontWeight: 800, color: '#111827', margin: '0 0 0.5rem' }}>{error ?? 'ไม่พบข้อมูล'}</h2>
-        <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>กรุณาติดต่อเจ้าของหอพัก</p>
+        <h2 style={{ fontWeight: 800, color: 'var(--color-gray-800)', margin: '0 0 0.5rem' }}>{error ?? 'ไม่พบข้อมูล'}</h2>
+        <p style={{ color: 'var(--color-gray-500)', fontSize: '0.875rem' }}>กรุณาติดต่อเจ้าของหอพัก</p>
       </div>
     );
   }
@@ -360,7 +360,7 @@ export default function TenantPortalPage() {
   // ── Main Portal ──
   return (
     <div className="portal-shell" style={{ minHeight: '100vh', background: '#E8EBF0', fontFamily: "'Sarabun', 'Inter', sans-serif" }}>
-    <div style={{ maxWidth: 600, margin: '0 auto', background: '#F3F4F6', minHeight: '100vh' }}>
+    <div style={{ maxWidth: 600, margin: '0 auto', background: 'var(--color-gray-100)', minHeight: '100vh' }}>
 
       {/* ── Hero ── */}
       <div style={{
@@ -391,12 +391,12 @@ export default function TenantPortalPage() {
             border: '2px solid rgba(255,255,255,0.25)',
             backdropFilter: 'blur(8px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.5rem', fontWeight: 900, color: '#fff',
+            fontSize: '1.5rem', fontWeight: 900, color: 'var(--color-white)',
           }}>
             {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : <Home size={24} color="#fff" />}
           </div>
           <div>
-            <div style={{ color: '#fff', fontWeight: 900, fontSize: '1.25rem', lineHeight: 1.2 }}>
+            <div style={{ color: 'var(--color-white)', fontWeight: 900, fontSize: '1.25rem', lineHeight: 1.2 }}>
               {profile?.full_name ?? 'ผู้เช่า'}
             </div>
             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.825rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
@@ -431,7 +431,7 @@ export default function TenantPortalPage() {
               borderRadius: '12px', padding: '0.625rem 0.75rem',
             }}>
               <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.68rem', fontWeight: 600, marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
-              <div style={{ color: '#fff', fontWeight: 800, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <div style={{ color: 'var(--color-white)', fontWeight: 800, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 {s.Icon && <s.Icon size={13} />} {s.value}
               </div>
             </div>
@@ -449,12 +449,12 @@ export default function TenantPortalPage() {
             <BillCard bill={currentBill} config={config} defaultOpen={true} promptpay={promptpay} />
           ) : (
             <div style={{
-              background: '#fff', borderRadius: '16px', padding: '1.5rem',
-              border: '1px solid #E5E7EB', textAlign: 'center',
+              background: 'var(--color-white)', borderRadius: '16px', padding: '1.5rem',
+              border: '1px solid var(--color-gray-200)', textAlign: 'center',
               boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
             }}>
               <Receipt size={28} color="#D1D5DB" style={{ marginBottom: '0.5rem' }} />
-              <p style={{ color: '#9CA3AF', fontSize: '0.875rem', margin: 0 }}>
+              <p style={{ color: 'var(--color-gray-400)', fontSize: '0.875rem', margin: 0 }}>
                 ยังไม่มีบิลสำหรับ{fmtMonth(currentMonth)}
               </p>
             </div>
@@ -485,19 +485,19 @@ export default function TenantPortalPage() {
         {config?.bill_customization?.dorm_phone && (
           <section>
             <div style={{
-              background: '#fff', borderRadius: '14px', padding: '0.875rem 1rem',
-              border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: '0.75rem',
+              background: 'var(--color-white)', borderRadius: '14px', padding: '0.875rem 1rem',
+              border: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', gap: '0.75rem',
               boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
             }}>
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Phone size={16} color="#fff" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#111827' }}>ติดต่อหอพัก</div>
-                <div style={{ fontSize: '0.8rem', color: '#6B7280' }}>{config.bill_customization.dorm_phone}</div>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-gray-800)' }}>ติดต่อหอพัก</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>{config.bill_customization.dorm_phone}</div>
               </div>
               <a href={`tel:${config.bill_customization.dorm_phone}`}
-                style={{ background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', color: '#fff', borderRadius: '10px', padding: '0.425rem 1rem', fontWeight: 700, fontSize: '0.8125rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                style={{ background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', color: 'var(--color-white)', borderRadius: '10px', padding: '0.425rem 1rem', fontWeight: 700, fontSize: '0.8125rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <Phone size={13} /> โทร
               </a>
             </div>
@@ -518,7 +518,7 @@ export default function TenantPortalPage() {
         {/* Footer */}
         <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: 0.45 }}>
           <img src={horcareLogo} alt="" style={{ width: 20, height: 20, borderRadius: 5 }} />
-          <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600 }}>Powered by HorCare</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', fontWeight: 600 }}>Powered by HorCare</span>
         </div>
       </div>
 
@@ -594,11 +594,11 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
             const st = PORTAL_STATUS_CFG[req.status] ?? PORTAL_STATUS_CFG.open;
             return (
               <div key={req.id} style={{
-                background: '#fff', borderRadius: '12px', padding: '0.75rem 1rem',
-                border: '1px solid #E5E7EB', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                background: 'var(--color-white)', borderRadius: '12px', padding: '0.75rem 1rem',
+                border: '1px solid var(--color-gray-200)', boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem', flexWrap: 'wrap' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8125rem', fontWeight: 600, color: '#374151' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-gray-700)' }}>
                     {catOpt && <catOpt.Icon size={13} color={catOpt.color} />}
                     {catOpt?.label ?? req.category}
                   </span>
@@ -615,16 +615,16 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
                     {st.label}
                   </span>
                 </div>
-                <p style={{ fontSize: '0.8125rem', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)', margin: 0, lineHeight: 1.5 }}>
                   {req.description}
                 </p>
                 {req.admin_note && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#374151', borderLeft: '3px solid #8B5CF6', paddingLeft: '0.625rem', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: '0.3rem' }}>
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--color-gray-700)', borderLeft: '3px solid #8B5CF6', paddingLeft: '0.625rem', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: '0.3rem' }}>
                     <Pencil size={11} color="#8B5CF6" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
                     {req.admin_note}
                   </div>
                 )}
-                <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: '0.375rem' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--color-gray-400)', marginTop: '0.375rem' }}>
                   {new Date(req.created_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
                 </div>
               </div>
@@ -639,7 +639,7 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
           onClick={() => setShowForm(true)}
           style={{
             width: '100%', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-            color: '#fff', border: 'none', borderRadius: '14px',
+            color: 'var(--color-white)', border: 'none', borderRadius: '14px',
             padding: '0.875rem', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             boxShadow: '0 2px 12px rgba(79,70,229,0.25)',
@@ -649,16 +649,16 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
         </button>
       ) : (
         <div style={{
-          background: '#fff', borderRadius: '16px', padding: '1.125rem',
-          border: '1px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          background: 'var(--color-white)', borderRadius: '16px', padding: '1.125rem',
+          border: '1px solid var(--color-gray-200)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         }}>
-          <h3 style={{ fontWeight: 800, fontSize: '0.9375rem', color: '#111827', margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <h3 style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)', margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
             <Wrench size={16} /> แจ้งซ่อมใหม่
           </h3>
 
           {/* Category grid */}
           <div style={{ marginBottom: '0.875rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: '0.4rem' }}>ประเภทปัญหา</label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>ประเภทปัญหา</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.375rem' }}>
               {PORTAL_CATEGORY_OPTIONS.map(opt => {
                 const active = form.category === opt.value;
@@ -669,13 +669,13 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
                     style={{
                       padding: '0.5rem 0.25rem', borderRadius: '10px', cursor: 'pointer',
                       border: active ? `2px solid ${opt.color}` : '1.5px solid #E5E7EB',
-                      background: active ? `${opt.color}18` : '#fff',
+                      background: active ? `${opt.color}18` : 'var(--color-white)',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
                       transition: 'all 0.15s',
                     }}
                   >
-                    <opt.Icon size={18} color={active ? opt.color : '#9CA3AF'} />
-                    <span style={{ fontSize: '0.62rem', textAlign: 'center', lineHeight: 1.2, fontWeight: active ? 700 : 500, color: active ? opt.color : '#374151' }}>
+                    <opt.Icon size={18} color={active ? opt.color : 'var(--color-gray-400)'} />
+                    <span style={{ fontSize: '0.62rem', textAlign: 'center', lineHeight: 1.2, fontWeight: active ? 700 : 500, color: active ? opt.color : 'var(--color-gray-700)' }}>
                       {opt.label}
                     </span>
                   </button>
@@ -686,16 +686,16 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
 
           {/* Urgency */}
           <div style={{ marginBottom: '0.875rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: '0.4rem' }}>ความเร่งด่วน</label>
+            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>ความเร่งด่วน</label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {([
                 { value: 'normal', label: 'ปกติ',   dotColor: '#16A34A' },
                 { value: 'urgent', label: 'ด่วนมาก', dotColor: '#DC2626' },
               ] as const).map(u => {
                 const active = form.urgency === u.value;
-                const borderColor = active ? (u.value === 'urgent' ? '#DC2626' : '#4F46E5') : '#E5E7EB';
-                const bgColor    = active ? (u.value === 'urgent' ? 'rgba(220,38,38,0.08)' : 'rgba(79,70,229,0.08)') : '#fff';
-                const textColor  = active ? (u.value === 'urgent' ? '#DC2626' : '#4F46E5') : '#374151';
+                const borderColor = active ? (u.value === 'urgent' ? '#DC2626' : '#4F46E5') : 'var(--color-gray-200)';
+                const bgColor    = active ? (u.value === 'urgent' ? 'rgba(220,38,38,0.08)' : 'rgba(79,70,229,0.08)') : 'var(--color-white)';
+                const textColor  = active ? (u.value === 'urgent' ? '#DC2626' : '#4F46E5') : 'var(--color-gray-700)';
                 return (
                   <button
                     key={u.value}
@@ -719,7 +719,7 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
 
           {/* Description */}
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6B7280', display: 'block', marginBottom: '0.4rem' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
               รายละเอียดปัญหา *
             </label>
             <textarea
@@ -743,14 +743,14 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
               disabled={submitting || !form.description.trim()}
               style={{
                 flex: 1, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-                color: '#fff', border: 'none', borderRadius: '12px',
+                color: 'var(--color-white)', border: 'none', borderRadius: '12px',
                 padding: '0.875rem', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
                 opacity: submitting || !form.description.trim() ? 0.5 : 1,
               }}
             >
               {submitting
-                ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> กำลังส่ง...</>
+                ? <><span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'var(--color-white)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> กำลังส่ง...</>
                 : <><Send size={16} /> ส่งคำขอ</>
               }
             </button>
@@ -758,8 +758,8 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
               onClick={() => setShowForm(false)}
               style={{
                 padding: '0.875rem 1.25rem', borderRadius: '12px', cursor: 'pointer',
-                background: '#F3F4F6', border: '1px solid #E5E7EB',
-                color: '#6B7280', fontWeight: 600, fontSize: '0.875rem',
+                background: 'var(--color-gray-100)', border: '1px solid var(--color-gray-200)',
+                color: 'var(--color-gray-500)', fontWeight: 600, fontSize: '0.875rem',
               }}
             >
               ยกเลิก
@@ -774,8 +774,9 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
 // ── Section label helper ──────────────────────────────────────────────────────
 function SectionLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '1.25rem 0 0.625rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '1.25rem 0 0.625rem' }}>
       {icon} {label}
     </div>
   );
 }
+
