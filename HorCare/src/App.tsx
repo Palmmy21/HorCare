@@ -705,7 +705,6 @@ function App() {
             onUnlockMonth={unlockMonth}
             uid={user?.uid}
             buildingId={activeBuildingId ?? undefined}
-            isTrial={profile?.license === 'free'}
             canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
           />

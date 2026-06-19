@@ -29,7 +29,7 @@ interface SummaryProps {
     onUnlockMonth: (month: string) => void;
     uid?: string;
     buildingId?: string;
-    isTrial?: boolean;
+
     canSendLine?: boolean;
     onUpgrade?: () => void;
 }
@@ -44,7 +44,7 @@ export default function Summary({
     onUnlockMonth,
     uid,
     buildingId,
-    isTrial = false,
+
     canSendLine = true,
     onUpgrade,
 }: SummaryProps) {
@@ -161,7 +161,6 @@ export default function Summary({
 
 
     const generateMonthlyReportPDF = async () => {
-        if (isTrial) { onUpgrade?.(); return; }
         // Use the off-screen unconstrained copy — not the one inside the scrollable modal
         if (!hiddenReportRef.current) return;
         setIsExportingReport(true);
@@ -220,7 +219,6 @@ export default function Summary({
     };
 
     const handleDownloadBill = async (bill: MonthlyBill) => {
-        if (isTrial) { onUpgrade?.(); return; }
         setDownloadingBillId(bill.id);
         try {
             await captureAndDownload(bill);
@@ -234,7 +232,6 @@ export default function Summary({
     };
 
     const handleDownloadAllBills = async () => {
-        if (isTrial) { onUpgrade?.(); return; }
         if (monthBills.length === 0) return;
         setIsDownloadingAll(true);
         setDownloadAllProgress(0);
@@ -308,10 +305,9 @@ export default function Summary({
                                 className="btn btn-outline"
                                 onClick={handleDownloadAllBills}
                                 disabled={isDownloadingAll || !!downloadingBillId}
-                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : 'ดาวน์โหลดบิลทุกห้องแบบแยกรูป'}
-                                style={isTrial ? { opacity: 0.55 } : undefined}
+                                title="ดาวน์โหลดบิลทุกห้องแบบแยกรูป"
                             >
-                                {isTrial ? <Lock size={18} /> : <Download size={18} />}
+                                <Download size={18} />
                                 {isDownloadingAll
                                     ? `ดาวน์โหลด ${downloadAllProgress}/${monthBills.length}...`
                                     : 'ดาวน์โหลดทุกห้อง'}
@@ -477,14 +473,12 @@ export default function Summary({
                                                     <button
                                                         className="btn btn-outline btn-sm"
                                                         onClick={() => bill && handleDownloadBill(bill)}
-                                                        title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : 'ดาวน์โหลดรูปบิล'}
+                                                        title="ดาวน์โหลดรูปบิล"
                                                         disabled={!!downloadingBillId || isDownloadingAll || !hasBill}
-                                                        style={isTrial ? { opacity: 0.55 } : undefined}
                                                     >
-                                                        {isTrial ? <Lock size={14} /> :
-                                                            downloadingBillId === bill?.id
-                                                                ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
-                                                                : <Download size={14} />}
+                                                        {downloadingBillId === bill?.id
+                                                            ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
+                                                            : <Download size={14} />}
                                                     </button>
                                                 </div>
                                             </td>
@@ -566,13 +560,11 @@ export default function Summary({
                                                 className="btn btn-outline btn-sm flex-1"
                                                 onClick={() => bill && handleDownloadBill(bill)}
                                                 disabled={!!downloadingBillId || isDownloadingAll || !hasBill}
-                                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : undefined}
-                                                style={isTrial ? { opacity: 0.55 } : undefined}
+
                                             >
-                                                {isTrial ? <Lock size={14} /> :
-                                                    downloadingBillId === bill?.id
-                                                        ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
-                                                        : <Download size={14} />}
+                                                {downloadingBillId === bill?.id
+                                                    ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
+                                                    : <Download size={14} />}
                                             </button>
                                         </div>
                                     </div>
@@ -723,13 +715,10 @@ export default function Summary({
                                 className="btn btn-outline"
                                 onClick={() => handleDownloadBill(selectedBill)}
                                 disabled={!!downloadingBillId || isDownloadingAll}
-                                title={isTrial ? 'อัปเกรดเพื่อดาวน์โหลด' : undefined}
-                                style={isTrial ? { opacity: 0.6 } : undefined}
+
                             >
-                                {isTrial ? <Lock size={18} /> : <Download size={18} />}
-                                {downloadingBillId === selectedBill.id
-                                    ? 'กำลังดาวน์โหลด...'
-                                    : (isTrial ? 'ล็อก — อัปเกรด' : 'ดาวน์โหลด')}
+                                <Download size={18} />
+                                {downloadingBillId === selectedBill.id ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด'}
                             </button>
                             <button className="btn btn-primary" onClick={() => {
                                 setShowAllInvoices(false);
