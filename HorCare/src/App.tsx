@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Wallet, CheckCircle, Users, Wrench, SlidersHorizontal, Lock, CreditCard
+  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -42,7 +42,6 @@ function App() {
   const buildingMenuRef = useRef<HTMLDivElement>(null);
   const [paymentToast, setPaymentToast] = useState<'success' | 'cancel' | null>(null);
   const [pendingPlan, setPendingPlan] = useState<{ planId: string; cycle: string } | null>(null);
-  const [showPaymentsUpgradeModal, setShowPaymentsUpgradeModal] = useState(false);
   const [showFeatureLockedModal, setShowFeatureLockedModal] = useState<string | null>(null);
 
   // Theme
@@ -188,20 +187,15 @@ function App() {
     navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
   }
 
-  const PAID_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations'];
+  const PAID_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations', 'payments'];
   const PAID_ONLY_LABELS: Record<string, string> = {
     tenants: 'ผู้เช่า',
     maintenance: 'แจ้งซ่อม',
     operations: 'ระบบจัดการ',
+    payments: 'การชำระเงิน',
   };
 
   const handleNavClick = (view: ViewMode) => {
-    // Block free plan users from accessing the Payments page
-    if (view === 'payments' && profile?.license === 'free') {
-      setShowPaymentsUpgradeModal(true);
-      setMobileMenuOpen(false);
-      return;
-    }
     // Block free plan users from paid-only features
     if (PAID_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
       setShowFeatureLockedModal(PAID_ONLY_LABELS[view] ?? view);
@@ -803,141 +797,7 @@ function App() {
         </div>
       )}
 
-      {/* Payments Upgrade Modal — shown when free plan user tries to access Payments page */}
-      {showPaymentsUpgradeModal && (
-        <div
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1rem',
-          }}
-          onClick={() => setShowPaymentsUpgradeModal(false)}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: '420px', width: '100%',
-              borderRadius: '20px', overflow: 'hidden',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-              border: 'none',
-            }}
-          >
-            {/* Header */}
-            <div style={{
-              background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 50%, #EC4899 100%)',
-              padding: '2rem 1.75rem 1.5rem',
-              textAlign: 'center',
-              position: 'relative',
-            }}>
-              <button
-                onClick={() => setShowPaymentsUpgradeModal(false)}
-                style={{
-                  position: 'absolute', top: '1rem', right: '1rem',
-                  background: 'rgba(255,255,255,0.2)', border: 'none',
-                  borderRadius: '50%', width: 32, height: 32,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: '#fff',
-                }}
-              >
-                <X size={18} />
-              </button>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 1rem',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-              }}>
-                <Wallet size={34} color="#fff" />
-              </div>
-              <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 0.375rem' }}>
-                การชำระเงิน / สลิป
-              </h3>
-              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.875rem', margin: 0 }}>
-                ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงินแล้วเท่านั้น
-              </p>
-            </div>
-
-            {/* Body */}
-            <div style={{ padding: '1.5rem 1.75rem', background: '#fff' }}>
-              <p style={{ color: '#6B7280', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
-                ติดตามสถานะการชำระเงินของผู้เช่า บันทึกสลิป และจัดการการชำระเงินทั้งหมดในที่เดียว
-              </p>
-
-              {/* Features */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.5rem' }}>
-                {[
-                  'ดูสถานะ "ชำระแล้ว" และ "ค้างชำระ" ของทุกห้อง',
-                  'บันทึกและตรวจสอบสลิปการโอนเงิน',
-                  'กรองและค้นหาตามเดือนหรือห้องได้ทันที',
-                ].map((feat, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
-                    <div style={{
-                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                      background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      marginTop: '0.1rem',
-                    }}>
-                      <CheckCircle size={12} color="#fff" />
-                    </div>
-                    <span style={{ fontSize: '0.85rem', color: '#111827', lineHeight: 1.5 }}>{feat}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pricing hint */}
-              <div style={{
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.06))',
-                border: '1px solid rgba(139,92,246,0.2)',
-                borderRadius: '12px', padding: '0.875rem 1rem',
-                marginBottom: '1.25rem',
-                display: 'flex', alignItems: 'center', gap: '0.625rem',
-              }}>
-                <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.8125rem', color: '#111827', lineHeight: 1.5 }}>
-                  เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
-                </span>
-              </div>
-
-              {/* Buttons */}
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
-                  onClick={() => setShowPaymentsUpgradeModal(false)}
-                  style={{
-                    flex: 1, padding: '0.75rem', borderRadius: '10px',
-                    background: 'none', border: '1px solid #E5E7EB',
-                    cursor: 'pointer', fontWeight: 600, color: '#6B7280',
-                  }}
-                >
-                  ปิด
-                </button>
-                <button
-                  onClick={() => {
-                    setShowPaymentsUpgradeModal(false);
-                    setCurrentView('pricing');
-                  }}
-                  style={{
-                    flex: 2, padding: '0.75rem', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
-                    border: 'none', cursor: 'pointer',
-                    fontWeight: 700, color: '#fff', fontSize: '0.9rem',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                    boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
-                  }}
-                >
-                  <Zap size={16} />
-                  ดูแพ็กเกจ
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Feature locked modal (tenants / maintenance / operations) */}
+      {/* Feature locked modal (payments / tenants / maintenance / operations) */}
       {showFeatureLockedModal && (
         <div
           style={{
