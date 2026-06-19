@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Wallet, CheckCircle, Users, Wrench, SlidersHorizontal
+  Building2, ChevronDown, Plus, Check, Pencil, Wallet, CheckCircle, Users, Wrench, SlidersHorizontal, Lock
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -43,6 +43,7 @@ function App() {
   const [paymentToast, setPaymentToast] = useState<'success' | 'cancel' | null>(null);
   const [pendingPlan, setPendingPlan] = useState<{ planId: string; cycle: string } | null>(null);
   const [showPaymentsUpgradeModal, setShowPaymentsUpgradeModal] = useState(false);
+  const [showFeatureLockedModal, setShowFeatureLockedModal] = useState<string | null>(null);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -187,10 +188,23 @@ function App() {
     navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
   }
 
+  const PAID_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations'];
+  const PAID_ONLY_LABELS: Record<string, string> = {
+    tenants: 'ผู้เช่า',
+    maintenance: 'แจ้งซ่อม',
+    operations: 'ระบบจัดการ',
+  };
+
   const handleNavClick = (view: ViewMode) => {
     // Block free plan users from accessing the Payments page
     if (view === 'payments' && profile?.license === 'free') {
       setShowPaymentsUpgradeModal(true);
+      setMobileMenuOpen(false);
+      return;
+    }
+    // Block free plan users from paid-only features
+    if (PAID_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
+      setShowFeatureLockedModal(PAID_ONLY_LABELS[view] ?? view);
       setMobileMenuOpen(false);
       return;
     }
@@ -530,16 +544,20 @@ function App() {
         )}
 
         <nav className="sidebar-nav">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${currentView === item.id ? 'active' : ''}`}
-              onClick={() => handleNavClick(item.id)}
-            >
-              <item.icon size={20} />
-              {item.label}
-            </button>
-          ))}
+          {navItems.map(item => {
+            const isLocked = PAID_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
+            return (
+              <button
+                key={item.id}
+                className={`nav-item ${currentView === item.id ? 'active' : ''} ${isLocked ? 'nav-item-locked' : ''}`}
+                onClick={() => handleNavClick(item.id)}
+              >
+                <item.icon size={20} />
+                {item.label}
+                {isLocked && <Lock size={13} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Upgrade nudge for free users */}
@@ -899,6 +917,109 @@ function App() {
                 <button
                   onClick={() => {
                     setShowPaymentsUpgradeModal(false);
+                    setCurrentView('pricing');
+                  }}
+                  style={{
+                    flex: 2, padding: '0.75rem', borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                    border: 'none', cursor: 'pointer',
+                    fontWeight: 700, color: '#fff', fontSize: '0.9rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                  }}
+                >
+                  <Zap size={16} />
+                  ดูแพ็กเกจ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feature locked modal (tenants / maintenance / operations) */}
+      {showFeatureLockedModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={() => setShowFeatureLockedModal(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '400px', width: '100%',
+              borderRadius: '20px', overflow: 'hidden',
+              boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 50%, #EC4899 100%)',
+              padding: '2rem 1.75rem 1.5rem',
+              textAlign: 'center',
+              position: 'relative',
+            }}>
+              <button
+                onClick={() => setShowFeatureLockedModal(null)}
+                style={{
+                  position: 'absolute', top: '1rem', right: '1rem',
+                  background: 'rgba(255,255,255,0.2)', border: 'none',
+                  borderRadius: '50%', width: 32, height: 32,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#fff',
+                }}
+              >
+                <X size={18} />
+              </button>
+              <div style={{
+                width: 72, height: 72, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 1rem',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              }}>
+                <Lock size={32} color="#fff" />
+              </div>
+              <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 0.375rem' }}>
+                {showFeatureLockedModal}
+              </h3>
+              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.875rem', margin: 0 }}>
+                ฟีเจอร์นี้สำหรับแพ็กเกจที่ชำระเงินแล้วเท่านั้น
+              </p>
+            </div>
+
+            <div style={{ padding: '1.5rem 1.75rem', background: '#fff' }}>
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.06))',
+                border: '1px solid rgba(139,92,246,0.2)',
+                borderRadius: '12px', padding: '0.875rem 1rem',
+                marginBottom: '1.25rem',
+                display: 'flex', alignItems: 'center', gap: '0.625rem',
+              }}>
+                <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.8125rem', color: '#111827', lineHeight: 1.5 }}>
+                  เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={() => setShowFeatureLockedModal(null)}
+                  style={{
+                    flex: 1, padding: '0.75rem', borderRadius: '10px',
+                    background: 'none', border: '1px solid #E5E7EB',
+                    cursor: 'pointer', fontWeight: 600, color: '#6B7280',
+                  }}
+                >
+                  ปิด
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFeatureLockedModal(null);
                     setCurrentView('pricing');
                   }}
                   style={{
