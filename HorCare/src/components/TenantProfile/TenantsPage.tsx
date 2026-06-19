@@ -29,12 +29,12 @@ function formatDate(iso?: string) {
 
 // ── Single room card (fetches its own profile) ───────────────────────────────
 function TenantCard({
-  room, uid, buildingId, isPaid, onUpgrade, onOpenProfile, filter, search,
+  room, uid, buildingId, onOpenProfile, filter, search,
 }: {
   room: Room;
   uid: string;
   buildingId: string;
-  isPaid: boolean;
+  isPaid?: boolean;
   onUpgrade?: () => void;
   onOpenProfile: (room: Room) => void;
   filter: FilterMode;

@@ -316,7 +316,7 @@ function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSet
                     flexShrink: 0,
                 }}>
                     <button
-                        onClick={() => onExtend(u.uid)}
+                        onClick={() => onSetLicense(u.uid, 'active')}
                         disabled={isProcessing}
                         style={{
                             flex: 1, background: 'rgba(245,158,11,0.1)', color: '#FCD34D',

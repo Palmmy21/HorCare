@@ -6,7 +6,7 @@ import { db } from '../../firebase/config';
 import type { Vendor, StockItem, Asset, AssetCondition, Expense } from '../../types';
 import type { Room } from '../../types';
 import {
-  HardHat, Package, Layers, Receipt, Plus, Edit2, Trash2, Check, X,
+  HardHat, Package, Layers, Receipt, Plus, Edit2, Trash2, Check,
   Phone, AlertTriangle, ChevronDown, ChevronUp,
 } from 'lucide-react';
 

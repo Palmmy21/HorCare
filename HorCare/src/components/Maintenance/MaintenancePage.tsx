@@ -430,7 +430,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                       background: selected ? 'rgba(139,92,246,0.04)' : 'transparent',
                                     }}>
                                       <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', truncate: 'ellipsis' }}>
+                                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {item.name}
                                         </div>
                                         <div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>

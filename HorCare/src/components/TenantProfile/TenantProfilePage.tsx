@@ -10,10 +10,10 @@ function useMobile(breakpoint = 640): boolean {
   return mobile;
 }
 import {
-  User, Phone, Calendar, Home, Banknote, AlertTriangle,
-  ChevronDown, ChevronUp, Plus, Trash2, Edit2, Check, X,
+  User, Calendar, Banknote,
+  Plus, Trash2, Edit2, Check, X,
   Clock, LogIn, LogOut, RefreshCw, FileText, Lock, Zap,
-  Heart, GraduationCap, UserCheck,
+  Heart, GraduationCap,
 } from 'lucide-react';
 import type { Room, TenantProfile, TenantEvent } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
@@ -578,7 +578,7 @@ export default function TenantProfilePage({
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SectionCard({
-  title, icon, children, locked = false, onUnlock,
+  title, icon, children, locked = false,
 }: {
   title: string;
   icon: React.ReactNode;

@@ -178,8 +178,8 @@ function PromptPayCard({ number, name, amount }: { number: string; name: string;
 }
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
-function BillCard({ bill, config, defaultOpen, promptpay }: {
-  bill: MonthlyBill; config: DormConfig | null;
+function BillCard({ bill, defaultOpen, promptpay }: {
+  bill: MonthlyBill; config?: DormConfig | null;
   defaultOpen: boolean; promptpay: { number: string; name: string };
 }) {
   const [open, setOpen] = useState(defaultOpen);
