@@ -48,7 +48,7 @@ function App() {
     user, profile, loading: authLoading, error: authError,
     emailVerified, login, register, logout, resetPassword,
     resendVerification, refreshEmailVerified,
-    isTrialExpired, isPaidExpired, trialDaysLeft, licenseDaysLeft, isBanned, setError
+    isPaidExpired, licenseDaysLeft, isBanned, setError
   } = useAuth();
 
   // Buildings (multi-building support — Large plan)
@@ -240,10 +240,10 @@ function App() {
     );
   }
 
-  // Trial OR paid plan expired → show upgrade/renewal wall.
+  // Paid plan expired → show renewal wall.
   // Paid plans are one-time payments that don't auto-renew, so once the period
   // lapses the user must pay again to keep using the app.
-  if (user && (isTrialExpired || isPaidExpired)) {
+  if (user && isPaidExpired) {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -257,14 +257,10 @@ function App() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}><Clock size={40} color="#A78BFA" /></div>
         <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>
-          {isPaidExpired ? 'แพ็กเกจหมดอายุแล้ว' : 'ทดลองใช้หมดอายุแล้ว'}
+          แพ็กเกจหมดอายุแล้ว
         </h2>
         <p style={{ color: '#9CA3AF', maxWidth: '400px', lineHeight: 1.7, margin: 0 }}>
-          {isPaidExpired ? (
-            <>แพ็กเกจของคุณครบรอบการใช้งานแล้ว<br />ต่ออายุเพื่อใช้งานต่อได้เลย</>
-          ) : (
-            <>ระยะเวลาทดลองใช้งานฟรี 60 วันของคุณหมดอายุแล้ว<br />อัปเกรดแผนเพื่อใช้งานต่อได้เลย</>
-          )}
+          แพ็กเกจของคุณครบรอบการใช้งานแล้ว<br />ต่ออายุเพื่อใช้งานต่อได้เลย
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
           <button
@@ -368,29 +364,12 @@ function App() {
   const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
   const maxBuildings = profile ? getMaxBuildings(profile.license) : 1;
   const canAddBuilding = maxBuildings > 1;
-  const isTrial = profile?.license === 'trial';
   const lineEnabled = profile?.license ? canSendLine(profile.license) : true;
   const maxRooms = profile ? getMaxRooms(profile.license) : 5;
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
 
   return (
     <div className="app-container">
-      {/* Trial Banner */}
-      {profile?.license === 'trial' && trialDaysLeft !== null && (
-        <div
-          className={`trial-banner ${isTrialExpired ? 'expired' : ''}`}
-          style={{ cursor: 'pointer' }}
-          onClick={() => setCurrentView('pricing')}
-        >
-          <Clock size={16} />
-          {isTrialExpired
-            ? 'ทดลองใช้หมดอายุแล้ว — คลิกเพื่ออัปเกรด'
-            : `ทดลองใช้ฟรี เหลือ ${trialDaysLeft} วัน — คลิกเพื่ออัปเกรด`
-          }
-          <Zap size={14} style={{ marginLeft: 'auto' }} />
-        </div>
-      )}
-
       {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
       {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (
         <div
@@ -550,8 +529,8 @@ function App() {
           ))}
         </nav>
 
-        {/* Upgrade nudge for trial users */}
-        {profile?.license === 'trial' && !hasPaidSubscription && (
+        {/* Upgrade nudge for free users */}
+        {profile?.license === 'free' && !hasPaidSubscription && (
           <button
             onClick={() => handleNavClick('pricing')}
             style={{
@@ -643,7 +622,7 @@ function App() {
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
             maxRooms={maxRooms}
-            isTrial={isTrial}
+            isTrial={profile?.license === 'free'}
             onUpgrade={() => setCurrentView('pricing')}
           />
         )}
@@ -672,7 +651,7 @@ function App() {
             onUnlockMonth={unlockMonth}
             uid={user?.uid}
             buildingId={activeBuildingId ?? undefined}
-            isTrial={isTrial}
+            isTrial={profile?.license === 'free'}
             canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
           />

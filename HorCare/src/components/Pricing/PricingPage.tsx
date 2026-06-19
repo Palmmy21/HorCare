@@ -696,7 +696,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
         }
     };
 
-    const currentPlanId = profile && profile.license !== 'trial' ? profile.plan_name : undefined;
+    const currentPlanId = profile && profile.license !== 'free' ? profile.plan_name : undefined;
     const currentPlan = PLANS.find(p => p.id === currentPlanId);
     const otherPlans = PLANS.filter(p => p.id !== currentPlanId);
 

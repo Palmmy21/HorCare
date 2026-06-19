@@ -15,7 +15,6 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import type { UserProfile } from '../types';
 
-const TRIAL_DAYS = 60;
 
 export function useAuth() {
     const [user, setUser] = useState<User | null>(null);
@@ -75,7 +74,7 @@ export function useAuth() {
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(cred.user, { displayName });
 
-            // ส่งอีเมลยืนยันตัวตน — กันสมัครด้วยอีเมลปลอม + กันเปิดหลายบัญชีรับ trial ฟรี.
+            // ส่งอีเมลยืนยันตัวตน — กันสมัครด้วยอีเมลปลอม
             // best-effort: ถ้าส่งพลาด (เช่นโดน rate-limit) ก็ยังให้สมัครต่อได้ แล้วกดส่งซ้ำที่หน้า gate
             try {
                 await sendEmailVerification(cred.user);
@@ -83,17 +82,13 @@ export function useAuth() {
                 console.warn('sendEmailVerification on register failed:', (e as Error).message);
             }
 
-            // Create user profile in Firestore
-            const trialExpires = new Date();
-            trialExpires.setDate(trialExpires.getDate() + TRIAL_DAYS);
-
+            // Create user profile in Firestore — free plan, no expiry
             const userProfile: UserProfile = {
                 uid: cred.user.uid,
                 email,
                 display_name: displayName,
-                license: 'trial',
-                trial_expires_at: trialExpires.toISOString(),
-                access_until: trialExpires.getTime(), // server-enforced expiry (Firestore rules)
+                license: 'free',
+                access_until: 0, // 0 = no expiry (Firestore rules treat this as permanent)
                 created_at: new Date().toISOString()
             };
 
@@ -184,10 +179,6 @@ export function useAuth() {
         }
     }, []);
 
-    // Check if trial is expired — treat missing trial_expires_at as expired (safe default)
-    const isTrialExpired = profile?.license === 'trial' &&
-        (!profile.trial_expires_at || new Date(profile.trial_expires_at) < new Date());
-
     // Paid plans (monthly_*/yearly_*) are time-boxed by current_period_end.
     // One-time PromptPay payments don't auto-renew, so once the period passes the
     // license MUST lapse — otherwise a single 79฿ payment buys lifetime access.
@@ -200,17 +191,12 @@ export function useAuth() {
 
     const isLicenseActive =
         profile?.license === 'active' ||
-        (profile?.license === 'trial' && !isTrialExpired) ||
+        profile?.license === 'free' ||
         (isPaidPlan && !isPaidExpired);
 
     // Days left on a paid plan (null when not on a paid plan) — drives the renewal banner
     const licenseDaysLeft = isPaidPlan && profile?.current_period_end
         ? Math.max(0, Math.ceil((new Date(profile.current_period_end).getTime() - Date.now()) / 86400000))
-        : null;
-
-    // Days remaining in trial
-    const trialDaysLeft = profile?.license === 'trial'
-        ? Math.max(0, Math.ceil((new Date(profile.trial_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
         : null;
 
     // Ban check — admin sets status: 'banned' in Firestore
@@ -228,10 +214,8 @@ export function useAuth() {
         resetPassword,
         resendVerification,
         refreshEmailVerified,
-        isTrialExpired,
         isPaidExpired,
         isLicenseActive,
-        trialDaysLeft,
         licenseDaysLeft,
         isBanned,
         setError

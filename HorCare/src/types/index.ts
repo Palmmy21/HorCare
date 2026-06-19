@@ -3,7 +3,7 @@
 export type PlanName = 'small' | 'medium' | 'large';
 export type BillingCycle = 'monthly' | 'yearly';
 export type LicenseType =
-  | 'trial'
+  | 'free'
   | 'active'
   | 'monthly_small'
   | 'monthly_medium'
@@ -19,7 +19,7 @@ export interface UserProfile {
   license: LicenseType;
   role?: 'admin' | 'user';
   status?: 'active' | 'banned'; // 'banned' = blocked by admin
-  trial_expires_at: string; // ISO date
+  trial_expires_at?: string; // legacy — unused for free plan
   created_at: string;
   // Subscription info (Stripe)
   subscription_id?: string;

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 const LICENSE_OPTIONS: { value: LicenseType; label: string; color: string; bg: string; border: string }[] = [
-    { value: 'trial',          label: 'Trial (ทดลองใช้)',         color: '#FCD34D', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)' },
+    { value: 'free',            label: 'Free (แผนฟรี)',             color: '#FCD34D', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)' },
     { value: 'monthly_small',  label: 'Small รายเดือน (฿79)',     color: '#A5B4FC', bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.3)' },
     { value: 'monthly_medium', label: 'Medium รายเดือน (฿259)',   color: '#67E8F9', bg: 'rgba(6,182,212,0.15)', border: 'rgba(6,182,212,0.3)' },
     { value: 'monthly_large',  label: 'Large รายเดือน (฿399)',    color: '#C4B5FD', bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.3)' },
@@ -58,10 +58,9 @@ function InfoRow({ icon, label, value, mono }: { icon: React.ReactNode; label: s
     );
 }
 
-function UserDetailPanel({ u, onClose, onExtend, onUnlock, onBan, onUnban, onRevoke, onSetLicense, isProcessing }: {
+function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSetLicense, isProcessing }: {
     u: UserProfile;
     onClose: () => void;
-    onExtend: (uid: string) => void;
     onUnlock: (uid: string) => void;
     onBan: (uid: string) => void;
     onUnban: (uid: string) => void;
@@ -71,16 +70,12 @@ function UserDetailPanel({ u, onClose, onExtend, onUnlock, onBan, onUnban, onRev
 }) {
     const [licenseMenuOpen, setLicenseMenuOpen] = useState(false);
     const isBanned = u.status === 'banned';
-    const isExpired = u.license === 'trial' && u.trial_expires_at && new Date(u.trial_expires_at) < new Date();
-    const daysLeft = u.license === 'trial' && u.trial_expires_at ? getDaysLeft(u.trial_expires_at) : null;
-
     let statusLabel = isBanned ? 'ถูกแบน' : 'ตลอดชีพ';
     let statusColor = isBanned ? '#FCA5A5' : '#6EE7B7';
     let statusBg = isBanned ? 'rgba(220,38,38,0.15)' : 'rgba(16,185,129,0.15)';
     let statusBorder = isBanned ? 'rgba(220,38,38,0.3)' : 'rgba(16,185,129,0.3)';
-    if (!isBanned && u.license === 'trial') {
-        if (isExpired) { statusLabel = 'หมดอายุ'; statusColor = '#FCA5A5'; statusBg = 'rgba(220,38,38,0.15)'; statusBorder = 'rgba(220,38,38,0.3)'; }
-        else { statusLabel = 'ทดลองใช้'; statusColor = '#FCD34D'; statusBg = 'rgba(245,158,11,0.15)'; statusBorder = 'rgba(245,158,11,0.3)'; }
+    if (!isBanned && u.license === 'free') {
+        statusLabel = 'Free'; statusColor = '#FCD34D'; statusBg = 'rgba(245,158,11,0.15)'; statusBorder = 'rgba(245,158,11,0.3)';
     }
 
     const [copied, setCopied] = useState(false);
@@ -133,7 +128,7 @@ function UserDetailPanel({ u, onClose, onExtend, onUnlock, onBan, onUnban, onRev
                                 background: statusBg, color: statusColor, border: `1px solid ${statusBorder}`,
                                 borderRadius: '999px', padding: '0.2rem 0.625rem', fontSize: '0.75rem', fontWeight: 700,
                             }}>
-                                {u.license === 'active' ? <InfinityIcon size={11} /> : isExpired ? <XCircle size={11} /> : <Clock size={11} />}
+                                {u.license === 'active' ? <InfinityIcon size={11} /> : u.license === 'free' ? <Clock size={11} /> : <Package size={11} />}
                                 {statusLabel}
                             </span>
                         </span>
@@ -179,24 +174,6 @@ function UserDetailPanel({ u, onClose, onExtend, onUnlock, onBan, onUnban, onRev
                     <InfoRow icon={<BadgeCheck size={15} />} label="ประเภทสิทธิ์" value={
                         licenseLabel(u.license)
                     } />
-                    {u.license === 'trial' && u.trial_expires_at && (
-                        <InfoRow icon={<Timer size={15} />} label="หมดอายุ" value={
-                            <span>
-                                <span style={{ display: 'block' }}>{new Date(u.trial_expires_at).toLocaleDateString('th-TH', {
-                                    year: 'numeric', month: 'long', day: 'numeric'
-                                })}</span>
-                                {daysLeft !== null && (
-                                    <span style={{
-                                        marginTop: '0.25rem', display: 'inline-block',
-                                        fontWeight: 700, fontSize: '0.875rem',
-                                        color: daysLeft <= 0 ? '#DC2626' : daysLeft <= 7 ? '#D97706' : '#16A34A'
-                                    }}>
-                                        {daysLeft <= 0 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><AlertTriangle size={14} /> หมดอายุแล้ว</span> : `เหลืออีก ${daysLeft} วัน`}
-                                    </span>
-                                )}
-                            </span>
-                        } />
-                    )}
                     {u.role && (
                         <InfoRow icon={<ShieldAlert size={15} />} label="บทบาท" value={
                             u.role === 'admin'
@@ -276,12 +253,12 @@ function UserDetailPanel({ u, onClose, onExtend, onUnlock, onBan, onUnban, onRev
                             {/* Revoke */}
                             <button
                                 onClick={() => onRevoke(u.uid)}
-                                disabled={isProcessing || u.license === 'trial'}
+                                disabled={isProcessing || u.license === 'free'}
                                 style={{
-                                    background: u.license === 'trial' ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.1)', color: u.license === 'trial' ? 'rgba(255,255,255,0.3)' : '#FCD34D',
-                                    border: '1px solid ' + (u.license === 'trial' ? 'rgba(255,255,255,0.05)' : 'rgba(245,158,11,0.3)'), borderRadius: '8px',
+                                    background: u.license === 'free' ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.1)', color: u.license === 'free' ? 'rgba(255,255,255,0.3)' : '#FCD34D',
+                                    border: '1px solid ' + (u.license === 'free' ? 'rgba(255,255,255,0.05)' : 'rgba(245,158,11,0.3)'), borderRadius: '8px',
                                     padding: '0.5rem 0.875rem', fontSize: '0.8125rem', fontWeight: 600,
-                                    cursor: (isProcessing || u.license === 'trial') ? 'not-allowed' : 'pointer',
+                                    cursor: (isProcessing || u.license === 'free') ? 'not-allowed' : 'pointer',
                                     opacity: isProcessing ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem',
                                     textAlign: 'left',
                                 }}
@@ -289,7 +266,7 @@ function UserDetailPanel({ u, onClose, onExtend, onUnlock, onBan, onUnban, onRev
                                 <RotateCcw size={13} />
                                 <span>
                                     <span style={{ display: 'block' }}>เพิกถอนสิทธิ์ (Revoke)</span>
-                                    <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>เปลี่ยน license เป็น trial ที่หมดอายุทันที</span>
+                                    <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>reset license กลับเป็น Free plan</span>
                                 </span>
                             </button>
                             {/* Ban / Unban */}
@@ -425,18 +402,6 @@ export default function AdminDashboard() {
         }
     }, [users]);
 
-    const handleExtendTrial = async (uid: string) => {
-        setProcessingId(uid);
-        try {
-            const current = users.find(u => u.uid === uid);
-            if (!current) return;
-            const currentExp = new Date(current.trial_expires_at || new Date());
-            currentExp.setDate(currentExp.getDate() + 30);
-            await updateUserLicense(uid, { trial_expires_at: currentExp.toISOString(), license: 'trial' });
-            await loadUsers(true);
-        } catch (err) { console.error(err); }
-        finally { setProcessingId(null); }
-    };
 
     const handleUnlockForever = async (uid: string) => {
         if (!confirm('ยืนยันปลดล็อกถาวรให้กับผู้ใช้นี้?')) return;
@@ -468,12 +433,10 @@ export default function AdminDashboard() {
     };
 
     const handleRevoke = async (uid: string) => {
-        if (!confirm('ยืนยันเพิกถอนสิทธิ์? license จะถูก reset เป็น trial ที่หมดอายุแล้ว')) return;
+        if (!confirm('ยืนยันเพิกถอนสิทธิ์? license จะถูก reset กลับเป็น Free plan')) return;
         setProcessingId(uid);
         try {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            await updateUserLicense(uid, { license: 'trial', trial_expires_at: yesterday.toISOString() });
+            await updateUserLicense(uid, { license: 'free', access_until: 0 });
             await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
@@ -486,7 +449,7 @@ export default function AdminDashboard() {
         try {
             const updates: Partial<UserProfile> = { license };
             // If switching to a paid plan, set subscription fields
-            if (license !== 'trial' && license !== 'active') {
+            if (license !== 'free' && license !== 'active') {
                 const periodEnd = new Date();
                 const isYearly = license.startsWith('yearly_');
                 if (isYearly) periodEnd.setFullYear(periodEnd.getFullYear() + 1);
@@ -535,15 +498,18 @@ export default function AdminDashboard() {
 
     const totalUsers = users.length;
     const activeUsers = users.filter(u => u.license === 'active').length;
-    const paidUsers = users.filter(u => u.license !== 'trial' && u.license !== 'active').length;
-    const trialUsers = users.filter(u => u.license === 'trial' && u.trial_expires_at && new Date(u.trial_expires_at) >= new Date()).length;
-    const expiredUsers = users.filter(u => u.license === 'trial' && u.trial_expires_at && new Date(u.trial_expires_at) < new Date()).length;
+    const paidUsers = users.filter(u => u.license !== 'free' && u.license !== 'active').length;
+    const freeUsers = users.filter(u => u.license === 'free').length;
+    const expiredUsers = users.filter(u => {
+        if (!u.license?.startsWith('monthly_') && !u.license?.startsWith('yearly_')) return false;
+        return u.current_period_end ? new Date(u.current_period_end) < new Date() : false;
+    }).length;
 
     const statCards = [
         { label: 'ผู้ใช้ทั้งหมด', value: totalUsers, icon: Users, color: '#818CF8', bg: 'rgba(99,102,241,0.15)' },
         { label: 'Paid Plans', value: paidUsers, icon: Package, color: '#A78BFA', bg: 'rgba(124,58,237,0.15)' },
         { label: 'ตลอดชีพ', value: activeUsers, icon: UserCheck, color: '#34D399', bg: 'rgba(16,185,129,0.15)' },
-        { label: 'ทดลองใช้', value: trialUsers, icon: Timer, color: '#FCD34D', bg: 'rgba(245,158,11,0.15)' },
+        { label: 'Free', value: freeUsers, icon: Timer, color: '#FCD34D', bg: 'rgba(245,158,11,0.15)' },
         { label: 'หมดอายุ', value: expiredUsers, icon: XCircle, color: '#FCA5A5', bg: 'rgba(220,38,38,0.15)' },
     ];
 
@@ -646,8 +612,9 @@ export default function AdminDashboard() {
                             </thead>
                             <tbody>
                                 {filteredUsers.map((u, i) => {
-                                    const isExpired = u.license === 'trial' && u.trial_expires_at && new Date(u.trial_expires_at) < new Date();
-                                    const daysLeft = u.license === 'trial' && u.trial_expires_at ? getDaysLeft(u.trial_expires_at) : null;
+                                    const isPaidPlan = u.license?.startsWith('monthly_') || u.license?.startsWith('yearly_');
+                                    const isExpired = isPaidPlan && u.current_period_end ? new Date(u.current_period_end) < new Date() : false;
+                                    const daysLeft = isPaidPlan && u.current_period_end ? getDaysLeft(u.current_period_end) : null;
                                     const isProcessing = processingId === u.uid;
                                     const isSelected = selectedUser?.uid === u.uid;
 
@@ -714,13 +681,6 @@ export default function AdminDashboard() {
                                             </td>
                                             <td style={{ padding: '0.875rem 1.25rem' }}>
                                                 <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                                                    <button
-                                                        onClick={() => handleExtendTrial(u.uid)}
-                                                        disabled={isProcessing}
-                                                        style={{ background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', padding: '0.375rem 0.75rem', fontSize: '0.8rem', fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '0.375rem', whiteSpace: 'nowrap' }}
-                                                    >
-                                                        {isProcessing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Timer size={12} />}+30 วัน
-                                                    </button>
                                                     {u.license !== 'active' && (
                                                         <button
                                                             onClick={() => handleUnlockForever(u.uid)}
@@ -747,7 +707,6 @@ export default function AdminDashboard() {
                 <UserDetailPanel
                     u={selectedUser}
                     onClose={() => setSelectedUser(null)}
-                    onExtend={handleExtendTrial}
                     onUnlock={handleUnlockForever}
                     onBan={handleBan}
                     onUnban={handleUnban}

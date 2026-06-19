@@ -2,7 +2,7 @@ import type { PlanName, BillingCycle, LicenseType } from '../types';
 
 /* ── Plan config ── */
 
-export const TRIAL_MAX_ROOMS = 10;
+export const FREE_MAX_ROOMS = 100;
 
 export const PLAN_CONFIG = {
     small:  { maxRooms: 30,       name: 'หอเล็ก' },
@@ -12,7 +12,7 @@ export const PLAN_CONFIG = {
 
 /** Max rooms allowed for a given license */
 export function getMaxRooms(license: LicenseType): number {
-    if (license === 'trial') return TRIAL_MAX_ROOMS;
+    if (license === 'free') return FREE_MAX_ROOMS;
     if (license === 'active') return Infinity;
     const parsed = parseLicense(license);
     if (!parsed) return 0;
@@ -44,13 +44,13 @@ export function isPaidLicense(license: LicenseType): boolean {
 
 /** Whether this license can send bills via LINE (all paid plans) */
 export function canSendLine(license: LicenseType): boolean {
-    if (license === 'active' || license === 'trial') return true;
+    if (license === 'active' || license === 'free') return true;
     return parseLicense(license) !== null;
 }
 
 /** Max buildings allowed for a given license */
 export function getMaxBuildings(license: LicenseType): number {
-    if (license === 'trial') return 1;
+    if (license === 'free') return 1;
     if (license === 'active') return Infinity;
     const parsed = parseLicense(license);
     if (!parsed) return 1;
