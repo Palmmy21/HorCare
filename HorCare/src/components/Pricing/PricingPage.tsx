@@ -308,42 +308,49 @@ interface Plan {
 
 const PLANS: Plan[] = [
     {
-        id: 'small', name: 'หอเล็ก', icon: Home, roomRange: '1–40 ห้อง',
+        id: 'small', name: 'หอเล็ก', icon: Home, roomRange: 'สูงสุด 30 ห้อง',
         monthlyPrice: 79, yearlyPrice: 790, originalYearlyPrice: 948,
         gradient: 'linear-gradient(135deg,#3B82F6,#6366F1)',
         glowColor: 'rgba(99,102,241,0.45)',
         features: [
-            'ห้องสูงสุด 40 ห้อง', 'จัดการได้สูงสุด 5 หอพัก',
+            'ห้องสูงสุด 30 ห้อง', '1 หอพักเท่านั้น',
             'จดมิเตอร์ไฟ / น้ำ รายเดือน', 'ออกบิลอัตโนมัติ',
-            'QR PromptPay ในบิล', 'สรุปยอดรายเดือน',
-            '❌ ไม่รองรับส่งบิลผ่าน LINE',
+            'QR PromptPay ในบิล', 'ส่งบิลผ่าน LINE อัตโนมัติ',
+            'สรุปยอดรายเดือน',
+            '❌ Multi-หอ (จัดการหลายอาคาร)',
+            '❌ ทีมงาน / สิทธิ์หลายระดับ',
         ],
     },
     {
-        id: 'medium', name: 'หอกลาง', icon: Building, roomRange: '41–100 ห้อง',
+        id: 'medium', name: 'หอกลาง', icon: Building, roomRange: 'สูงสุด 100 ห้อง',
         monthlyPrice: 259, yearlyPrice: 1590, originalYearlyPrice: 3108,
         gradient: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
         glowColor: 'rgba(139,92,246,0.45)',
         popular: true,
         features: [
-            'ห้องสูงสุด 100 ห้อง', 'จัดการได้สูงสุด 20 หอพัก',
+            'ห้องสูงสุด 100 ห้อง', 'สูงสุด 3 หอพัก (Multi-หอ)',
             'จดมิเตอร์ไฟ / น้ำ รายเดือน', 'ออกบิลอัตโนมัติ',
-            'QR PromptPay ในบิล', 'Export PDF / Excel',
-            'ตั้งค่าราคาแต่ละห้องได้', 'รองรับหอพักพาณิชย์',
-            'สรุปยอดรายเดือน', '❌ ไม่รองรับส่งบิลผ่าน LINE',
+            'QR PromptPay ในบิล', 'ส่งบิลผ่าน LINE อัตโนมัติ',
+            'Export PDF', 'สรุปยอดรายเดือน',
+            '[soon] ทีมงานสูงสุด 3 คน (RBAC)',
+            '[soon] รายงานภาษี / บัญชี',
+            '[soon] Dashboard วิเคราะห์ธุรกิจ',
         ],
     },
     {
-        id: 'large', name: 'หอใหญ่', icon: Building2, roomRange: '100+ ห้อง',
+        id: 'large', name: 'หอใหญ่', icon: Building2, roomRange: 'มากกว่า 100 ห้อง',
         monthlyPrice: 399, yearlyPrice: 2590, originalYearlyPrice: 4788,
         gradient: 'linear-gradient(135deg,#F59E0B,#EF4444)',
         glowColor: 'rgba(245,158,11,0.45)',
         features: [
             'ห้องไม่จำกัด', 'จัดการหอพักไม่จำกัด',
             'จดมิเตอร์ไฟ / น้ำ รายเดือน', 'ออกบิลอัตโนมัติ',
-            'QR PromptPay ในบิล', 'ส่งบิลผ่าน LINE ปุ่มเดียว',
-            'Export PDF / Excel', 'ตั้งค่าราคาแต่ละห้องได้',
-            'รองรับหอพักพาณิชย์', 'Dashboard วิเคราะห์ขั้นสูง',
+            'QR PromptPay ในบิล', 'ส่งบิลผ่าน LINE อัตโนมัติ',
+            'Export PDF',
+            '[soon] ทีมงานไม่จำกัด (RBAC)',
+            '[soon] รายงานภาษี + custom format',
+            '[soon] Dashboard เปรียบเทียบหลายหอ',
+            '[soon] Waitlist อัตโนมัติ',
             'Priority Support',
         ],
     },
@@ -437,15 +444,25 @@ const PlanCard = memo(function PlanCard({
                 flex: 1, display: 'flex', flexDirection: 'column', gap: '0.6rem',
             }}>
                 {plan.features.map(f => {
-                    const unavailable = f.startsWith('❌');
-                    const label = unavailable ? f.slice(2) : f;
+                    const coming = f.startsWith('[soon]');
+                    const unavailable = !coming && f.startsWith('❌');
+                    const label = coming ? f.slice(7) : (unavailable ? f.slice(2) : f);
                     return (
                         <li key={f} style={{
                             display: 'flex', alignItems: 'flex-start',
                             gap: '0.6rem', fontSize: '0.86rem',
-                            color: unavailable ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.72)',
+                            color: (unavailable || coming) ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.72)',
                         }}>
-                            {unavailable ? (
+                            {coming ? (
+                                <div style={{
+                                    background: 'rgba(245,158,11,0.12)',
+                                    border: '1px solid rgba(245,158,11,0.25)',
+                                    borderRadius: '50%', width: 18, height: 18,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                }}>
+                                    <Clock size={9} color="rgba(245,158,11,0.7)" strokeWidth={2.5} />
+                                </div>
+                            ) : unavailable ? (
                                 <div className="feat-check unavailable" style={{
                                     background: 'rgba(255,255,255,0.08)',
                                     borderRadius: '50%', width: 18, height: 18,
@@ -458,7 +475,19 @@ const PlanCard = memo(function PlanCard({
                                     <Check size={10} color="#fff" strokeWidth={3} />
                                 </div>
                             )}
-                            {label}
+                            <span>
+                                {label}
+                                {coming && (
+                                    <span style={{
+                                        marginLeft: '0.35rem', fontSize: '0.62rem', fontWeight: 800,
+                                        background: 'rgba(245,158,11,0.13)',
+                                        border: '1px solid rgba(245,158,11,0.28)',
+                                        color: 'rgba(245,158,11,0.75)', borderRadius: '999px',
+                                        padding: '0.06rem 0.4rem', verticalAlign: 'middle',
+                                        letterSpacing: '0.02em',
+                                    }}>เร็วๆ นี้</span>
+                                )}
+                            </span>
                         </li>
                     );
                 })}
