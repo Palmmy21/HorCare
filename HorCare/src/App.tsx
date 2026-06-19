@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Wallet, CheckCircle, Users, Wrench, SlidersHorizontal, Lock
+  Building2, ChevronDown, Plus, Check, Pencil, Wallet, CheckCircle, Users, Wrench, SlidersHorizontal, Lock, CreditCard
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -176,7 +176,7 @@ function App() {
     { id: 'operations'   as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
     { id: 'recording'    as ViewMode, icon: FileText,           label: 'จดมิเตอร์' },
     { id: 'summary'    as ViewMode, icon: Send,            label: 'สรุปยอด' },
-    { id: 'payments'   as ViewMode, icon: Wallet,          label: 'การชำระเงิน' },
+    { id: 'payments'   as ViewMode, icon: CreditCard,       label: 'การชำระเงิน' },
     { id: 'calculator' as ViewMode, icon: Calculator,      label: 'คำนวณมิเตอร์' },
     { id: 'settings'   as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
     { id: 'pricing'    as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
