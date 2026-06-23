@@ -95,6 +95,24 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
         return;
     }
 
+    // ── 2b. Rich Menu — ส่งสลิป ──────────────────────────────────
+    if (text === 'ส่งสลิป') {
+        const isRegistered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: isRegistered
+                ? '📷 กรุณาถ่ายรูปสลิปการโอนเงิน แล้วส่งมาในแชทนี้ได้เลยค่ะ\n\n(ส่งรูปได้โดยตรง ไม่ต้องพิมพ์ข้อความ)'
+                : '🏠 ยังไม่ได้ลงทะเบียนค่ะ\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนก่อนนะคะ',
+        }]);
+        return;
+    }
+
+    // ── 2c. Rich Menu — พอร์ทัล ──────────────────────────────────
+    if (text === 'พอร์ทัล' || text.toLowerCase() === 'portal') {
+        await handlePortalCommand(lineUserId, replyToken);
+        return;
+    }
+
     // ── 2d. Rich Menu — ติดต่อแอดมิน ──────────────────────────────
     if (text === 'ติดต่อแอดมิน') {
         await lineReply(replyToken, [{
@@ -287,6 +305,77 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
 
     const bill = billDoc.data();
     await lineReply(replyToken, [buildBillFlex(bill, dorm_name || '-', due_day ?? 5, bill.month as string)]);
+}
+
+/** ส่งลิงก์พอร์ทัลส่วนตัวของลูกหอ */
+async function handlePortalCommand(lineUserId: string, replyToken: string) {
+    const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
+    if (!lineRoomSnap.exists) {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: '🏠 ยังไม่ได้ลงทะเบียนค่ะ\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนก่อนนะคะ',
+        }]);
+        return;
+    }
+
+    const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
+    const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
+    const portalUrl = `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${room_id}`;
+
+    await lineReply(replyToken, [{
+        type: 'flex',
+        altText: `🏠 พอร์ทัลผู้เช่า ห้อง ${room_number}`,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '16px',
+                backgroundColor: '#4F46E5',
+                contents: [
+                    { type: 'text', text: '🏠 พอร์ทัลผู้เช่า', color: '#ffffff', size: 'sm', weight: 'bold' },
+                    { type: 'text', text: dorm_name || 'HorCare', color: '#ffffffcc', size: 'xs' },
+                ],
+            },
+            body: {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'sm',
+                paddingAll: '16px',
+                contents: [
+                    {
+                        type: 'box', layout: 'horizontal',
+                        contents: [
+                            { type: 'text', text: 'ห้อง', color: '#888888', size: 'sm', flex: 2 },
+                            { type: 'text', text: room_number, size: 'sm', weight: 'bold', flex: 3, align: 'end' },
+                        ],
+                    },
+                    { type: 'separator', margin: 'md' },
+                    {
+                        type: 'text',
+                        text: 'ดูบิล · สถานะการชำระ · แจ้งซ่อม · QR PromptPay',
+                        size: 'xs',
+                        color: '#888888',
+                        margin: 'md',
+                        wrap: true,
+                    },
+                ],
+            },
+            footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: '12px',
+                contents: [{
+                    type: 'button',
+                    action: { type: 'uri', label: '🔗 เปิดพอร์ทัล', uri: portalUrl },
+                    style: 'primary',
+                    color: '#4F46E5',
+                    height: 'sm',
+                }],
+            },
+        },
+    }]);
 }
 
 /**

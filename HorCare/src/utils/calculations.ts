@@ -85,7 +85,9 @@ export function getEffectiveRates(
 ): { electricityRate: number; waterConfig: WaterConfig } {
     // Water config priority: room custom > room-type default > global
     const isCommercial = (room.room_type || 'dormitory') === 'commercial';
-    const defaultWaterConfig = isCommercial
+    // Resort and hotel buildings reuse commercial_water_config as their default rate
+    const isCommercialBuilding = ['commercial', 'resort', 'hotel'].includes(config.building_type);
+    const defaultWaterConfig = (isCommercial || isCommercialBuilding)
         ? (config.commercial_water_config ?? config.water_config)
         : config.water_config;
 

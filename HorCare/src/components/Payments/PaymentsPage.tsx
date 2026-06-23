@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
     Wallet, CheckCircle2, Clock, AlertCircle, Receipt, Search,
     Image as ImageIcon, Check, RotateCcw, Loader2, X, TrendingUp,
-    CalendarDays, User, Banknote,
+    CalendarDays, User, Banknote, Download, CheckSquare, Square, TriangleAlert,
 } from 'lucide-react';
 import type { MonthlyBill, Room, DormConfig, PaymentStatus } from '../../types';
 import { ref, getDownloadURL } from 'firebase/storage';
@@ -41,6 +41,8 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     const [search, setSearch] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [slipView, setSlipView] = useState<{ url?: string; loading: boolean; error?: string; bill: MonthlyBill } | null>(null);
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const dormName = config.bill_customization?.dorm_name || 'หอพัก';
 
@@ -69,6 +71,73 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         if (search && !b.room_number.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
     });
+
+    // Overdue: bills from months BEFORE currentMonth that are still not paid
+    const overdueBills = useMemo(() => {
+        return bills.filter(b =>
+            b.is_saved &&
+            b.month < currentMonth &&
+            statusOf(b) !== 'paid'
+        ).sort((a, b) => a.month.localeCompare(b.month));
+    }, [bills, currentMonth]);
+
+    // Bulk select helpers
+    const selectableBills = filtered.filter(b => statusOf(b) !== 'paid');
+    const allSelected = selectableBills.length > 0 && selectableBills.every(b => selected.has(b.id));
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelected(new Set());
+        } else {
+            setSelected(new Set(selectableBills.map(b => b.id)));
+        }
+    };
+    const toggleSelect = (id: string) => {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const bulkConfirmPaid = async () => {
+        if (selected.size === 0) return;
+        if (!confirm(`ยืนยันว่าห้อง ${selected.size} ห้องที่เลือกชำระแล้วทั้งหมด?`)) return;
+        setBulkProcessing(true);
+        try {
+            const now = new Date().toISOString();
+            await Promise.all([...selected].map(id =>
+                onUpdatePayment(id, { payment_status: 'paid', paid_at: now, paid_method: 'manual' })
+            ));
+            setSelected(new Set());
+        } finally { setBulkProcessing(false); }
+    };
+
+    // CSV export
+    const exportCSV = () => {
+        const THAI_STATUS: Record<PaymentStatus, string> = { paid: 'จ่ายแล้ว', pending: 'รอตรวจสอบ', unpaid: 'ยังไม่จ่าย' };
+        const rows = [
+            ['เดือน', 'ห้อง', 'ค่าไฟ (หน่วย)', 'ค่าไฟ (บาท)', 'ค่าน้ำ (หน่วย)', 'ค่าน้ำ (บาท)', 'ค่าเช่า (บาท)', 'รวม (บาท)', 'สถานะ', 'ยอดสลิป', 'วันที่ชำระ'],
+            ...monthBills.map(b => [
+                monthLabel(b.month),
+                b.room_number,
+                b.elec_units,
+                b.elec_bill,
+                b.water_units,
+                b.water_bill,
+                b.room_rent,
+                b.total_bill,
+                THAI_STATUS[statusOf(b)],
+                b.slip_amount ?? '',
+                b.paid_at ? new Date(b.paid_at).toLocaleDateString('th-TH') : '',
+            ]),
+        ];
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `bills_${currentMonth}_${dormName}.csv`;
+        a.click();
+    };
 
     // แจ้งลูกหอทาง LINE ว่าเจ้าของยืนยันการจ่ายแล้ว — best-effort, ไม่ให้กระทบการยืนยัน
     // ถ้าส่งไม่สำเร็จ (ห้องยังไม่ผูก LINE / token หมด) ก็เงียบไว้ ไม่ขึ้น error ให้เจ้าของ
@@ -151,16 +220,55 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                         {dormName} · รอบ {monthLabel(currentMonth)}
                     </p>
                 </div>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-white)', border: '1px solid var(--color-gray-200)', borderRadius: 'var(--radius-md)', padding: '0.5rem 0.75rem' }}>
-                    <CalendarDays size={16} color="var(--color-gray-500)" />
-                    <input
-                        type="month"
-                        value={currentMonth}
-                        onChange={e => e.target.value && onMonthChange(e.target.value)}
-                        style={{ border: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--color-gray-800)', outline: 'none' }}
-                    />
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {monthBills.length > 0 && (
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={exportCSV}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                            title="ดาวน์โหลดข้อมูลการชำระเงินเป็น CSV"
+                        >
+                            <Download size={15} /> Export CSV
+                        </button>
+                    )}
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-white)', border: '1px solid var(--color-gray-200)', borderRadius: 'var(--radius-md)', padding: '0.5rem 0.75rem' }}>
+                        <CalendarDays size={16} color="var(--color-gray-500)" />
+                        <input
+                            type="month"
+                            value={currentMonth}
+                            onChange={e => e.target.value && onMonthChange(e.target.value)}
+                            style={{ border: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--color-gray-800)', outline: 'none' }}
+                        />
+                    </label>
+                </div>
             </div>
+
+            {/* Overdue banner */}
+            {overdueBills.length > 0 && (
+                <div style={{
+                    background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.25)',
+                    borderRadius: 'var(--radius-lg)', padding: '0.875rem 1rem',
+                    marginBottom: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                }}>
+                    <TriangleAlert size={18} color="#DC2626" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <div>
+                        <div style={{ fontWeight: 700, color: '#B91C1C', fontSize: '0.875rem', marginBottom: '0.25rem' }}>
+                            มีบิลค้างชำระจากเดือนก่อน ({overdueBills.length} รายการ)
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {overdueBills.map(b => (
+                                <span key={b.id} style={{
+                                    fontSize: '0.75rem', fontWeight: 600,
+                                    background: 'rgba(239,68,68,0.12)', color: '#B91C1C',
+                                    borderRadius: 6, padding: '0.15rem 0.5rem',
+                                }}>
+                                    ห้อง {b.room_number} · {monthLabel(b.month)} · ฿{b.total_bill.toLocaleString()}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Stat cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -207,6 +315,43 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                 </div>
             </div>
 
+            {/* Bulk action toolbar */}
+            {selectableBills.length > 0 && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+                    marginBottom: '0.75rem', padding: '0.625rem 0.875rem',
+                    background: selected.size > 0 ? 'rgba(99,102,241,0.07)' : 'var(--color-gray-50)',
+                    borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-200)',
+                    transition: 'background 0.2s',
+                }}>
+                    <button
+                        onClick={toggleSelectAll}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-gray-600)', fontSize: '0.8125rem', fontWeight: 600, padding: 0 }}
+                    >
+                        {allSelected ? <CheckSquare size={17} color="#6366F1" /> : <Square size={17} />}
+                        {allSelected ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทั้งหมด'}
+                    </button>
+                    {selected.size > 0 && (
+                        <>
+                            <span style={{ fontSize: '0.8125rem', color: '#6366F1', fontWeight: 700 }}>เลือกแล้ว {selected.size} ห้อง</span>
+                            <button
+                                onClick={bulkConfirmPaid}
+                                disabled={bulkProcessing}
+                                style={{
+                                    marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                                    padding: '0.4rem 0.875rem', borderRadius: 'var(--radius-md)', border: 'none',
+                                    background: '#059669', color: '#fff', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer',
+                                    opacity: bulkProcessing ? 0.6 : 1,
+                                }}
+                            >
+                                {bulkProcessing ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
+                                ยืนยันจ่ายทั้งหมด ({selected.size})
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+
             {/* List */}
             {monthBills.length === 0 ? (
                 <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-gray-500)' }}>
@@ -220,8 +365,18 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                         const s = statusOf(b);
                         const meta = STATUS_META[s];
                         const busy = processingId === b.id;
+                        const isSelectable = s !== 'paid';
+                        const isSelected = selected.has(b.id);
                         return (
-                            <div key={b.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+                            <div key={b.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', outline: isSelected ? '2px solid #6366F1' : 'none', outlineOffset: -1 }}>
+                                {/* Checkbox */}
+                                {isSelectable ? (
+                                    <button onClick={() => toggleSelect(b.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, color: isSelected ? '#6366F1' : 'var(--color-gray-300)' }}>
+                                        {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                                    </button>
+                                ) : (
+                                    <span style={{ width: 18, flexShrink: 0 }} />
+                                )}
                                 {/* Room + amount */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 180 }}>
                                     <div style={{ width: 46, height: 46, borderRadius: 12, background: 'var(--color-gray-100)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

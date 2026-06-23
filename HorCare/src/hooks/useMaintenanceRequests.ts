@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, doc, onSnapshot, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { MaintenanceRequest, MaintenancePartUsed, StockItem, Asset, AssetCondition } from '../types';
+import type { MaintenanceRequest, MaintenancePartUsed, StockItem, Asset, AssetCondition, Vendor } from '../types';
 
 export function useMaintenanceRequests(
   uid: string | null,
@@ -40,12 +40,19 @@ export function useMaintenanceRequests(
     reqId: string,
     status: MaintenanceRequest['status'],
     adminNote?: string,
+    extra?: {
+      vendor_id?: string;
+      vendor_name?: string;
+      vendor_phone?: string;
+      scheduled_date?: string;
+    },
   ) => {
     if (!buildingPath) return;
     await updateDoc(doc(db, buildingPath, 'maintenance', reqId), {
       status,
       updated_at: new Date().toISOString(),
       ...(adminNote !== undefined && { admin_note: adminNote }),
+      ...(extra && extra),
     });
   };
 
@@ -139,4 +146,27 @@ export function useAssets(uid: string | null, buildingId: string | null) {
   };
 
   return { assets, loading, updateCondition };
+}
+
+// ── Vendors hook (for use in MaintenancePage assignment panel) ────────────────
+export function useVendors(uid: string | null, buildingId: string | null) {
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!uid || !buildingId) { setLoading(false); return; }
+    const unsub = onSnapshot(
+      collection(db, `users/${uid}/buildings/${buildingId}/vendors`),
+      snap => {
+        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Vendor));
+        docs.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+        setVendors(docs);
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+    return unsub;
+  }, [uid, buildingId]);
+
+  return { vendors, loading };
 }

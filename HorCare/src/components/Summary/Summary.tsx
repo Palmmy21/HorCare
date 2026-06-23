@@ -9,6 +9,7 @@ import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
 import InvoiceBill from './InvoiceBill';
+import PrintBillSlip from './PrintBillSlip';
 import MonthlyReport from './MonthlyReport';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
@@ -75,6 +76,12 @@ export default function Summary({
 
     const monthBills = bills.filter(b => b.month === currentMonth);
     const isLocked = monthBills.some(b => b.is_locked);
+
+    // Count rooms in this month's bills that have no LINE user linked
+    const unlinkedLineCount = monthBills.filter(bill => {
+        const room = rooms.find(r => r.id === bill.room_id);
+        return !room?.line_user_id;
+    }).length;
 
     const handleSendLineBills = async () => {
         if (!uid || !buildingId) return;
@@ -313,18 +320,31 @@ export default function Summary({
                                     : 'ดาวน์โหลดทุกห้อง'}
                             </button>
                             {uid && buildingId && config.dorm_code && (
-                                <button
-                                    className={`btn ${canSendLine ? 'btn-line' : 'btn-outline'}`}
-                                    onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
-                                    disabled={canSendLine && lineStatus === 'sending'}
-                                    title={canSendLine ? undefined : 'ฟีเจอร์นี้สำหรับผู้ใช้แพ็กเกจที่ชำระเงินแล้ว'}
-                                    style={canSendLine ? undefined : { opacity: 0.75 }}
-                                >
-                                    {canSendLine ? <MessageCircle size={18} /> : <Lock size={18} />}
-                                    {canSendLine
-                                        ? (lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE')
-                                        : 'ส่งบิลผ่าน LINE'}
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'flex-start' }}>
+                                    <button
+                                        className={`btn ${canSendLine ? 'btn-line' : 'btn-outline'}`}
+                                        onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
+                                        disabled={canSendLine && lineStatus === 'sending'}
+                                        title={canSendLine ? undefined : 'ฟีเจอร์นี้สำหรับผู้ใช้แพ็กเกจที่ชำระเงินแล้ว'}
+                                        style={canSendLine ? undefined : { opacity: 0.75 }}
+                                    >
+                                        {canSendLine ? <MessageCircle size={18} /> : <Lock size={18} />}
+                                        {canSendLine
+                                            ? (lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE')
+                                            : 'ส่งบิลผ่าน LINE'}
+                                    </button>
+                                    {canSendLine && unlinkedLineCount > 0 && lineStatus === 'idle' && (
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                                            fontSize: '0.75rem', color: '#92400E',
+                                            background: '#FEF3C7', borderRadius: 6, padding: '0.25rem 0.6rem',
+                                            border: '1px solid #FDE68A',
+                                        }}>
+                                            <AlertTriangle size={12} />
+                                            {unlinkedLineCount} ห้องยังไม่ลงทะเบียน LINE จะถูกข้าม
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             <button className="btn btn-primary" onClick={() => setShowMonthlyReport(true)}>
                                 <BarChart3 size={18} />
@@ -765,27 +785,26 @@ export default function Summary({
                 </div>
             )}
 
-            {/* Hidden print area for all invoices */}
+            {/* Hidden print area — compact Thai slip grid (2-up per row) */}
             {showAllInvoices && (
                 <div className="print-only-area" ref={printRef}>
-                    {monthBills.map(bill => (
-                        <div key={bill.id} className="invoice-print-page">
-                            {(() => {
-                                const room = rooms.find(r => r.id === bill.room_id);
-                                const rates = room ? getEffectiveRates(room, config) : null;
-                                return (
-                                    <InvoiceBill
-                                        bill={bill}
-                                        config={config}
-                                        billDate={billDate}
-                                        effectiveElecRate={rates?.electricityRate}
-                                        effectiveWaterConfig={rates?.waterConfig}
-                                        billCustomization={billCustomization}
-                                    />
-                                );
-                            })()}
-                        </div>
-                    ))}
+                    <div className="print-slip-grid">
+                        {monthBills.map(bill => {
+                            const room = rooms.find(r => r.id === bill.room_id);
+                            const rates = room ? getEffectiveRates(room, config) : null;
+                            return (
+                                <PrintBillSlip
+                                    key={bill.id}
+                                    bill={bill}
+                                    config={config}
+                                    billDate={billDate}
+                                    effectiveElecRate={rates?.electricityRate}
+                                    effectiveWaterConfig={rates?.waterConfig}
+                                    billCustomization={billCustomization}
+                                />
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 

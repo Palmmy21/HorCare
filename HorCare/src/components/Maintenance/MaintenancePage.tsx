@@ -4,9 +4,55 @@ import {
   Edit3, Check, Zap, Droplets, Wind, DoorOpen,
   ShowerHead, Sofa, Package, RefreshCw, Trash2,
   PackageOpen, Layers, ChevronDown, ChevronUp, Minus, Plus,
+  ImageIcon, HardHat, Calendar, Phone,
 } from 'lucide-react';
-import { useMaintenanceRequests, useStockItems, useAssets } from '../../hooks/useMaintenanceRequests';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import { useMaintenanceRequests, useStockItems, useAssets, useVendors } from '../../hooks/useMaintenanceRequests';
 import type { MaintenanceRequest, MaintenanceCategory, MaintenanceStatus, AssetCondition, MaintenancePartUsed } from '../../types';
+
+// ── Lazy photo loader ─────────────────────────────────────────────────────────
+function MaintenancePhoto({ uid, buildingId, reqId }: { uid: string; buildingId: string; reqId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    if (src) { setExpanded(e => !e); return; }
+    setLoading(true);
+    try {
+      const snap = await getDoc(doc(db, `users/${uid}/buildings/${buildingId}/maintenance_images`, reqId));
+      if (snap.exists()) setSrc(snap.data().data as string);
+    } catch { /* ignore */ } finally { setLoading(false); setExpanded(true); }
+  };
+
+  return (
+    <div style={{ marginBottom: '0.625rem' }}>
+      <button
+        onClick={load}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+          fontSize: '0.75rem', fontWeight: 600, color: '#7C3AED',
+          background: '#F5F3FF', border: '1px solid #DDD6FE',
+          padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer',
+        }}
+      >
+        {loading
+          ? <span style={{ width: 12, height: 12, border: '1.5px solid #C4B5FD', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+          : <ImageIcon size={13} />
+        }
+        {src ? (expanded ? 'ซ่อนรูป' : 'ดูรูป') : 'ดูรูปประกอบ'}
+      </button>
+      {expanded && src && (
+        <img
+          src={src}
+          alt="รูปแจ้งซ่อม"
+          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #E5E7EB' }}
+        />
+      )}
+    </div>
+  );
+}
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +107,14 @@ interface CompletionState {
 
 const EMPTY_COMPLETION: CompletionState = { note: '', partQty: {}, assetId: '', conditionAfter: 'good' };
 
+interface AssignState {
+  vendorId: string;
+  vendorName: string;
+  vendorPhone: string;
+  scheduledDate: string;
+}
+const EMPTY_ASSIGN: AssignState = { vendorId: '', vendorName: '', vendorPhone: '', scheduledDate: '' };
+
 interface Props { uid: string; buildingId: string; }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -68,6 +122,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
   const { requests, loading, updateStatus, completeRequest, deleteRequest } = useMaintenanceRequests(uid, buildingId);
   const { items: stockItems, decrementMany } = useStockItems(uid, buildingId);
   const { assets, updateCondition } = useAssets(uid, buildingId);
+  const { vendors } = useVendors(uid, buildingId);
 
   const [filter, setFilter] = useState<FilterMode>('all');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -79,6 +134,8 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
   const [stockSearch, setStockSearch] = useState('');
   const [stockExpanded, setStockExpanded] = useState(true);
   const [assetExpanded, setAssetExpanded] = useState(true);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignForm, setAssignForm] = useState<AssignState>(EMPTY_ASSIGN);
 
   const filtered = filter === 'all' ? requests : requests.filter(r => r.status === filter);
 
@@ -94,6 +151,31 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
     setSaving(req.id);
     try { await updateStatus(req.id, next); }
     finally { setSaving(null); }
+  };
+
+  const openAssign = (req: MaintenanceRequest) => {
+    setAssigningId(req.id);
+    setAssignForm({
+      vendorId: req.vendor_id ?? '',
+      vendorName: req.vendor_name ?? '',
+      vendorPhone: req.vendor_phone ?? '',
+      scheduledDate: req.scheduled_date ?? '',
+    });
+  };
+
+  const handleAssignConfirm = async (req: MaintenanceRequest) => {
+    setSaving(req.id);
+    try {
+      const extra: Record<string, string> = {};
+      if (assignForm.vendorName) {
+        extra.vendor_name = assignForm.vendorName;
+        if (assignForm.vendorId) extra.vendor_id = assignForm.vendorId;
+        if (assignForm.vendorPhone) extra.vendor_phone = assignForm.vendorPhone;
+      }
+      if (assignForm.scheduledDate) extra.scheduled_date = assignForm.scheduledDate;
+      await updateStatus(req.id, 'in_progress', undefined, Object.keys(extra).length ? extra : undefined);
+      setAssigningId(null);
+    } finally { setSaving(null); }
   };
 
   const handleSaveNote = async (req: MaintenanceRequest) => {
@@ -273,11 +355,49 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                   {req.description}
                 </p>
 
+                {/* Photo attachment */}
+                {req.has_photo && (
+                  <MaintenancePhoto uid={uid} buildingId={buildingId} reqId={req.id} />
+                )}
+
                 {/* Timestamp */}
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-400, #9CA3AF)', marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-400, #9CA3AF)', marginBottom: '0.375rem' }}>
                   {fmtRelative(req.created_at)}
                   {req.updated_at && ` · อัปเดต ${fmtRelative(req.updated_at)}`}
                 </div>
+
+                {/* Vendor + schedule badges (in_progress) */}
+                {req.status === 'in_progress' && (req.vendor_name || req.scheduled_date) && (
+                  <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '0.625rem' }}>
+                    {req.vendor_name && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                        padding: '0.2rem 0.55rem', borderRadius: '6px',
+                        background: '#FFF7ED', color: '#D97706',
+                        border: '1px solid #FDE68A', fontSize: '0.75rem', fontWeight: 600,
+                      }}>
+                        <HardHat size={11} /> {req.vendor_name}
+                        {req.vendor_phone && (
+                          <a href={`tel:${req.vendor_phone}`} style={{ color: '#D97706', marginLeft: '0.2rem' }}
+                            onClick={e => e.stopPropagation()}>
+                            <Phone size={10} />
+                          </a>
+                        )}
+                      </span>
+                    )}
+                    {req.scheduled_date && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                        padding: '0.2rem 0.55rem', borderRadius: '6px',
+                        background: '#EFF6FF', color: '#3B82F6',
+                        border: '1px solid #BFDBFE', fontSize: '0.75rem', fontWeight: 600,
+                      }}>
+                        <Calendar size={11} />
+                        {new Date(req.scheduled_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Admin note display */}
                 {req.admin_note && !isEditingNote && (
@@ -599,12 +719,101 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                   </div>
                 )}
 
+                {/* Assignment panel */}
+                {assigningId === req.id && (
+                  <div style={{
+                    background: '#FFFBEB', borderRadius: '12px', padding: '0.875rem 1rem',
+                    border: '1px solid #FDE68A', marginBottom: '0.75rem',
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#92400E', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <HardHat size={15} /> มอบหมายงาน
+                    </div>
+
+                    {/* Vendor select */}
+                    <div style={{ marginBottom: '0.625rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.25rem' }}>
+                        ช่าง / ผู้รับเหมา (ไม่จำเป็น)
+                      </label>
+                      {vendors.length > 0 ? (
+                        <select
+                          className="form-input"
+                          value={assignForm.vendorId}
+                          onChange={e => {
+                            const v = vendors.find(v => v.id === e.target.value);
+                            setAssignForm(f => ({
+                              ...f,
+                              vendorId: e.target.value,
+                              vendorName: v?.name ?? f.vendorName,
+                              vendorPhone: v?.phone ?? f.vendorPhone,
+                            }));
+                          }}
+                          style={{ fontSize: '0.8125rem', marginBottom: '0.375rem' }}
+                        >
+                          <option value="">— เลือกจากรายชื่อ —</option>
+                          {vendors.map(v => (
+                            <option key={v.id} value={v.id}>{v.name} · {v.specialty}</option>
+                          ))}
+                        </select>
+                      ) : null}
+                      <input
+                        className="form-input"
+                        placeholder={vendors.length > 0 ? 'หรือพิมพ์ชื่อช่างเอง...' : 'ชื่อช่าง / ผู้รับเหมา...'}
+                        value={assignForm.vendorId ? (vendors.find(v => v.id === assignForm.vendorId)?.name ?? assignForm.vendorName) : assignForm.vendorName}
+                        readOnly={!!assignForm.vendorId}
+                        onChange={e => setAssignForm(f => ({ ...f, vendorName: e.target.value, vendorId: '' }))}
+                        style={{ fontSize: '0.8125rem', background: assignForm.vendorId ? 'var(--color-gray-50)' : undefined }}
+                      />
+                      {assignForm.vendorId && (
+                        <input
+                          className="form-input"
+                          placeholder="เบอร์โทรช่าง"
+                          value={assignForm.vendorPhone}
+                          onChange={e => setAssignForm(f => ({ ...f, vendorPhone: e.target.value }))}
+                          style={{ fontSize: '0.8125rem', marginTop: '0.375rem' }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Scheduled date */}
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.25rem' }}>
+                        <Calendar size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />
+                        วันนัดซ่อม (ไม่จำเป็น)
+                      </label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={assignForm.scheduledDate}
+                        onChange={e => setAssignForm(f => ({ ...f, scheduledDate: e.target.value }))}
+                        style={{ fontSize: '0.8125rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => handleAssignConfirm(req)}
+                        disabled={isSaving}
+                        style={{ background: '#D97706', color: 'var(--color-white)', border: 'none', flex: 1 }}
+                      >
+                        {isSaving
+                          ? <span className="loading-spinner" style={{ width: 14, height: 14, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'var(--color-white)' }} />
+                          : <Clock size={14} />}
+                        รับเรื่องและดำเนินการ
+                      </button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setAssigningId(null)} disabled={isSaving}>
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {req.status === 'open' && (
+                  {req.status === 'open' && assigningId !== req.id && (
                     <button
                       className="btn btn-sm"
-                      onClick={() => handleStatus(req, 'in_progress')}
+                      onClick={() => openAssign(req)}
                       disabled={isSaving}
                       style={{ background: '#FEF3C7', color: '#D97706', border: '1px solid #FDE68A' }}
                     >

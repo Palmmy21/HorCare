@@ -62,16 +62,18 @@ export interface BillCustomization {
   promptpay_name: string;     // ชื่อบัญชี PromptPay
   footer_text: string;        // ข้อความด้านล่างบิล
   due_day: number;            // กำหนดชำระวันที่
+  dorm_logo?: string;         // base64 โลโก้หอพัก (แสดงในพอร์ทัลผู้เช่า)
 }
 
 export interface DormConfig {
-  building_type: 'dormitory' | 'commercial';
+  building_type: 'dormitory' | 'commercial' | 'resort' | 'hotel' | 'other';
   electricity_rate: number;
   water_config: WaterConfig; // Default for dormitory rooms
-  commercial_water_config?: WaterConfig; // Default for commercial rooms
+  commercial_water_config?: WaterConfig; // Default for commercial / resort / hotel rooms
   room_rent: number;
   bill_customization?: BillCustomization; // ตั้งค่าใบแจ้งหนี้
   dorm_code?: string; // รหัสสำหรับลงทะเบียนรับบิลผ่าน LINE
+  portal_pin?: string; // PIN สำหรับเข้า tenant portal (4 หลัก)
 }
 
 export interface Room {
@@ -238,6 +240,12 @@ export interface MaintenanceRequest {
   created_at: string;   // ISO
   updated_at?: string;  // ISO
   admin_note?: string;
+  has_photo?: boolean;  // true ถ้ามีรูปใน maintenance_images/{id}
+  // Assignment (set when moving to in_progress)
+  vendor_id?: string;
+  vendor_name?: string;
+  vendor_phone?: string;
+  scheduled_date?: string; // YYYY-MM-DD
   // Completion data
   parts_used?: MaintenancePartUsed[];
   asset_id?: string;

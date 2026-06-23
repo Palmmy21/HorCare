@@ -73,7 +73,7 @@ export function useLocalStorage() {
         const newRoom: Room = {
             id: `room_${Date.now()}`,
             room_number: roomNumber,
-            room_type: config.building_type || 'dormitory',
+            room_type: config.building_type === 'commercial' ? 'commercial' : 'dormitory',
             current_meter_elec: 0,
             current_meter_water: 0,
             is_active: true,

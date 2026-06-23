@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard
+  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
+import { useFCMToken } from './hooks/useFCMToken';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 import Dashboard from './components/Dashboard/Dashboard';
@@ -24,9 +25,12 @@ import InstallPrompt from './components/PWA/InstallPrompt';
 import TenantsPage from './components/TenantProfile/TenantsPage';
 import MaintenancePage from './components/Maintenance/MaintenancePage';
 import OperationsPage from './components/Operations/OperationsPage';
+import FeatureLockedModal from './components/FeatureLockedModal';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine } from './hooks/useSubscription';
+import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
 
 import './index.css';
+
 
 type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'payments' | 'settings' | 'admin' | 'calculator' | 'pricing';
 
@@ -43,6 +47,7 @@ function App() {
   const [paymentToast, setPaymentToast] = useState<'success' | 'cancel' | null>(null);
   const [pendingPlan, setPendingPlan] = useState<{ planId: string; cycle: string } | null>(null);
   const [showFeatureLockedModal, setShowFeatureLockedModal] = useState<string | null>(null);
+  const [deleteBuildingConfirm, setDeleteBuildingConfirm] = useState<string | null>(null);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -55,8 +60,11 @@ function App() {
     isPaidExpired, licenseDaysLeft, isBanned, setError
   } = useAuth();
 
+  // FCM push notification token — registers silently when permission is already granted
+  useFCMToken(user?.uid ?? null);
+
   // Buildings (multi-building support — Large plan)
-  const { buildings, loading: buildingsLoading, addBuilding, renameBuilding } = useBuildings(user?.uid ?? null);
+  const { buildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(user?.uid ?? null);
 
   // Active building — persisted per user in localStorage
   const buildingStorageKey = user ? `horcare_active_building_${user.uid}` : null;
@@ -129,6 +137,18 @@ function App() {
     setRenamingName('');
   };
 
+  const handleDeleteBuilding = async (id: string) => {
+    if (buildings.length <= 1) return; // ป้องกันลบตึกสุดท้าย
+    await deleteBuilding(id);
+    // ถ้าตึกที่ลบคือตึกที่กำลังใช้งาน ให้สลับไปตึกแรกที่เหลือ
+    if (activeBuildingId === id) {
+      const next = buildings.find(b => b.id !== id);
+      if (next) handleSwitchBuilding(next.id);
+    }
+    setDeleteBuildingConfirm(null);
+    setBuildingMenuOpen(false);
+  };
+
   // Firestore — scoped to active building
   const {
     config,
@@ -164,6 +184,21 @@ function App() {
     });
   }, [bills, rooms, dataLoading, user, deleteBill]);
 
+  // Maintenance badge — real-time count of open/in-progress requests
+  const { requests: _maintenanceReqs } = useMaintenanceRequests(
+    user?.uid ?? null,
+    activeBuildingId,
+  );
+  const pendingMaintenanceCount = _maintenanceReqs.filter(
+    r => r.status === 'open' || r.status === 'in_progress'
+  ).length;
+
+  // Stock badge — real-time count of items below minimum quantity
+  const { items: _stockItems } = useStockItems(user?.uid ?? null, activeBuildingId);
+  const lowStockCount = _stockItems.filter(
+    i => i.min_quantity > 0 && i.quantity <= i.min_quantity
+  ).length;
+
   const stats = getMonthStats(currentMonth);
   const monthBills = getBillsForMonth(currentMonth);
 
@@ -181,7 +216,7 @@ function App() {
     { id: 'pricing'    as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
 
-  const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
+  const isAdmin = profile?.role === 'admin';
 
   if (isAdmin) {
     navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
@@ -353,7 +388,7 @@ function App() {
 
   // Email not verified → block usage until verified (admin exempt to avoid lockout).
   // Stops fake-email signups and unlimited free-trial farming via throwaway emails.
-  if (!emailVerified && user.email !== 'horcare.admin@gmail.com') {
+  if (!emailVerified && profile?.role !== 'admin') {
     return (
       <VerifyEmailWall
         email={user.email ?? ''}
@@ -412,8 +447,20 @@ function App() {
         <button
           className="mobile-menu-btn"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{ position: 'relative' }}
         >
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          {/* Red dot on hamburger when menu is closed and there are pending items */}
+          {!mobileMenuOpen && (pendingMaintenanceCount > 0 || lowStockCount > 0) && hasPaidSubscription && (
+            <span style={{
+              position: 'absolute', top: 6, right: 6,
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#EF4444',
+              border: '1.5px solid var(--bg-primary, #fff)',
+              boxShadow: '0 0 5px rgba(239,68,68,0.7)',
+              pointerEvents: 'none',
+            }} />
+          )}
         </button>
         <span style={{ fontWeight: 700 }}>HorCare</span>
         <div style={{ width: 44 }}></div>
@@ -489,10 +536,20 @@ function App() {
                         </button>
                         <button
                           onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }}
-                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 0.5rem' }}
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 0.25rem' }}
+                          title="เปลี่ยนชื่อ"
                         >
                           <Pencil size={12} />
                         </button>
+                        {buildings.length > 1 && (
+                          <button
+                            onClick={() => setDeleteBuildingConfirm(b.id)}
+                            style={{ background: 'none', border: 'none', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', padding: '0 0.25rem' }}
+                            title="ลบตึก"
+                          >
+                            <TrashIcon size={12} />
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -540,14 +597,45 @@ function App() {
         <nav className="sidebar-nav">
           {navItems.map(item => {
             const isLocked = PAID_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
+            const showBadge = hasPaidSubscription && (
+              (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
+              (item.id === 'operations' && lowStockCount > 0)
+            );
+            const badgeCount = item.id === 'maintenance' ? pendingMaintenanceCount : lowStockCount;
             return (
               <button
                 key={item.id}
                 className={`nav-item ${currentView === item.id ? 'active' : ''} ${isLocked ? 'nav-item-locked' : ''}`}
                 onClick={() => handleNavClick(item.id)}
               >
-                <item.icon size={20} />
+                {/* Icon with optional red dot */}
+                <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+                  <item.icon size={20} />
+                  {showBadge && (
+                    <span style={{
+                      position: 'absolute', top: -3, right: -4,
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: '#EF4444',
+                      border: '1.5px solid #1a2035',
+                      boxShadow: '0 0 6px rgba(239,68,68,0.7)',
+                    }} />
+                  )}
+                </span>
                 {item.label}
+                {/* Badge count on the right when not locked */}
+                {showBadge && (
+                  <span style={{
+                    marginLeft: 'auto',
+                    minWidth: 18, height: 18, borderRadius: 9,
+                    background: '#EF4444',
+                    color: '#fff', fontSize: '0.6875rem', fontWeight: 700,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 5px',
+                    boxShadow: '0 2px 6px rgba(239,68,68,0.5)',
+                  }}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
                 {isLocked && <Lock size={13} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
               </button>
             );
@@ -678,6 +766,7 @@ function App() {
             uid={user.uid}
             buildingId={activeBuildingId}
             rooms={rooms}
+            lowStockCount={lowStockCount}
           />
         )}
 
@@ -798,107 +887,90 @@ function App() {
 
       {/* Feature locked modal (payments / tenants / maintenance / operations) */}
       {showFeatureLockedModal && (
-        <div
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1rem',
+        <FeatureLockedModal
+          featureName={showFeatureLockedModal}
+          onClose={() => setShowFeatureLockedModal(null)}
+          onUpgrade={() => {
+            setShowFeatureLockedModal(null);
+            setCurrentView('pricing');
           }}
-          onClick={() => setShowFeatureLockedModal(null)}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              maxWidth: '400px', width: '100%',
-              borderRadius: '20px', overflow: 'hidden',
-              boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
-            }}
-          >
-            <div style={{
-              background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 50%, #EC4899 100%)',
-              padding: '2rem 1.75rem 1.5rem',
-              textAlign: 'center',
-              position: 'relative',
-            }}>
-              <button
-                onClick={() => setShowFeatureLockedModal(null)}
-                style={{
-                  position: 'absolute', top: '1rem', right: '1rem',
-                  background: 'rgba(255,255,255,0.2)', border: 'none',
-                  borderRadius: '50%', width: 32, height: 32,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: '#fff',
-                }}
-              >
-                <X size={18} />
-              </button>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.2)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 1rem',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-              }}>
-                <Lock size={32} color="#fff" />
-              </div>
-              <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.25rem', margin: '0 0 0.375rem' }}>
-                {showFeatureLockedModal}
-              </h3>
-              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.875rem', margin: 0 }}>
-                ฟีเจอร์นี้สำหรับแพ็กเกจที่ชำระเงินแล้วเท่านั้น
-              </p>
-            </div>
+        />
+      )}
 
-            <div style={{ padding: '1.5rem 1.75rem', background: '#fff' }}>
+      {/* Delete Building Confirm Modal */}
+      {deleteBuildingConfirm && (() => {
+        const b = buildings.find(x => x.id === deleteBuildingConfirm);
+        if (!b) return null;
+        return (
+          <div
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.55)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '1rem',
+            }}
+            onClick={() => setDeleteBuildingConfirm(null)}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                maxWidth: '380px', width: '100%', background: '#fff',
+                borderRadius: '20px', overflow: 'hidden',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.4)',
+              }}
+            >
               <div style={{
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.06))',
-                border: '1px solid rgba(139,92,246,0.2)',
-                borderRadius: '12px', padding: '0.875rem 1rem',
-                marginBottom: '1.25rem',
-                display: 'flex', alignItems: 'center', gap: '0.625rem',
+                background: 'linear-gradient(135deg, #DC2626, #EF4444)',
+                padding: '1.75rem 1.5rem', textAlign: 'center',
               }}>
-                <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.8125rem', color: '#111827', lineHeight: 1.5 }}>
-                  เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
-                </span>
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 0.75rem',
+                }}>
+                  <TrashIcon size={28} color="#fff" />
+                </div>
+                <h3 style={{ color: '#fff', fontWeight: 800, fontSize: '1.1rem', margin: '0 0 0.25rem' }}>
+                  ลบตึก "{b.name}"?
+                </h3>
+                <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8125rem', margin: 0 }}>
+                  ข้อมูลทั้งหมดในตึกนี้จะถูกลบ และไม่สามารถย้อนกลับได้
+                </p>
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ padding: '1.25rem 1.5rem', display: 'flex', gap: '0.75rem' }}>
                 <button
-                  onClick={() => setShowFeatureLockedModal(null)}
+                  onClick={() => setDeleteBuildingConfirm(null)}
                   style={{
                     flex: 1, padding: '0.75rem', borderRadius: '10px',
                     background: 'none', border: '1px solid #E5E7EB',
                     cursor: 'pointer', fontWeight: 600, color: '#6B7280',
                   }}
                 >
-                  ปิด
+                  ยกเลิก
                 </button>
                 <button
-                  onClick={() => {
-                    setShowFeatureLockedModal(null);
-                    setCurrentView('pricing');
-                  }}
+                  onClick={() => handleDeleteBuilding(deleteBuildingConfirm)}
                   style={{
                     flex: 2, padding: '0.75rem', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                    background: 'linear-gradient(135deg, #DC2626, #EF4444)',
                     border: 'none', cursor: 'pointer',
                     fontWeight: 700, color: '#fff', fontSize: '0.9rem',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                    boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                    boxShadow: '0 4px 16px rgba(220,38,38,0.4)',
                   }}
                 >
-                  <Zap size={16} />
-                  ดูแพ็กเกจ
+                  <TrashIcon size={16} /> ลบตึก
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
+
   );
 }
 

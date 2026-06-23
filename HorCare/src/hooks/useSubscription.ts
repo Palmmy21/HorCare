@@ -2,7 +2,7 @@ import type { PlanName, BillingCycle, LicenseType } from '../types';
 
 /* ── Plan config ── */
 
-export const FREE_MAX_ROOMS = 100;
+export const FREE_MAX_ROOMS = 250;
 
 export const PLAN_CONFIG = {
     small:  { maxRooms: 30,       name: 'หอเล็ก' },

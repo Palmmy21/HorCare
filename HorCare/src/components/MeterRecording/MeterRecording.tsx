@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
-    ChevronLeft, ChevronRight, Home, Banknote, FileText
+    ChevronLeft, ChevronRight, Home, Banknote, FileText,
+    Download, Upload, X,
 } from 'lucide-react';
 import type { Room, DormConfig, MonthlyBill } from '../../types';
 import {
@@ -85,6 +86,8 @@ export default function MeterRecording({
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
     const [savingRooms, setSavingRooms] = useState<Record<string, boolean>>({});
     const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
+    const [importResult, setImportResult] = useState<{ updated: number; skipped: string[] } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const draftKey = `${DRAFT_PREFIX}${buildingId || 'local'}_${currentMonth}`;
 
@@ -247,6 +250,111 @@ export default function MeterRecording({
         } finally {
             setSavingRooms(prev => ({ ...prev, [roomId]: false }));
         }
+    };
+
+    // ── CSV export template ────────────────────────────────────────────────────
+    const exportTemplate = () => {
+        const header = ['ห้อง', 'ไฟก่อนหน้า', 'ไฟปัจจุบัน', 'น้ำก่อนหน้า', 'น้ำปัจจุบัน'];
+        const activeRoomsForExport = rooms.filter(r => r.is_active);
+        const rows = activeRoomsForExport.map(room => {
+            const state = recordingState[room.id];
+            return [
+                room.room_number,
+                state?.prevElec ?? room.current_meter_elec ?? '0',
+                state?.currElec ?? '',
+                state?.prevWater ?? room.current_meter_water ?? '0',
+                state?.currWater ?? '',
+            ];
+        });
+        const csv = [header, ...rows]
+            .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `meter_template_${currentMonth}.csv`;
+        a.click();
+    };
+
+    // ── CSV import ─────────────────────────────────────────────────────────────
+    const handleImportFile = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const text = (e.target?.result as string).replace(/^﻿/, ''); // strip BOM
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                if (lines.length < 2) return;
+
+                // Parse header to find column indices (order-independent)
+                const ALIASES: Record<string, string> = {
+                    'ห้อง': 'room', 'room': 'room', 'room_number': 'room', 'เลขห้อง': 'room',
+                    'ไฟก่อนหน้า': 'prevElec', 'prev_elec': 'prevElec', 'มิเตอร์ไฟก่อนหน้า': 'prevElec',
+                    'ไฟปัจจุบัน': 'currElec', 'curr_elec': 'currElec', 'มิเตอร์ไฟปัจจุบัน': 'currElec',
+                    'น้ำก่อนหน้า': 'prevWater', 'prev_water': 'prevWater', 'มิเตอร์น้ำก่อนหน้า': 'prevWater',
+                    'น้ำปัจจุบัน': 'currWater', 'curr_water': 'currWater', 'มิเตอร์น้ำปัจจุบัน': 'currWater',
+                };
+
+                const parseRow = (line: string) =>
+                    line.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"'));
+
+                const headers = parseRow(lines[0]).map(h => h.toLowerCase().trim());
+                const colIdx: Record<string, number> = {};
+                headers.forEach((h, i) => {
+                    const key = ALIASES[h] ?? ALIASES[h.replace(/\s+/g, '')] ?? null;
+                    if (key && !(key in colIdx)) colIdx[key] = i;
+                });
+
+                // Fallback to positional if header not recognised
+                if (!('room' in colIdx)) {
+                    colIdx.room = 0; colIdx.prevElec = 1; colIdx.currElec = 2;
+                    colIdx.prevWater = 3; colIdx.currWater = 4;
+                }
+
+                const roomMap = new Map(rooms.filter(r => r.is_active).map(r => [r.room_number, r]));
+                const updatedState: Record<string, RoomRecordingState> = {};
+                const skipped: string[] = [];
+                let updated = 0;
+
+                // Skip header row (index 0), parse data rows
+                const startIdx = ALIASES[headers[0] ?? ''] !== undefined || colIdx.room === 0 ? 1 : 0;
+                for (let i = startIdx; i < lines.length; i++) {
+                    const cols = parseRow(lines[i]);
+                    const roomNum = cols[colIdx.room]?.trim();
+                    if (!roomNum) continue;
+
+                    const room = roomMap.get(roomNum);
+                    if (!room) { skipped.push(roomNum); continue; }
+
+                    const existing = recordingState[room.id];
+                    if (existing?.isLocked) { skipped.push(roomNum); continue; }
+
+                    const get = (key: string) => colIdx[key] !== undefined ? (cols[colIdx[key]] ?? '').trim() : '';
+
+                    const prevElec = get('prevElec') || existing?.prevElec || '0';
+                    const currElec = get('currElec') || existing?.currElec || '';
+                    const prevWater = get('prevWater') || existing?.prevWater || '0';
+                    const currWater = get('currWater') || existing?.currWater || '';
+
+                    const newState: RoomRecordingState = {
+                        prevElec, currElec, prevWater, currWater,
+                        isSaved: false,
+                        isLocked: existing?.isLocked ?? false,
+                    };
+                    updatedState[room.id] = newState;
+                    writeDraft(draftKey, room.id, { prevElec, currElec, prevWater, currWater });
+                    updated++;
+                }
+
+                setRecordingState(prev => ({ ...prev, ...updatedState }));
+                setImportResult({ updated, skipped });
+                setTimeout(() => setImportResult(null), 6000);
+            } catch (err) {
+                console.error('CSV import error:', err);
+                setImportResult({ updated: 0, skipped: ['ไม่สามารถอ่านไฟล์ได้'] });
+                setTimeout(() => setImportResult(null), 5000);
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
     };
 
     const renderRoomCard = (room: Room) => {
@@ -478,11 +586,62 @@ export default function MeterRecording({
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
-                <p className="page-subtitle">
-                    กรอกเลขมิเตอร์และกดบันทึกแต่ละห้อง
-                </p>
+                <div>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
+                    <p className="page-subtitle">กรอกเลขมิเตอร์และกดบันทึกแต่ละห้อง</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={exportTemplate}
+                        title="ดาวน์โหลด Template CSV"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                    >
+                        <Download size={15} /> Template
+                    </button>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="นำเข้าข้อมูลมิเตอร์จาก CSV"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                    >
+                        <Upload size={15} /> นำเข้า CSV
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) { handleImportFile(f); e.target.value = ''; }
+                        }}
+                    />
+                </div>
             </div>
+
+            {/* Import result toast */}
+            {importResult && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.625rem',
+                    background: importResult.updated > 0 ? '#ECFDF5' : '#FEF3C7',
+                    border: `1px solid ${importResult.updated > 0 ? '#A7F3D0' : '#FDE68A'}`,
+                    color: importResult.updated > 0 ? '#065F46' : '#92400E',
+                    borderRadius: '10px', padding: '0.625rem 0.875rem',
+                    fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.75rem',
+                }}>
+                    <CheckCircle size={15} color={importResult.updated > 0 ? '#059669' : '#D97706'} />
+                    <span style={{ flex: 1 }}>
+                        {importResult.updated > 0
+                            ? `นำเข้าสำเร็จ ${importResult.updated} ห้อง`
+                            : 'ไม่พบห้องที่ตรงกัน'}
+                        {importResult.skipped.length > 0 && ` · ข้ามไป: ${importResult.skipped.join(', ')}`}
+                    </span>
+                    <button onClick={() => setImportResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
 
             {/* Month Selector */}
             <div className="month-selector">

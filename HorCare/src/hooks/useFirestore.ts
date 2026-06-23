@@ -146,7 +146,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         const newRoom: Room = {
             id: roomId,
             room_number: roomNumber,
-            room_type: config.building_type || 'dormitory',
+            room_type: config.building_type === 'commercial' ? 'commercial' : 'dormitory',
             current_meter_elec: 0,
             current_meter_water: 0,
             is_active: true,

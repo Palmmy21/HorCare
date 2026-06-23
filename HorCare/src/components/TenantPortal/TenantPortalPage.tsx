@@ -1,17 +1,34 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  collection, doc, onSnapshot, query, where, addDoc,
+  collection, doc, onSnapshot, query, where, addDoc, setDoc,
 } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { db, auth } from '../../firebase/config';
 import type { Room, DormConfig, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory } from '../../types';
 import {
   Home, Zap, Droplets, Phone, ChevronDown, ChevronUp,
   CheckCircle2, XCircle, Clock, AlertCircle, Link2Off,
   Building2, CalendarDays, CreditCard, Receipt,
   Wrench, Plus, AlertTriangle, Plug, Wind, DoorOpen,
-  Bath, Armchair, Send, Pencil,
+  Bath, Armchair, Send, Pencil, Camera, X as XIcon,
 } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
+
+// ── Image compression (canvas) ────────────────────────────────────────────────
+async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(n?: number) {
@@ -308,6 +325,10 @@ export default function TenantPortalPage() {
   const { data, loading, error } = useTenantData(uid, buildingId, roomId);
   const { room, config, profile, bills, buildingName } = data;
 
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+
   const currentMonth = getCurrentMonth();
   const currentBill = bills.find(b => b.month === currentMonth);
   const prevBills = bills.filter(b => b.month !== currentMonth);
@@ -357,6 +378,67 @@ export default function TenantPortalPage() {
     );
   }
 
+  // ── PIN Gate ──
+  const requiredPin = config?.portal_pin;
+  if (requiredPin && !pinUnlocked) {
+    const handlePinSubmit = () => {
+      if (pinInput === requiredPin) {
+        setPinUnlocked(true);
+        setPinError(false);
+      } else {
+        setPinError(true);
+        setPinInput('');
+      }
+    };
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)' }}>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }`}</style>
+        <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
+        <div style={{
+          background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(12px)',
+          borderRadius: '24px', padding: '2rem 2rem 2.25rem',
+          border: '1px solid rgba(255,255,255,0.25)',
+          width: '100%', maxWidth: 340, textAlign: 'center',
+          animation: pinError ? 'shake 0.4s ease' : 'none',
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔒</div>
+          <h2 style={{ fontWeight: 800, color: '#fff', margin: '0 0 0.375rem', fontSize: '1.25rem' }}>ยืนยันตัวตน</h2>
+          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem', margin: '0 0 1.5rem' }}>กรอก PIN 4 หลักที่ได้รับจากเจ้าของหอพัก</p>
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="• • • •"
+            value={pinInput}
+            onChange={e => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError(false); }}
+            onKeyDown={e => e.key === 'Enter' && handlePinSubmit()}
+            style={{
+              width: '100%', textAlign: 'center', fontSize: '2rem', letterSpacing: '0.5em',
+              padding: '0.75rem 1rem', borderRadius: '14px', border: pinError ? '2px solid #FCA5A5' : '2px solid rgba(255,255,255,0.3)',
+              background: 'rgba(255,255,255,0.15)', color: '#fff', outline: 'none',
+              fontFamily: 'monospace', boxSizing: 'border-box', marginBottom: '0.75rem',
+            }}
+            autoFocus
+          />
+          {pinError && <p style={{ color: '#FCA5A5', fontSize: '0.825rem', marginBottom: '0.75rem' }}>PIN ไม่ถูกต้อง กรุณาลองใหม่</p>}
+          <button
+            onClick={handlePinSubmit}
+            disabled={pinInput.length !== 4}
+            style={{
+              width: '100%', padding: '0.875rem', borderRadius: '14px', border: 'none',
+              background: pinInput.length === 4 ? '#fff' : 'rgba(255,255,255,0.25)',
+              color: pinInput.length === 4 ? '#4F46E5' : 'rgba(255,255,255,0.5)',
+              fontWeight: 800, fontSize: '1rem', cursor: pinInput.length === 4 ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s',
+            }}
+          >
+            เข้าสู่พอร์ทัล
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ── Main Portal ──
   return (
     <div className="portal-shell" style={{ minHeight: '100vh', background: '#E8EBF0', fontFamily: "'Sarabun', 'Inter', sans-serif" }}>
@@ -374,12 +456,20 @@ export default function TenantPortalPage() {
 
         {/* Top bar: logo + building name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.375rem' }}>
-          <img src={horcareLogo} alt="HorCare"
-            style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
-          />
+          {config?.bill_customization?.dorm_logo ? (
+            <img
+              src={config.bill_customization.dorm_logo}
+              alt="โลโก้หอพัก"
+              style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'contain', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.25)', background: 'rgba(255,255,255,0.9)', padding: 2 }}
+            />
+          ) : (
+            <img src={horcareLogo} alt="HorCare"
+              style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.25)' }}
+            />
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'rgba(255,255,255,0.75)', fontSize: '0.8125rem' }}>
             <Building2 size={13} />
-            <span>{buildingName || 'HorCare'}</span>
+            <span>{config?.bill_customization?.dorm_name || buildingName || 'HorCare'}</span>
           </div>
         </div>
 
@@ -543,24 +633,72 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<{
     category: MaintenanceCategory; description: string; urgency: 'urgent' | 'normal';
   }>({ category: 'other', description: '', urgency: 'normal' });
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoLoading(true);
+    try {
+      const b64 = await compressImageToBase64(file);
+      setPhoto(b64);
+    } catch {
+      alert('ไม่สามารถโหลดรูปได้ กรุณาลองใหม่');
+    } finally {
+      setPhotoLoading(false);
+      // reset input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async () => {
     if (!form.description.trim()) return;
     setSubmitting(true);
     try {
-      await addDoc(collection(db, `users/${uid}/buildings/${buildingId}/maintenance`), {
+      const docRef = await addDoc(collection(db, `users/${uid}/buildings/${buildingId}/maintenance`), {
         room_id: roomId,
         room_number: roomNumber,
         category: form.category,
         description: form.description.trim(),
         urgency: form.urgency,
         status: 'open',
+        has_photo: photo !== null,
         created_at: new Date().toISOString(),
       });
+
+      // Save photo to a separate subcollection (keeps main doc lightweight)
+      if (photo) {
+        await setDoc(
+          doc(db, `users/${uid}/buildings/${buildingId}/maintenance_images`, docRef.id),
+          { data: photo, created_at: new Date().toISOString() }
+        );
+      }
+
+      // Push notification to owner via backend (best-effort)
+      try {
+        const catLabel = PORTAL_CATEGORY_OPTIONS.find(c => c.value === form.category)?.label ?? form.category;
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          fetch('/api/notify-owner', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              building_id: buildingId,
+              title: `🔧 แจ้งซ่อมใหม่ ห้อง ${roomNumber}`,
+              body: `[${catLabel}${form.urgency === 'urgent' ? ' ⚡ด่วน' : ''}] ${form.description.trim().slice(0, 80)}`,
+              url: '/',
+            }),
+          }).catch(() => { /* best-effort */ });
+        }
+      } catch { /* best-effort */ }
+
       setForm({ category: 'other', description: '', urgency: 'normal' });
+      setPhoto(null);
       setShowForm(false);
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 4000);
@@ -718,7 +856,7 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
           </div>
 
           {/* Description */}
-          <div style={{ marginBottom: '1rem' }}>
+          <div style={{ marginBottom: '0.875rem' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
               รายละเอียดปัญหา *
             </label>
@@ -734,6 +872,58 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
                 fontFamily: "'Sarabun', 'Inter', sans-serif", boxSizing: 'border-box',
               }}
             />
+          </div>
+
+          {/* Photo attachment */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
+              รูปประกอบ (ไม่บังคับ)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={handlePhotoChange}
+            />
+            {photo ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img
+                  src={photo}
+                  alt="รูปแจ้งซ่อม"
+                  style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1.5px solid #E5E7EB' }}
+                />
+                <button
+                  onClick={() => setPhoto(null)}
+                  style={{
+                    position: 'absolute', top: 6, right: 6,
+                    background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%',
+                    width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: 'white',
+                  }}
+                >
+                  <XIcon size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={photoLoading}
+                style={{
+                  width: '100%', padding: '0.75rem', borderRadius: 10,
+                  border: '1.5px dashed #C4B5FD', background: '#F5F3FF',
+                  color: '#7C3AED', fontWeight: 600, fontSize: '0.875rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  opacity: photoLoading ? 0.6 : 1,
+                }}
+              >
+                {photoLoading
+                  ? <><span style={{ width: 14, height: 14, border: '2px solid #C4B5FD', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> กำลังโหลด...</>
+                  : <><Camera size={15} /> ถ่ายรูป / เลือกรูป</>
+                }
+              </button>
+            )}
           </div>
 
           {/* Actions */}

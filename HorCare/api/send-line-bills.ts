@@ -2,6 +2,21 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildBillFlex, linePush, runPooled } from './_line.js';
 
+async function fcmPushToOwner(uid: string, title: string, body: string) {
+    try {
+        const fcmDoc = await db.doc(`users/${uid}/data/fcm`).get();
+        if (!fcmDoc.exists) return;
+        const tokensMap: Record<string, { token: string }> = fcmDoc.data()?.tokens ?? {};
+        const tokens = Object.values(tokensMap).map(v => v.token).filter(Boolean);
+        if (tokens.length === 0) return;
+        await admin.messaging().sendEachForMulticast({
+            tokens,
+            notification: { title, body },
+            webpush: { notification: { icon: '/logo-icon.png', badge: '/logo-icon.png', lang: 'th' }, fcmOptions: { link: '/' } },
+        });
+    } catch { /* best-effort, don't fail the main operation */ }
+}
+
 // หอใหญ่อาจมี 100-200 ห้อง การยิง LINE push พร้อมกันทั้งหมดจะโดน rate-limit (429)
 // และเปิด socket จำนวนมากพร้อมกัน — คุมให้ส่งทีละชุดเพื่อให้ scale ถึง 1000 หอได้นิ่ง
 const PUSH_CONCURRENCY = 8;
@@ -88,6 +103,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         console.log(`sendLineBills uid=${uid} building=${building_id} month=${month} sent=${sent} skipped=${skipped}`);
+
+        if (sent > 0) {
+            await fcmPushToOwner(
+                uid,
+                `✅ ส่งบิลสำเร็จ ${sent} ห้อง`,
+                `เดือน ${month} · ข้ามไป ${skipped} ห้อง (ยังไม่ลงทะเบียน LINE)`,
+            );
+        }
+
         res.status(200).json({ data: { sent, skipped, results } });
 
     } catch (error: any) {

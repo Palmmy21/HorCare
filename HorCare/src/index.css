@@ -1702,31 +1702,32 @@ body {
   justify-content: space-between;
 }
 
-/* Print area for all invoices */
+/* Print area — hidden on screen, shown only when printing */
 .print-only-area {
   display: none;
 }
 
+/* Compact Thai slip: invisible on screen */
+.print-slip-box {
+  display: none;
+}
+
+/* Old single-page wrapper — no longer used for print, kept for compat */
 .invoice-print-page {
   page-break-after: always;
   padding: 20px;
 }
-
 .invoice-print-page:last-child {
   page-break-after: auto;
 }
 
 /* ===== Print Styles ===== */
 @media print {
+  @page { size: A4 portrait; margin: 10mm; }
 
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
-  }
+  /* Hide everything on screen except the print area */
+  body * { visibility: hidden; }
 
-  /* Show invoice bills */
-  .invoice-bill,
-  .invoice-bill *,
   .print-only-area,
   .print-only-area *,
   .invoice-modal .modal-body,
@@ -1734,31 +1735,37 @@ body {
     visibility: visible;
   }
 
-  /* Hide non-print elements */
-  .sidebar,
-  .mobile-header,
-  .modal-footer,
-  .modal-header,
-  .modal-overlay,
-  .page-header,
-  .card:not(.invoice-bill),
-  .magic-button-container,
-  nav {
-    display: none !important;
-  }
-
+  /* ── Compact slip grid (2 per row, auto rows) ── */
   .print-only-area {
     display: block !important;
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 100%;
   }
 
+  .print-slip-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+    padding: 0;
+  }
+
+  .print-slip-box {
+    display: block !important;
+    border: 1px solid #000;
+    padding: 5mm;
+    font-family: 'Sarabun', 'TH Sarabun New', sans-serif;
+    font-size: 11pt;
+    color: #000;
+    background: #fff;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* ── Single invoice bill (used by individual download modal) ── */
   .invoice-modal .modal-body {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 100%;
   }
 
@@ -1771,28 +1778,17 @@ body {
     page-break-inside: avoid;
   }
 
-  .invoice-header {
-    border-bottom: 2px solid #000;
-  }
-
-  .invoice-th {
-    border-top: 2px solid #000;
-    border-bottom: 2px solid #000;
-    background: #f0f0f0;
-  }
-
+  .invoice-header  { border-bottom: 2px solid #000; }
+  .invoice-th      { border-top: 2px solid #000; border-bottom: 2px solid #000; background: #f0f0f0; }
   .invoice-total-label,
-  .invoice-total-value {
-    border-top: 2px solid #000;
-    border-bottom: 2px solid #000;
-  }
+  .invoice-total-value { border-top: 2px solid #000; border-bottom: 2px solid #000; }
+  .invoice-total-value { color: #000; }
+  .invoice-room-number { color: #000; }
 
-  .invoice-total-value {
-    color: #000;
-  }
-
-  .invoice-room-number {
-    color: #000;
+  /* Hide UI chrome */
+  .sidebar, .mobile-header, .modal-footer, .modal-header, .modal-overlay,
+  .page-header, .card:not(.invoice-bill), .magic-button-container, nav {
+    display: none !important;
   }
 }
 

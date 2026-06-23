@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing } from 'lucide-react';
+import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeSVG } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase/config';
@@ -7,6 +8,22 @@ import type { DormConfig, WaterConfig } from '../../types';
 import { generateDormCode } from '../../utils/calculations';
 import { THEME_PRESETS } from '../../hooks/useTheme';
 import type { ThemeMode } from '../../hooks/useTheme';
+
+async function compressLogoToBase64(file: File, maxPx = 400, quality = 0.85): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/png', quality));
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+    });
+}
 
 interface SettingsProps {
     config: DormConfig;
@@ -93,6 +110,17 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
     const [dormCode, setDormCode] = useState(config.dorm_code || '');
     const [codeCopied, setCodeCopied] = useState(false);
     const [showQR, setShowQR] = useState(false);
+    const [portalPin, setPortalPin] = useState(config.portal_pin || '');
+
+    // Push Notifications
+    const { permission, enabled, loading: notifLoading, requestPermission, toggleEnabled } = usePushNotification();
+    const [notifRequesting, setNotifRequesting] = useState(false);
+
+    const handleRequestNotif = async () => {
+        setNotifRequesting(true);
+        await requestPermission();
+        setNotifRequesting(false);
+    };
 
     // Bill customization state
     const [billForm, setBillForm] = useState({
@@ -104,6 +132,9 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
         footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
         due_day: config.bill_customization?.due_day || 5,
     });
+    const [dormLogo, setDormLogo] = useState<string | undefined>(config.bill_customization?.dorm_logo);
+    const [logoLoading, setLogoLoading] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
 
     const [prevConfig, setPrevConfig] = useState(config);
 
@@ -133,12 +164,30 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
             due_day: config.bill_customization?.due_day || 5,
         });
+        setDormLogo(config.bill_customization?.dorm_logo);
         setDormCode(config.dorm_code || '');
+        setPortalPin(config.portal_pin || '');
     }
 
     const handleChange = (field: string, value: string | number) => {
         setFormData(prev => ({ ...prev, [field]: value }));
         setSaved(false);
+    };
+
+    const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setLogoLoading(true);
+        try {
+            const b64 = await compressLogoToBase64(file);
+            setDormLogo(b64);
+            setSaved(false);
+        } catch {
+            alert('ไม่สามารถโหลดรูปได้ กรุณาลองใหม่');
+        } finally {
+            setLogoLoading(false);
+            if (logoInputRef.current) logoInputRef.current.value = '';
+        }
     };
 
     const handleSave = () => {
@@ -161,7 +210,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             };
 
         const newConfig: DormConfig = {
-            building_type: formData.building_type as 'dormitory' | 'commercial',
+            building_type: formData.building_type as DormConfig['building_type'],
             electricity_rate: Number(formData.electricity_rate),
             room_rent: Number(formData.room_rent),
             water_config: dormWaterConfig,
@@ -174,8 +223,10 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 promptpay_name: billForm.promptpay_name,
                 footer_text: billForm.footer_text,
                 due_day: Number(billForm.due_day) || 5,
+                ...(dormLogo ? { dorm_logo: dormLogo } : {}),
             },
-            ...(dormCode ? { dorm_code: dormCode } : {})
+            ...(dormCode ? { dorm_code: dormCode } : {}),
+            ...(portalPin.length === 4 ? { portal_pin: portalPin } : {})
         };
 
         onSaveConfig(newConfig);
@@ -448,6 +499,58 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
                     ข้อมูลเหล่านี้จะแสดงในใบแจ้งหนี้ทุกใบ และเอกสารสรุปรายเดือน
                 </p>
+
+                {/* Dorm logo */}
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <ImageIcon size={15} /> โลโก้หอพัก (แสดงในพอร์ทัลผู้เช่า)
+                    </label>
+                    <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoChange} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                        {dormLogo ? (
+                            <img src={dormLogo} alt="โลโก้หอพัก" style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 10, border: '1.5px solid var(--color-gray-200)', background: '#F9FAFB', padding: 4 }} />
+                        ) : (
+                            <div style={{ width: 72, height: 72, borderRadius: 10, border: '1.5px dashed var(--color-gray-300)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-gray-400)', background: '#F9FAFB' }}>
+                                <ImageIcon size={24} />
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <button
+                                type="button"
+                                onClick={() => logoInputRef.current?.click()}
+                                disabled={logoLoading}
+                                style={{
+                                    padding: '0.5rem 1rem', borderRadius: 8, cursor: 'pointer',
+                                    border: '1.5px solid var(--color-primary)', background: 'rgba(139,92,246,0.07)',
+                                    color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.875rem',
+                                    display: 'flex', alignItems: 'center', gap: '0.35rem',
+                                    opacity: logoLoading ? 0.6 : 1,
+                                }}
+                            >
+                                {logoLoading
+                                    ? <span style={{ width: 14, height: 14, border: '2px solid #C4B5FD', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                                    : <ImageIcon size={14} />
+                                }
+                                {dormLogo ? 'เปลี่ยนโลโก้' : 'อัพโหลดโลโก้'}
+                            </button>
+                            {dormLogo && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setDormLogo(undefined); setSaved(false); }}
+                                    style={{
+                                        padding: '0.35rem 0.75rem', borderRadius: 8, cursor: 'pointer',
+                                        border: '1px solid #FCA5A5', background: 'transparent',
+                                        color: '#DC2626', fontWeight: 500, fontSize: '0.8rem',
+                                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                    }}
+                                >
+                                    <Trash2 size={13} /> ลบโลโก้
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <p className="form-hint">รองรับ PNG/JPG ขนาดแนะนำ 400×400 px ขึ้นไป (บีบอัดอัตโนมัติ)</p>
+                </div>
 
                 <div className="settings-grid">
                     <div className="form-group">
@@ -853,6 +956,37 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 })()}
             </div>
 
+            {/* Tenant Portal PIN */}
+            <div className="settings-section">
+                <h3 className="settings-title">
+                    <Lock size={20} color="#059669" />
+                    พอร์ทัลผู้เช่า — PIN
+                </h3>
+                <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
+                    ถ้าตั้งค่า PIN ผู้เช่าต้องกรอก 4 หลักก่อนเข้าดูบิลและแจ้งซ่อม — ปล่อยว่างไว้เพื่อปิดการตรวจสอบ
+                </p>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">PIN (4 หลัก)</label>
+                    <input
+                        type="text"
+                        className="form-input mono"
+                        inputMode="numeric"
+                        maxLength={4}
+                        placeholder="ปล่อยว่าง = ไม่ต้องกรอก PIN"
+                        style={{ maxWidth: '180px', padding: '0.75rem 1rem', fontSize: '1.25rem', letterSpacing: '0.25em' }}
+                        value={portalPin}
+                        onChange={e => {
+                            const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            setPortalPin(v);
+                            setSaved(false);
+                        }}
+                    />
+                    {portalPin && portalPin.length !== 4 && (
+                        <p className="form-hint" style={{ color: '#DC2626' }}>PIN ต้องมี 4 หลัก</p>
+                    )}
+                </div>
+            </div>
+
             {/* Theme Settings */}
             <div className="settings-section">
                 <h3 className="settings-title">
@@ -993,6 +1127,145 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 </div>
             </div>
 
+
+            {/* Push Notifications */}
+            <div className="settings-section">
+                <h3 className="settings-title">
+                    <Bell size={20} color="#8B5CF6" />
+                    การแจ้งเตือน (Push Notification)
+                </h3>
+                <p className="form-hint" style={{ marginBottom: '1.25rem', fontSize: '0.875rem' }}>
+                    รับการแจ้งเตือนบนมือถือ/เดสก์ท็อปเมื่อลูกหอแจ้งซ่อม, ส่งสลิป หรือมีเหตุการณ์สำคัญ
+                </p>
+
+                {permission === 'unsupported' ? (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: '0.625rem',
+                        padding: '0.875rem 1rem', borderRadius: '12px',
+                        background: 'var(--color-gray-100)', border: '1px solid var(--color-gray-200)',
+                        fontSize: '0.875rem', color: 'var(--color-gray-500)',
+                    }}>
+                        <BellOff size={18} />
+                        เบราว์เซอร์นี้ไม่รองรับ Push Notification
+                    </div>
+                ) : permission === 'denied' ? (
+                    <div style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '0.625rem',
+                        padding: '0.875rem 1rem', borderRadius: '12px',
+                        background: '#FEF3C7', border: '1px solid #FDE68A',
+                        fontSize: '0.875rem', color: '#92400E',
+                    }}>
+                        <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                        <div>
+                            <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>การแจ้งเตือนถูกบล็อค</div>
+                            <div>กรุณาเปิดใช้งานในการตั้งค่าเบราว์เซอร์ → Site Settings → Notifications → Allow</div>
+                        </div>
+                    </div>
+                ) : permission === 'granted' ? (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: '1rem', flexWrap: 'wrap',
+                        padding: '1rem 1.25rem', borderRadius: '14px',
+                        background: enabled
+                            ? 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(109,40,217,0.04))'
+                            : 'var(--color-gray-50)',
+                        border: enabled
+                            ? '1.5px solid rgba(139,92,246,0.3)'
+                            : '1.5px solid var(--color-gray-200)',
+                        transition: 'all 0.2s',
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{
+                                width: 42, height: 42, borderRadius: '12px', flexShrink: 0,
+                                background: enabled
+                                    ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)'
+                                    : 'var(--color-gray-200)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'background 0.2s',
+                            }}>
+                                {enabled
+                                    ? <BellRing size={20} color="#fff" />
+                                    : <BellOff size={20} color="var(--color-gray-500)" />
+                                }
+                            </div>
+                            <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text)' }}>
+                                    {enabled ? 'เปิดการแจ้งเตือนแล้ว' : 'ปิดการแจ้งเตือน'}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '0.125rem' }}>
+                                    {enabled
+                                        ? 'จะได้รับ push เมื่อลูกหอแจ้งซ่อมหรือส่งสลิป'
+                                        : 'เปิดเพื่อรับแจ้งเตือนแบบ real-time'
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        {/* Toggle switch */}
+                        <button
+                            onClick={() => toggleEnabled(!enabled)}
+                            disabled={notifLoading}
+                            style={{
+                                position: 'relative',
+                                width: 52, height: 28, borderRadius: 14,
+                                border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
+                                background: enabled
+                                    ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)'
+                                    : 'var(--color-gray-300)',
+                                transition: 'background 0.25s',
+                                opacity: notifLoading ? 0.6 : 1,
+                            }}
+                            aria-label={enabled ? 'ปิดการแจ้งเตือน' : 'เปิดการแจ้งเตือน'}
+                        >
+                            <span style={{
+                                position: 'absolute',
+                                top: 3, left: enabled ? 27 : 3,
+                                width: 22, height: 22, borderRadius: '50%',
+                                background: '#fff',
+                                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                                transition: 'left 0.2s',
+                                display: 'block',
+                            }} />
+                        </button>
+                    </div>
+                ) : (
+                    /* permission === 'default' — not asked yet */
+                    <div style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem',
+                        padding: '1.75rem 1.5rem', borderRadius: '16px', textAlign: 'center',
+                        background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(109,40,217,0.03))',
+                        border: '1.5px dashed rgba(139,92,246,0.3)',
+                    }}>
+                        <div style={{
+                            width: 56, height: 56, borderRadius: '16px',
+                            background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                        }}>
+                            <Bell size={26} color="#fff" />
+                        </div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)', marginBottom: '0.375rem' }}>
+                                เปิดรับการแจ้งเตือน
+                            </div>
+                            <div style={{ fontSize: '0.8375rem', color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 300 }}>
+                                รู้ทันทีเมื่อมีการแจ้งซ่อม, ชำระเงิน หรือเหตุการณ์สำคัญ — แม้ไม่ได้เปิดแอป
+                            </div>
+                        </div>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleRequestNotif}
+                            disabled={notifRequesting}
+                            style={{ padding: '0.75rem 2rem', fontSize: '0.9375rem', borderRadius: '12px', gap: '0.5rem' }}
+                        >
+                            {notifRequesting
+                                ? <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                                : <Bell size={17} />
+                            }
+                            {notifRequesting ? 'กำลังขอสิทธิ์...' : 'เปิดรับการแจ้งเตือน'}
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {/* Save Button */}
             <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>

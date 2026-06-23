@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload } from 'lucide-react';
 import type { Room, DormConfig } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
@@ -33,6 +33,8 @@ export default function RoomManagement({
 }: RoomManagementProps) {
     const [newRoomNumber, setNewRoomNumber] = useState('');
     const [editingRoom, setEditingRoom] = useState<string | null>(null);
+    const [importResult, setImportResult] = useState<{ updated: number; created: number; skipped: string[] } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [editValue, setEditValue] = useState('');
     const [editRentAmount, setEditRentAmount] = useState('');
     const [editRentType, setEditRentType] = useState<'monthly' | 'semester'>('monthly');
@@ -44,6 +46,21 @@ export default function RoomManagement({
     const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [tenantRoomId, setTenantRoomId] = useState<string | null>(null);
+
+    // ── Search & Filter state ───────────────────────────────────────────────────
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterType, setFilterType] = useState<'all' | 'dormitory' | 'commercial'>('all');
+    const [filterLine, setFilterLine] = useState<'all' | 'linked' | 'unlinked'>('all');
+
+    const filteredRooms = rooms.filter(r => {
+        const matchSearch = searchQuery === '' || r.room_number.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchType = filterType === 'all' || (r.room_type || 'dormitory') === filterType;
+        const matchLine = filterLine === 'all'
+            ? true
+            : filterLine === 'linked' ? !!r.line_user_id : !r.line_user_id;
+        return matchSearch && matchType && matchLine;
+    });
+    const isFiltering = searchQuery !== '' || filterType !== 'all' || filterLine !== 'all';
 
     const hasAnyCommercial = rooms.some(r => (r.room_type || 'dormitory') === 'commercial');
 
@@ -153,12 +170,160 @@ export default function RoomManagement({
         setShowBulkDeleteConfirm(false);
     };
 
+    // ── CSV export template ────────────────────────────────────────────────────
+    const exportTemplate = () => {
+        const header = ['ห้อง', 'ค่าเช่า', 'จำนวนผู้เช่า', 'ประเภทห้อง', 'ประเภทค่าเช่า', 'มิเตอร์ไฟเริ่มต้น', 'มิเตอร์น้ำเริ่มต้น'];
+        const dataRows = rooms.map(r => [
+            r.room_number,
+            r.rent_amount,
+            r.tenant_count ?? 1,
+            r.room_type === 'commercial' ? 'commercial' : 'dormitory',
+            r.rent_type === 'semester' ? 'semester' : 'monthly',
+            r.current_meter_elec ?? 0,
+            r.current_meter_water ?? 0,
+        ]);
+        // Append a blank example row if no rooms exist yet
+        if (dataRows.length === 0) dataRows.push(['101', config.room_rent, 1, 'dormitory', 'monthly', 0, 0]);
+        const csv = [header, ...dataRows]
+            .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'rooms_template.csv';
+        a.click();
+    };
+
+    // ── CSV import ─────────────────────────────────────────────────────────────
+    const handleImportFile = async (file: File) => {
+        const text = await file.text();
+        const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+        if (lines.length < 2) return;
+
+        const parseRow = (line: string) =>
+            line.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"'));
+
+        const ALIASES: Record<string, string> = {
+            'ห้อง': 'room', 'room': 'room', 'room_number': 'room', 'เลขห้อง': 'room',
+            'ค่าเช่า': 'rent', 'rent_amount': 'rent', 'rent': 'rent',
+            'จำนวนผู้เช่า': 'tenants', 'tenant_count': 'tenants', 'tenants': 'tenants',
+            'ประเภทห้อง': 'type', 'room_type': 'type', 'type': 'type',
+            'ประเภทค่าเช่า': 'renttype', 'rent_type': 'renttype', 'renttype': 'renttype',
+            'มิเตอร์ไฟเริ่มต้น': 'elec', 'current_meter_elec': 'elec', 'elec': 'elec',
+            'มิเตอร์น้ำเริ่มต้น': 'water', 'current_meter_water': 'water', 'water': 'water',
+        };
+
+        const headers = parseRow(lines[0]).map(h => h.toLowerCase().trim());
+        const col: Record<string, number> = {};
+        headers.forEach((h, i) => {
+            const key = ALIASES[h] ?? ALIASES[h.replace(/\s+/g, '')] ?? null;
+            if (key && !(key in col)) col[key] = i;
+        });
+        if (!('room' in col)) { col.room = 0; col.rent = 1; col.tenants = 2; col.type = 3; col.renttype = 4; col.elec = 5; col.water = 6; }
+
+        const roomMap = new Map(rooms.map(r => [r.room_number, r]));
+        const get = (cols: string[], key: string) => col[key] !== undefined ? (cols[col[key]] ?? '').trim() : '';
+
+        let updated = 0, created = 0;
+        const skipped: string[] = [];
+        const promises: Promise<void>[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const cols = parseRow(lines[i]);
+            const roomNum = get(cols, 'room');
+            if (!roomNum) continue;
+
+            const existing = roomMap.get(roomNum);
+            const rentVal = get(cols, 'rent');
+            const tenantsVal = get(cols, 'tenants');
+            const typeVal = get(cols, 'type').toLowerCase();
+            const rentTypeVal = get(cols, 'renttype').toLowerCase();
+            const elecVal = get(cols, 'elec');
+            const waterVal = get(cols, 'water');
+
+            const updates: Partial<Room> = {};
+            if (rentVal) updates.rent_amount = Number(rentVal) || 0;
+            if (tenantsVal) updates.tenant_count = Math.max(1, Number(tenantsVal) || 1);
+            if (typeVal === 'commercial') updates.room_type = 'commercial';
+            else if (typeVal === 'dormitory') updates.room_type = 'dormitory';
+            if (rentTypeVal === 'semester') updates.rent_type = 'semester';
+            else if (rentTypeVal === 'monthly') updates.rent_type = 'monthly';
+            if (elecVal) updates.current_meter_elec = Number(elecVal) || 0;
+            if (waterVal) updates.current_meter_water = Number(waterVal) || 0;
+
+            if (existing) {
+                promises.push(onUpdateRoom(existing.id, updates).then(() => { updated++; }));
+            } else {
+                if (atRoomLimit) { skipped.push(roomNum); continue; }
+                onAddRoom(roomNum);
+                created++;
+            }
+        }
+
+        await Promise.all(promises);
+        setImportResult({ updated, created, skipped });
+        setTimeout(() => setImportResult(null), 7000);
+    };
+
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Home size={28} /> จัดการห้องพัก</h1>
-                <p className="page-subtitle">เพิ่ม แก้ไข หรือลบห้องพักในระบบ</p>
+                <div>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Home size={28} /> จัดการห้องพัก</h1>
+                    <p className="page-subtitle">เพิ่ม แก้ไข หรือลบห้องพักในระบบ</p>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={exportTemplate}
+                        title="ดาวน์โหลด Template CSV"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                    >
+                        <Download size={15} /> Template
+                    </button>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        title="นำเข้าข้อมูลห้องจาก CSV"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                    >
+                        <Upload size={15} /> นำเข้า CSV
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                            const f = e.target.files?.[0];
+                            if (f) { handleImportFile(f); e.target.value = ''; }
+                        }}
+                    />
+                </div>
             </div>
+
+            {/* Import result toast */}
+            {importResult && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.625rem',
+                    background: '#ECFDF5', border: '1px solid #A7F3D0',
+                    color: '#065F46', borderRadius: '10px',
+                    padding: '0.625rem 0.875rem', fontSize: '0.8125rem',
+                    fontWeight: 600, marginBottom: '0.75rem',
+                }}>
+                    <Check size={15} color="#059669" />
+                    <span style={{ flex: 1 }}>
+                        {importResult.updated > 0 && `อัปเดต ${importResult.updated} ห้อง`}
+                        {importResult.updated > 0 && importResult.created > 0 && ' · '}
+                        {importResult.created > 0 && `สร้างใหม่ ${importResult.created} ห้อง`}
+                        {importResult.updated === 0 && importResult.created === 0 && 'ไม่พบข้อมูลที่นำเข้าได้'}
+                        {importResult.skipped.length > 0 && ` · ข้ามไป (ถึงลิมิต): ${importResult.skipped.join(', ')}`}
+                    </span>
+                    <button onClick={() => setImportResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}>
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
 
             {/* Room limit banner — trial users only */}
             {isTrial && maxRooms !== Infinity && (
@@ -249,11 +414,69 @@ export default function RoomManagement({
                 )}
             </div>
 
+            {/* Search & Filter bar */}
+            <div className="card mb-4" style={{ padding: '0.75rem 1rem' }}>
+                <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/* Search */}
+                    <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 0 }}>
+                        <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', pointerEvents: 'none' }} />
+                        <input
+                            type="text"
+                            className="form-input"
+                            style={{ paddingLeft: '2.1rem', width: '100%', height: '36px', fontSize: '0.875rem' }}
+                            placeholder="ค้นหมายเลขห้อง..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                    {/* Type filter */}
+                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#F3F4F6)', borderRadius: '8px', padding: '0.2rem' }}>
+                        {([['all', 'ทั้งหมด'], ['dormitory', 'หอพัก'], ['commercial', 'พาณิชย์']] as const).map(([val, label]) => (
+                            <button key={val} onClick={() => setFilterType(val)}
+                                style={{
+                                    padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: filterType === val ? 700 : 500, border: 'none',
+                                    background: filterType === val ? 'var(--color-primary,#8B5CF6)' : 'none',
+                                    color: filterType === val ? '#fff' : 'var(--color-text-muted)',
+                                }}
+                            >{label}</button>
+                        ))}
+                    </div>
+                    {/* LINE filter */}
+                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#F3F4F6)', borderRadius: '8px', padding: '0.2rem' }}>
+                        {([['all', 'LINE: ทั้งหมด'], ['linked', 'เชื่อมแล้ว'], ['unlinked', 'ยังไม่เชื่อม']] as const).map(([val, label]) => (
+                            <button key={val} onClick={() => setFilterLine(val)}
+                                style={{
+                                    padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: filterLine === val ? 700 : 500, border: 'none',
+                                    background: filterLine === val ? '#06C755' : 'none',
+                                    color: filterLine === val ? '#fff' : 'var(--color-text-muted)',
+                                }}
+                            >{label}</button>
+                        ))}
+                    </div>
+                    {/* Clear */}
+                    {isFiltering && (
+                        <button onClick={() => { setSearchQuery(''); setFilterType('all'); setFilterLine('all'); }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.625rem',
+                                borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
+                                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#F87171',
+                            }}
+                        >
+                            <X size={12} /> ล้างตัวกรอง
+                        </button>
+                    )}
+                    <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
+                        <Filter size={12} style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} />
+                        {filteredRooms.length}/{rooms.length} ห้อง
+                    </span>
+                </div>
+            </div>
+
             {/* Room List */}
             <div className="card">
                 <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <ClipboardList size={18} /> รายการห้องทั้งหมด ({rooms.length} ห้อง)
+                        <ClipboardList size={18} /> รายการห้องทั้งหมด ({rooms.length} ห้อง{isFiltering ? ` — แสดง ${filteredRooms.length}` : ''})
                     </span>
                     {selectedRooms.size > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -293,6 +516,12 @@ export default function RoomManagement({
                         <h3>ยังไม่มีห้องพัก</h3>
                         <p>เพิ่มห้องพักด้านบนเพื่อเริ่มต้นใช้งาน</p>
                     </div>
+                ) : filteredRooms.length === 0 ? (
+                    <div className="empty-state">
+                        <Search size={40} />
+                        <h3>ไม่พบห้องที่ตรงกับการค้นหา</h3>
+                        <p>ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
+                    </div>
                 ) : (
                     <div className="table-container">
                         <table className="table">
@@ -320,7 +549,7 @@ export default function RoomManagement({
                                 </tr>
                             </thead>
                             <tbody>
-                                {rooms.map((room, index) => (
+                                {filteredRooms.map((room, index) => (
                                     <tr key={room.id} style={selectedRooms.has(room.id) ? { background: 'rgba(96,165,250,0.06)' } : undefined}>
                                         <td style={{ textAlign: 'center' }}>
                                             <button
