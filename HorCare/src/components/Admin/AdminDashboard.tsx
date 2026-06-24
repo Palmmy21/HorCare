@@ -778,7 +778,7 @@ export default function AdminDashboard() {
                                                     </span>
                                                 ) : (
                                                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', background: 'rgba(245,158,11,0.15)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '999px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 600 }}>
-                                                        <Clock size={12} /> ทดลองใช้
+                                                        <Clock size={12} /> Free Plan
                                                     </span>
                                                 )}
                                             </td>
