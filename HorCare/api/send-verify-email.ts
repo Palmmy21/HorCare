@@ -145,6 +145,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (err: unknown) {
         console.error('send-verify-email error:', err);
-        res.status(500).json({ error: (err as Error).message || 'Internal Server Error' });
+        const errMsg = (err as Error).message || '';
+        if (errMsg.includes('TOO_MANY_ATTEMPTS_TRY_LATER') || errMsg.includes('too-many-requests')) {
+            res.status(429).json({ error: 'TOO_MANY_ATTEMPTS: ส่งบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่' });
+        } else {
+            res.status(500).json({ error: errMsg || 'Internal Server Error' });
+        }
     }
 }

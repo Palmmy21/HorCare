@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeSVG } from 'qrcode.react';
@@ -120,9 +120,27 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
     const { permission, enabled, loading: notifLoading, requestPermission, toggleEnabled } = usePushNotification();
     const [notifRequesting, setNotifRequesting] = useState(false);
 
-    // Email verification
+    // Email verification + cooldown
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'checking'>('idle');
     const [verifyMsg, setVerifyMsg] = useState('');
+    const [verifyCooldown, setVerifyCooldown] = useState(0); // seconds remaining
+    const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const startCooldown = (seconds = 60) => {
+        setVerifyCooldown(seconds);
+        cooldownRef.current = setInterval(() => {
+            setVerifyCooldown(prev => {
+                if (prev <= 1) {
+                    clearInterval(cooldownRef.current!);
+                    cooldownRef.current = null;
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
     const handleSendVerifyEmail = async () => {
         setVerifyStatus('sending');
@@ -131,9 +149,16 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             await onSendVerifyEmail();
             setVerifyStatus('sent');
             setVerifyMsg('ส่งอีเมลยืนยันแล้ว! กรุณาตรวจสอบกล่องจดหมายของคุณ');
+            startCooldown(60);
         } catch (e: unknown) {
+            const msg = (e as Error).message || '';
             setVerifyStatus('error');
-            setVerifyMsg((e as Error).message || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+            if (msg.includes('TOO_MANY_ATTEMPTS') || msg.includes('too-many-requests')) {
+                setVerifyMsg('ส่งบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่');
+                startCooldown(120);
+            } else {
+                setVerifyMsg(msg || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+            }
         }
     };
 
@@ -446,19 +471,29 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <button
                             onClick={handleSendVerifyEmail}
-                            disabled={verifyStatus === 'sending' || verifyStatus === 'checking'}
+                            disabled={verifyStatus === 'sending' || verifyStatus === 'checking' || verifyCooldown > 0}
                             style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                                color: '#fff', border: 'none',
+                                background: verifyCooldown > 0
+                                    ? 'var(--color-gray-200)'
+                                    : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                color: verifyCooldown > 0 ? 'var(--color-gray-500)' : '#fff',
+                                border: 'none',
                                 padding: '0.625rem 1.25rem', borderRadius: '10px',
-                                fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
-                                opacity: (verifyStatus === 'sending' || verifyStatus === 'checking') ? 0.7 : 1,
-                                boxShadow: '0 2px 10px rgba(245,158,11,0.3)',
+                                fontWeight: 700, fontSize: '0.875rem',
+                                cursor: verifyCooldown > 0 ? 'not-allowed' : 'pointer',
+                                opacity: verifyStatus === 'sending' ? 0.7 : 1,
+                                boxShadow: verifyCooldown > 0 ? 'none' : '0 2px 10px rgba(245,158,11,0.3)',
+                                transition: 'all 0.2s',
                             }}
                         >
                             <Mail size={15} />
-                            {verifyStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งลิงก์ยืนยัน'}
+                            {verifyStatus === 'sending'
+                                ? 'กำลังส่ง...'
+                                : verifyCooldown > 0
+                                    ? `รอ ${verifyCooldown}s`
+                                    : 'ส่งลิงก์ยืนยัน'
+                            }
                         </button>
                         {verifyStatus === 'sent' && (
                             <button
