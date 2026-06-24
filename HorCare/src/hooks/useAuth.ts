@@ -6,6 +6,7 @@ import {
     signOut,
     updateProfile,
     sendPasswordResetEmail,
+    sendEmailVerification,
     setPersistence,
     browserLocalPersistence,
     type User
@@ -159,7 +160,13 @@ export function useAuth() {
         });
         if (!res.ok) {
             const body = await res.json().catch(() => ({})) as { error?: string };
-            throw new Error(body.error || `HTTP ${res.status}`);
+            const errMsg = body.error || `HTTP ${res.status}`;
+            // Resend domain not configured — fall back to Firebase native email
+            if (errMsg.toLowerCase().includes('allowlist') || errMsg.toLowerCase().includes('domain')) {
+                await sendEmailVerification(auth.currentUser);
+                return { data: { sent: true } };
+            }
+            throw new Error(errMsg);
         }
         return res.json() as Promise<{ data: { sent: boolean; alreadyVerified?: boolean } }>;
     }, []);
