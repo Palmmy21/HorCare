@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Users, User, Phone, AlertTriangle, Search,
   LogIn, Banknote, ChevronRight, Home, MessageCircle,
-  UserCheck, UserX, Link2, CheckCheck,
+  UserCheck, UserX, Link2, CheckCheck, LayoutGrid,
+  ChevronDown, ChevronUp,
 } from 'lucide-react';
 import type { Room } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
@@ -14,6 +15,7 @@ interface TenantsPageProps {
   buildingId: string;
   isPaid: boolean;
   onUpgrade?: () => void;
+  onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
 }
 
 // ── Helper: วันที่เหลือ ──────────────────────────────────────────────────────
@@ -25,6 +27,284 @@ function daysUntil(iso?: string): number | null {
 function formatDate(iso?: string) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+// ── Room Status types ──────────────────────────────────────────────────────
+type RoomStatus = 'occupied' | 'vacant' | 'reserved';
+
+const STATUS_CONFIG: Record<RoomStatus, { label: string; color: string; bg: string; border: string; dot: string }> = {
+  occupied: {
+    label: 'มีผู้เช่า',
+    color: '#059669',
+    bg: 'rgba(5,150,105,0.10)',
+    border: 'rgba(5,150,105,0.30)',
+    dot: '#10B981',
+  },
+  vacant: {
+    label: 'ว่าง',
+    color: '#6B7280',
+    bg: 'rgba(107,114,128,0.08)',
+    border: 'rgba(107,114,128,0.25)',
+    dot: '#9CA3AF',
+  },
+  reserved: {
+    label: 'ติดจอง',
+    color: '#D97706',
+    bg: 'rgba(217,119,6,0.10)',
+    border: 'rgba(217,119,6,0.30)',
+    dot: '#F59E0B',
+  },
+};
+
+// ── Room Status Dashboard ────────────────────────────────────────────────────
+function RoomStatusDashboard({
+  rooms,
+  onUpdateRoom,
+}: {
+  rooms: Room[];
+  onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const activeRooms = rooms.filter(r => r.is_active);
+
+  // Count by status
+  const counts = activeRooms.reduce(
+    (acc, r) => {
+      const s = r.room_status ?? 'vacant';
+      acc[s] = (acc[s] || 0) + 1;
+      return acc;
+    },
+    { occupied: 0, vacant: 0, reserved: 0 } as Record<RoomStatus, number>,
+  );
+
+  // Cycle status: occupied → vacant → reserved → occupied
+  const cycleStatus = useCallback(
+    async (room: Room) => {
+      if (!onUpdateRoom) return;
+      const current = room.room_status ?? 'vacant';
+      const next: RoomStatus =
+        current === 'occupied' ? 'vacant' : current === 'vacant' ? 'reserved' : 'occupied';
+      setUpdatingId(room.id);
+      try {
+        await onUpdateRoom(room.id, { room_status: next });
+      } finally {
+        setUpdatingId(null);
+      }
+    },
+    [onUpdateRoom],
+  );
+
+  // Sort rooms: natural sort of room_number
+  const sorted = [...activeRooms].sort((a, b) =>
+    a.room_number.localeCompare(b.room_number, 'th', { numeric: true }),
+  );
+
+  return (
+    <div
+      className="card mb-6"
+      style={{ overflow: 'hidden', padding: 0 }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.875rem 1rem',
+          borderBottom: collapsed ? 'none' : '1px solid var(--color-border, #E5E7EB)',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+        onClick={() => setCollapsed(c => !c)}
+        role="button"
+        aria-expanded={!collapsed}
+        aria-label="ภาพรวมสถานะห้องพัก"
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <LayoutGrid size={17} color="var(--color-primary, #3B82F6)" />
+          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text, #111827)' }}>
+            ภาพรวมสถานะห้องพัก
+          </span>
+          {/* Summary badges */}
+          <div style={{ display: 'flex', gap: '0.375rem', marginLeft: '0.25rem' }}>
+            {(['occupied', 'vacant', 'reserved'] as RoomStatus[]).map(s => (
+              counts[s] > 0 && (
+                <span
+                  key={s}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                    fontSize: '0.72rem', fontWeight: 700,
+                    padding: '0.15rem 0.45rem', borderRadius: '6px',
+                    background: STATUS_CONFIG[s].bg,
+                    color: STATUS_CONFIG[s].color,
+                    border: `1px solid ${STATUS_CONFIG[s].border}`,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: STATUS_CONFIG[s].dot, flexShrink: 0,
+                    }}
+                  />
+                  {counts[s]}
+                </span>
+              )
+            ))}
+          </div>
+        </div>
+        <div style={{ color: 'var(--color-gray-400, #9CA3AF)', display: 'flex' }}>
+          {collapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+        </div>
+      </div>
+
+      {/* Room grid */}
+      {!collapsed && (
+        <div style={{ padding: '0.875rem 1rem 1rem' }}>
+          {/* Legend */}
+          <div style={{
+            display: 'flex', gap: '1rem', marginBottom: '0.75rem',
+            flexWrap: 'wrap',
+          }}>
+            {(['occupied', 'vacant', 'reserved'] as RoomStatus[]).map(s => (
+              <span
+                key={s}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.3rem',
+                  fontSize: '0.72rem', color: 'var(--color-text-muted, #6B7280)',
+                }}
+              >
+                <span
+                  style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: STATUS_CONFIG[s].dot,
+                  }}
+                />
+                {STATUS_CONFIG[s].label}
+              </span>
+            ))}
+            {onUpdateRoom && (
+              <span style={{
+                fontSize: '0.68rem',
+                color: 'var(--color-gray-400, #9CA3AF)',
+                marginLeft: 'auto',
+                alignSelf: 'center',
+              }}>
+                แตะห้องเพื่อเปลี่ยนสถานะ
+              </span>
+            )}
+          </div>
+
+          {/* Tiles */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
+              gap: '0.5rem',
+            }}
+          >
+            {sorted.map(room => {
+              const status: RoomStatus = room.room_status ?? 'vacant';
+              const cfg = STATUS_CONFIG[status];
+              const isUpdating = updatingId === room.id;
+              return (
+                <button
+                  key={room.id}
+                  id={`room-status-tile-${room.id}`}
+                  onClick={() => cycleStatus(room)}
+                  disabled={isUpdating || !onUpdateRoom}
+                  title={`ห้อง ${room.room_number} · ${cfg.label} · ${onUpdateRoom ? 'คลิกเพื่อเปลี่ยนสถานะ' : ''}`}
+                  style={{
+                    border: `1.5px solid ${cfg.border}`,
+                    borderRadius: '10px',
+                    background: cfg.bg,
+                    padding: '0.5rem 0.25rem',
+                    cursor: onUpdateRoom ? 'pointer' : 'default',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    transition: 'all 0.15s',
+                    opacity: isUpdating ? 0.5 : 1,
+                    minWidth: 0,
+                  }}
+                  className="room-status-tile"
+                >
+                  {/* Status dot */}
+                  <span
+                    style={{
+                      width: 7, height: 7,
+                      borderRadius: '50%',
+                      background: cfg.dot,
+                      flexShrink: 0,
+                    }}
+                  />
+                  {/* Room number */}
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      color: cfg.color,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '100%',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {room.room_number}
+                  </span>
+                  {/* Status label */}
+                  <span
+                    style={{
+                      fontSize: '0.62rem',
+                      color: cfg.color,
+                      opacity: 0.85,
+                      textAlign: 'center',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {cfg.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Summary row */}
+          <div
+            style={{
+              marginTop: '0.875rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '0.5rem',
+            }}
+          >
+            {(['occupied', 'vacant', 'reserved'] as RoomStatus[]).map(s => (
+              <div
+                key={s}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '0.625rem 0.5rem', borderRadius: '10px',
+                  background: STATUS_CONFIG[s].bg,
+                  border: `1px solid ${STATUS_CONFIG[s].border}`,
+                  gap: '0.15rem',
+                }}
+              >
+                <span style={{ fontWeight: 800, fontSize: '1.25rem', color: STATUS_CONFIG[s].color, lineHeight: 1 }}>
+                  {counts[s]}
+                </span>
+                <span style={{ fontSize: '0.7rem', color: STATUS_CONFIG[s].color, opacity: 0.85, fontWeight: 600 }}>
+                  {STATUS_CONFIG[s].label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Single room card (fetches its own profile) ───────────────────────────────
@@ -221,7 +501,7 @@ function TenantCard({
 type FilterMode = 'all' | 'has_profile' | 'no_profile' | 'risk';
 
 export default function TenantsPage({
-  rooms, uid, buildingId, isPaid, onUpgrade,
+  rooms, uid, buildingId, isPaid, onUpgrade, onUpdateRoom,
 }: TenantsPageProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
@@ -240,6 +520,9 @@ export default function TenantsPage({
           จัดการและดูข้อมูลผู้เช่าทั้งหมด {activeRooms.length} ห้อง
         </p>
       </div>
+
+      {/* ── Room Status Dashboard ── */}
+      <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} />
 
       {/* Search + Filter Bar */}
       <div className="card mb-6" style={{ padding: '0.75rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>

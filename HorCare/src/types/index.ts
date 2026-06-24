@@ -90,6 +90,9 @@ export interface Room {
   // Per-room rate overrides (used in commercial mode)
   custom_electricity_rate?: number | null;
   custom_water_config?: WaterConfig | null;
+  // Room occupancy status — set manually by owner
+  // 'occupied' = มีผู้เช่า, 'vacant' = ว่าง, 'reserved' = ติดจอง
+  room_status?: 'occupied' | 'vacant' | 'reserved';
 }
 
 export interface MonthlyBill {

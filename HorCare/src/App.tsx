@@ -740,6 +740,7 @@ function App() {
             buildingId={activeBuildingId}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
+            onUpdateRoom={updateRoom}
           />
         )}
 

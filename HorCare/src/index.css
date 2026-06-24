@@ -3860,3 +3860,27 @@ html.dark [data-modal="true"] {
   background: var(--color-white) !important;
   color: var(--color-gray-700) !important;
 }
+
+/* ── Room Status Tiles (TenantsPage dashboard) ─────────────────────────── */
+.room-status-tile:hover:not(:disabled) {
+  filter: brightness(0.93);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+}
+.room-status-tile:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.88);
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-status-tile {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Tenant card hover lift */
+.tenant-card-hover:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+  transform: translateY(-1px);
+}
+
