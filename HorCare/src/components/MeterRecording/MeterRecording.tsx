@@ -647,6 +647,19 @@ export default function MeterRecording({
 
     return (
         <div>
+        {/* Keyframes — always mounted so animations are ready before the modal opens */}
+        <style>{`
+            @keyframes bsOverlayIn { from { opacity:0 } to { opacity:1 } }
+            @keyframes bsCardIn { from { opacity:0; transform:scale(0.88) translateY(16px) } to { opacity:1; transform:scale(1) translateY(0) } }
+            @keyframes bsSpin { to { transform:rotate(360deg) } }
+            @keyframes bsPulseRing { 0%,100% { transform:scale(1); opacity:0.5 } 50% { transform:scale(1.2); opacity:0.1 } }
+            @keyframes bsCountPop { 0% { transform:scale(1) } 40% { transform:scale(1.2) } 100% { transform:scale(1) } }
+            @keyframes bsRoomSlide { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
+            @keyframes bsShimmer { from { transform:translateX(-100%) } to { transform:translateX(250%) } }
+            @keyframes bsSuccessScale { 0% { transform:scale(0.5); opacity:0 } 60% { transform:scale(1.15) } 100% { transform:scale(1); opacity:1 } }
+            @keyframes bsDotBounce { 0%,80%,100% { transform:translateY(0) } 40% { transform:translateY(-7px) } }
+        `}</style>
+
         {/* Bulk save progress modal */}
         {bulkProgress && (
             <div style={{
@@ -656,17 +669,6 @@ export default function MeterRecording({
                 padding: '1rem',
                 animation: 'bsOverlayIn 0.2s ease',
             }}>
-                <style>{`
-                    @keyframes bsOverlayIn { from { opacity:0 } to { opacity:1 } }
-                    @keyframes bsCardIn { from { opacity:0; transform:scale(0.88) translateY(16px) } to { opacity:1; transform:scale(1) translateY(0) } }
-                    @keyframes bsSpin { to { transform:rotate(360deg) } }
-                    @keyframes bsPulseRing { 0%,100% { transform:scale(1); opacity:0.6 } 50% { transform:scale(1.18); opacity:0.15 } }
-                    @keyframes bsCountPop { 0% { transform:scale(1) } 40% { transform:scale(1.18) } 100% { transform:scale(1) } }
-                    @keyframes bsRoomSlide { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
-                    @keyframes bsShimmer { from { transform:translateX(-100%) } to { transform:translateX(200%) } }
-                    @keyframes bsSuccessScale { 0% { transform:scale(0.5); opacity:0 } 60% { transform:scale(1.15) } 100% { transform:scale(1); opacity:1 } }
-                    @keyframes bsDotBounce { 0%,80%,100% { transform:translateY(0) } 40% { transform:translateY(-6px) } }
-                `}</style>
 
                 <div style={{
                     background: 'linear-gradient(160deg,#0f0c29,#1a1040,#24243e)',
@@ -696,7 +698,7 @@ export default function MeterRecording({
                                     animation: 'bsPulseRing 1.5s ease-in-out infinite',
                                 }} />
                                 {/* Spinning ring */}
-                                <svg style={{ position: 'absolute', inset: 0, animation: 'bsSpin 1.2s linear infinite' }} viewBox="0 0 72 72">
+                                <svg width="72" height="72" style={{ position: 'absolute', top: 0, left: 0, animation: 'bsSpin 1.2s linear infinite' }} viewBox="0 0 72 72">
                                     <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
                                     <circle cx="36" cy="36" r="33" fill="none" stroke="url(#spinGrad)" strokeWidth="3"
                                         strokeDasharray="60 150" strokeLinecap="round" />
