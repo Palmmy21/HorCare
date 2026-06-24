@@ -146,20 +146,6 @@ export function useAuth() {
         setProfile(null);
     }, []);
 
-    // ส่งอีเมลยืนยันซ้ำผ่าน Resend
-    const resendVerification = useCallback(async () => {
-        if (!auth.currentUser) throw new Error('not-signed-in');
-        const idToken = await auth.currentUser.getIdToken();
-        const res = await fetch('/api/send-verify-email', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        });
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({})) as { error?: string };
-            throw new Error(body.error || `HTTP ${res.status}`);
-        }
-    }, []);
-
     // ส่งอีเมลยืนยันผ่าน Resend API — หลีกเลี่ยง spam, ส่งจาก domain ตัวเอง
     const sendVerifyEmailViaResend = useCallback(async () => {
         if (!auth.currentUser) throw new Error('not-signed-in');
@@ -240,7 +226,6 @@ export function useAuth() {
         login,
         logout,
         resetPassword,
-        resendVerification,
         sendVerifyEmailViaResend,
         refreshEmailVerified,
         isPaidExpired,

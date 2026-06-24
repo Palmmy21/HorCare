@@ -16,7 +16,6 @@ import MeterRecording from './components/MeterRecording/MeterRecording';
 import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
-import VerifyEmailWall from './components/Auth/VerifyEmailWall';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import PaymentsPage from './components/Payments/PaymentsPage';
 import MeterCalculator from './components/MeterCalculator/MeterCalculator';
@@ -56,7 +55,7 @@ function App() {
   const {
     user, profile, loading: authLoading, error: authError,
     emailVerified, login, register, logout, resetPassword,
-    sendVerifyEmailViaResend, resendVerification, refreshEmailVerified,
+    sendVerifyEmailViaResend, refreshEmailVerified,
     isPaidExpired, licenseDaysLeft, isBanned, setError
   } = useAuth();
 
