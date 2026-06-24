@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db as clientDb } from '../../firebase/config';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useFirestore } from '../../hooks/useFirestore';
 import type { UserProfile, LicenseType } from '../../types';
@@ -8,8 +6,16 @@ import {
     Search, Loader2, CheckCircle, Clock, Shield, AlertTriangle,
     Users, UserCheck, Timer, XCircle, Key, Infinity as InfinityIcon,
     X, Mail, CalendarDays, Hash, BadgeCheck, ShieldAlert, Copy,
-    Ban, RotateCcw, ShieldOff, Crown, Package, ChevronDown, MailCheck
+    Ban, RotateCcw, ShieldOff, Crown, Package, ChevronDown, MailCheck,
+    RefreshCw, ShieldCheck, ShieldX, LogIn
 } from 'lucide-react';
+
+// Extended type that includes Firebase Auth fields not in Firestore
+type AdminUserRow = UserProfile & {
+    email_verified?: boolean;
+    last_sign_in?: string | null;
+    has_firestore_profile?: boolean;
+};
 
 const LICENSE_OPTIONS: { value: LicenseType; label: string; color: string; bg: string; border: string }[] = [
     { value: 'free',            label: 'Free (แผนฟรี)',             color: '#FCD34D', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.3)' },
@@ -61,7 +67,7 @@ function InfoRow({ icon, label, value, mono }: { icon: React.ReactNode; label: s
 }
 
 function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSetLicense, onVerifyEmail, isProcessing }: {
-    u: UserProfile;
+    u: AdminUserRow;
     onClose: () => void;
     onUnlock: (uid: string) => void;
     onBan: (uid: string) => void;
@@ -151,6 +157,23 @@ function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSet
                 {/* Panel body */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
                     <InfoRow icon={<Mail size={15} />} label="อีเมล" value={u.email} />
+                    <InfoRow icon={u.email_verified ? <ShieldCheck size={15} /> : <ShieldX size={15} />} label="ยืนยันอีเมล" value={
+                        u.email_verified === true
+                            ? <span style={{ color: '#6EE7B7', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={13} /> ยืนยันแล้ว</span>
+                            : u.email_verified === false
+                                ? <span style={{ color: '#FCA5A5', display: 'flex', alignItems: 'center', gap: 4 }}><XCircle size={13} /> ยังไม่ยืนยัน</span>
+                                : '—'
+                    } />
+                    {u.last_sign_in && (
+                        <InfoRow icon={<LogIn size={15} />} label="เข้าสู่ระบบล่าสุด" value={
+                            new Date(u.last_sign_in).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        } />
+                    )}
+                    {u.has_firestore_profile === false && (
+                        <div style={{ margin: '0.5rem 0', padding: '0.5rem 0.75rem', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, fontSize: '0.75rem', color: '#FCD34D', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <AlertTriangle size={12} /> ไม่มี Firestore profile (สมัครไม่สมบูรณ์)
+                        </div>
+                    )}
                     <InfoRow
                         icon={<Hash size={15} />}
                         label="UID"
@@ -410,34 +433,37 @@ export default function AdminDashboard() {
     const { user, profile } = useAuth();
     const { updateUserLicense } = useFirestore(user?.uid ?? null, null);
 
-    const [users, setUsers] = useState<UserProfile[]>([]);
+    const [users, setUsers] = useState<AdminUserRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
 
-    // Real-time listener
-    useEffect(() => {
-        const unsubscribe = onSnapshot(
-            collection(clientDb, 'users'),
-            (snap) => {
-                const result = snap.docs
-                    .map(d => d.data() as UserProfile)
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                setUsers(result);
-                setLoading(false);
-                setError(null);
-            },
-            (err) => {
-                setError(err.message || 'ไม่สามารถโหลดข้อมูลผู้ใช้งานได้');
-                setLoading(false);
-            }
-        );
-        return () => unsubscribe();
-    }, []);
+    const loadUsers = useCallback(async (showRefresh = false) => {
+        if (!user) return;
+        if (showRefresh) setRefreshing(true); else setLoading(true);
+        setError(null);
+        try {
+            const idToken = await user.getIdToken();
+            const res = await fetch('/api/admin-list-users', {
+                headers: { 'Authorization': `Bearer ${idToken}` },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json() as { users: AdminUserRow[] };
+            setUsers(data.users);
+        } catch (err: unknown) {
+            setError((err as Error).message || 'ไม่สามารถโหลดข้อมูลได้');
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [user]);
 
-    // Sync selected user panel when live data changes
+    useEffect(() => { loadUsers(); }, [loadUsers]);
+
+    // Sync selected user panel after refresh
     useEffect(() => {
         if (selectedUser) {
             const updated = users.find(u => u.uid === selectedUser.uid);
@@ -492,6 +518,7 @@ export default function AdminDashboard() {
             const body = await res.json().catch(() => ({})) as { error?: string };
             throw new Error(body.error || `HTTP ${res.status}`);
         }
+        await loadUsers(true);
     };
 
     const handleSetLicense = async (uid: string, license: LicenseType) => {
@@ -588,15 +615,16 @@ export default function AdminDashboard() {
                         <p style={{ color: 'rgba(165,180,252,0.8)', fontSize: '0.875rem', margin: 0 }}>จัดการสิทธิ์และข้อมูลผู้ใช้งาน HorCare</p>
                     </div>
                 </div>
-                <div style={{
-                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
-                    borderRadius: '10px', color: '#6EE7B7', padding: '0.5rem 1rem',
+                <button onClick={() => loadUsers(true)} disabled={refreshing} style={{
+                    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '10px', color: '#C7D2FE', padding: '0.625rem 1.25rem',
+                    cursor: refreshing ? 'not-allowed' : 'pointer',
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    fontSize: '0.8125rem', fontWeight: 500,
+                    fontSize: '0.875rem', fontWeight: 500,
                 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-                    Live
-                </div>
+                    <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+                    รีเฟรช
+                </button>
             </div>
 
             {/* Stats */}
