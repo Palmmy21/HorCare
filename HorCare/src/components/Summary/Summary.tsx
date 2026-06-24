@@ -136,7 +136,7 @@ export default function Summary({
 
     const generatePDFFromElement = async (element: HTMLElement, filename: string) => {
         const dataUrl = await toPng(element, {
-            pixelRatio: 2,
+            pixelRatio: 3,
             backgroundColor: '#ffffff',
         });
 
