@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeSVG } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
@@ -32,6 +32,10 @@ interface SettingsProps {
     onSetTheme: (id: string) => void;
     mode: ThemeMode;
     onSetMode: (m: ThemeMode) => void;
+    emailVerified: boolean;
+    userEmail: string;
+    onSendVerifyEmail: () => Promise<unknown>;
+    onRefreshEmailVerified: () => Promise<boolean>;
 }
 
 const BUILDING_TYPES = [
@@ -82,7 +86,7 @@ const BUILDING_TYPES = [
     },
 ];
 
-export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode }: SettingsProps) {
+export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified }: SettingsProps) {
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,
@@ -115,6 +119,41 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
     // Push Notifications
     const { permission, enabled, loading: notifLoading, requestPermission, toggleEnabled } = usePushNotification();
     const [notifRequesting, setNotifRequesting] = useState(false);
+
+    // Email verification
+    const [verifyStatus, setVerifyStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'checking'>('idle');
+    const [verifyMsg, setVerifyMsg] = useState('');
+
+    const handleSendVerifyEmail = async () => {
+        setVerifyStatus('sending');
+        setVerifyMsg('');
+        try {
+            await onSendVerifyEmail();
+            setVerifyStatus('sent');
+            setVerifyMsg('ส่งอีเมลยืนยันแล้ว! กรุณาตรวจสอบกล่องจดหมายของคุณ');
+        } catch (e: unknown) {
+            setVerifyStatus('error');
+            setVerifyMsg((e as Error).message || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+        }
+    };
+
+    const handleCheckVerified = async () => {
+        setVerifyStatus('checking');
+        setVerifyMsg('');
+        try {
+            const verified = await onRefreshEmailVerified();
+            if (verified) {
+                setVerifyStatus('idle');
+                setVerifyMsg('');
+            } else {
+                setVerifyStatus('sent');
+                setVerifyMsg('ยังไม่พบการยืนยัน — กดลิงก์ในอีเมลก่อน แล้วลองใหม่');
+            }
+        } catch {
+            setVerifyStatus('error');
+            setVerifyMsg('ตรวจสอบไม่สำเร็จ กรุณาลองใหม่');
+        }
+    };
 
     const handleRequestNotif = async () => {
         setNotifRequesting(true);
@@ -366,6 +405,98 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><SettingsIcon size={28} /> ตั้งค่าระบบ</h1>
                 <p className="page-subtitle">กำหนดอัตราค่าบริการและค่าเช่า</p>
             </div>
+
+            {/* ── Email Verification Banner ── */}
+            {!emailVerified && (
+                <div style={{
+                    background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(239,68,68,0.06))',
+                    border: '1.5px solid rgba(245,158,11,0.35)',
+                    borderRadius: '16px',
+                    padding: '1.25rem 1.5rem',
+                    marginBottom: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '1rem',
+                    flexWrap: 'wrap',
+                }}>
+                    <div style={{
+                        width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
+                        background: 'rgba(245,158,11,0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                        <Mail size={22} color="#D97706" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-gray-800)', marginBottom: '0.25rem' }}>
+                            ยังไม่ได้ยืนยันอีเมล
+                        </div>
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)', lineHeight: 1.6 }}>
+                            ยืนยัน <strong>{userEmail}</strong> เพื่อความปลอดภัยของบัญชี
+                        </div>
+                        {verifyMsg && (
+                            <div style={{
+                                marginTop: '0.5rem', fontSize: '0.8rem', lineHeight: 1.5,
+                                color: verifyStatus === 'error' ? '#DC2626' : '#059669',
+                                fontWeight: 500,
+                            }}>
+                                {verifyStatus === 'sent' && '📨 '}{verifyMsg}
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button
+                            onClick={handleSendVerifyEmail}
+                            disabled={verifyStatus === 'sending' || verifyStatus === 'checking'}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                color: '#fff', border: 'none',
+                                padding: '0.625rem 1.25rem', borderRadius: '10px',
+                                fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
+                                opacity: (verifyStatus === 'sending' || verifyStatus === 'checking') ? 0.7 : 1,
+                                boxShadow: '0 2px 10px rgba(245,158,11,0.3)',
+                            }}
+                        >
+                            <Mail size={15} />
+                            {verifyStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งลิงก์ยืนยัน'}
+                        </button>
+                        {verifyStatus === 'sent' && (
+                            <button
+                                onClick={handleCheckVerified}
+                                disabled={verifyStatus === 'checking'}
+                                style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                                    background: 'transparent',
+                                    color: 'var(--color-gray-500)',
+                                    border: '1px solid var(--color-gray-200)',
+                                    padding: '0.625rem 1rem', borderRadius: '10px',
+                                    fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer',
+                                }}
+                            >
+                                <RefreshCw size={14} /> ตรวจสอบอีกครั้ง
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Email Verified Badge ── */}
+            {emailVerified && (
+                <div style={{
+                    background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.05))',
+                    border: '1.5px solid rgba(16,185,129,0.3)',
+                    borderRadius: '14px',
+                    padding: '0.875rem 1.25rem',
+                    marginBottom: '1.5rem',
+                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                }}>
+                    <ShieldCheck size={20} color="#059669" />
+                    <div>
+                        <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#059669' }}>อีเมลยืนยันแล้ว</span>
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)', marginLeft: '0.5rem' }}>{userEmail}</span>
+                    </div>
+                </div>
+            )}
 
             {/* Supported Building Types (Static Display) */}
             <div className="settings-section">

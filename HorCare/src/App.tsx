@@ -56,7 +56,7 @@ function App() {
   const {
     user, profile, loading: authLoading, error: authError,
     emailVerified, login, register, logout, resetPassword,
-    resendVerification, refreshEmailVerified,
+    sendVerifyEmailViaResend, resendVerification, refreshEmailVerified,
     isPaidExpired, licenseDaysLeft, isBanned, setError
   } = useAuth();
 
@@ -90,9 +90,9 @@ function App() {
     }
   }, []);
 
-  // After login+verify, redirect to pricing and pre-select the plan chosen as guest
+  // After login, redirect to pricing and pre-select the plan chosen as guest
   useEffect(() => {
-    if (!user || !emailVerified) return;
+    if (!user) return;
     const pending = localStorage.getItem('horcare_pending_plan');
     if (pending) {
       localStorage.removeItem('horcare_pending_plan');
@@ -101,7 +101,7 @@ function App() {
       } catch {}
       setCurrentView('pricing');
     }
-  }, [user, emailVerified]);
+  }, [user]);
 
   // Close building menu on outside click
   useEffect(() => {
@@ -386,18 +386,8 @@ function App() {
     );
   }
 
-  // Email not verified → block usage until verified (admin exempt to avoid lockout).
-  // Stops fake-email signups and unlimited free-trial farming via throwaway emails.
-  if (!emailVerified && profile?.role !== 'admin') {
-    return (
-      <VerifyEmailWall
-        email={user.email ?? ''}
-        onResend={resendVerification}
-        onRefresh={refreshEmailVerified}
-        onLogout={logout}
-      />
-    );
-  }
+  // (Email verification is now optional — users can access immediately after signup)
+  // A banner in Settings will prompt them to verify when convenient
 
   // Still loading data (buildings must resolve first so we have a valid buildingId)
   if (buildingsLoading || dataLoading || !activeBuildingId) {
@@ -824,6 +814,10 @@ function App() {
             onSetTheme={setTheme}
             mode={mode}
             onSetMode={setMode}
+            emailVerified={emailVerified}
+            userEmail={user?.email ?? ''}
+            onSendVerifyEmail={sendVerifyEmailViaResend}
+            onRefreshEmailVerified={refreshEmailVerified}
           />
         )}
 

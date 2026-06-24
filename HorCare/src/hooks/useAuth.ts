@@ -6,7 +6,6 @@ import {
     signOut,
     updateProfile,
     sendPasswordResetEmail,
-    sendEmailVerification,
     setPersistence,
     browserLocalPersistence,
     type User
@@ -74,12 +73,15 @@ export function useAuth() {
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(cred.user, { displayName });
 
-            // ส่งอีเมลยืนยันตัวตน — กันสมัครด้วยอีเมลปลอม
-            // best-effort: ถ้าส่งพลาด (เช่นโดน rate-limit) ก็ยังให้สมัครต่อได้ แล้วกดส่งซ้ำที่หน้า gate
+            // ส่งอีเมลยืนยันผ่าน Resend (ไม่ตกสแปม) — best-effort ถ้าพลาดก็ให้สมัครต่อได้
             try {
-                await sendEmailVerification(cred.user);
+                const idToken = await cred.user.getIdToken();
+                await fetch('/api/send-verify-email', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+                });
             } catch (e) {
-                console.warn('sendEmailVerification on register failed:', (e as Error).message);
+                console.warn('send-verify-email on register failed:', (e as Error).message);
             }
 
             // Create user profile in Firestore — free plan, no expiry
@@ -144,10 +146,36 @@ export function useAuth() {
         setProfile(null);
     }, []);
 
-    // ส่งอีเมลยืนยันซ้ำ (เรียกจากหน้า gate) — โยน error code ให้ผู้เรียกแสดงข้อความเอง
+    // ส่งอีเมลยืนยันซ้ำผ่าน Resend
     const resendVerification = useCallback(async () => {
         if (!auth.currentUser) throw new Error('not-signed-in');
-        await sendEmailVerification(auth.currentUser);
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/send-verify-email', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({})) as { error?: string };
+            throw new Error(body.error || `HTTP ${res.status}`);
+        }
+    }, []);
+
+    // ส่งอีเมลยืนยันผ่าน Resend API — หลีกเลี่ยง spam, ส่งจาก domain ตัวเอง
+    const sendVerifyEmailViaResend = useCallback(async () => {
+        if (!auth.currentUser) throw new Error('not-signed-in');
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/send-verify-email', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({})) as { error?: string };
+            throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        return res.json() as Promise<{ data: { sent: boolean; alreadyVerified?: boolean } }>;
     }, []);
 
     // เช็คสถานะยืนยันอีเมลใหม่หลังผู้ใช้กดลิงก์ในอีเมล — reload() จาก Firebase
@@ -213,6 +241,7 @@ export function useAuth() {
         logout,
         resetPassword,
         resendVerification,
+        sendVerifyEmailViaResend,
         refreshEmailVerified,
         isPaidExpired,
         isLicenseActive,
