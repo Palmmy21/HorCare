@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db as clientDb } from '../../firebase/config';
 import { useAuth } from '../../hooks/useAuth';
 import { useFirestore } from '../../hooks/useFirestore';
 import type { UserProfile, LicenseType } from '../../types';
@@ -6,7 +8,7 @@ import {
     Search, Loader2, CheckCircle, Clock, Shield, AlertTriangle,
     Users, UserCheck, Timer, XCircle, RefreshCw, Key, Infinity as InfinityIcon,
     X, Mail, CalendarDays, Hash, BadgeCheck, ShieldAlert, Copy,
-    Ban, RotateCcw, ShieldOff, Crown, Package, ChevronDown
+    Ban, RotateCcw, ShieldOff, Crown, Package, ChevronDown, MailCheck
 } from 'lucide-react';
 
 const LICENSE_OPTIONS: { value: LicenseType; label: string; color: string; bg: string; border: string }[] = [
@@ -58,7 +60,7 @@ function InfoRow({ icon, label, value, mono }: { icon: React.ReactNode; label: s
     );
 }
 
-function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSetLicense, isProcessing }: {
+function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSetLicense, onVerifyEmail, isProcessing }: {
     u: UserProfile;
     onClose: () => void;
     onUnlock: (uid: string) => void;
@@ -66,9 +68,12 @@ function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSet
     onUnban: (uid: string) => void;
     onRevoke: (uid: string) => void;
     onSetLicense: (uid: string, license: LicenseType) => void;
+    onVerifyEmail: (uid: string) => Promise<void>;
     isProcessing: boolean;
 }) {
     const [licenseMenuOpen, setLicenseMenuOpen] = useState(false);
+    const [verifyingEmail, setVerifyingEmail] = useState(false);
+    const [emailVerifyDone, setEmailVerifyDone] = useState(false);
     const isBanned = u.status === 'banned';
     let statusLabel = isBanned ? 'ถูกแบน' : 'ตลอดชีพ';
     let statusColor = isBanned ? '#FCA5A5' : '#6EE7B7';
@@ -244,6 +249,42 @@ function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSet
                         </div>
                     </div>
 
+                    {/* Verify Email */}
+                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(6,182,212,0.08)', borderRadius: '12px', border: '1px solid rgba(6,182,212,0.2)' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#67E8F9', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <MailCheck size={13} /> ยืนยันอีเมล
+                        </div>
+                        <button
+                            onClick={async () => {
+                                setVerifyingEmail(true);
+                                try {
+                                    await onVerifyEmail(u.uid);
+                                    setEmailVerifyDone(true);
+                                } finally {
+                                    setVerifyingEmail(false);
+                                }
+                            }}
+                            disabled={isProcessing || verifyingEmail || emailVerifyDone}
+                            style={{
+                                width: '100%',
+                                background: emailVerifyDone ? 'rgba(16,185,129,0.1)' : 'rgba(6,182,212,0.1)',
+                                color: emailVerifyDone ? '#6EE7B7' : '#67E8F9',
+                                border: `1px solid ${emailVerifyDone ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.3)'}`,
+                                borderRadius: '8px', padding: '0.5rem 0.875rem',
+                                fontSize: '0.8125rem', fontWeight: 600,
+                                cursor: (isProcessing || verifyingEmail || emailVerifyDone) ? 'not-allowed' : 'pointer',
+                                opacity: (isProcessing || verifyingEmail) ? 0.5 : 1,
+                                display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left',
+                            }}
+                        >
+                            {verifyingEmail ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : emailVerifyDone ? <CheckCircle size={13} /> : <MailCheck size={13} />}
+                            <span>
+                                <span style={{ display: 'block' }}>{emailVerifyDone ? 'ยืนยันอีเมลแล้ว ✓' : 'ยืนยันอีเมลแทนผู้ใช้'}</span>
+                                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>force-verify ผ่าน Firebase Admin SDK</span>
+                            </span>
+                        </button>
+                    </div>
+
                     {/* Danger Zone */}
                     <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(220,38,38,0.08)', borderRadius: '12px', border: '1px solid rgba(220,38,38,0.2)' }}>
                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCA5A5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
@@ -359,6 +400,7 @@ function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSet
             <style>{`
                 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
                 @keyframes slideInRight { from { transform: translateX(100%) } to { transform: translateX(0) } }
+                @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
             `}</style>
         </>
     );
@@ -366,35 +408,36 @@ function UserDetailPanel({ u, onClose, onUnlock, onBan, onUnban, onRevoke, onSet
 
 export default function AdminDashboard() {
     const { user, profile } = useAuth();
-    const { getAllUsers, updateUserLicense } = useFirestore(user?.uid ?? null, null);
+    const { updateUserLicense } = useFirestore(user?.uid ?? null, null);
 
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
-    const [refreshing, setRefreshing] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
-    const loadUsers = async (showRefresh = false) => {
-        if (showRefresh) setRefreshing(true);
-        else setLoading(true);
-        setError(null);
-        try {
-            const result = await getAllUsers();
-            setUsers(result);
-        } catch (err: unknown) {
-            const e = err as { message?: string };
-            setError(e.message || 'ไม่สามารถโหลดข้อมูลผู้ใช้งานได้');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
+    // Real-time listener
+    useEffect(() => {
+        const unsubscribe = onSnapshot(
+            collection(clientDb, 'users'),
+            (snap) => {
+                const result = snap.docs
+                    .map(d => d.data() as UserProfile)
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                setUsers(result);
+                setLoading(false);
+                setError(null);
+            },
+            (err) => {
+                setError(err.message || 'ไม่สามารถโหลดข้อมูลผู้ใช้งานได้');
+                setLoading(false);
+            }
+        );
+        return () => unsubscribe();
+    }, []);
 
-    useEffect(() => { loadUsers(); }, [getAllUsers]);
-
-    // Sync selected user data when users list refreshes
+    // Sync selected user panel when live data changes
     useEffect(() => {
         if (selectedUser) {
             const updated = users.find(u => u.uid === selectedUser.uid);
@@ -440,6 +483,19 @@ export default function AdminDashboard() {
             await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
+    };
+
+    const handleVerifyEmail = async (targetUid: string) => {
+        const idToken = await user!.getIdToken();
+        const res = await fetch('/api/admin-verify-email', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetUid }),
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({})) as { error?: string };
+            throw new Error(body.error || `HTTP ${res.status}`);
+        }
     };
 
     const handleSetLicense = async (uid: string, license: LicenseType) => {
@@ -537,15 +593,15 @@ export default function AdminDashboard() {
                         <p style={{ color: 'rgba(165,180,252,0.8)', fontSize: '0.875rem', margin: 0 }}>จัดการสิทธิ์และข้อมูลผู้ใช้งาน HorCare</p>
                     </div>
                 </div>
-                <button onClick={() => loadUsers(true)} disabled={refreshing} style={{
-                    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '10px', color: '#C7D2FE', padding: '0.625rem 1.25rem',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    fontSize: '0.875rem', fontWeight: 500,
+                <div style={{
+                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)',
+                    borderRadius: '10px', color: '#6EE7B7', padding: '0.5rem 1rem',
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    fontSize: '0.8125rem', fontWeight: 500,
                 }}>
-                    <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-                    รีเฟรช
-                </button>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                    Live
+                </div>
             </div>
 
             {/* Stats */}
@@ -712,6 +768,7 @@ export default function AdminDashboard() {
                     onUnban={handleUnban}
                     onRevoke={handleRevoke}
                     onSetLicense={handleSetLicense}
+                    onVerifyEmail={handleVerifyEmail}
                     isProcessing={processingId === selectedUser.uid}
                 />
             )}
