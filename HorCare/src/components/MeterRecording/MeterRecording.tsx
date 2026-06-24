@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
     ChevronLeft, ChevronRight, Home, Banknote, FileText,
@@ -280,12 +281,12 @@ export default function MeterRecording({
 
         if (pending.length === 0) return;
 
-        setBulkProgress({ current: 0, total: pending.length, roomNumber: '', done: false, failed: 0 });
+        flushSync(() => setBulkProgress({ current: 0, total: pending.length, roomNumber: '', done: false, failed: 0 }));
         let failed = 0;
 
         for (let i = 0; i < pending.length; i++) {
             const room = pending[i];
-            setBulkProgress({ current: i + 1, total: pending.length, roomNumber: room.room_number, done: false, failed });
+            flushSync(() => setBulkProgress({ current: i + 1, total: pending.length, roomNumber: room.room_number, done: false, failed }));
 
             const state = recordingState[room.id];
             const prevElec = parseInt(state.prevElec) || 0;
@@ -322,7 +323,7 @@ export default function MeterRecording({
             }
         }
 
-        setBulkProgress(prev => prev ? { ...prev, done: true, failed } : null);
+        flushSync(() => setBulkProgress(prev => prev ? { ...prev, done: true, failed } : null));
     };
 
     // ── CSV export template ────────────────────────────────────────────────────
