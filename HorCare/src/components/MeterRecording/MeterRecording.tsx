@@ -651,58 +651,167 @@ export default function MeterRecording({
         {bulkProgress && (
             <div style={{
                 position: 'fixed', inset: 0, zIndex: 500,
-                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                background: 'rgba(10,8,30,0.75)', backdropFilter: 'blur(8px)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '1rem',
+                animation: 'bsOverlayIn 0.2s ease',
             }}>
+                <style>{`
+                    @keyframes bsOverlayIn { from { opacity:0 } to { opacity:1 } }
+                    @keyframes bsCardIn { from { opacity:0; transform:scale(0.88) translateY(16px) } to { opacity:1; transform:scale(1) translateY(0) } }
+                    @keyframes bsSpin { to { transform:rotate(360deg) } }
+                    @keyframes bsPulseRing { 0%,100% { transform:scale(1); opacity:0.6 } 50% { transform:scale(1.18); opacity:0.15 } }
+                    @keyframes bsCountPop { 0% { transform:scale(1) } 40% { transform:scale(1.18) } 100% { transform:scale(1) } }
+                    @keyframes bsRoomSlide { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
+                    @keyframes bsShimmer { from { transform:translateX(-100%) } to { transform:translateX(200%) } }
+                    @keyframes bsSuccessScale { 0% { transform:scale(0.5); opacity:0 } 60% { transform:scale(1.15) } 100% { transform:scale(1); opacity:1 } }
+                    @keyframes bsDotBounce { 0%,80%,100% { transform:translateY(0) } 40% { transform:translateY(-6px) } }
+                `}</style>
+
                 <div style={{
-                    background: '#fff', borderRadius: '20px', padding: '2rem',
-                    width: '100%', maxWidth: '380px',
-                    boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+                    background: 'linear-gradient(160deg,#0f0c29,#1a1040,#24243e)',
+                    borderRadius: '24px', padding: '2.25rem 2rem',
+                    width: '100%', maxWidth: '360px',
+                    boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.07)',
                     textAlign: 'center',
+                    animation: 'bsCardIn 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                    position: 'relative', overflow: 'hidden',
                 }}>
+                    {/* Ambient glow bg */}
                     <div style={{
-                        width: 60, height: 60, borderRadius: '50%', margin: '0 auto 1.25rem',
-                        background: bulkProgress.done ? 'linear-gradient(135deg,#10B981,#059669)' : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                        {bulkProgress.done
-                            ? <CheckCircle size={28} color="#fff" />
-                            : <Layers size={26} color="#fff" style={{ animation: 'pulse 1s infinite' }} />}
+                        position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
+                        width: 200, height: 200, borderRadius: '50%',
+                        background: bulkProgress.done ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.2)',
+                        filter: 'blur(40px)', pointerEvents: 'none', transition: 'background 0.5s',
+                    }} />
+
+                    {/* Icon */}
+                    <div style={{ position: 'relative', width: 72, height: 72, margin: '0 auto 1.5rem' }}>
+                        {!bulkProgress.done && (
+                            <>
+                                {/* Pulse ring */}
+                                <div style={{
+                                    position: 'absolute', inset: -4, borderRadius: '50%',
+                                    background: 'rgba(99,102,241,0.3)',
+                                    animation: 'bsPulseRing 1.5s ease-in-out infinite',
+                                }} />
+                                {/* Spinning ring */}
+                                <svg style={{ position: 'absolute', inset: 0, animation: 'bsSpin 1.2s linear infinite' }} viewBox="0 0 72 72">
+                                    <circle cx="36" cy="36" r="33" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+                                    <circle cx="36" cy="36" r="33" fill="none" stroke="url(#spinGrad)" strokeWidth="3"
+                                        strokeDasharray="60 150" strokeLinecap="round" />
+                                    <defs>
+                                        <linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#818CF8" />
+                                            <stop offset="100%" stopColor="#C084FC" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                            </>
+                        )}
+                        <div style={{
+                            position: 'absolute', inset: 0, borderRadius: '50%',
+                            background: bulkProgress.done
+                                ? 'linear-gradient(135deg,#10B981,#059669)'
+                                : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            animation: bulkProgress.done ? 'bsSuccessScale 0.45s cubic-bezier(0.34,1.56,0.64,1)' : 'none',
+                            transition: 'background 0.4s',
+                            boxShadow: bulkProgress.done ? '0 0 24px rgba(16,185,129,0.5)' : '0 0 20px rgba(99,102,241,0.4)',
+                        }}>
+                            {bulkProgress.done
+                                ? <CheckCircle size={30} color="#fff" />
+                                : <Layers size={26} color="#fff" />}
+                        </div>
                     </div>
 
-                    <h3 style={{ fontWeight: 800, fontSize: '1.125rem', margin: '0 0 0.25rem', color: '#111827' }}>
-                        {bulkProgress.done ? 'บันทึกเสร็จสิ้น' : 'กำลังบันทึก...'}
+                    {/* Title */}
+                    <h3 style={{ fontWeight: 800, fontSize: '1.125rem', margin: '0 0 0.375rem', color: '#fff' }}>
+                        {bulkProgress.done ? '🎉 บันทึกเสร็จสิ้น' : 'กำลังบันทึก...'}
                     </h3>
-                    <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: '0 0 1.5rem' }}>
+
+                    {/* Room name / summary */}
+                    <p key={bulkProgress.roomNumber + bulkProgress.done} style={{
+                        color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem', margin: '0 0 1.75rem',
+                        animation: 'bsRoomSlide 0.2s ease',
+                        minHeight: '1.4em',
+                    }}>
                         {bulkProgress.done
-                            ? `บันทึกแล้ว ${bulkProgress.total - bulkProgress.failed}/${bulkProgress.total} ห้อง${bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed} ห้อง` : ' ✅'}`
+                            ? `${bulkProgress.total - bulkProgress.failed} ห้อง สำเร็จ${bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed}` : ''}`
                             : `ห้อง ${bulkProgress.roomNumber}`}
                     </p>
 
-                    {/* Counter */}
-                    <div style={{ fontSize: '2rem', fontWeight: 900, color: '#6366F1', fontFamily: 'var(--font-mono)', marginBottom: '1rem', letterSpacing: '-0.02em' }}>
-                        {bulkProgress.current}<span style={{ fontSize: '1.1rem', color: '#9CA3AF', fontWeight: 500 }}>/{bulkProgress.total}</span>
+                    {/* Big counter */}
+                    <div key={bulkProgress.current} style={{
+                        animation: 'bsCountPop 0.25s ease',
+                        marginBottom: '1.25rem',
+                        lineHeight: 1,
+                    }}>
+                        <span style={{
+                            fontSize: '3rem', fontWeight: 900, color: '#fff',
+                            fontFamily: 'var(--font-mono)', letterSpacing: '-0.04em',
+                        }}>
+                            {bulkProgress.current}
+                        </span>
+                        <span style={{ fontSize: '1.25rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>
+                            /{bulkProgress.total}
+                        </span>
                     </div>
 
                     {/* Progress bar */}
-                    <div style={{ background: '#F3F4F6', borderRadius: '999px', height: 10, overflow: 'hidden', marginBottom: '1.5rem' }}>
+                    <div style={{
+                        background: 'rgba(255,255,255,0.08)', borderRadius: '999px',
+                        height: 8, overflow: 'hidden', marginBottom: '0.75rem', position: 'relative',
+                    }}>
                         <div style={{
-                            height: '100%', borderRadius: '999px',
-                            background: bulkProgress.done ? 'linear-gradient(90deg,#10B981,#059669)' : 'linear-gradient(90deg,#6366F1,#8B5CF6)',
+                            height: '100%', borderRadius: '999px', position: 'relative', overflow: 'hidden',
+                            background: bulkProgress.done
+                                ? 'linear-gradient(90deg,#10B981,#34D399)'
+                                : 'linear-gradient(90deg,#6366F1,#A78BFA,#C084FC)',
                             width: `${(bulkProgress.current / bulkProgress.total) * 100}%`,
-                            transition: 'width 0.3s ease',
-                        }} />
+                            transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)',
+                            boxShadow: bulkProgress.done ? '0 0 12px #10B981' : '0 0 12px #818CF8',
+                        }}>
+                            {/* Shimmer */}
+                            {!bulkProgress.done && (
+                                <div style={{
+                                    position: 'absolute', inset: 0,
+                                    background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent)',
+                                    animation: 'bsShimmer 1.4s ease infinite',
+                                }} />
+                            )}
+                        </div>
                     </div>
 
-                    {bulkProgress.done && (
+                    {/* Percent */}
+                    <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.35)', marginBottom: '1.75rem', fontFamily: 'var(--font-mono)' }}>
+                        {Math.round((bulkProgress.current / bulkProgress.total) * 100)}%
+                    </div>
+
+                    {/* Waiting dots / Close button */}
+                    {bulkProgress.done ? (
                         <button
                             onClick={() => setBulkProgress(null)}
-                            className="btn btn-primary"
-                            style={{ width: '100%', padding: '0.75rem', fontSize: '0.9375rem', fontWeight: 700 }}
+                            style={{
+                                width: '100%', padding: '0.8rem', fontSize: '0.9375rem', fontWeight: 700,
+                                background: 'linear-gradient(135deg,#10B981,#059669)',
+                                color: '#fff', border: 'none', borderRadius: '14px',
+                                cursor: 'pointer', boxShadow: '0 4px 20px rgba(16,185,129,0.4)',
+                                animation: 'bsRoomSlide 0.3s ease 0.1s both',
+                            }}
                         >
-                            ปิด
+                            เสร็จสิ้น ✓
                         </button>
+                    ) : (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
+                            {[0, 1, 2].map(i => (
+                                <div key={i} style={{
+                                    width: 6, height: 6, borderRadius: '50%',
+                                    background: 'rgba(165,180,252,0.6)',
+                                    animation: `bsDotBounce 1.2s ease ${i * 0.2}s infinite`,
+                                }} />
+                            ))}
+                        </div>
                     )}
                 </div>
             </div>
