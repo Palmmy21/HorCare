@@ -6,7 +6,7 @@ import { useFirestore } from '../../hooks/useFirestore';
 import type { UserProfile, LicenseType } from '../../types';
 import {
     Search, Loader2, CheckCircle, Clock, Shield, AlertTriangle,
-    Users, UserCheck, Timer, XCircle, RefreshCw, Key, Infinity as InfinityIcon,
+    Users, UserCheck, Timer, XCircle, Key, Infinity as InfinityIcon,
     X, Mail, CalendarDays, Hash, BadgeCheck, ShieldAlert, Copy,
     Ban, RotateCcw, ShieldOff, Crown, Package, ChevronDown, MailCheck
 } from 'lucide-react';
@@ -451,7 +451,6 @@ export default function AdminDashboard() {
         setProcessingId(uid);
         try {
             await updateUserLicense(uid, { license: 'active' });
-            await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
     };
@@ -461,7 +460,6 @@ export default function AdminDashboard() {
         setProcessingId(uid);
         try {
             await updateUserLicense(uid, { status: 'banned' });
-            await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
     };
@@ -470,7 +468,6 @@ export default function AdminDashboard() {
         setProcessingId(uid);
         try {
             await updateUserLicense(uid, { status: 'active' });
-            await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
     };
@@ -480,7 +477,6 @@ export default function AdminDashboard() {
         setProcessingId(uid);
         try {
             await updateUserLicense(uid, { license: 'free', access_until: 0 });
-            await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
     };
@@ -528,7 +524,6 @@ export default function AdminDashboard() {
                 updates.access_until = undefined;
             }
             await updateUserLicense(uid, updates);
-            await loadUsers(true);
         } catch (err) { console.error(err); }
         finally { setProcessingId(null); }
     };
