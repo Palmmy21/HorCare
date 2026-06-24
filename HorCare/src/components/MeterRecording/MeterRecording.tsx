@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
     ChevronLeft, ChevronRight, Home, Banknote, FileText,
-    Download, Upload, X,
+    Download, Upload, X, Layers,
 } from 'lucide-react';
 import type { Room, DormConfig, MonthlyBill } from '../../types';
 import {
@@ -87,6 +87,7 @@ export default function MeterRecording({
     const [savingRooms, setSavingRooms] = useState<Record<string, boolean>>({});
     const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
     const [importResult, setImportResult] = useState<{ updated: number; skipped: string[] } | null>(null);
+    const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomNumber: string; done: boolean; failed: number } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const draftKey = `${DRAFT_PREFIX}${buildingId || 'local'}_${currentMonth}`;
@@ -250,6 +251,67 @@ export default function MeterRecording({
         } finally {
             setSavingRooms(prev => ({ ...prev, [roomId]: false }));
         }
+    };
+
+    // ── Save all rooms at once ─────────────────────────────────────────────────
+    const handleSaveAll = async () => {
+        const activeRooms = rooms.filter(r => r.is_active);
+        const pending = activeRooms.filter(room => {
+            const state = recordingState[room.id];
+            if (!state || state.isSaved || state.isLocked) return false;
+            const prevElec = parseInt(state.prevElec) || 0;
+            const prevWater = parseInt(state.prevWater) || 0;
+            const currElec = parseInt(state.currElec) || 0;
+            const currWater = parseInt(state.currWater) || 0;
+            return state.currElec !== '' && state.currWater !== '' &&
+                validateReading(prevElec, currElec).valid && validateReading(prevWater, currWater).valid;
+        });
+
+        if (pending.length === 0) return;
+
+        setBulkProgress({ current: 0, total: pending.length, roomNumber: '', done: false, failed: 0 });
+        let failed = 0;
+
+        for (let i = 0; i < pending.length; i++) {
+            const room = pending[i];
+            setBulkProgress({ current: i + 1, total: pending.length, roomNumber: room.room_number, done: false, failed });
+
+            const state = recordingState[room.id];
+            const prevElec = parseInt(state.prevElec) || 0;
+            const prevWater = parseInt(state.prevWater) || 0;
+            const currElec = parseInt(state.currElec) || 0;
+            const currWater = parseInt(state.currWater) || 0;
+            const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+            const { electricityRate, waterConfig } = getEffectiveRates(room, config);
+            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig);
+            const bill: MonthlyBill = {
+                id: `bill_${room.id}_${currentMonth}`,
+                room_id: room.id,
+                room_number: room.room_number,
+                month: currentMonth,
+                prev_elec: prevElec, curr_elec: currElec,
+                elec_units: calculation.elec_units, elec_bill: calculation.elec_bill,
+                prev_water: prevWater, curr_water: currWater,
+                water_units: calculation.water_units, water_bill: calculation.water_bill,
+                water_flat_amount: calculation.water_flat_amount,
+                water_excess_units: calculation.water_excess_units,
+                water_excess_amount: calculation.water_excess_amount,
+                room_rent: effectiveRent,
+                total_bill: calculation.total_bill,
+                is_saved: true, is_locked: false, is_notified: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+            try {
+                await onSaveBill(bill);
+                removeDraft(draftKey, room.id);
+                setRecordingState(prev => ({ ...prev, [room.id]: { ...prev[room.id], isSaved: true } }));
+            } catch {
+                failed++;
+            }
+        }
+
+        setBulkProgress(prev => prev ? { ...prev, done: true, failed } : null);
     };
 
     // ── CSV export template ────────────────────────────────────────────────────
@@ -585,12 +647,88 @@ export default function MeterRecording({
 
     return (
         <div>
+        {/* Bulk save progress modal */}
+        {bulkProgress && (
+            <div style={{
+                position: 'fixed', inset: 0, zIndex: 500,
+                background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '1rem',
+            }}>
+                <div style={{
+                    background: '#fff', borderRadius: '20px', padding: '2rem',
+                    width: '100%', maxWidth: '380px',
+                    boxShadow: '0 24px 60px rgba(0,0,0,0.25)',
+                    textAlign: 'center',
+                }}>
+                    <div style={{
+                        width: 60, height: 60, borderRadius: '50%', margin: '0 auto 1.25rem',
+                        background: bulkProgress.done ? 'linear-gradient(135deg,#10B981,#059669)' : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                        {bulkProgress.done
+                            ? <CheckCircle size={28} color="#fff" />
+                            : <Layers size={26} color="#fff" style={{ animation: 'pulse 1s infinite' }} />}
+                    </div>
+
+                    <h3 style={{ fontWeight: 800, fontSize: '1.125rem', margin: '0 0 0.25rem', color: '#111827' }}>
+                        {bulkProgress.done ? 'บันทึกเสร็จสิ้น' : 'กำลังบันทึก...'}
+                    </h3>
+                    <p style={{ color: '#6B7280', fontSize: '0.875rem', margin: '0 0 1.5rem' }}>
+                        {bulkProgress.done
+                            ? `บันทึกแล้ว ${bulkProgress.total - bulkProgress.failed}/${bulkProgress.total} ห้อง${bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed} ห้อง` : ' ✅'}`
+                            : `ห้อง ${bulkProgress.roomNumber}`}
+                    </p>
+
+                    {/* Counter */}
+                    <div style={{ fontSize: '2rem', fontWeight: 900, color: '#6366F1', fontFamily: 'var(--font-mono)', marginBottom: '1rem', letterSpacing: '-0.02em' }}>
+                        {bulkProgress.current}<span style={{ fontSize: '1.1rem', color: '#9CA3AF', fontWeight: 500 }}>/{bulkProgress.total}</span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ background: '#F3F4F6', borderRadius: '999px', height: 10, overflow: 'hidden', marginBottom: '1.5rem' }}>
+                        <div style={{
+                            height: '100%', borderRadius: '999px',
+                            background: bulkProgress.done ? 'linear-gradient(90deg,#10B981,#059669)' : 'linear-gradient(90deg,#6366F1,#8B5CF6)',
+                            width: `${(bulkProgress.current / bulkProgress.total) * 100}%`,
+                            transition: 'width 0.3s ease',
+                        }} />
+                    </div>
+
+                    {bulkProgress.done && (
+                        <button
+                            onClick={() => setBulkProgress(null)}
+                            className="btn btn-primary"
+                            style={{ width: '100%', padding: '0.75rem', fontSize: '0.9375rem', fontWeight: 700 }}
+                        >
+                            ปิด
+                        </button>
+                    )}
+                </div>
+            </div>
+        )}
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
                     <p className="page-subtitle">กรอกเลขมิเตอร์และกดบันทึกแต่ละห้อง</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    {(() => {
+                        const pendingCount = rooms.filter(r => r.is_active).filter(room => {
+                            const state = recordingState[room.id];
+                            if (!state || state.isSaved || state.isLocked) return false;
+                            return state.currElec !== '' && state.currWater !== '';
+                        }).length;
+                        return pendingCount > 0 ? (
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={handleSaveAll}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontWeight: 700 }}
+                            >
+                                <Layers size={15} /> บันทึกทั้งหมด ({pendingCount})
+                            </button>
+                        ) : null;
+                    })()}
                     <button
                         className="btn btn-outline btn-sm"
                         onClick={exportTemplate}
