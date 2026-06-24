@@ -463,7 +463,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                         {verifyStatus === 'sent' && (
                             <button
                                 onClick={handleCheckVerified}
-                                disabled={verifyStatus === 'checking'}
+                                disabled={false}
                                 style={{
                                     display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                                     background: 'transparent',
