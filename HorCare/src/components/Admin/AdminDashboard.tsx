@@ -560,6 +560,28 @@ export default function AdminDashboard() {
         u.display_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const missingProfileCount = users.filter(u => !u.has_firestore_profile).length;
+    const [backfilling, setBackfilling] = useState(false);
+
+    const handleBackfill = async () => {
+        if (!confirm(`สร้าง Firestore profile ให้ ${missingProfileCount} user ที่ยังไม่มี?`)) return;
+        setBackfilling(true);
+        try {
+            const idToken = await user!.getIdToken();
+            const res = await fetch('/api/admin-backfill-profiles', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${idToken}` },
+            });
+            const data = await res.json() as { created: number; message?: string };
+            alert(`✅ สร้างแล้ว ${data.created} profiles`);
+            await loadUsers(true);
+        } catch (err) {
+            alert('Error: ' + (err as Error).message);
+        } finally {
+            setBackfilling(false);
+        }
+    };
+
     const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
 
     if (!isAdmin) {
@@ -615,16 +637,32 @@ export default function AdminDashboard() {
                         <p style={{ color: 'rgba(165,180,252,0.8)', fontSize: '0.875rem', margin: 0 }}>จัดการสิทธิ์และข้อมูลผู้ใช้งาน HorCare</p>
                     </div>
                 </div>
-                <button onClick={() => loadUsers(true)} disabled={refreshing} style={{
-                    background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '10px', color: '#C7D2FE', padding: '0.625rem 1.25rem',
-                    cursor: refreshing ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    fontSize: '0.875rem', fontWeight: 500,
-                }}>
-                    <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-                    รีเฟรช
-                </button>
+                <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
+                    {missingProfileCount > 0 && (
+                        <button onClick={handleBackfill} disabled={backfilling} style={{
+                            background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)',
+                            borderRadius: '10px', color: '#FCD34D', padding: '0.625rem 1.25rem',
+                            cursor: backfilling ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '0.5rem',
+                            fontSize: '0.875rem', fontWeight: 600,
+                        }}>
+                            {backfilling
+                                ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                                : <AlertTriangle size={15} />}
+                            สร้าง {missingProfileCount} profile ที่หาย
+                        </button>
+                    )}
+                    <button onClick={() => loadUsers(true)} disabled={refreshing} style={{
+                        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: '10px', color: '#C7D2FE', padding: '0.625rem 1.25rem',
+                        cursor: refreshing ? 'not-allowed' : 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        fontSize: '0.875rem', fontWeight: 500,
+                    }}>
+                        <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+                        รีเฟรช
+                    </button>
+                </div>
             </div>
 
             {/* Stats */}

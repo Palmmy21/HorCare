@@ -42,9 +42,25 @@ export function useAuth() {
                 const { onSnapshot, doc } = await import('firebase/firestore');
                 profileUnsubscribe = onSnapshot(
                     doc(db, 'users', firebaseUser.uid),
-                    (docSnap) => {
+                    async (docSnap) => {
                         if (docSnap.exists()) {
                             setProfile(docSnap.data() as UserProfile);
+                        } else {
+                            // Profile missing — create it now (handles incomplete signups & legacy users)
+                            const fallback: UserProfile = {
+                                uid: firebaseUser.uid,
+                                email: firebaseUser.email ?? '',
+                                display_name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? '',
+                                license: 'free',
+                                access_until: 0,
+                                created_at: firebaseUser.metadata.creationTime ?? new Date().toISOString(),
+                            };
+                            try {
+                                await setDoc(doc(db, 'users', firebaseUser.uid), fallback);
+                            } catch (e) {
+                                console.warn('Auto-create profile failed:', e);
+                                setProfile(fallback);
+                            }
                         }
                     },
                     (error) => {
