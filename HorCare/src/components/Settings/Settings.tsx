@@ -36,6 +36,8 @@ interface SettingsProps {
     userEmail: string;
     onSendVerifyEmail: () => Promise<unknown>;
     onRefreshEmailVerified: () => Promise<boolean>;
+    isPaid?: boolean;
+    onUpgrade?: () => void;
 }
 
 const BUILDING_TYPES = [
@@ -86,7 +88,7 @@ const BUILDING_TYPES = [
     },
 ];
 
-export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified }: SettingsProps) {
+export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade }: SettingsProps) {
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,
@@ -809,7 +811,39 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             </div>
 
             {/* LINE Integration */}
-            <div className="settings-section">
+            <div className="settings-section" style={{ position: 'relative' }}>
+            {!isPaid && (
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 10,
+                    background: 'rgba(255,255,255,0.82)',
+                    backdropFilter: 'blur(3px)',
+                    borderRadius: 'inherit',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+                }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: '50%',
+                        background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 16px rgba(109,40,217,0.3)',
+                    }}>
+                        <Lock size={22} color="#fff" />
+                    </div>
+                    <p style={{ margin: 0, fontWeight: 700, color: '#111827', fontSize: '0.9375rem' }}>ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงิน</p>
+                    <button
+                        onClick={onUpgrade}
+                        style={{
+                            background: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
+                            color: '#fff', border: 'none', borderRadius: '10px',
+                            padding: '0.625rem 1.5rem', fontWeight: 700, fontSize: '0.875rem',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem',
+                            boxShadow: '0 4px 14px rgba(139,92,246,0.35)',
+                        }}
+                    >
+                        <Zap size={15} /> ดูแพ็กเกจ
+                    </button>
+                </div>
+            )}
                 <h3 className="settings-title">
                     <MessageCircle size={20} color="#06C755" />
                     เชื่อมต่อ LINE (ส่งบิลผ่าน LINE)
@@ -1123,7 +1157,39 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             </div>
 
             {/* Tenant Portal PIN */}
-            <div className="settings-section">
+            <div className="settings-section" style={{ position: 'relative' }}>
+            {!isPaid && (
+                <div style={{
+                    position: 'absolute', inset: 0, zIndex: 10,
+                    background: 'rgba(255,255,255,0.82)',
+                    backdropFilter: 'blur(3px)',
+                    borderRadius: 'inherit',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: '0.75rem',
+                }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: '50%',
+                        background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 16px rgba(109,40,217,0.3)',
+                    }}>
+                        <Lock size={22} color="#fff" />
+                    </div>
+                    <p style={{ margin: 0, fontWeight: 700, color: '#111827', fontSize: '0.9375rem' }}>ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงิน</p>
+                    <button
+                        onClick={onUpgrade}
+                        style={{
+                            background: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
+                            color: '#fff', border: 'none', borderRadius: '10px',
+                            padding: '0.625rem 1.5rem', fontWeight: 700, fontSize: '0.875rem',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem',
+                            boxShadow: '0 4px 14px rgba(139,92,246,0.35)',
+                        }}
+                    >
+                        <Zap size={15} /> ดูแพ็กเกจ
+                    </button>
+                </div>
+            )}
                 <h3 className="settings-title">
                     <Lock size={20} color="#059669" />
                     พอร์ทัลผู้เช่า — PIN

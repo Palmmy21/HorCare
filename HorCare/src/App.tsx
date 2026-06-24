@@ -817,6 +817,8 @@ function App() {
             userEmail={user?.email ?? ''}
             onSendVerifyEmail={sendVerifyEmailViaResend}
             onRefreshEmailVerified={refreshEmailVerified}
+            isPaid={hasPaidSubscription}
+            onUpgrade={() => setCurrentView('pricing')}
           />
         )}
 
