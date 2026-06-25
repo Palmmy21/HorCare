@@ -41,12 +41,24 @@ service cloud.firestore {
              || au > request.time.toMillis();
     }
 
-    // Fields only the backend (or admin) should write — never the user directly
+    // Fields only the backend (or admin) should write — never the user directly (updates only)
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
                              'current_period_end', 'access_until', 'plan_name', 'billing_cycle',
                              'stripe_customer_id', 'trial_expires_at', 'role', 'status'];
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields);
+    }
+
+    // On CREATE: allow license='free' and access_until=0 (initial signup defaults),
+    // but block any billing/subscription fields that only the backend should set.
+    function isWritingProtectedFieldsOnCreate() {
+      let billingFields = ['subscription_id', 'subscription_status', 'current_period_end',
+                           'plan_name', 'billing_cycle', 'stripe_customer_id', 'trial_expires_at',
+                           'role', 'status'];
+      let hasBillingField = request.resource.data.keys().hasAny(billingFields);
+      let licenseOk = request.resource.data.get('license', 'free') == 'free';
+      let accessUntilOk = request.resource.data.get('access_until', 0) == 0;
+      return hasBillingField || !licenseOk || !accessUntilOk;
     }
 
     // ── User Profile ─────────────────────────────────────────────────────
@@ -56,7 +68,7 @@ service cloud.firestore {
       // User can write their own profile, but NOT protected subscription/license fields
       allow write: if isAdmin();
       allow update: if isOwner(userId) && !isWritingProtectedFields() && isNotBanned();
-      allow create: if isOwner(userId) && !isWritingProtectedFields();
+      allow create: if isOwner(userId) && !isWritingProtectedFieldsOnCreate();
 
       // ── Buildings ───────────────────────────────────────────────────────
       // read: any non-banned owner. write: also requires a non-expired license.
