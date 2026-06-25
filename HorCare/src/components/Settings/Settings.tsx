@@ -129,6 +129,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
     const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const startCooldown = (seconds = 60) => {
+        if (cooldownRef.current) clearInterval(cooldownRef.current);
         setVerifyCooldown(seconds);
         cooldownRef.current = setInterval(() => {
             setVerifyCooldown(prev => {
@@ -142,6 +143,20 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
         }, 1000);
     };
 
+    // Pre-fill cooldown from registration/previous send — prevents immediate re-send hitting rate limit
+    useEffect(() => {
+        const sentAt = localStorage.getItem('horcare_verify_sent_at');
+        if (!sentAt) return;
+        const elapsed = Math.floor((Date.now() - parseInt(sentAt)) / 1000);
+        const remaining = 120 - elapsed;
+        if (remaining > 0) {
+            setVerifyStatus('sent');
+            setVerifyMsg('ส่งอีเมลยืนยันแล้ว! กรุณาตรวจสอบกล่องจดหมายของคุณ');
+            startCooldown(remaining);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
     const handleSendVerifyEmail = async () => {
@@ -149,6 +164,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
         setVerifyMsg('');
         try {
             await onSendVerifyEmail();
+            localStorage.setItem('horcare_verify_sent_at', Date.now().toString());
             setVerifyStatus('sent');
             setVerifyMsg('ส่งอีเมลยืนยันแล้ว! กรุณาตรวจสอบกล่องจดหมายของคุณ');
             startCooldown(60);
@@ -172,6 +188,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             if (verified) {
                 setVerifyStatus('idle');
                 setVerifyMsg('');
+                localStorage.removeItem('horcare_verify_sent_at');
             } else {
                 setVerifyStatus('sent');
                 setVerifyMsg('ยังไม่พบการยืนยัน — กดลิงก์ในอีเมลก่อน แล้วลองใหม่');

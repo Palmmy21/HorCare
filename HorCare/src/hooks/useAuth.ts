@@ -97,6 +97,7 @@ export function useAuth() {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
                 });
+                localStorage.setItem('horcare_verify_sent_at', Date.now().toString());
             } catch (e) {
                 console.warn('send-verify-email on register failed:', (e as Error).message);
             }
@@ -180,10 +181,12 @@ export function useAuth() {
             // Resend domain not configured — fall back to Firebase native email
             if (errMsg.toLowerCase().includes('allowlist') || errMsg.toLowerCase().includes('domain')) {
                 await sendEmailVerification(auth.currentUser);
+                localStorage.setItem('horcare_verify_sent_at', Date.now().toString());
                 return { data: { sent: true } };
             }
             throw new Error(errMsg);
         }
+        localStorage.setItem('horcare_verify_sent_at', Date.now().toString());
         return res.json() as Promise<{ data: { sent: boolean; alreadyVerified?: boolean } }>;
     }, []);
 
