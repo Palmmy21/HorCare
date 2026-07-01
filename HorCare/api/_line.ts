@@ -90,13 +90,13 @@ export function buildBillFlex(
     const dueDate   = `${dueDay} ${THAI_MONTHS[m]} ${y + 543}`;
     const total     = bill.total_bill as number;
 
-    const footerContents: object[] = [
+    const footerContents: object[] = opts.portalUrl ? [
         {
             type: 'button',
-            action: { type: 'uri', label: '🔗 เปิดพอร์ทัล / ดูบิล', uri: opts.portalUrl ?? '#' },
+            action: { type: 'uri', label: '🔗 เปิดพอร์ทัล / ดูบิล', uri: opts.portalUrl },
             style: 'primary', color: '#2563EB', height: 'sm',
         },
-    ];
+    ] : [];
 
     return {
         type: 'flex',
@@ -147,10 +147,12 @@ export function buildBillFlex(
                     ] },
                 ],
             },
-            footer: {
-                type: 'box', layout: 'vertical', paddingAll: '12px',
-                contents: footerContents,
-            },
+            ...(footerContents.length > 0 ? {
+                footer: {
+                    type: 'box', layout: 'vertical', paddingAll: '12px',
+                    contents: footerContents,
+                },
+            } : {}),
         },
     };
 }

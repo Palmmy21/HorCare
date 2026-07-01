@@ -105,13 +105,14 @@ export default function Summary({
                 })
             });
 
-            if (!res.ok) throw new Error('Failed to send bills');
-            const { data } = await res.json();
-            setLineResult(data);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+            setLineResult(json.data);
             setLineStatus('done');
         } catch (error) {
             console.error('Send LINE bills error:', error);
             setLineStatus('error');
+            alert(`ส่งบิลไม่สำเร็จ: ${(error as Error).message}`);
         }
     };
 
