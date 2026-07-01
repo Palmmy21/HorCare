@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2, AlertTriangle, Smartphone, Cloud, Zap } from 'lucide-react';
-import PricingPage from '../Pricing/PricingPage';
+const PricingPage = lazy(() => import('../Pricing/PricingPage'));
 
 interface LoginPageProps {
     onLogin: (email: string, password: string) => Promise<void>;
@@ -67,12 +67,14 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
     // ─── Pricing (guest) View ────────────────────────────────────────────────
     if (mode === 'pricing') {
         return (
-            <PricingPage
-                profile={null}
-                isGuest
-                onNeedAuth={handleGuestSelectPlan}
-                onBack={() => switchMode('login')}
-            />
+            <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><Loader2 size={28} style={{ animation: 'spin 1s linear infinite' }} /></div>}>
+                <PricingPage
+                    profile={null}
+                    isGuest
+                    onNeedAuth={handleGuestSelectPlan}
+                    onBack={() => switchMode('login')}
+                />
+            </Suspense>
         );
     }
 

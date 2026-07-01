@@ -3,6 +3,7 @@ import './index.css'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 import TenantPortalPage from './components/TenantPortal/TenantPortalPage.tsx'
+import TenantGateway from './components/TenantPortal/TenantGateway.tsx'
 
 // ── Firestore internal assertion error → auto silent reload ──────────────────
 // Firebase SDK can enter a broken state when too many listeners are created /
@@ -29,16 +30,24 @@ window.addEventListener('unhandledrejection', (e) => {
   }
 });
 
-// Route: ถ้า URL มี query params ?uid= &bid= &rid= → แสดงหน้า Tenant Portal
-// Route: ถ้าเป็น path อื่น → แสดง Owner App ปกติ
+// Route: /portal            → TenantGateway (LIFF auto-identify → redirect to portal)
+// Route: ?uid=&bid=&rid=    → TenantPortalPage (direct portal link)
+// Route: everything else    → Owner App
 const params = new URLSearchParams(window.location.search);
+const isTenantGateway = window.location.pathname === '/portal';
 const isTenantPortal = params.has('uid') && params.has('bid') && params.has('rid');
+
+function Root() {
+  if (isTenantGateway) return <TenantGateway />;
+  if (isTenantPortal) return <TenantPortalPage />;
+  return <App />;
+}
 
 // NOTE: StrictMode removed — React 18 StrictMode double-mounts effects in dev,
 // which causes Firebase listeners to cycle create→destroy→create faster than
 // Firestore's Watch stream can handle, triggering INTERNAL ASSERTION errors.
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
-    {isTenantPortal ? <TenantPortalPage /> : <App />}
+    <Root />
   </ErrorBoundary>,
 )

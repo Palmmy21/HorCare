@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
@@ -10,25 +10,37 @@ import { useBuildings } from './hooks/useBuildings';
 import { useFCMToken } from './hooks/useFCMToken';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
+// Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
 import RoomManagement from './components/RoomManagement/RoomManagement';
 import MeterRecording from './components/MeterRecording/MeterRecording';
-import Summary from './components/Summary/Summary';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
-import AdminDashboard from './components/Admin/AdminDashboard';
-import PaymentsPage from './components/Payments/PaymentsPage';
-import MeterCalculator from './components/MeterCalculator/MeterCalculator';
-import PricingPage from './components/Pricing/PricingPage';
-import InstallPrompt from './components/PWA/InstallPrompt';
-import TenantsPage from './components/TenantProfile/TenantsPage';
-import MaintenancePage from './components/Maintenance/MaintenancePage';
-import OperationsPage from './components/Operations/OperationsPage';
-import FeatureLockedModal from './components/FeatureLockedModal';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine } from './hooks/useSubscription';
 import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
+// Heavy pages — lazy loaded so their chunks (jsPDF, html2canvas, Stripe, etc.)
+// are downloaded only when the user first navigates to them
+const Summary         = lazy(() => import('./components/Summary/Summary'));
+const PaymentsPage    = lazy(() => import('./components/Payments/PaymentsPage'));
+const TenantsPage     = lazy(() => import('./components/TenantProfile/TenantsPage'));
+const MaintenancePage = lazy(() => import('./components/Maintenance/MaintenancePage'));
+const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
+const MeterCalculator = lazy(() => import('./components/MeterCalculator/MeterCalculator'));
+const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
+const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
+const InstallPrompt   = lazy(() => import('./components/PWA/InstallPrompt'));
+const FeatureLockedModal = lazy(() => import('./components/FeatureLockedModal'));
 
 import './index.css';
+
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '0.75rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem' }}>
+      <div className="loading-spinner" style={{ width: 24, height: 24 }} />
+      กำลังโหลด...
+    </div>
+  );
+}
 
 
 type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'payments' | 'settings' | 'admin' | 'calculator' | 'pricing';
@@ -221,8 +233,10 @@ function App() {
     navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
   }
 
-  const PAID_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations', 'payments'];
-  const PAID_ONLY_LABELS: Record<string, string> = {
+  // Start+ features (any paid plan: Start / Plus / Pro)
+  const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations', 'payments'];
+
+  const VIEW_LABELS: Record<string, string> = {
     tenants: 'ผู้เช่า',
     maintenance: 'แจ้งซ่อม',
     operations: 'ระบบจัดการ',
@@ -230,9 +244,8 @@ function App() {
   };
 
   const handleNavClick = (view: ViewMode) => {
-    // Block free plan users from paid-only features
-    if (PAID_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
-      setShowFeatureLockedModal(PAID_ONLY_LABELS[view] ?? view);
+    if (START_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
+      setShowFeatureLockedModal(VIEW_LABELS[view] ?? view);
       setMobileMenuOpen(false);
       return;
     }
@@ -405,7 +418,7 @@ function App() {
     );
   }
 
-  // Check if user has paid subscription / large plan
+  // Plan tier checks
   const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
   const maxBuildings = profile ? getMaxBuildings(profile.license) : 1;
   const canAddBuilding = maxBuildings > 1;
@@ -585,7 +598,7 @@ function App() {
 
         <nav className="sidebar-nav">
           {navItems.map(item => {
-            const isLocked = PAID_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
+            const isLocked = START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
             const showBadge = hasPaidSubscription && (
               (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
               (item.id === 'operations' && lowStockCount > 0)
@@ -650,7 +663,7 @@ function App() {
               <span style={{ fontWeight: 700, fontSize: '0.8125rem' }}>อัปเกรดแผน</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'rgba(196,181,253,0.7)', lineHeight: 1.4 }}>
-              เริ่มต้น ฿79/เดือน
+              Start ฿79 · Plus ฿199/เดือน
             </div>
           </button>
         )}
@@ -704,6 +717,7 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
+      <Suspense fallback={<PageLoader />}>
         {currentView === 'dashboard' && (
           <Dashboard
             config={config}
@@ -839,6 +853,7 @@ function App() {
             }}
           />
         )}
+      </Suspense>
       </main>
       <InstallPrompt />
 

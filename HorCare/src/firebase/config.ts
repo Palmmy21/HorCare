@@ -1,6 +1,6 @@
 // Firebase Configuration
 import { initializeApp } from 'firebase/app';
-import { getFirestore, initializeFirestore, persistentLocalCache } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getMessaging, isSupported } from 'firebase/messaging';

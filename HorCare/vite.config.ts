@@ -5,11 +5,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   server: {
     proxy: {
-      // Vite has no runtime for the Vercel functions in api/, so local dev
-      // forwards API calls to the deployed production functions instead.
+      // Local dev forwards API calls to the deployed production functions
       '/api': {
         target: 'https://hor-care.vercel.app',
         changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Firebase SDK — large but shared across the whole app; cache separately
+          'firebase-core': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          'firebase-extra': ['firebase/storage', 'firebase/messaging'],
+          // PDF / image export — only needed when user clicks "export"
+          'pdf-export': ['jspdf', 'jspdf-autotable', 'html2canvas', 'html-to-image'],
+          // QR code generation
+          'qr': ['qrcode.react', 'promptpay-qr'],
+          // React runtime
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
       },
     },
   },
@@ -18,7 +34,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: { enabled: true },
-      includeAssets: ['favicon.svg', 'logo.png', 'logo-icon.png', 'apple-touch-icon.png'],
+      // Only precache lightweight app-shell assets — NOT large PNGs (they get
+      // runtime-cached on first use instead, keeping the SW install fast)
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'HorCare - ระบบจัดการหอพัก',
         short_name: 'HorCare',
@@ -32,39 +50,36 @@ export default defineConfig({
         categories: ['business', 'utilities'],
         lang: 'th',
         icons: [
-          {
-            src: '/pwa-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            src: '/pwa-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            src: '/pwa-maskable-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
-          }
-        ]
+          { src: '/pwa-192.png',         sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/pwa-512.png',         sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/pwa-maskable-512.png',sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Precache only JS, CSS, HTML, SVG — skip large PNGs
+        globPatterns: ['**/*.{js,css,html,svg,ico,woff2}'],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         runtimeCaching: [
+          // App icons & logos — cache after first request, long TTL
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|webp|gif)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images-cache',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Google Fonts
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'google-fonts-cache',
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] }
-            }
+              cacheableResponse: { statuses: [0, 200] },
+            },
           },
           {
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
@@ -72,21 +87,14 @@ export default defineConfig({
             options: {
               cacheName: 'gstatic-fonts-cache',
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] }
-            }
+              cacheableResponse: { statuses: [0, 200] },
+            },
           },
-          {
-            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'firestore-cache',
-              networkTimeoutSeconds: 10,
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-              cacheableResponse: { statuses: [0, 200] }
-            }
-          }
-        ]
-      }
-    })
+          // NOTE: firestore.googleapis.com intentionally NOT cached here.
+          // Firebase SDK's persistentLocalCache() (IndexedDB) handles Firestore
+          // offline support correctly — workbox HTTP-level caching would conflict.
+        ],
+      },
+    }),
   ],
 })
