@@ -18,6 +18,7 @@ import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine } from './hooks/useSubscription';
 import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
+import SlipNotificationToast from './components/SlipNotificationToast';
 // Heavy pages — lazy loaded so their chunks (jsPDF, html2canvas, Stripe, etc.)
 // are downloaded only when the user first navigates to them
 const Summary         = lazy(() => import('./components/Summary/Summary'));
@@ -431,6 +432,10 @@ function App() {
 
   return (
     <div className="app-container">
+      <SlipNotificationToast
+        bills={bills}
+        onGoToPayments={() => setCurrentView('payments')}
+      />
       {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
       {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (
         <div
