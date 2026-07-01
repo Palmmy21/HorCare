@@ -60,8 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const configSnap = await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get();
         const cfg = configSnap.data() ?? {};
-        const dormName = cfg.bill_customization?.dorm_name || 'หอพัก';
-        const dueDay   = cfg.bill_customization?.due_day || 5;
+        const dormName       = cfg.bill_customization?.dorm_name || 'หอพัก';
+        const dueDay         = cfg.bill_customization?.due_day || 5;
+        const promptpayNumber = (cfg.bill_customization?.promptpay_number ?? '') as string;
+        const promptpayName   = (cfg.bill_customization?.promptpay_name ?? '') as string;
+        const appUrl          = (process.env.APP_URL ?? '').replace(/\/$/, '');
 
         const billsSnap = await db.collection(`users/${uid}/buildings/${building_id}/bills`)
             .where('month', '==', month)
@@ -93,7 +96,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             try {
-                await linePush(lineUserId, [buildBillFlex(bill, dormName, dueDay, month)]);
+                const portalUrl = appUrl
+                    ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${bill.room_id}`
+                    : undefined;
+                await linePush(lineUserId, [buildBillFlex(bill, dormName, dueDay, month, {
+                    promptpayNumber: promptpayNumber || undefined,
+                    promptpayName: promptpayName || undefined,
+                    portalUrl,
+                })]);
                 await billDoc.ref.update({ is_notified: true });
                 sent++;
                 results.push(`✅ ห้อง ${bill.room_number}`);

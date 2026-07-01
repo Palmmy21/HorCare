@@ -72,11 +72,41 @@ export function thaiMonthLabel(month: string): string {
     return `${THAI_MONTHS[parseInt(mon)]} ${parseInt(year) + 543}`;
 }
 
+interface BillFlexOptions {
+    promptpayNumber?: string;
+    promptpayName?: string;
+    portalUrl?: string;
+}
+
+/** สร้าง PromptPay QR image URL จาก phone number + amount */
+function promptpayQrUrl(phone: string, amount: number): string {
+    // EMVCo PromptPay payload (simplified — phone number type)
+    const normalized = phone.replace(/[-\s]/g, '');
+    const withCountry = normalized.startsWith('0')
+        ? '0066' + normalized.slice(1)
+        : normalized;
+    const aid = '00160017A000000677010111';
+    const accountField = `0113${withCountry}`;
+    const aid2 = aid + accountField;
+    const payload0 = `000201010212${String(aid2.length).padStart(2, '0')}${aid2}5802TH`;
+    const amtStr = amount.toFixed(2);
+    const fullPayload = `${payload0}5303764540${String(amtStr.length).padStart(2, '0')}${amtStr}6304`;
+    // CRC16 (CCITT)
+    let crc = 0xFFFF;
+    for (let i = 0; i < fullPayload.length; i++) {
+        crc ^= fullPayload.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+    }
+    const payload = fullPayload + (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=10&data=${encodeURIComponent(payload)}`;
+}
+
 export function buildBillFlex(
     bill: any,
     dormName: string,
     dueDay: number,
-    month: string
+    month: string,
+    opts: BillFlexOptions = {}
 ): object {
     const [year, mon] = month.split('-');
     const thaiMonths = THAI_MONTHS;
@@ -84,10 +114,61 @@ export function buildBillFlex(
     const y = parseInt(year);
     const monthThai = `${thaiMonths[m]} ${y + 543}`;
     const dueDate   = `${dueDay} ${thaiMonths[m]} ${y + 543}`;
+    const total     = bill.total_bill as number;
+
+    const qrSection: object[] = [];
+    if (opts.promptpayNumber) {
+        const qrUrl = promptpayQrUrl(opts.promptpayNumber, total);
+        qrSection.push(
+            { type: 'separator', margin: 'lg' },
+            {
+                type: 'box', layout: 'vertical', margin: 'md',
+                backgroundColor: '#F8FAFF', cornerRadius: '12px', paddingAll: '12px',
+                contents: [
+                    { type: 'text', text: '💳 ชำระผ่าน PromptPay', size: 'sm', weight: 'bold', color: '#2563EB', align: 'center' },
+                    ...(opts.promptpayName ? [{ type: 'text', text: opts.promptpayName, size: 'xs', color: '#555555', align: 'center', margin: 'xs' }] : []),
+                    { type: 'text', text: opts.promptpayNumber, size: 'xs', color: '#888888', align: 'center' },
+                    {
+                        type: 'image',
+                        url: qrUrl,
+                        size: 'xl',
+                        aspectRatio: '1:1',
+                        aspectMode: 'fit',
+                        margin: 'sm',
+                        align: 'center',
+                    },
+                    {
+                        type: 'box', layout: 'horizontal', margin: 'sm',
+                        backgroundColor: '#FEF9C3', cornerRadius: '8px', paddingAll: '8px',
+                        contents: [
+                            { type: 'text', text: '📎 กรุณาส่งสลิปโอนเงินมาในแชทนี้ด้วยนะคะ 🙏', size: 'xs', color: '#92400E', wrap: true, align: 'center' },
+                        ],
+                    },
+                ],
+            }
+        );
+    } else {
+        qrSection.push({
+            type: 'box', layout: 'horizontal', margin: 'md',
+            backgroundColor: '#FEF9C3', cornerRadius: '8px', paddingAll: '8px',
+            contents: [
+                { type: 'text', text: '📎 กรุณาส่งสลิปโอนเงินมาในแชทนี้ด้วยนะคะ 🙏', size: 'xs', color: '#92400E', wrap: true, align: 'center' },
+            ],
+        });
+    }
+
+    const footerContents: object[] = [];
+    if (opts.portalUrl) {
+        footerContents.push({
+            type: 'button',
+            action: { type: 'uri', label: '🔗 เปิดพอร์ทัล / ดูบิล', uri: opts.portalUrl },
+            style: 'primary', color: '#2563EB', height: 'sm',
+        });
+    }
 
     return {
         type: 'flex',
-        altText: `📋 บิลค่าน้ำ-ไฟ ห้อง ${bill.room_number} เดือน ${monthThai}`,
+        altText: `📋 บิลค่าน้ำ-ไฟ ห้อง ${bill.room_number} เดือน ${monthThai} ยอด ฿${total.toLocaleString()}`,
         contents: {
             type: 'bubble',
             size: 'kilo',
@@ -126,14 +207,21 @@ export function buildBillFlex(
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
                         { type: 'text', text: 'ยอดรวม', size: 'md', weight: 'bold', flex: 2 },
-                        { type: 'text', text: `฿${(bill.total_bill as number).toLocaleString()}`, size: 'md', weight: 'bold', color: '#2563EB', align: 'end', flex: 3 },
+                        { type: 'text', text: `฿${total.toLocaleString()}`, size: 'md', weight: 'bold', color: '#2563EB', align: 'end', flex: 3 },
                     ] },
                     { type: 'box', layout: 'horizontal', margin: 'sm', contents: [
                         { type: 'text', text: 'กำหนดชำระ', color: '#888888', size: 'xs', flex: 2 },
                         { type: 'text', text: dueDate, color: '#DC2626', size: 'xs', align: 'end', flex: 3 },
                     ] },
+                    ...qrSection,
                 ],
             },
+            ...(footerContents.length > 0 ? {
+                footer: {
+                    type: 'box', layout: 'vertical', paddingAll: '12px',
+                    contents: footerContents,
+                },
+            } : {}),
         },
     };
 }
