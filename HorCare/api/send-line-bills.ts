@@ -71,8 +71,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .where('is_saved', '==', true)
             .get();
 
+        // debug: sample what's actually in Firestore
+        const allBillsSnap = await db.collection(`users/${uid}/buildings/${building_id}/bills`).limit(3).get();
+        const sampleBills = allBillsSnap.docs.map(d => ({ month: d.data().month, is_saved: d.data().is_saved, room_id: d.data().room_id }));
+        console.log(`sendLineBills debug uid=${uid} building=${building_id} queried_month=${month} sample_bills=${JSON.stringify(sampleBills)}`);
+
         if (billsSnap.empty) {
-            res.status(200).json({ data: { sent: 0, skipped: 0, message: 'ไม่มีบิลที่บันทึกแล้วในเดือนนี้' } });
+            res.status(200).json({ data: { sent: 0, skipped: 0, message: `ไม่มีบิลที่บันทึกแล้วในเดือน ${month} (มีบิลทั้งหมด ${allBillsSnap.size} ใบในตัวอย่าง: ${JSON.stringify(sampleBills)})` } });
             return;
         }
 
