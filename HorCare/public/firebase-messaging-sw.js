@@ -27,6 +27,7 @@ function initFCM(config) {
       lang: 'th',
       data: data || {},
       requireInteraction: false,
+      vibrate: [200, 100, 200],
     };
     self.registration.showNotification(title || 'HorCare', opts);
   });

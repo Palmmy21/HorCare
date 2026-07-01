@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getToken } from 'firebase/messaging';
+import { getToken, onMessage } from 'firebase/messaging';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { messagingPromise, firebaseConfig } from '../firebase/config';
 import { db } from '../firebase/config';
@@ -62,7 +62,6 @@ export function useFCMToken(uid: string | null) {
                 if (savedRef.current !== fcmToken) {
                     savedRef.current = fcmToken;
                     const tokenDocRef = doc(db, `users/${uid}/data/fcm`);
-                    // Use setDoc merge so we only add/update, never wipe other tokens
                     const deviceKey = btoa(fcmToken.slice(-32)).replace(/[^a-z0-9]/gi, '').slice(0, 20);
                     await setDoc(tokenDocRef, {
                         [`tokens.${deviceKey}`]: {
@@ -72,6 +71,24 @@ export function useFCMToken(uid: string | null) {
                         }
                     }, { merge: true });
                 }
+
+                // Foreground messages — show system notification while app is open
+                onMessage(messaging, (payload) => {
+                    if (cancelled) return;
+                    const title = payload.notification?.title || 'HorCare';
+                    const body  = payload.notification?.body  || '';
+                    const url   = (payload.data as any)?.url || '/';
+                    if (Notification.permission === 'granted') {
+                        const n = new Notification(title, {
+                            body,
+                            icon: '/logo-icon.png',
+                            badge: '/logo-icon.png',
+                            // @ts-ignore — vibrate is valid in mobile browsers
+                            vibrate: [200, 100, 200],
+                        });
+                        n.onclick = () => { n.close(); window.focus(); window.location.href = url; };
+                    }
+                });
             } catch (e: any) {
                 if (!cancelled) setError(e.message);
             }
