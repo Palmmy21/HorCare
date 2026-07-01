@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { buildBillFlex, linePush, runPooled } from './_line.js';
+import { buildBillFlex, buildPromptpayMessages, linePush, runPooled } from './_line.js';
 
 async function fcmPushToOwner(uid: string, title: string, body: string) {
     try {
@@ -99,11 +99,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const portalUrl = appUrl
                     ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${bill.room_id}`
                     : undefined;
-                await linePush(lineUserId, [buildBillFlex(bill, dormName, dueDay, month, {
-                    promptpayNumber: promptpayNumber || undefined,
-                    promptpayName: promptpayName || undefined,
-                    portalUrl,
-                })]);
+                const messages: object[] = [buildBillFlex(bill, dormName, dueDay, month, { portalUrl })];
+                if (promptpayNumber) {
+                    messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, bill.total_bill as number));
+                }
+                await linePush(lineUserId, messages);
                 await billDoc.ref.update({ is_notified: true });
                 sent++;
                 results.push(`✅ ห้อง ${bill.room_number}`);
