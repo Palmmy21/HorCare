@@ -434,7 +434,9 @@ function App() {
     <div className="app-container">
       <SlipNotificationToast
         bills={bills}
+        maintenanceRequests={_maintenanceReqs}
         onGoToPayments={() => setCurrentView('payments')}
+        onGoToMaintenance={() => setCurrentView('maintenance')}
       />
       {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
       {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (

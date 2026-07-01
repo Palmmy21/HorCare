@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { CreditCard, X } from 'lucide-react';
-import type { MonthlyBill } from '../types';
+import { CreditCard, Wrench, X } from 'lucide-react';
+import type { MonthlyBill, MaintenanceRequest } from '../types';
+
+type ToastKind = 'slip' | 'maintenance';
 
 interface Toast {
   id: string;
+  kind: ToastKind;
   roomNumber: string;
-  billId: string;
+  description?: string;
+  urgency?: string;
 }
 
 function playNotificationSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const now = ctx.currentTime;
-    // สองโน้ต: ding-dong
     const notes = [880, 1100];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -27,110 +30,139 @@ function playNotificationSound() {
       osc.start(now + i * 0.18);
       osc.stop(now + i * 0.18 + 0.35);
     });
-  } catch { /* browser blocked autoplay — silent */ }
+  } catch { /* autoplay blocked */ }
 }
 
 interface Props {
   bills: MonthlyBill[];
+  maintenanceRequests: MaintenanceRequest[];
   onGoToPayments: () => void;
+  onGoToMaintenance: () => void;
 }
 
-export default function SlipNotificationToast({ bills, onGoToPayments }: Props) {
+export default function SlipNotificationToast({
+  bills, maintenanceRequests, onGoToPayments, onGoToMaintenance,
+}: Props) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const seenIds = useRef<Set<string>>(new Set());
-  const initialised = useRef(false);
+  const seenSlips = useRef<Set<string>>(new Set());
+  const seenMaint = useRef<Set<string>>(new Set());
+  const slipInit = useRef(false);
+  const maintInit = useRef(false);
 
+  // ── Slip notifications ──
   useEffect(() => {
-    const pendingBills = bills.filter(b => b.payment_status === 'pending');
-
-    if (!initialised.current) {
-      // mark existing pending bills as "seen" on first load — don't toast for old ones
-      pendingBills.forEach(b => seenIds.current.add(b.id));
-      initialised.current = true;
+    const pending = bills.filter(b => b.payment_status === 'pending');
+    if (!slipInit.current) {
+      pending.forEach(b => seenSlips.current.add(b.id));
+      slipInit.current = true;
       return;
     }
-
-    const newBills = pendingBills.filter(b => !seenIds.current.has(b.id));
-    if (newBills.length === 0) return;
-
-    newBills.forEach(b => seenIds.current.add(b.id));
+    const fresh = pending.filter(b => !seenSlips.current.has(b.id));
+    if (!fresh.length) return;
+    fresh.forEach(b => seenSlips.current.add(b.id));
     playNotificationSound();
-
     setToasts(prev => [
       ...prev,
-      ...newBills.map(b => ({
-        id: b.id,
-        roomNumber: b.room_number,
-        billId: b.id,
-      })),
+      ...fresh.map(b => ({ id: `slip-${b.id}`, kind: 'slip' as ToastKind, roomNumber: b.room_number })),
     ]);
   }, [bills]);
 
+  // ── Maintenance notifications ──
+  useEffect(() => {
+    const open = maintenanceRequests.filter(r => r.status === 'open');
+    if (!maintInit.current) {
+      open.forEach(r => seenMaint.current.add(r.id));
+      maintInit.current = true;
+      return;
+    }
+    const fresh = open.filter(r => !seenMaint.current.has(r.id));
+    if (!fresh.length) return;
+    fresh.forEach(r => seenMaint.current.add(r.id));
+    playNotificationSound();
+    setToasts(prev => [
+      ...prev,
+      ...fresh.map(r => ({
+        id: `maint-${r.id}`,
+        kind: 'maintenance' as ToastKind,
+        roomNumber: r.room_number,
+        description: r.description?.slice(0, 60),
+        urgency: r.urgency,
+      })),
+    ]);
+  }, [maintenanceRequests]);
+
   const dismiss = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
-  if (toasts.length === 0) return null;
+  if (!toasts.length) return null;
 
   return (
     <div style={{
       position: 'fixed', top: 20, right: 20, zIndex: 9999,
       display: 'flex', flexDirection: 'column', gap: 10,
-      maxWidth: 320,
+      maxWidth: 320, width: '90vw',
     }}>
-      {toasts.map(toast => (
-        <div
-          key={toast.id}
-          style={{
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(110%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+      `}</style>
+      {toasts.map(toast => {
+        const isSlip = toast.kind === 'slip';
+        const accent = isSlip ? '#059669' : '#D97706';
+        const bg = isSlip ? '#d1fae5' : '#FEF3C7';
+        return (
+          <div key={toast.id} style={{
             background: '#fff',
             border: '1px solid #e2e8f0',
-            borderLeft: '4px solid #059669',
+            borderLeft: `4px solid ${accent}`,
             borderRadius: 12,
             boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
             padding: '12px 14px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 10,
+            display: 'flex', alignItems: 'flex-start', gap: 10,
             animation: 'slideInRight 0.25s ease',
-          }}
-        >
-          <style>{`
-            @keyframes slideInRight {
-              from { transform: translateX(110%); opacity: 0; }
-              to   { transform: translateX(0);    opacity: 1; }
-            }
-          `}</style>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: '#d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
           }}>
-            <CreditCard size={18} color="#059669" />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>
-              💳 ได้รับสลิปใหม่
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              {isSlip
+                ? <CreditCard size={18} color={accent} />
+                : <Wrench size={18} color={accent} />}
             </div>
-            <div style={{ fontSize: '0.8125rem', color: '#555', marginTop: 2 }}>
-              ห้อง <strong>{toast.roomNumber}</strong> ส่งสลิปมาแล้ว
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>
+                {isSlip ? '💳 ได้รับสลิปใหม่' : `🔧 แจ้งซ่อมใหม่${toast.urgency === 'urgent' ? ' ⚡ด่วน' : ''}`}
+              </div>
+              <div style={{ fontSize: '0.8125rem', color: '#555', marginTop: 2 }}>
+                ห้อง <strong>{toast.roomNumber}</strong>
+                {!isSlip && toast.description && (
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#777', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {toast.description}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => { dismiss(toast.id); isSlip ? onGoToPayments() : onGoToMaintenance(); }}
+                style={{
+                  marginTop: 8, fontSize: '0.75rem', fontWeight: 600,
+                  color: accent, background: 'none', border: 'none',
+                  cursor: 'pointer', padding: 0,
+                }}
+              >
+                {isSlip ? 'ดูที่การชำระเงิน →' : 'ดูที่แจ้งซ่อม →'}
+              </button>
             </div>
             <button
-              onClick={() => { dismiss(toast.id); onGoToPayments(); }}
-              style={{
-                marginTop: 8, fontSize: '0.75rem', fontWeight: 600,
-                color: '#059669', background: 'none', border: 'none',
-                cursor: 'pointer', padding: 0,
-              }}
+              onClick={() => dismiss(toast.id)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#aaa', flexShrink: 0 }}
             >
-              ดูที่การชำระเงิน →
+              <X size={14} />
             </button>
           </div>
-          <button
-            onClick={() => dismiss(toast.id)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#999', flexShrink: 0 }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
