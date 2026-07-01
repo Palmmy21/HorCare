@@ -66,22 +66,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const promptpayName   = (cfg.bill_customization?.promptpay_name ?? '') as string;
         const appUrl          = (process.env.APP_URL ?? '').replace(/\/$/, '');
 
-        const billsSnap = await db.collection(`users/${uid}/buildings/${building_id}/bills`)
-            .where('month', '==', month)
-            .where('is_saved', '==', true)
-            .get();
+        const [allBillsSnap, roomsSnap] = await Promise.all([
+            db.collection(`users/${uid}/buildings/${building_id}/bills`).get(),
+            db.collection(`users/${uid}/buildings/${building_id}/rooms`).get(),
+        ]);
 
-        // debug: sample what's actually in Firestore
-        const allBillsSnap = await db.collection(`users/${uid}/buildings/${building_id}/bills`).limit(3).get();
-        const sampleBills = allBillsSnap.docs.map(d => ({ month: d.data().month, is_saved: d.data().is_saved, room_id: d.data().room_id }));
-        console.log(`sendLineBills debug uid=${uid} building=${building_id} queried_month=${month} sample_bills=${JSON.stringify(sampleBills)}`);
+        const billDocs = allBillsSnap.docs.filter(d => {
+            const data = d.data();
+            return String(data.month) === String(month) && data.is_saved === true;
+        });
 
-        if (billsSnap.empty) {
-            res.status(200).json({ data: { sent: 0, skipped: 0, message: `ไม่มีบิลที่บันทึกแล้วในเดือน ${month} (มีบิลทั้งหมด ${allBillsSnap.size} ใบในตัวอย่าง: ${JSON.stringify(sampleBills)})` } });
+        console.log(`sendLineBills uid=${uid} building=${building_id} month=${month} total_bills=${allBillsSnap.size} matched=${billDocs.length}`);
+
+        if (billDocs.length === 0) {
+            const sample = allBillsSnap.docs.slice(0, 3).map(d => ({ month: d.data().month, is_saved: d.data().is_saved }));
+            console.log('sample bills:', JSON.stringify(sample));
+            res.status(200).json({ data: { sent: 0, skipped: 0, message: 'ไม่มีบิลที่บันทึกแล้วในเดือนนี้' } });
             return;
         }
 
-        const roomsSnap = await db.collection(`users/${uid}/buildings/${building_id}/rooms`).get();
         const roomsMap = new Map();
         roomsSnap.docs.forEach(doc => roomsMap.set(doc.id, doc.data()));
 
@@ -89,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let skipped = 0;
         const results: string[] = [];
 
-        await runPooled(billsSnap.docs, PUSH_CONCURRENCY, async (billDoc) => {
+        await runPooled(billDocs, PUSH_CONCURRENCY, async (billDoc: FirebaseFirestore.QueryDocumentSnapshot) => {
             const bill = billDoc.data();
             const roomData = roomsMap.get(bill.room_id);
             const lineUserId = roomData?.line_user_id as string | undefined;
