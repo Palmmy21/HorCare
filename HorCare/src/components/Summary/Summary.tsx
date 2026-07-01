@@ -53,7 +53,7 @@ export default function Summary({
     const [isSending, setIsSending] = useState(false);
     const [sendComplete, setSendComplete] = useState(false);
     const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
-    const [lineResult, setLineResult] = useState<{ sent: number; skipped: number } | null>(null);
+    const [lineResult, setLineResult] = useState<{ sent: number; skipped: number; message?: string; results?: string[] } | null>(null);
     const [showLineUpgradeModal, setShowLineUpgradeModal] = useState(false);
     const [billDate, setBillDate] = useState(() => {
         const now = new Date();
@@ -295,7 +295,11 @@ export default function Summary({
                         <div className="line-send-result success">
                             <CheckCircle size={15} />
                             ส่งสำเร็จ {lineResult.sent} ห้อง
-                            {lineResult.skipped > 0 && ` · ข้าม ${lineResult.skipped} ห้อง (ยังไม่ลงทะเบียน LINE)`}
+                            {lineResult.skipped > 0 && ` · ข้าม ${lineResult.skipped} ห้อง`}
+                            {lineResult.message && <div style={{fontSize:'0.75rem',opacity:0.8,marginTop:2}}>{lineResult.message}</div>}
+                            {lineResult.results && lineResult.results.length > 0 && (
+                                <div style={{fontSize:'0.75rem',marginTop:4}}>{lineResult.results.join(' · ')}</div>
+                            )}
                         </div>
                     )}
                     {lineStatus === 'error' && (

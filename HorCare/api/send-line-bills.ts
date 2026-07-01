@@ -81,7 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (billDocs.length === 0) {
             const sample = allBillsSnap.docs.slice(0, 3).map(d => ({ month: d.data().month, is_saved: d.data().is_saved }));
             console.log('sample bills:', JSON.stringify(sample));
-            res.status(200).json({ data: { sent: 0, skipped: 0, message: 'ไม่มีบิลที่บันทึกแล้วในเดือนนี้' } });
+            const debugMsg = `ค้นหาเดือน "${month}" ใน building "${building_id}" — พบบิลทั้งหมด ${allBillsSnap.size} ใบ ตัวอย่าง: ${JSON.stringify(sample)}`;
+            res.status(200).json({ data: { sent: 0, skipped: 0, message: debugMsg } });
             return;
         }
 
