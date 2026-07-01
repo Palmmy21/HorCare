@@ -1,4 +1,3 @@
-// Firebase Configuration
 import { initializeApp } from 'firebase/app';
 import { initializeFirestore, persistentLocalCache } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
