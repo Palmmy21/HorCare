@@ -64,7 +64,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const dueDay         = cfg.bill_customization?.due_day || 5;
         const promptpayNumber = (cfg.bill_customization?.promptpay_number ?? '') as string;
         const promptpayName   = (cfg.bill_customization?.promptpay_name ?? '') as string;
-        const appUrl          = (process.env.APP_URL ?? '').replace(/\/$/, '');
+        let appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
+        if (appUrl && !appUrl.startsWith('http')) appUrl = `https://${appUrl}`;
 
         const [allBillsSnap, roomsSnap] = await Promise.all([
             db.collection(`users/${uid}/buildings/${building_id}/bills`).get(),
@@ -81,8 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (billDocs.length === 0) {
             const sample = allBillsSnap.docs.slice(0, 3).map(d => ({ month: d.data().month, is_saved: d.data().is_saved }));
             console.log('sample bills:', JSON.stringify(sample));
-            const debugMsg = `ค้นหาเดือน "${month}" ใน building "${building_id}" — พบบิลทั้งหมด ${allBillsSnap.size} ใบ ตัวอย่าง: ${JSON.stringify(sample)}`;
-            res.status(200).json({ data: { sent: 0, skipped: 0, message: debugMsg } });
+            res.status(200).json({ data: { sent: 0, skipped: 0, message: 'ไม่มีบิลที่บันทึกแล้วในเดือนนี้' } });
             return;
         }
 
