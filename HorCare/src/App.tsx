@@ -204,6 +204,9 @@ function App() {
     r => r.status === 'open' || r.status === 'in_progress'
   ).length;
 
+  // Payment slip badge — bills waiting for owner confirmation
+  const pendingSlipCount = bills.filter(b => b.payment_status === 'pending').length;
+
   // Stock badge — real-time count of items below minimum quantity
   const { items: _stockItems } = useStockItems(user?.uid ?? null, activeBuildingId);
   const lowStockCount = _stockItems.filter(
@@ -453,7 +456,7 @@ function App() {
         >
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           {/* Red dot on hamburger when menu is closed and there are pending items */}
-          {!mobileMenuOpen && (pendingMaintenanceCount > 0 || lowStockCount > 0) && hasPaidSubscription && (
+          {!mobileMenuOpen && (pendingMaintenanceCount > 0 || lowStockCount > 0 || pendingSlipCount > 0) && hasPaidSubscription && (
             <span style={{
               position: 'absolute', top: 6, right: 6,
               width: 8, height: 8, borderRadius: '50%',
@@ -601,9 +604,12 @@ function App() {
             const isLocked = START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
             const showBadge = hasPaidSubscription && (
               (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
-              (item.id === 'operations' && lowStockCount > 0)
+              (item.id === 'operations' && lowStockCount > 0) ||
+              (item.id === 'payments' && pendingSlipCount > 0)
             );
-            const badgeCount = item.id === 'maintenance' ? pendingMaintenanceCount : lowStockCount;
+            const badgeCount = item.id === 'maintenance' ? pendingMaintenanceCount
+              : item.id === 'payments' ? pendingSlipCount
+              : lowStockCount;
             return (
               <button
                 key={item.id}

@@ -505,4 +505,21 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
             ? `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n✅ ตรวจ QR ผ่าน (ไม่ซ้ำ)\nเจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ 🙏`
             : `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n⏳ ระบบอ่าน QR ไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`,
     }]);
+
+    // แจ้งเจ้าของหอผ่าน FCM (best-effort)
+    try {
+        const fcmDoc = await db.doc(`users/${uid}/data/fcm`).get();
+        const tokensMap: Record<string, { token: string }> = fcmDoc.data()?.tokens ?? {};
+        const tokens = Object.values(tokensMap).map(v => v.token).filter(Boolean);
+        if (tokens.length > 0) {
+            await admin.messaging().sendEachForMulticast({
+                tokens,
+                notification: {
+                    title: `💳 สลิปใหม่ ห้อง ${room_number}`,
+                    body: qrPassed ? 'ตรวจ QR ผ่านแล้ว — กรุณายืนยันยอด' : 'รอตรวจสอบ — กรุณาดูสลิป',
+                },
+                webpush: { notification: { icon: '/logo-icon.png', badge: '/logo-icon.png', lang: 'th' }, fcmOptions: { link: '/' } },
+            });
+        }
+    } catch { /* best-effort */ }
 }
