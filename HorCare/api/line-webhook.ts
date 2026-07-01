@@ -24,6 +24,20 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 const DORM_CODE_RE = /^HC-[A-Z0-9]{6}$/;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // GET /api/line-webhook?lid=... — tenant portal lookup (used by TenantGateway)
+    if (req.method === 'GET') {
+        const lid = String(req.query.lid ?? '').trim();
+        if (!lid || lid.length > 200) {
+            return res.status(400).json({ error: 'bad_request' });
+        }
+        const snap = await db.collection('line_rooms').doc(lid).get();
+        if (!snap.exists) {
+            return res.status(404).json({ error: 'not_found' });
+        }
+        const { uid, building_id, room_id, room_number, dorm_name } = snap.data()!;
+        return res.status(200).json({ uid, building_id, room_id, room_number, dorm_name });
+    }
+
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
         return;

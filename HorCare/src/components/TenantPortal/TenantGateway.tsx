@@ -51,7 +51,7 @@ export default function TenantGateway() {
         const profile = await window.liff.getProfile();
         const lineUserId: string = profile.userId;
 
-        const res = await fetch(`/api/portal-lookup?lid=${encodeURIComponent(lineUserId)}`);
+        const res = await fetch(`/api/line-webhook?lid=${encodeURIComponent(lineUserId)}`);
 
         if (res.status === 404) {
           setState({ status: 'not_registered' });
