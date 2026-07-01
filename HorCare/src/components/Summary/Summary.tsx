@@ -280,82 +280,78 @@ export default function Summary({
                 <div className="card-header">
                     <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Calendar size={16} /> วันที่ในบิล</span>
                 </div>
-                <div className="flex gap-4 items-center" style={{ flexWrap: 'wrap' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                        <input
-                            type="date"
-                            className="form-input mono"
-                            style={{ maxWidth: '200px' }}
-                            value={billDate}
-                            onChange={e => setBillDate(e.target.value)}
-                        />
-                        <p className="form-hint">วันที่ที่จะแสดงในใบแจ้งยอด</p>
+                {/* Row 1: Date input */}
+                <div style={{ marginBottom: '1rem' }}>
+                    <input
+                        type="date"
+                        className="form-input mono"
+                        style={{ maxWidth: '180px' }}
+                        value={billDate}
+                        onChange={e => setBillDate(e.target.value)}
+                    />
+                    <p className="form-hint" style={{ marginTop: '0.25rem' }}>วันที่ที่จะแสดงในใบแจ้งยอด</p>
+                </div>
+
+                {/* Row 2: Action buttons */}
+                {monthBills.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button className="btn btn-outline btn-sm" onClick={handlePrintAll}>
+                            <Printer size={15} /> พิมพ์ใบแจ้งยอด
+                        </button>
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={handleDownloadAllBills}
+                            disabled={isDownloadingAll || !!downloadingBillId}
+                        >
+                            <Download size={15} />
+                            {isDownloadingAll
+                                ? `ดาวน์โหลด ${downloadAllProgress}/${monthBills.length}...`
+                                : 'ดาวน์โหลดทุกห้อง'}
+                        </button>
+                        {uid && buildingId && config.dorm_code && (
+                            <button
+                                className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
+                                onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
+                                disabled={canSendLine && lineStatus === 'sending'}
+                                style={canSendLine ? undefined : { opacity: 0.75 }}
+                            >
+                                {canSendLine ? <MessageCircle size={15} /> : <Lock size={15} />}
+                                {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
+                            </button>
+                        )}
+                        <button className="btn btn-primary btn-sm" onClick={() => setShowMonthlyReport(true)}>
+                            <BarChart3 size={15} /> สรุปรายเดือน
+                        </button>
                     </div>
+                )}
+
+                {/* Row 3: Status / warnings */}
+                <div style={{ marginTop: '0.625rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
                     {lineStatus === 'done' && lineResult && (
                         <div className="line-send-result success">
-                            <CheckCircle size={15} />
+                            <CheckCircle size={14} />
                             ส่งสำเร็จ {lineResult.sent} ห้อง
                             {lineResult.skipped > 0 && ` · ข้าม ${lineResult.skipped} ห้อง`}
-                            {lineResult.message && <div style={{fontSize:'0.75rem',opacity:0.8,marginTop:2}}>{lineResult.message}</div>}
                             {lineResult.results && lineResult.results.length > 0 && (
-                                <div style={{fontSize:'0.75rem',marginTop:4}}>{lineResult.results.join(' · ')}</div>
+                                <span style={{ fontSize: '0.72rem', opacity: 0.85 }}> · {lineResult.results.join(' · ')}</span>
                             )}
                         </div>
                     )}
                     {lineStatus === 'error' && (
                         <div className="line-send-result error">
-                            <XCircle size={15} /> เกิดข้อผิดพลาด กรุณาลองใหม่
+                            <XCircle size={14} /> เกิดข้อผิดพลาด กรุณาลองใหม่
                         </div>
                     )}
-                    {monthBills.length > 0 && (
-                        <>
-                            <button className="btn btn-outline" onClick={handlePrintAll}>
-                                <Printer size={18} />
-                                พิมพ์ใบแจ้งยอดทั้งหมด
-                            </button>
-                            <button
-                                className="btn btn-outline"
-                                onClick={handleDownloadAllBills}
-                                disabled={isDownloadingAll || !!downloadingBillId}
-                                title="ดาวน์โหลดบิลทุกห้องแบบแยกรูป"
-                            >
-                                <Download size={18} />
-                                {isDownloadingAll
-                                    ? `ดาวน์โหลด ${downloadAllProgress}/${monthBills.length}...`
-                                    : 'ดาวน์โหลดทุกห้อง'}
-                            </button>
-                            {uid && buildingId && config.dorm_code && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', alignItems: 'flex-start' }}>
-                                    <button
-                                        className={`btn ${canSendLine ? 'btn-line' : 'btn-outline'}`}
-                                        onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
-                                        disabled={canSendLine && lineStatus === 'sending'}
-                                        title={canSendLine ? undefined : 'ฟีเจอร์นี้สำหรับผู้ใช้แพ็กเกจที่ชำระเงินแล้ว'}
-                                        style={canSendLine ? undefined : { opacity: 0.75 }}
-                                    >
-                                        {canSendLine ? <MessageCircle size={18} /> : <Lock size={18} />}
-                                        {canSendLine
-                                            ? (lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE')
-                                            : 'ส่งบิลผ่าน LINE'}
-                                    </button>
-                                    {canSendLine && unlinkedLineCount > 0 && lineStatus === 'idle' && (
-                                        <div style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.35rem',
-                                            fontSize: '0.75rem', color: '#92400E',
-                                            background: '#FEF3C7', borderRadius: 6, padding: '0.25rem 0.6rem',
-                                            border: '1px solid #FDE68A',
-                                        }}>
-                                            <AlertTriangle size={12} />
-                                            {unlinkedLineCount} ห้องยังไม่ลงทะเบียน LINE จะถูกข้าม
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <button className="btn btn-primary" onClick={() => setShowMonthlyReport(true)}>
-                                <BarChart3 size={18} />
-                                สรุปรายเดือน
-                            </button>
-                        </>
+                    {canSendLine && unlinkedLineCount > 0 && lineStatus === 'idle' && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '0.35rem',
+                            fontSize: '0.75rem', color: '#92400E',
+                            background: '#FEF3C7', borderRadius: 6, padding: '0.25rem 0.6rem',
+                            border: '1px solid #FDE68A',
+                        }}>
+                            <AlertTriangle size={12} />
+                            {unlinkedLineCount} ห้องยังไม่ลงทะเบียน LINE จะถูกข้าม
+                        </div>
                     )}
                 </div>
             </div>
