@@ -93,6 +93,15 @@ export default function SlipNotificationToast({
 
   const dismiss = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
+  // auto-dismiss after 6s
+  useEffect(() => {
+    if (!toasts.length) return;
+    const timer = setTimeout(() => {
+      setToasts(prev => prev.slice(1));
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [toasts]);
+
   if (!toasts.length) return null;
 
   return (
