@@ -533,7 +533,7 @@ export default function AdminDashboard() {
         setError(null);
         try {
             const idToken = await user.getIdToken();
-            const res = await fetch('/api/admin-list-users', {
+            const res = await fetch('/api/admin?action=list-users', {
                 headers: { 'Authorization': `Bearer ${idToken}` },
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -673,7 +673,7 @@ export default function AdminDashboard() {
 
     const handleVerifyEmail = async (targetUid: string) => {
         const idToken = await user!.getIdToken();
-        const res = await fetch('/api/admin-verify-email', {
+        const res = await fetch('/api/admin?action=verify-email', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ targetUid }),
@@ -691,7 +691,7 @@ export default function AdminDashboard() {
         setBackfilling(true);
         try {
             const idToken = await user!.getIdToken();
-            const res = await fetch('/api/admin-backfill-profiles', {
+            const res = await fetch('/api/admin?action=backfill-profiles', {
                 method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` },
             });
             const data = await res.json() as { created: number };
