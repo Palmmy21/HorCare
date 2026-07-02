@@ -27,7 +27,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // GET /api/line-webhook?lid=... — tenant portal lookup (used by TenantGateway)
     if (req.method === 'GET') {
         const lid = String(req.query.lid ?? '').trim();
-        if (!lid || lid.length > 200) {
+        // LINE user IDs are always "U" followed by 32 hex characters
+        if (!lid || !/^U[0-9a-f]{32}$/.test(lid)) {
             return res.status(400).json({ error: 'bad_request' });
         }
         const snap = await db.collection('line_rooms').doc(lid).get();
@@ -264,14 +265,17 @@ async function handleRoomNumber(
     const roomDoc = roomsSnap.docs[0];
     const existingLineUserId = roomDoc.data().line_user_id as string | undefined;
 
-    const batch = db.batch();
-
-    // ── ลบการลงทะเบียนเก่า (ถ้ามีคนอื่นอยู่ในห้องนี้แล้ว) ────────
-    // ยึดคนล่าสุดเสมอ — คนเก่าจะไม่ได้รับบิลอีกต่อไป
+    // ── ป้องกันการแย่งห้อง — ถ้าห้องมีคนลงทะเบียนอยู่แล้ว ปฏิเสธ ────
     if (existingLineUserId && existingLineUserId !== lineUserId) {
-        batch.delete(db.collection('line_rooms').doc(existingLineUserId));
-        // Clear line_user_id ออกจาก room ด้วย (จะถูก overwrite ทันที)
+        await db.collection('line_pending').doc(lineUserId).delete();
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: `⚠️ ห้อง ${roomNumberInput} มีผู้ลงทะเบียน LINE ไว้แล้วค่ะ\n\nกรุณาติดต่อเจ้าของหอเพื่อยกเลิกการลงทะเบียนเก่าก่อนนะคะ`,
+        }]);
+        return;
     }
+
+    const batch = db.batch();
 
     // ── บันทึกการลงทะเบียนใหม่ ────────────────────────────────────
     batch.update(roomDoc.ref, { line_user_id: lineUserId });

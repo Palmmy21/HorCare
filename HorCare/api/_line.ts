@@ -1,9 +1,15 @@
 import * as crypto from 'crypto';
 
 export function verifyLineSignature(rawBody: Buffer | string, secret: string, signature: string): boolean {
+    if (!signature) return false;
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(rawBody);
-    return hmac.digest('base64') === signature;
+    const computed = Buffer.from(hmac.digest('base64'));
+    try {
+        return crypto.timingSafeEqual(computed, Buffer.from(signature));
+    } catch {
+        return false;
+    }
 }
 
 export async function lineReply(replyToken: string, messages: object[]): Promise<void> {

@@ -133,8 +133,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Generate Firebase email verification link
+        let appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
+        if (!appUrl.startsWith('http')) appUrl = `https://${appUrl || 'hor-care.vercel.app'}`;
         const verifyLink = await admin.auth().generateEmailVerificationLink(userRecord.email, {
-            url: `${req.headers.origin || 'https://horcare.vercel.app'}/?verified=1`,
+            url: `${appUrl}/?verified=1`,
         });
 
         // Send via Resend
@@ -149,7 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (errMsg.includes('TOO_MANY_ATTEMPTS_TRY_LATER') || errMsg.includes('too-many-requests')) {
             res.status(429).json({ error: 'TOO_MANY_ATTEMPTS: ส่งบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่' });
         } else {
-            res.status(500).json({ error: errMsg || 'Internal Server Error' });
+            res.status(500).json({ error: 'Internal Server Error' });
         }
     }
 }

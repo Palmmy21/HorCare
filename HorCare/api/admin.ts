@@ -8,8 +8,7 @@ async function verifyAdmin(req: VercelRequest): Promise<string | null> {
     if (!authHeader?.startsWith('Bearer ')) return null;
     try {
         const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
-        const callerDoc = await db.collection('users').doc(decoded.uid).get();
-        const isAdmin = callerDoc.data()?.role === 'admin' || decoded.email === ADMIN_EMAIL;
+        const isAdmin = decoded.email === ADMIN_EMAIL;
         return isAdmin ? decoded.uid : null;
     } catch {
         return null;
@@ -113,6 +112,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     } catch (err: unknown) {
         console.error(`admin/${action} error:`, err);
-        res.status(500).json({ error: (err as Error).message || 'Internal Server Error' });
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 }

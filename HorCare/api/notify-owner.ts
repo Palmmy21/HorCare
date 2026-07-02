@@ -102,6 +102,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json({ data: result });
     } catch (err: any) {
         console.error('notify-owner error:', err);
-        res.status(500).json({ error: err.message || 'Internal Server Error' });
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 }

@@ -119,6 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json({ data: { url: session.url } });
     } catch (error: any) {
         console.error('Create checkout error:', error);
-        res.status(500).json({ error: error.message || 'Internal Server Error' });
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 }
