@@ -485,7 +485,7 @@ function App() {
           <span>HorCare</span>
         </div>
 
-        {/* Building Switcher — all paid plans (small=5, medium=20, large=∞) */}
+        {/* Building Switcher — Plus/Pro (multiple buildings) */}
         {canAddBuilding && (
           <div ref={buildingMenuRef} style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
             <button
@@ -605,6 +605,80 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Single Building Name Bar — Start plan (1 building, no switcher) */}
+        {!canAddBuilding && activeBuilding && (
+          <div style={{ padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            {renamingBuildingId === activeBuilding.id ? (
+              <form
+                style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}
+                onSubmit={e => { e.preventDefault(); handleRenameBuilding(activeBuilding.id); }}
+              >
+                <input
+                  autoFocus
+                  value={renamingName}
+                  onChange={e => setRenamingName(e.target.value)}
+                  placeholder="ชื่อหอพัก"
+                  style={{
+                    flex: 1, background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(139,92,246,0.5)',
+                    borderRadius: '8px', color: '#fff',
+                    fontSize: '0.8125rem', padding: '0.4rem 0.625rem',
+                    outline: 'none', minWidth: 0,
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30, height: 30,
+                    background: 'rgba(96,165,250,0.18)',
+                    border: '1px solid rgba(96,165,250,0.4)',
+                    borderRadius: '8px', color: '#60A5FA',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRenamingBuildingId(null)}
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30, height: 30,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '8px', color: 'rgba(255,255,255,0.45)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => { setRenamingBuildingId(activeBuilding.id); setRenamingName(activeBuilding.name); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px', padding: '0.5rem 0.625rem', cursor: 'pointer',
+                  color: 'rgba(255,255,255,0.8)', fontSize: '0.8125rem', fontWeight: 600,
+                  transition: 'all 0.2s',
+                }}
+                title="คลิกเพื่อเปลี่ยนชื่อหอพัก"
+              >
+                <Building2 size={15} style={{ flexShrink: 0, opacity: 0.6 }} />
+                <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {activeBuilding.name}
+                </span>
+                <Pencil size={12} style={{ flexShrink: 0, opacity: 0.4 }} />
+              </button>
+            )}
+          </div>
+        )}
+
 
         <nav className="sidebar-nav">
           {navItems.map(item => {
@@ -781,6 +855,7 @@ function App() {
             allBills={bills}
             uid={user?.uid}
             buildingId={activeBuildingId ?? undefined}
+            buildingName={activeBuilding?.name}
             onGoToPayments={() => setCurrentView('payments')}
           />
         )}

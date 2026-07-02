@@ -26,6 +26,7 @@ interface DashboardProps {
     allBills?: MonthlyBill[];
     uid?: string;
     buildingId?: string;
+    buildingName?: string;
     onGoToPayments?: () => void;
 }
 
@@ -40,7 +41,7 @@ function expenseMonth(dateStr: string): string {
 
 export default function Dashboard({
     config, stats, currentMonth, recentBills, allBills = [],
-    uid, buildingId, onGoToPayments,
+    uid, buildingId, buildingName, onGoToPayments,
 }: DashboardProps) {
     const [showCustomize, setShowCustomize] = useState(false);
     const { allWidgets, toggle, isEnabled } = useDashboardPrefs(uid);
@@ -120,6 +121,26 @@ export default function Dashboard({
         <div>
             <div className="page-header">
                 <div>
+                    {/* ชื่อหอพัก — แสดงโดดเด่นให้ผู้ใช้รู้สึกเป็นเจ้าของ */}
+                    {buildingName && (
+                        <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.12))',
+                            border: '1px solid rgba(139,92,246,0.3)',
+                            borderRadius: '20px',
+                            padding: '0.25rem 0.75rem',
+                            marginBottom: '0.4rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            color: '#A78BFA',
+                            letterSpacing: '0.01em',
+                        }}>
+                            <Home size={12} style={{ opacity: 0.8 }} />
+                            {buildingName}
+                        </div>
+                    )}
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <BarChart3 size={28} /> Dashboard
                     </h1>
