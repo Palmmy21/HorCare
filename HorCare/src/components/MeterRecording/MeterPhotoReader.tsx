@@ -4,7 +4,7 @@
  */
 
 import { useRef, useState } from 'react';
-import { Camera, Upload, X, RotateCcw, CheckCircle, AlertTriangle, Zap, Droplets, HelpCircle } from 'lucide-react';
+import { Camera, Upload, X, RotateCcw, CheckCircle, AlertTriangle, Zap, Droplets, HelpCircle, AlertCircle } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
 
 export interface MeterReadResult {
