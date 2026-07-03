@@ -58,14 +58,15 @@ export default function NongCarePanel({ contextData, isPro, onUpgrade }: NongCar
                 })
             });
 
+            const data = await res.json();
+            
             if (!res.ok) {
                 if (res.status === 403) {
                     throw new Error('pro_required');
                 }
-                throw new Error('API Error');
+                throw new Error(data.details || data.error || 'API Error');
             }
 
-            const data = await res.json();
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: data.reply }]);
         } catch (err: any) {
             console.error(err);
@@ -79,7 +80,7 @@ export default function NongCarePanel({ contextData, isPro, onUpgrade }: NongCar
                 setMessages(prev => [...prev, { 
                     id: Date.now().toString(), 
                     role: 'assistant', 
-                    text: 'ขออภัยค่ะ ระบบกำลังมีปัญหา ไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้งนะคะ' 
+                    text: `ขออภัยค่ะ ระบบมีปัญหา: ${err.message}` 
                 }]);
             }
         } finally {
