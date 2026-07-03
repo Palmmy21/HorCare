@@ -181,6 +181,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (err: any) {
         console.error('[read-meter] error:', err?.message ?? err);
-        res.status(500).json({ error: 'internal_error', message: 'เกิดข้อผิดพลาด กรุณาลองใหม่' });
+        res.status(500).json({ error: 'internal_error', message: `API Error: ${err?.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่'}` });
     }
 }

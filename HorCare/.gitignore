@@ -33,3 +33,4 @@ functions/.env.*
 .firebase 
 
 .vercel
+.env*
