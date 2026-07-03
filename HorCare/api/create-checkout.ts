@@ -98,8 +98,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // ── Promo code: validate & apply via Stripe API ─────────────────────────
         // Stripe enforces max_redemptions_per_customer=1 at promo-code level.
+        // We enforce Plus/Pro only restriction here since we use price_data (no Stripe products).
         let discounts: { promotion_code: string }[] | undefined;
         if (promoCode && typeof promoCode === 'string' && promoCode.trim()) {
+            // Block promo codes on Start plan
+            if (plan === 'small') {
+                res.status(400).json({ error: 'โค้ดนี้ใช้ได้เฉพาะแพ็กเกจ Plus และ Pro เท่านั้น' });
+                return;
+            }
             const code = promoCode.trim().toUpperCase();
             const promoCodes = await stripe.promotionCodes.list({ code, active: true, limit: 1 });
             if (promoCodes.data.length === 0) {
@@ -108,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             discounts = [{ promotion_code: promoCodes.data[0].id }];
         }
-        // ───────────────────────────────────────────────────────────────
+        // ───────────────────────────────────────────────────────────────────────
 
         const session = await stripe.checkout.sessions.create({
             customer: customerId,
