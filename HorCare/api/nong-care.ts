@@ -44,8 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-        // Use gemini-2.5-flash for general reasoning
-        const model = 'gemini-2.5-flash-preview-05-20'; 
+        // Use gemini-1.5-flash for general reasoning
+        const model = 'gemini-1.5-flash'; 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         const systemPrompt = `คุณคือ "น้องแคร์" (Nong Care) ผู้ช่วยอัจฉริยะด้านการเงินและภาษีสำหรับเจ้าของหอพัก

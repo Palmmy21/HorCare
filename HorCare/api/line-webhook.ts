@@ -505,7 +505,7 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
                 const base64 = match[2];
                 const apiKey = process.env.GEMINI_API_KEY;
                 if (apiKey) {
-                    const model = 'gemini-2.5-flash-preview-05-20';
+                    const model = 'gemini-1.5-flash';
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
                     
                     const prompt = `ดึงตัวเลข "จำนวนเงินที่โอน" จากสลิปโอนเงินนี้ (ไม่ต้องรวมค่าธรรมเนียม)
