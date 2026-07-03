@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         const uid = decodedToken.uid;
 
-        const { plan, cycle } = req.body.data || req.body;
+        const { plan, cycle, promoCode } = req.body.data || req.body;
         if (!plan || !cycle) {
             res.status(400).json({ error: 'Missing plan or cycle' });
             return;
@@ -95,7 +95,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const cycleLabel = cycle === 'monthly' ? 'รายเดือน' : 'รายปี';
-        const session = await stripe.checkout.sessions.create({
+
+        // ── Promo code validation & apply ──────────────────────────────────
+        // Only allow promo codes on Plus (medium) and Pro (large) plans.
+        // Stripe enforces max_redemptions_per_customer=1 at the promotion-code level.
+        let discounts: { promotion_code: string }[] | undefined;
+        if (promoCode && typeof promoCode === 'string') {
+            const code = promoCode.trim().toUpperCase();
+            // Reject promo codes on Start (small) plan
+            if (plan === 'small') {
+                res.status(400).json({ error: 'โปรโมชันนี้ไม่สามารถใช้กับแพ็กเกจ Start ได้' });
+                return;
+            }
+            // Look up active promotion codes matching the code string
+            const promoCodes = await stripe.promotionCodes.list({
+                code,
+                active: true,
+                limit: 1,
+            });
+            if (promoCodes.data.length === 0) {
+                res.status(400).json({ error: 'โค้ดส่วนลดไม่ถูกต้องหรือหมดอายุแล้ว' });
+                return;
+            }
+            discounts = [{ promotion_code: promoCodes.data[0].id }];
+        }
+        // ────────────────────────────────────────────────────────────────────
+
+        const sessionParams: Stripe.Checkout.SessionCreateParams = {
             customer: customerId,
             mode: 'payment',
             payment_method_types: ['promptpay', 'card'],
@@ -113,8 +139,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             cancel_url: `${appUrl}?payment=cancel`,
             metadata: { uid, plan, cycle },
             locale: 'th',
-            allow_promotion_codes: true,
-        });
+            // If promo code was supplied, apply it directly (no manual input field needed).
+            // Otherwise show the promotion code input box on the Stripe page.
+            ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+        };
+
+        const session = await stripe.checkout.sessions.create(sessionParams);
 
         res.status(200).json({ data: { url: session.url } });
     } catch (error: any) {
