@@ -75,6 +75,9 @@ export function slipFingerprint(payload: string): string {
  */
 export async function compressSlipToDataUrl(image: Buffer): Promise<string | null> {
     try {
+        if (image.length < 900_000) {
+            return `data:image/jpeg;base64,${image.toString('base64')}`;
+        }
         const img = await Jimp.read(image);
         // ไล่จากใหญ่/คมไปเล็ก/บีบ — resize ลดขนาดอย่างเดียวจึงทำต่อเนื่องได้
         const attempts = [
