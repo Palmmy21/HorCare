@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         const uid = decodedToken.uid;
 
-        const { plan, cycle } = req.body.data || req.body;
+        const { plan, cycle, promoCode } = req.body.data || req.body;
         if (!plan || !cycle) {
             res.status(400).json({ error: 'Missing plan or cycle' });
             return;
@@ -50,8 +50,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         const AMOUNTS: Record<string, number> = {
             monthly_small:  79,  yearly_small:  790,
-            monthly_medium: 259, yearly_medium: 1590,
-            monthly_large:  399, yearly_large:  2590,
+            monthly_medium: 259, yearly_medium: 1990,
+            monthly_large:  399, yearly_large:  3990,
         };
 
         const amount = AMOUNTS[licenseKey];
@@ -96,6 +96,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const cycleLabel = cycle === 'monthly' ? 'รายเดือน' : 'รายปี';
 
+        // ── Promo code: validate & apply via Stripe API ─────────────────────────
+        // Stripe enforces max_redemptions_per_customer=1 at promo-code level.
+        let discounts: { promotion_code: string }[] | undefined;
+        if (promoCode && typeof promoCode === 'string' && promoCode.trim()) {
+            const code = promoCode.trim().toUpperCase();
+            const promoCodes = await stripe.promotionCodes.list({ code, active: true, limit: 1 });
+            if (promoCodes.data.length === 0) {
+                res.status(400).json({ error: 'โค้ดไม่ถูกต้องหรือหมดอายุแล้ว' });
+                return;
+            }
+            discounts = [{ promotion_code: promoCodes.data[0].id }];
+        }
+        // ───────────────────────────────────────────────────────────────
+
         const session = await stripe.checkout.sessions.create({
             customer: customerId,
             mode: 'payment',
@@ -103,10 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             line_items: [{
                 price_data: {
                     currency: 'thb',
-                    product_data: {
-                        name: `HorCare ${PLAN_NAMES_TH[plan]} (${cycleLabel})`,
-                    },
-                    unit_amount: amount * 100, // satang
+                    product_data: { name: `HorCare ${PLAN_NAMES_TH[plan]} (${cycleLabel})` },
+                    unit_amount: amount * 100,
                 },
                 quantity: 1,
             }],
@@ -114,7 +126,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             cancel_url: `${appUrl}?payment=cancel`,
             metadata: { uid, plan, cycle },
             locale: 'th',
-            allow_promotion_codes: true, // ลูกค้ากรอกโค้ดเองบนหน้า Stripe Checkout
+            // If promo code was supplied and valid, apply directly.
+            // Otherwise show the promotion code field on Stripe's page as fallback.
+            ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         });
 
         res.status(200).json({ data: { url: session.url } });

@@ -327,7 +327,7 @@ const PLANS: Plan[] = [
     },
     {
         id: 'medium', name: 'Plus', icon: Building, roomRange: 'สูงสุด 150 ห้อง · 5 หอ',
-        monthlyPrice: 199, yearlyPrice: 1990, originalYearlyPrice: 2388,
+        monthlyPrice: 259, yearlyPrice: 1990, originalYearlyPrice: 3108,
         gradient: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
         glowColor: 'rgba(139,92,246,0.45)',
         popular: true,
@@ -516,8 +516,12 @@ const PlanCard = memo(function PlanCard({
 });
 
 /* ----------- Demo Modal ----------- */
-const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
-    plan: Plan; cycle: BillingCycle; onClose: () => void; onConfirm: () => void;
+const DemoModal = memo(function DemoModal({
+    plan, cycle, onClose, onConfirm, promoCode, onPromoCodeChange, promoError,
+}: {
+    plan: Plan; cycle: BillingCycle;
+    onClose: () => void; onConfirm: () => void;
+    promoCode: string; onPromoCodeChange: (v: string) => void; promoError?: string;
 }) {
     const price = cycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
 
@@ -547,7 +551,7 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
 
                 <div style={{
                     background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.22)',
-                    borderRadius: '14px', padding: '1rem', marginBottom: '1.5rem',
+                    borderRadius: '14px', padding: '1rem', marginBottom: '1.25rem',
                     display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                 }}>
                     <QrCode size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
@@ -558,6 +562,39 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
                             แล้วสแกน QR ด้วยแอปธนาคารได้เลย
                         </div>
                     </div>
+                </div>
+
+                {/* Promo code input */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{
+                        display: 'block', fontSize: '0.75rem', fontWeight: 700,
+                        color: 'rgba(255,255,255,0.45)', marginBottom: '0.4rem', letterSpacing: '0.04em',
+                    }}>
+                        โค้ดส่วนลด <span style={{ fontWeight: 400, opacity: 0.6 }}>(optional)</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={promoCode}
+                        onChange={e => onPromoCodeChange(e.target.value.toUpperCase())}
+                        placeholder="เช่น HOR100"
+                        maxLength={20}
+                        style={{
+                            width: '100%', boxSizing: 'border-box',
+                            background: 'rgba(255,255,255,0.07)',
+                            border: `1px solid ${promoError ? 'rgba(239,68,68,0.55)' : 'rgba(255,255,255,0.13)'}`,
+                            borderRadius: '10px', color: '#fff',
+                            fontSize: '0.9rem', fontWeight: 700,
+                            padding: '0.55rem 0.875rem',
+                            outline: 'none', letterSpacing: '0.1em',
+                            fontFamily: 'monospace',
+                            transition: 'border-color 0.15s',
+                        }}
+                    />
+                    {promoError && (
+                        <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#F87171', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <X size={12} /> {promoError}
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -574,6 +611,7 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
         </>
     );
 });
+
 
 
 /* ----------- Success Screen ----------- */
@@ -637,9 +675,13 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
     );
     const [processing, setProcessing] = useState(false);
     const [successPlan] = useState<Plan | null>(null);
+    const [promoCode, setPromoCode] = useState('');
+    const [promoError, setPromoError] = useState<string | undefined>();
 
     // เมื่อ guest เลือกแผน → ข้าม modal ไปเรียก onNeedAuth ทันที
     const handlePlanSelect = (plan: Plan) => {
+        setPromoCode('');
+        setPromoError(undefined);
         if (isGuest) {
             onNeedAuth?.(plan.id, cycle);
         } else {
@@ -649,12 +691,9 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
     const handleConfirmPayment = async () => {
         if (!selectedPlan) return;
+        setPromoError(undefined);
 
-        // Open a blank tab synchronously (inside the click gesture) so the
-        // browser's popup blocker doesn't block it after the async fetch.
-        // We redirect this tab to Stripe once the session URL is ready.
         const checkoutTab = window.open('', '_blank');
-
         setProcessing(true);
         try {
             const { getAuth } = await import('firebase/auth');
@@ -663,29 +702,35 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
             const token = await auth.currentUser?.getIdToken();
             if (!token) throw new Error('Not authenticated');
 
+            const body: Record<string, string> = { plan: selectedPlan.id, cycle };
+            if (promoCode.trim()) body.promoCode = promoCode.trim();
+
             const res = await fetch('/api/create-checkout', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ plan: selectedPlan.id, cycle })
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body),
             });
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
+                // Show promo error inline (keep modal open)
+                if (promoCode.trim() && res.status === 400) {
+                    if (checkoutTab) checkoutTab.close();
+                    setPromoError(errorData.error || 'โค้ดไม่ถูกต้อง');
+                    setProcessing(false);
+                    return;
+                }
                 throw new Error(errorData.error || 'Failed to create checkout session');
             }
 
             const { data } = await res.json();
             if (!data?.url) throw new Error('No checkout URL returned');
 
-            if (checkoutTab) {
-                checkoutTab.location.href = data.url;
-            } else {
-                window.location.href = data.url;
-            }
+            if (checkoutTab) checkoutTab.location.href = data.url;
+            else window.location.href = data.url;
+
             setSelectedPlan(null);
+            setPromoCode('');
         } catch (err: any) {
             if (checkoutTab) checkoutTab.close();
             console.error('Checkout error:', err);
@@ -918,8 +963,11 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                 <DemoModal
                     plan={selectedPlan}
                     cycle={cycle}
-                    onClose={() => setSelectedPlan(null)}
+                    onClose={() => { setSelectedPlan(null); setPromoCode(''); setPromoError(undefined); }}
                     onConfirm={handleConfirmPayment}
+                    promoCode={promoCode}
+                    onPromoCodeChange={setPromoCode}
+                    promoError={promoError}
                 />
             )}
 
