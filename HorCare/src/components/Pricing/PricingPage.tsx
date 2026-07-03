@@ -516,12 +516,10 @@ const PlanCard = memo(function PlanCard({
 });
 
 /* ----------- Demo Modal ----------- */
-const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm, promoCode, onPromoCodeChange, promoError }: {
+const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
     plan: Plan; cycle: BillingCycle; onClose: () => void; onConfirm: () => void;
-    promoCode: string; onPromoCodeChange: (v: string) => void; promoError?: string;
 }) {
     const price = cycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
-    const isEligibleForPromo = plan.id === 'medium' || plan.id === 'large';
 
     return (
         <>
@@ -549,7 +547,7 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm, pro
 
                 <div style={{
                     background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.22)',
-                    borderRadius: '14px', padding: '1rem', marginBottom: '1.25rem',
+                    borderRadius: '14px', padding: '1rem', marginBottom: '1.5rem',
                     display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                 }}>
                     <QrCode size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
@@ -561,42 +559,6 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm, pro
                         </div>
                     </div>
                 </div>
-
-                {/* Promo code input — Plus & Pro only */}
-                {isEligibleForPromo && (
-                    <div style={{ marginBottom: '1.25rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.775rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: '0.4rem', letterSpacing: '0.03em' }}>
-                            โค้ดส่วนลด (optional)
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <input
-                                type="text"
-                                value={promoCode}
-                                onChange={e => onPromoCodeChange(e.target.value.toUpperCase())}
-                                placeholder="เช่น HOR100"
-                                maxLength={20}
-                                style={{
-                                    flex: 1,
-                                    background: 'rgba(255,255,255,0.07)',
-                                    border: `1px solid ${promoError ? 'rgba(239,68,68,0.6)' : 'rgba(255,255,255,0.14)'}`,
-                                    borderRadius: '10px',
-                                    color: '#fff',
-                                    fontSize: '0.875rem',
-                                    fontWeight: 700,
-                                    padding: '0.55rem 0.875rem',
-                                    outline: 'none',
-                                    letterSpacing: '0.08em',
-                                    fontFamily: 'monospace',
-                                }}
-                            />
-                        </div>
-                        {promoError && (
-                            <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#F87171', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                <X size={12} />{promoError}
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button className="modal-cancel" onClick={onClose}>ยกเลิก</button>
@@ -675,13 +637,9 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
     );
     const [processing, setProcessing] = useState(false);
     const [successPlan] = useState<Plan | null>(null);
-    const [promoCode, setPromoCode] = useState('');
-    const [promoError, setPromoError] = useState<string | undefined>();
 
     // เมื่อ guest เลือกแผน → ข้าม modal ไปเรียก onNeedAuth ทันที
     const handlePlanSelect = (plan: Plan) => {
-        setPromoCode('');
-        setPromoError(undefined);
         if (isGuest) {
             onNeedAuth?.(plan.id, cycle);
         } else {
@@ -691,8 +649,6 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
     const handleConfirmPayment = async () => {
         if (!selectedPlan) return;
-
-        setPromoError(undefined);
 
         // Open a blank tab synchronously (inside the click gesture) so the
         // browser's popup blocker doesn't block it after the async fetch.
@@ -707,27 +663,17 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
             const token = await auth.currentUser?.getIdToken();
             if (!token) throw new Error('Not authenticated');
 
-            const body: Record<string, string> = { plan: selectedPlan.id, cycle };
-            if (promoCode.trim()) body.promoCode = promoCode.trim();
-
             const res = await fetch('/api/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify({ plan: selectedPlan.id, cycle })
             });
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                // Show promo error inline without closing modal
-                if (promoCode.trim() && (res.status === 400)) {
-                    if (checkoutTab) checkoutTab.close();
-                    setPromoError(errorData.error || 'โค้ดไม่ถูกต้อง');
-                    setProcessing(false);
-                    return;
-                }
                 throw new Error(errorData.error || 'Failed to create checkout session');
             }
 
@@ -735,14 +681,11 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
             if (!data?.url) throw new Error('No checkout URL returned');
 
             if (checkoutTab) {
-                // Send the pre-opened tab to Stripe Checkout
                 checkoutTab.location.href = data.url;
             } else {
-                // Popup blocked — fall back to redirecting the current tab
                 window.location.href = data.url;
             }
             setSelectedPlan(null);
-            setPromoCode('');
         } catch (err: any) {
             if (checkoutTab) checkoutTab.close();
             console.error('Checkout error:', err);
@@ -975,11 +918,8 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                 <DemoModal
                     plan={selectedPlan}
                     cycle={cycle}
-                    onClose={() => { setSelectedPlan(null); setPromoCode(''); setPromoError(undefined); }}
+                    onClose={() => setSelectedPlan(null)}
                     onConfirm={handleConfirmPayment}
-                    promoCode={promoCode}
-                    onPromoCodeChange={setPromoCode}
-                    promoError={promoError}
                 />
             )}
 
