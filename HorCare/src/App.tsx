@@ -265,6 +265,28 @@ function App() {
     await register(email, password, name);
   };
 
+  const handleMonthChange = (newMonth: string) => {
+    const current = getCurrentMonth();
+    const currentY = parseInt(current.split('-')[0], 10);
+    const currentM = parseInt(current.split('-')[1], 10);
+    const newY = parseInt(newMonth.split('-')[0], 10);
+    const newM = parseInt(newMonth.split('-')[1], 10);
+    
+    const monthDiff = (currentY - newY) * 12 + (currentM - newM);
+
+    if (monthDiff > 0) {
+      if (!hasPaidSubscription) {
+        setShowFeatureLockedModal('ดูบิลย้อนหลัง (เฉพาะแพ็กเกจเสียเงินเท่านั้น)');
+        return;
+      }
+      if (monthDiff > 6) {
+        alert('แพ็กเกจของคุณสามารถดูบิลย้อนหลังได้สูงสุด 6 เดือนเท่านั้น');
+        return;
+      }
+    }
+    setCurrentMonth(newMonth);
+  };
+
   // Loading state
   if (authLoading) {
     return (
@@ -913,7 +935,7 @@ function App() {
             onSaveBill={saveBill}
             getBillForRoom={getBillForRoom}
             getPreviousBill={getPreviousBill}
-            onMonthChange={setCurrentMonth}
+            onMonthChange={handleMonthChange}
             buildingId={activeBuildingId ?? undefined}
             canUseMeterPhoto={isPlusOrAbove(profile?.license ?? 'free')}
           />
@@ -941,7 +963,7 @@ function App() {
             rooms={rooms}
             config={config}
             currentMonth={currentMonth}
-            onMonthChange={setCurrentMonth}
+            onMonthChange={handleMonthChange}
             onUpdatePayment={updateBillPayment}
             uid={user?.uid}
             buildingId={activeBuildingId ?? undefined}

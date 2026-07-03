@@ -10,7 +10,7 @@ import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, ge
 // selected month. Bounds reads + memory regardless of how long a dorm has existed —
 // the single most important change for supporting many dorms. Older months load
 // automatically when the user navigates to them (the window re-anchors).
-const BILLS_WINDOW_MONTHS = 12;
+const BILLS_WINDOW_MONTHS = 6;
 
 const DEFAULT_CONFIG: DormConfig = {
     building_type: 'dormitory',
