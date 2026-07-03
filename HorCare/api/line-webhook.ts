@@ -489,26 +489,101 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
         });
     }
 
-    // 7. ตั้งเป็น "รอตรวจสอบ" ให้เจ้าของยืนยันยอด
+    // 7. Auto Slip Verification for Pro Users (Gemini OCR)
+    let autoVerified = false;
+    let geminiAmount: number | null = null;
+    
+    const userSnap = await db.collection('users').doc(uid).get();
+    const license = userSnap.data()?.license || 'free';
+    const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_large$/);
+
+    if (isPro && dataUrl && !duplicate && qr.payload) {
+        try {
+            const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+            if (match) {
+                const mimeType = match[1];
+                const base64 = match[2];
+                const apiKey = process.env.GEMINI_API_KEY;
+                if (apiKey) {
+                    const model = 'gemini-2.5-flash-preview-05-20';
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    
+                    const prompt = `ดึงตัวเลข "จำนวนเงินที่โอน" จากสลิปโอนเงินนี้ (ไม่ต้องรวมค่าธรรมเนียม)
+ตอบเป็น JSON เท่านั้น:
+{
+  "amount": <ตัวเลขทศนิยม เช่น 1500.00 หรือ null ถ้าอ่านไม่ได้>
+}`;
+                    const body = {
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inline_data: { mime_type: mimeType, data: base64 } },
+                            ],
+                        }],
+                        generationConfig: {
+                            temperature: 0,
+                            responseMimeType: 'application/json',
+                        },
+                    };
+
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    });
+
+                    if (resp.ok) {
+                        const data = await resp.json() as any;
+                        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+                        try {
+                            const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                            const parsed = JSON.parse(cleanJson);
+                            geminiAmount = parsed.amount;
+                            if (typeof geminiAmount === 'number' && geminiAmount === bill.total_bill) {
+                                autoVerified = true;
+                            }
+                        } catch (e) {
+                            console.error('Parse Gemini slip error:', e);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Slip auto-verification failed:', err);
+        }
+    }
+
+    // 8. ตั้งเป็น "รอตรวจสอบ" ให้เจ้าของยืนยันยอด หรือ "จ่ายแล้ว" (ถ้าออโต้ผ่าน)
     const now = new Date().toISOString();
     const qrPassed = !!qr.payload;
 
     await billDoc.ref.update({
-        payment_status: 'pending',
+        payment_status: autoVerified ? 'paid' : 'pending',
         slip_submitted_at: now,
+        ...(autoVerified ? { payment_date: now.split('T')[0] } : {}),
         ...(dataUrl ? { slip_image: true } : {}),
         ...(fingerprint ? { slip_ref: fingerprint.slice(0, 12) } : {}),
-        verify_note: qrPassed
-            ? 'ตรวจ QR ผ่าน (ไม่ซ้ำ) — รอเจ้าของยืนยันยอด'
-            : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา',
+        ...(geminiAmount !== null ? { slip_ai_amount: geminiAmount } : {}),
+        verify_note: autoVerified 
+            ? 'อนุมัติอัตโนมัติด้วย AI (ยอดเงินตรง)'
+            : qrPassed
+                ? 'ตรวจ QR ผ่าน (ไม่ซ้ำ) — รอเจ้าของยืนยันยอด'
+                : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา',
     });
 
-    await lineReply(replyToken, [{
-        type: 'text',
-        text: qrPassed
-            ? `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n✅ ตรวจ QR ผ่าน (ไม่ซ้ำ)\nเจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ 🙏`
-            : `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n⏳ ระบบอ่าน QR ไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`,
-    }]);
+    if (autoVerified) {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: `✨ ได้รับยอดชำระ ${geminiAmount} บาท เรียบร้อยแล้วค่ะ ✅\n\nบิลของห้อง ${room_number} ถูกอัปเดตสถานะเป็น "จ่ายแล้ว" โดยอัตโนมัติ ขอบคุณค่ะ 🙏`,
+        }]);
+    } else {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: qrPassed
+                ? `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n✅ ตรวจ QR ผ่าน (ไม่ซ้ำ)\nเจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ 🙏`
+                : `📨 รับสลิปห้อง ${room_number} แล้วค่ะ\n\n⏳ ระบบอ่าน QR ไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`,
+        }]);
+    }
 
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
     try {

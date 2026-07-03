@@ -16,7 +16,7 @@ import RoomManagement from './components/RoomManagement/RoomManagement';
 import MeterRecording from './components/MeterRecording/MeterRecording';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
-import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine } from './hooks/useSubscription';
+import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine, isPlusOrAbove } from './hooks/useSubscription';
 import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
 import SlipNotificationToast from './components/SlipNotificationToast';
 // Heavy pages — lazy loaded so their chunks (jsPDF, html2canvas, Stripe, etc.)
@@ -857,6 +857,8 @@ function App() {
             buildingId={activeBuildingId ?? undefined}
             buildingName={activeBuilding?.name}
             onGoToPayments={() => setCurrentView('payments')}
+            license={profile?.license}
+            onUpgrade={() => setCurrentView('pricing')}
           />
         )}
 
@@ -913,6 +915,7 @@ function App() {
             getPreviousBill={getPreviousBill}
             onMonthChange={setCurrentMonth}
             buildingId={activeBuildingId ?? undefined}
+            canUseMeterPhoto={isPlusOrAbove(profile?.license ?? 'free')}
           />
         )}
 

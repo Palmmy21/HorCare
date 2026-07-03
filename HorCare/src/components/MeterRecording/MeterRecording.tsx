@@ -3,8 +3,9 @@ import { flushSync } from 'react-dom';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
     ChevronLeft, ChevronRight, Home, Banknote, FileText,
-    Download, Upload, X, Layers,
+    Download, Upload, X, Layers, Camera,
 } from 'lucide-react';
+import MeterPhotoReader, { type MeterReadResult } from './MeterPhotoReader';
 import type { Room, DormConfig, MonthlyBill } from '../../types';
 import {
     calculateFullBill,
@@ -25,6 +26,8 @@ interface MeterRecordingProps {
     getPreviousBill: (roomId: string, month: string) => MonthlyBill | undefined;
     onMonthChange: (month: string) => void;
     buildingId?: string;
+    /** true = ผู้ใช้เป็น Plus หรือ Pro — เปิดใช้ฟีเจอร์อ่านมิเตอร์จากรูปถ่าย */
+    canUseMeterPhoto?: boolean;
 }
 
 interface RoomRecordingState {
@@ -82,7 +85,8 @@ export default function MeterRecording({
     getBillForRoom,
     getPreviousBill,
     onMonthChange,
-    buildingId
+    buildingId,
+    canUseMeterPhoto = false,
 }: MeterRecordingProps) {
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
     const [savingRooms, setSavingRooms] = useState<Record<string, boolean>>({});
@@ -91,6 +95,8 @@ export default function MeterRecording({
     const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomNumber: string; done: boolean; failed: number } | null>(null);
     const [modalIn, setModalIn] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    /** roomId ของห้องที่กำลังเปิด MeterPhotoReader modal */
+    const [photoReaderId, setPhotoReaderId] = useState<string | null>(null);
 
     // Trigger pop-in transition on the frame after modal mounts
     useEffect(() => {
@@ -458,24 +464,65 @@ export default function MeterRecording({
         // prevElec/prevWater อาจเป็น '' (แทน 0) ถือว่า valid — ตรวจแค่ currElec/currWater ต้องกรอก
         const canSave = state.currElec !== '' && state.currWater !== '' && elecValidation.valid && waterValidation.valid;
 
+        // ── Photo reader confirm handler ────────────────────────────────────────
+        const handlePhotoConfirm = (result: MeterReadResult) => {
+            const field = result.meterType === 'electric'
+                ? 'currElec'
+                : result.meterType === 'water'
+                    ? 'currWater'
+                    : null;
+
+            if (field) {
+                // ใส่ค่าลง field ที่ตรงกับประเภทมิเตอร์
+                handleInputChange(room.id, field, result.reading.toString());
+            } else {
+                // ไม่ทราบประเภท — ถามผู้ใช้โดยเติมทั้งคู่ถ้ายังว่างอยู่
+                if (!state.currElec) handleInputChange(room.id, 'currElec', result.reading.toString());
+                if (!state.currWater) handleInputChange(room.id, 'currWater', result.reading.toString());
+            }
+            setPhotoReaderId(null);
+        };
+
         return (
             <div key={room.id} className={`room-card ${state.isSaved ? 'saved' : ''}`}>
                 <div className="room-card-header">
                     <span className="room-number" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={18} /> ห้อง {room.room_number}</span>
-                    <span className={`room-status ${state.isSaved ? 'saved' : 'pending'}`}>
-                        {state.isSaved ? (
-                            <>
-                                <CheckCircle size={16} />
-                                บันทึกแล้ว
-                            </>
-                        ) : (
-                            <>
-                                <Clock size={16} />
-                                รอบันทึก
-                            </>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {/* ปุ่มถ่ายรูป — เฉพาะ Plus/Pro และห้องที่ยังไม่ lock */}
+                        {canUseMeterPhoto && !state.isLocked && (
+                            <button
+                                className="btn-meter-photo"
+                                onClick={() => setPhotoReaderId(room.id)}
+                                title="อ่านมิเตอร์จากรูปถ่าย (AI)"
+                            >
+                                <Camera size={15} />
+                                <span>AI อ่านรูป</span>
+                            </button>
                         )}
-                    </span>
+                        <span className={`room-status ${state.isSaved ? 'saved' : 'pending'}`}>
+                            {state.isSaved ? (
+                                <>
+                                    <CheckCircle size={16} />
+                                    บันทึกแล้ว
+                                </>
+                            ) : (
+                                <>
+                                    <Clock size={16} />
+                                    รอบันทึก
+                                </>
+                            )}
+                        </span>
+                    </div>
                 </div>
+
+                {/* MeterPhotoReader modal */}
+                {photoReaderId === room.id && (
+                    <MeterPhotoReader
+                        roomNumber={room.room_number}
+                        onConfirm={handlePhotoConfirm}
+                        onClose={() => setPhotoReaderId(null)}
+                    />
+                )}
 
                 {/* Electricity */}
                 <div className="meter-section">

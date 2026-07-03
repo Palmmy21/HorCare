@@ -11,6 +11,8 @@ import { db } from '../../firebase/config';
 import type { DormConfig, MonthlyBill, PaymentStatus, Expense } from '../../types';
 import { formatCurrency, formatMonthThai, getPreviousMonth } from '../../utils/calculations';
 import { useDashboardPrefs, WIDGET_LABELS, type WidgetId } from '../../hooks/useDashboardPrefs';
+import NongCarePanel from '../NongCare/NongCarePanel';
+import { Bot } from 'lucide-react';
 
 interface DashboardProps {
     config: DormConfig;
@@ -28,6 +30,8 @@ interface DashboardProps {
     buildingId?: string;
     buildingName?: string;
     onGoToPayments?: () => void;
+    license?: string;
+    onUpgrade?: () => void;
 }
 
 function statusOf(b: MonthlyBill): PaymentStatus {
@@ -41,9 +45,10 @@ function expenseMonth(dateStr: string): string {
 
 export default function Dashboard({
     config, stats, currentMonth, recentBills, allBills = [],
-    uid, buildingId, buildingName, onGoToPayments,
+    uid, buildingId, buildingName, onGoToPayments, license, onUpgrade
 }: DashboardProps) {
     const [showCustomize, setShowCustomize] = useState(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'ai'>('overview');
     const { allWidgets, toggle, isEnabled } = useDashboardPrefs(uid);
 
     // ── Fetch expenses (last 6+ months) ──────────────────────────────────────
@@ -117,6 +122,24 @@ export default function Dashboard({
 
     const hasTrend = trend.rows.some(r => r.projected > 0 || r.expense > 0);
 
+    // Prepare context for AI
+    const aiContext = useMemo(() => ({
+        month: currentMonth,
+        buildingName: buildingName || 'ไม่ระบุ',
+        totalRooms: stats.totalRooms,
+        savedRooms: stats.savedCount,
+        collection: {
+            projected: collection_.projected,
+            collected: collection_.collected,
+            outstanding: collection_.outstanding,
+            paidCount: collection_.paid,
+            pendingCount: collection_.pending,
+            unpaidCount: collection_.unpaid
+        },
+        expenses: currentMonthExpenses.map(e => ({ item: e.description, amount: e.amount, category: e.category })),
+        netProfit: netProfit
+    }), [currentMonth, buildingName, stats, collection_, currentMonthExpenses, netProfit]);
+
     return (
         <div>
             <div className="page-header">
@@ -148,11 +171,46 @@ export default function Dashboard({
                         ภาพรวมหอพัก — รอบเดือน {formatMonthThai(currentMonth)}
                     </p>
                 </div>
-                <button className="btn btn-outline btn-sm" onClick={() => setShowCustomize(true)}>
+                <button className="btn btn-outline btn-sm" onClick={() => setShowCustomize(true)} style={{ visibility: activeTab === 'overview' ? 'visible' : 'hidden' }}>
                     <SlidersHorizontal size={15} /> ปรับแต่ง
                 </button>
             </div>
 
+            {/* ── Tabs ── */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-gray-200)', paddingBottom: '0.5rem' }}>
+                <button 
+                    onClick={() => setActiveTab('overview')}
+                    style={{ 
+                        background: activeTab === 'overview' ? 'var(--color-primary)' : 'transparent', 
+                        color: activeTab === 'overview' ? '#fff' : 'var(--color-gray-600)',
+                        border: 'none', padding: '0.5rem 1rem', borderRadius: '999px', fontWeight: 600, cursor: 'pointer',
+                        transition: 'var(--transition-fast)'
+                    }}
+                >
+                    ภาพรวมหอพัก
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ai')}
+                    style={{ 
+                        background: activeTab === 'ai' ? 'var(--color-primary)' : 'transparent', 
+                        color: activeTab === 'ai' ? '#fff' : 'var(--color-gray-600)',
+                        border: 'none', padding: '0.5rem 1rem', borderRadius: '999px', fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '0.375rem',
+                        transition: 'var(--transition-fast)'
+                    }}
+                >
+                    <Bot size={16} /> น้องแคร์ AI
+                </button>
+            </div>
+
+            {activeTab === 'ai' ? (
+                <NongCarePanel 
+                    contextData={aiContext} 
+                    isPro={license === 'active' || (license || '').includes('large')} 
+                    onUpgrade={onUpgrade || (() => {})} 
+                />
+            ) : (
+                <>
             {/* ── Collection overview ── */}
             {isEnabled('collection') && (
                 <div className="collection-panel card mb-6">
@@ -515,6 +573,8 @@ export default function Dashboard({
                         </table>
                     </div>
                 </div>
+            )}
+            </>
             )}
 
             {/* ── Customize Panel ── */}
