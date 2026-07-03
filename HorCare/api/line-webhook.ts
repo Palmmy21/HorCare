@@ -495,7 +495,8 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     
     const userSnap = await db.collection('users').doc(uid).get();
     const license = userSnap.data()?.license || 'free';
-    const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_large$/);
+    // อนุญาตให้ทุกแพ็กเกจที่จ่ายเงิน (small, medium, large) หรือ active ได้ใช้งาน AI 
+    const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 
     if (isPro && dataUrl && !duplicate && qr.payload) {
         try {
