@@ -17,10 +17,10 @@ interface Message {
 
 export default function NongCarePanel({ contextData, isPro, onUpgrade }: NongCarePanelProps) {
     const [messages, setMessages] = useState<Message[]>([
-        {
-            id: 'welcome',
-            role: 'assistant',
-            text: 'สวัสดีค่ะ! น้องแคร์พร้อมให้คำปรึกษาเรื่องการเงิน ภาษี และสรุปรายรับรายจ่ายของหอพักแล้วค่ะ มีอะไรให้แคร์ช่วยวิเคราะห์ไหมคะ? 😊'
+        { 
+            id: '1', 
+            role: 'assistant', 
+            text: 'สวัสดีค่ะ เจ้าของหอพัก\nน้องแคร์พร้อมให้คำปรึกษาด้านการเงินและภาษีแล้วค่ะ\n\nวันนี้อยากให้น้องแคร์ช่วยวิเคราะห์เรื่องไหนเป็นพิเศษไหมคะ?' 
         }
     ]);
     const [input, setInput] = useState('');
@@ -74,7 +74,7 @@ export default function NongCarePanel({ contextData, isPro, onUpgrade }: NongCar
                 setMessages(prev => [...prev, { 
                     id: Date.now().toString(), 
                     role: 'assistant', 
-                    text: 'ขออภัยค่ะ ฟีเจอร์ที่ปรึกษา AI "น้องแคร์" เปิดให้บริการเฉพาะแพ็กเกจ Pro เท่านั้นค่ะ 🙏' 
+                    text: 'ขออภัยค่ะ ฟีเจอร์ที่ปรึกษา AI "น้องแคร์" เปิดให้บริการเฉพาะแพ็กเกจ Pro เท่านั้นค่ะ' 
                 }]);
             } else {
                 setMessages(prev => [...prev, { 
