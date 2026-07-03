@@ -154,10 +154,10 @@ export default function MeterPhotoReader({ roomNumber, onConfirm, onClose }: Met
     };
 
     const meterTypeLabel = result?.meterType === 'electric'
-        ? '⚡ มิเตอร์ไฟฟ้า'
+        ? 'มิเตอร์ไฟฟ้า'
         : result?.meterType === 'water'
-            ? '💧 มิเตอร์น้ำ'
-            : '❓ ไม่ทราบประเภท';
+            ? 'มิเตอร์น้ำ'
+            : 'ไม่ทราบประเภท';
 
     const meterTypeIcon = result?.meterType === 'electric'
         ? <Zap size={14} color="#F59E0B" />
@@ -187,7 +187,7 @@ export default function MeterPhotoReader({ roomNumber, onConfirm, onClose }: Met
                     {/* ยังไม่มีรูป */}
                     {!previewUrl && (
                         <div className="meter-photo-upload-zone">
-                            <div className="meter-photo-upload-icon">📷</div>
+                            <div className="meter-photo-upload-icon"><Camera size={32} color="#6B7280" /></div>
                             <p className="meter-photo-upload-hint">เลือกวิธีถ่าย/อัปโหลดรูปมิเตอร์</p>
                             <div className="meter-photo-btn-row">
                                 <button
@@ -207,8 +207,8 @@ export default function MeterPhotoReader({ roomNumber, onConfirm, onClose }: Met
                                     อัปโหลด
                                 </button>
                             </div>
-                            <p className="meter-photo-tip">
-                                💡 ถ่ายให้ชัด ไม่สั่น หน้าปัทม์เห็นตัวเลขครบ
+                            <p className="meter-photo-tip" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                                <AlertCircle size={14} color="#F59E0B" /> ถ่ายให้ชัด ไม่สั่น หน้าปัทม์เห็นตัวเลขครบ
                             </p>
                         </div>
                     )}
