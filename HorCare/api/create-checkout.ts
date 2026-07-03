@@ -132,9 +132,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             cancel_url: `${appUrl}?payment=cancel`,
             metadata: { uid, plan, cycle },
             locale: 'th',
-            // If promo code was supplied and valid, apply directly.
-            // Otherwise show the promotion code field on Stripe's page as fallback.
-            ...(discounts ? { discounts } : { allow_promotion_codes: true }),
+            // Only allow promo codes on Plus (medium) and Pro (large).
+            // Start (small) users see no promo field on the Stripe page.
+            ...(discounts
+                ? { discounts }
+                : plan !== 'small' ? { allow_promotion_codes: true } : {}),
         });
 
         res.status(200).json({ data: { url: session.url } });
