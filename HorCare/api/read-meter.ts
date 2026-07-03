@@ -38,8 +38,8 @@ async function callGeminiVision(
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-    // ใช้ gemini-1.5-flash
-    const model = 'gemini-1.5-flash';
+    // ใช้ gemini-2.5-flash-lite
+    const model = 'gemini-2.5-flash-lite';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const prompt = `คุณคือผู้เชี่ยวชาญอ่านค่ามิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา
