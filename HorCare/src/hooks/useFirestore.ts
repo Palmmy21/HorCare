@@ -129,13 +129,18 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         await setDoc(doc(db, userPath, 'data', 'config'), newConfig);
         // Sync dorm_code lookup table so LINE webhook can find this building
         if (newConfig.dorm_code) {
-            await setDoc(doc(db, 'dorm_codes', newConfig.dorm_code), {
-                uid: userId,
-                building_id: buildingId,
-                dorm_name: newConfig.bill_customization?.dorm_name || '',
-                due_day: newConfig.bill_customization?.due_day || 5,
-                updated_at: serverTimestamp()
-            });
+            try {
+                await setDoc(doc(db, 'dorm_codes', newConfig.dorm_code), {
+                    uid: userId,
+                    building_id: buildingId,
+                    dorm_name: newConfig.bill_customization?.dorm_name || '',
+                    due_day: newConfig.bill_customization?.due_day || 5,
+                    updated_at: serverTimestamp()
+                });
+            } catch (e) {
+                console.error('Failed to sync dorm_code lookup table:', e);
+                throw e; // re-throw ให้ UI แสดง error ได้
+            }
         }
     }, [userPath, userId, buildingId]);
 
