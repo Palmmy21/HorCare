@@ -167,10 +167,14 @@ service cloud.firestore {
       allow write: if false; // backend only via admin SDK
     }
 
-    // ── Dorm codes (readable by backend, writable by admin) ─────────────
+    // ── Dorm codes (readable by backend, writable by owner or admin) ────
+    // เจ้าของหอสามารถสร้าง/อัปเดตรหัสหอของตัวเองได้
+    // ต้องมี uid field ตรงกับ auth.uid เพื่อกันการเขียนทับรหัสของคนอื่น
     match /dorm_codes/{code} {
       allow read: if false;  // backend only
-      allow write: if isAdmin();
+      allow write: if isAdmin()
+        || (isSignedIn() && isNotBanned()
+            && request.resource.data.uid == request.auth.uid);
     }
 
     // ── Deny all other paths ─────────────────────────────────────────────

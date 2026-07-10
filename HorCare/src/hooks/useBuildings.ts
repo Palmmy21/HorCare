@@ -70,7 +70,7 @@ export function useBuildings(userId: string | null) {
  * New:    users/{uid}/buildings/{id}/rooms, .../bills, .../data/config
  */
 async function migrateLegacyData(userId: string) {
-    const buildingId = 'default';
+    const buildingId = `building_${Date.now()}`;
     const basePath = `users/${userId}/buildings/${buildingId}`;
 
     // Check if legacy rooms exist
