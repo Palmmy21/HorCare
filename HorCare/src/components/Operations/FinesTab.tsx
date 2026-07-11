@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Fine, FineStatus, Room } from '../../types';
-import { AlertTriangle, Plus, Edit2, Trash2, Check, X, Filter } from 'lucide-react';
+import { AlertTriangle, Plus, Edit2, Trash2, Check, X, Filter, MessageCircle, Loader2 } from 'lucide-react';
+import { auth } from '../../firebase/config';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
@@ -40,6 +41,7 @@ export default function FinesTab({ rooms, fines, onAdd, onUpdate, onDelete }: Pr
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<FineStatus | 'all'>('all');
   const [filterRoomId, setFilterRoomId] = useState('');
+  const [sendingLineId, setSendingLineId] = useState<string | null>(null);
 
   const activeRooms = rooms.filter(r => r.is_active !== false);
 
@@ -100,6 +102,28 @@ export default function FinesTab({ rooms, fines, onAdd, onUpdate, onDelete }: Pr
   const handleDelete = async (id: string) => {
     await onDelete(id);
     setDeleteId(null);
+  };
+
+  const handleSendLine = async (fine: Fine) => {
+    if (!uid || !buildingId) return;
+    setSendingLineId(fine.id);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Not authenticated');
+      
+      const res = await fetch('/api/send-line-fine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ building_id: buildingId, fine_id: fine.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send LINE notification');
+      alert('ส่งแจ้งเตือนผ่าน LINE เรียบร้อยแล้ว');
+    } catch (e: any) {
+      alert(`ไม่สามารถส่ง LINE ได้: ${e.message}`);
+    } finally {
+      setSendingLineId(null);
+    }
   };
 
   const filtered = fines.filter(f => {
@@ -351,14 +375,25 @@ export default function FinesTab({ rooms, fines, onAdd, onUpdate, onDelete }: Pr
                     </div>
                     <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.375rem', justifyContent: 'flex-end' }}>
                       {fine.status === 'unpaid' ? (
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => handleMarkPaid(fine)}
-                          title="ทำเครื่องหมายว่าชำระแล้ว"
-                          style={{ color: '#059669', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                        >
-                          <Check size={11} /> ชำระแล้ว
-                        </button>
+                        <>
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => handleSendLine(fine)}
+                            disabled={sendingLineId === fine.id}
+                            title="ส่งแจ้งเตือนผ่าน LINE"
+                            style={{ color: '#2563EB', background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.25)', fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                          >
+                            {sendingLineId === fine.id ? <Loader2 size={11} className="spin" /> : <MessageCircle size={11} />} ส่ง LINE
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => handleMarkPaid(fine)}
+                            title="ทำเครื่องหมายว่าชำระแล้ว"
+                            style={{ color: '#059669', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                          >
+                            <Check size={11} /> ชำระแล้ว
+                          </button>
+                        </>
                       ) : (
                         <button
                           className="btn btn-sm"

@@ -280,3 +280,78 @@ export function buildReceiptFlex(
         },
     };
 }
+
+/**
+ * แจ้งยอดค่าปรับ
+ */
+export function buildFineFlex(
+    fine: any,
+    dormName: string,
+    opts: BillFlexOptions = {}
+): object {
+    const total = Number(fine.amount);
+    
+    // Convert date string to Thai format if possible
+    let dateStr = fine.date;
+    try {
+        if (fine.date) {
+            const [y, m, d] = fine.date.split('-');
+            dateStr = `${parseInt(d)} ${THAI_MONTHS[parseInt(m)]} ${parseInt(y) + 543}`;
+        }
+    } catch (e) {}
+
+    const footerContents: object[] = opts.portalUrl ? [
+        {
+            type: 'button',
+            action: { type: 'uri', label: '🔗 เปิดพอร์ทัล', uri: opts.portalUrl },
+            style: 'primary', color: '#DC2626', height: 'sm',
+        },
+    ] : [];
+
+    return {
+        type: 'flex',
+        altText: `🚨 แจ้งยอดค่าปรับ ห้อง ${fine.room_number} ยอด ฿${total.toLocaleString()}`,
+        contents: {
+            type: 'bubble',
+            size: 'kilo',
+            header: {
+                type: 'box', layout: 'vertical', paddingAll: '16px',
+                backgroundColor: '#DC2626',
+                contents: [
+                    { type: 'text', text: '🚨 แจ้งยอดค่าปรับ', color: '#ffffff', size: 'sm', weight: 'bold' },
+                    { type: 'text', text: dormName || '-', color: '#ffffffcc', size: 'xs' },
+                ],
+            },
+            body: {
+                type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px',
+                contents: [
+                    { type: 'box', layout: 'horizontal', contents: [
+                        { type: 'text', text: 'ห้อง', color: '#888888', size: 'sm', flex: 2 },
+                        { type: 'text', text: String(fine.room_number ?? '-'), size: 'sm', weight: 'bold', flex: 3, align: 'end' },
+                    ] },
+                    { type: 'box', layout: 'horizontal', contents: [
+                        { type: 'text', text: 'วันที่', color: '#888888', size: 'sm', flex: 2 },
+                        { type: 'text', text: dateStr || '-', size: 'sm', flex: 3, align: 'end' },
+                    ] },
+                    { type: 'separator', margin: 'md' },
+                    { type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs', contents: [
+                        { type: 'text', text: 'รายการ:', color: '#888888', size: 'xs' },
+                        { type: 'text', text: fine.reason || '-', size: 'sm', wrap: true },
+                        ...(fine.note ? [{ type: 'text', text: `หมายเหตุ: ${fine.note}`, size: 'xs', color: '#888888', wrap: true }] : []),
+                    ] },
+                    { type: 'separator', margin: 'md' },
+                    { type: 'box', layout: 'horizontal', margin: 'md', contents: [
+                        { type: 'text', text: 'ยอดรวม', size: 'md', weight: 'bold', flex: 2 },
+                        { type: 'text', text: `฿${total.toLocaleString()}`, size: 'md', weight: 'bold', color: '#DC2626', align: 'end', flex: 3 },
+                    ] },
+                ],
+            },
+            ...(footerContents.length > 0 ? {
+                footer: {
+                    type: 'box', layout: 'vertical', paddingAll: '12px',
+                    contents: footerContents,
+                },
+            } : {}),
+        },
+    };
+}
