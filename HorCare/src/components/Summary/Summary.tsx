@@ -51,7 +51,6 @@ export default function Summary({
 }: SummaryProps) {
     const [showConfirm, setShowConfirm] = useState(false);
     const [isSending, setIsSending] = useState(false);
-    const [sendComplete, setSendComplete] = useState(false);
     const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
     const [lineResult, setLineResult] = useState<{ sent: number; skipped: number; message?: string; results?: string[] } | null>(null);
     const [showLineUpgradeModal, setShowLineUpgradeModal] = useState(false);
@@ -121,16 +120,6 @@ export default function Summary({
         await onCloseMonth(currentMonth);
         setIsSending(false);
         setShowConfirm(false);
-    };
-
-    const handleSendBills = async () => {
-        setIsSending(true);
-        
-        // Use handlePrintAll to "send" (print/save as PDF) the individual bills to tenants
-        handlePrintAll();
-
-        setIsSending(false);
-        setSendComplete(true);
     };
 
 
@@ -653,7 +642,6 @@ export default function Summary({
                                 onClick={async () => {
                                     if (confirm('คุณต้องการยกเลิกการปิดยอดใช่หรือไม่? (สถานะของบิลทั้งหมดจะกลับไปเป็น "รอบันทึก" และคุณจะสามารถแก้ไขได้)')) {
                                         await onUnlockMonth(currentMonth);
-                                        setSendComplete(false);
                                     }
                                 }}
                             >

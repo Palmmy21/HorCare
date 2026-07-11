@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Download, Printer, Archive, Lock } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Download, Printer, Archive, Lock } from 'lucide-react';
 import type { MonthlyBill, DormConfig, Room } from '../../types';
 import { formatCurrency, formatMonthThai, getCurrentMonth, getPreviousMonth, getEffectiveRates } from '../../utils/calculations';
 import MonthlyReport from '../Summary/MonthlyReport';

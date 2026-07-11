@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, ChevronLeft, ChevronRight
+  Menu, X, LogOut, Clock, Shield, Zap, Ban,
+  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -50,7 +50,7 @@ type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations'
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
   const [buildingMenuOpen, setBuildingMenuOpen] = useState(false);
   const [addBuildingMode, setAddBuildingMode] = useState(false);

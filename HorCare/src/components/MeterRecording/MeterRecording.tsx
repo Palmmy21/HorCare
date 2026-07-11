@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
     ChevronLeft, ChevronRight, Home, Banknote, FileText,
-    Download, Upload, X, Layers, Camera, Check, Search, Filter,
+    Download, Upload, X, Layers, Camera, Check, Search,
 } from 'lucide-react';
 import MeterPhotoReader, { type MeterReadResult } from './MeterPhotoReader';
 import type { Room, DormConfig, MonthlyBill, CommonFee } from '../../types';
