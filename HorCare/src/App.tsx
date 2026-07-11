@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Calculator, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon
+  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -22,11 +22,12 @@ import SlipNotificationToast from './components/SlipNotificationToast';
 // Heavy pages — lazy loaded so their chunks (jsPDF, html2canvas, Stripe, etc.)
 // are downloaded only when the user first navigates to them
 const Summary         = lazy(() => import('./components/Summary/Summary'));
+const DocumentArchive = lazy(() => import('./components/DocumentArchive/DocumentArchive'));
 const PaymentsPage    = lazy(() => import('./components/Payments/PaymentsPage'));
 const TenantsPage     = lazy(() => import('./components/TenantProfile/TenantsPage'));
 const MaintenancePage = lazy(() => import('./components/Maintenance/MaintenancePage'));
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
-const MeterCalculator = lazy(() => import('./components/MeterCalculator/MeterCalculator'));
+
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
 const InstallPrompt   = lazy(() => import('./components/PWA/InstallPrompt'));
@@ -44,11 +45,12 @@ function PageLoader() {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'payments' | 'settings' | 'admin' | 'calculator' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
   const [buildingMenuOpen, setBuildingMenuOpen] = useState(false);
   const [addBuildingMode, setAddBuildingMode] = useState(false);
@@ -229,13 +231,14 @@ function App() {
   const navItems = [
     { id: 'dashboard'  as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'rooms'      as ViewMode, icon: Home,            label: 'จัดการห้อง' },
+    { id: 'recording'    as ViewMode, icon: FileText,           label: 'จดมิเตอร์' },
     { id: 'tenants'     as ViewMode, icon: Users,           label: 'ผู้เช่า' },
     { id: 'maintenance'  as ViewMode, icon: Wrench,             label: 'แจ้งซ่อม' },
     { id: 'operations'   as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
-    { id: 'recording'    as ViewMode, icon: FileText,           label: 'จดมิเตอร์' },
-    { id: 'summary'    as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'payments'   as ViewMode, icon: CreditCard,       label: 'การชำระเงิน' },
-    { id: 'calculator' as ViewMode, icon: Calculator,      label: 'คำนวณมิเตอร์' },
+    { id: 'summary'    as ViewMode, icon: Send,            label: 'สรุปยอด' },
+    { id: 'archives'   as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
+
     { id: 'settings'   as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
     { id: 'pricing'    as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
@@ -247,13 +250,14 @@ function App() {
   }
 
   // Start+ features (any paid plan: Start / Plus / Pro)
-  const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations', 'payments'];
+  const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations', 'payments', 'archives'];
 
   const VIEW_LABELS: Record<string, string> = {
     tenants: 'ผู้เช่า',
     maintenance: 'แจ้งซ่อม',
     operations: 'ระบบจัดการ',
     payments: 'การชำระเงิน',
+    archives: 'คลังเอกสาร',
   };
 
   const handleNavClick = (view: ViewMode) => {
@@ -283,15 +287,9 @@ function App() {
     
     const monthDiff = (currentY - newY) * 12 + (currentM - newM);
 
-    if (monthDiff > 0) {
-      if (!hasPaidSubscription) {
-        setShowFeatureLockedModal('ดูบิลย้อนหลัง (เฉพาะแพ็กเกจเสียเงินเท่านั้น)');
-        return;
-      }
-      if (monthDiff > 6) {
-        alert('แพ็กเกจของคุณสามารถดูบิลย้อนหลังได้สูงสุด 6 เดือนเท่านั้น');
-        return;
-      }
+    if (monthDiff > 6) {
+      alert('ระบบรองรับการดูบิลย้อนหลังได้สูงสุด 6 เดือนเท่านั้น');
+      return;
     }
     setCurrentMonth(newMonth);
   };
@@ -510,10 +508,11 @@ function App() {
       </div>
 
       {/* Sidebar */}
-      <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
+      <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-logo">
           <img src="/logo-icon.png" alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain' }} />
           <span>HorCare</span>
+
         </div>
 
         {/* Building Switcher — Plus/Pro (multiple buildings) */}
@@ -732,7 +731,7 @@ function App() {
                 <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
                   <item.icon size={20} />
                   {showBadge && (
-                    <span style={{
+                    <span className="nav-item-badge" style={{
                       position: 'absolute', top: -3, right: -4,
                       width: 8, height: 8, borderRadius: '50%',
                       background: '#EF4444',
@@ -741,10 +740,10 @@ function App() {
                     }} />
                   )}
                 </span>
-                {item.label}
+                <span className="nav-label">{item.label}</span>
                 {/* Badge count on the right when not locked */}
                 {showBadge && (
-                  <span style={{
+                  <span className="nav-item-badge" style={{
                     marginLeft: 'auto',
                     minWidth: 18, height: 18, borderRadius: 9,
                     background: '#EF4444',
@@ -756,7 +755,7 @@ function App() {
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
-                {isLocked && <Lock size={13} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
+                {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
               </button>
             );
           })}
@@ -765,6 +764,7 @@ function App() {
         {/* Upgrade nudge for free users */}
         {profile?.license === 'free' && !hasPaidSubscription && (
           <button
+            className="sidebar-upgrade-nudge"
             onClick={() => handleNavClick('pricing')}
             style={{
               margin: 'var(--space-4) var(--space-3) 0',
@@ -787,7 +787,7 @@ function App() {
         )}
 
         {/* User info + logout */}
-        <div style={{
+        <div className="sidebar-user-info" style={{
           marginTop: 'auto',
           paddingTop: 'var(--space-4)',
           borderTop: '1px solid rgba(255,255,255,0.08)'
@@ -851,7 +851,7 @@ function App() {
             <LogOut size={18} />
             ออกจากระบบ
           </button>
-          <div style={{
+          <div className="app-version" style={{
             color: 'rgba(255,255,255,0.3)',
             fontSize: '0.6875rem',
             marginTop: 'var(--space-2)'
@@ -875,7 +875,7 @@ function App() {
       )}
 
       {/* Main Content */}
-      <main className="main-content">
+      <main className={`main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
       <Suspense fallback={<PageLoader />}>
         {currentView === 'dashboard' && (
           <Dashboard
@@ -976,6 +976,16 @@ function App() {
           />
         )}
 
+        {currentView === 'archives' && (
+          <DocumentArchive
+            bills={bills}
+            rooms={rooms}
+            config={config}
+            isPaid={hasPaidSubscription}
+            onUpgrade={() => setCurrentView('pricing')}
+          />
+        )}
+
         {currentView === 'payments' && (
           <PaymentsPage
             bills={bills}
@@ -989,9 +999,7 @@ function App() {
           />
         )}
 
-        {currentView === 'calculator' && (
-          <MeterCalculator />
-        )}
+
 
         {currentView === 'settings' && (
           <Settings

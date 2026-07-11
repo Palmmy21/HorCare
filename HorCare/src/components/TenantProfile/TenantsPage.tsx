@@ -557,7 +557,7 @@ export default function TenantsPage({
 
         {/* Filter tabs — segmented control */}
         <div style={{
-          display: 'flex', background: 'var(--color-gray-100, #F3F4F6)',
+          display: 'flex', flexWrap: 'wrap', background: 'var(--color-gray-100, #F3F4F6)',
           borderRadius: '10px', padding: '3px', gap: '2px',
         }}>
           {([

@@ -105,57 +105,57 @@ export default function AssetsTab({ uid, buildingId, rooms }: Props) {
           <h3 style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
             {editId ? 'แก้ไขทรัพย์สิน' : 'เพิ่มทรัพย์สิน'}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ชื่อทรัพย์สิน *
               <input className="form-input" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="เช่น เครื่องปรับอากาศ มิตซู, โต๊ะ" style={{ marginTop: '0.25rem' }} />
+                placeholder="เช่น เครื่องปรับอากาศ มิตซู, โต๊ะ" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมวดหมู่
               <select className="form-input" value={form.category}
                 onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 {ASSET_CATEGORIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ห้อง
               <select className="form-input" value={form.room_id}
                 onChange={e => handleRoomChange(e.target.value)}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 <option value="">ส่วนกลาง</option>
                 {rooms.map(r => <option key={r.id} value={r.id}>ห้อง {r.room_number}</option>)}
               </select>
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               สภาพ
               <select className="form-input" value={form.condition}
                 onChange={e => setForm(f => ({ ...f, condition: e.target.value as AssetCondition }))}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 {(Object.keys(CONDITION_CFG) as AssetCondition[]).map(c => (
                   <option key={c} value={c}>{CONDITION_CFG[c].label}</option>
                 ))}
               </select>
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               วันที่ซื้อ
               <input className="form-input" type="date" value={form.purchase_date}
                 onChange={e => setForm(f => ({ ...f, purchase_date: e.target.value }))}
-                style={{ marginTop: '0.25rem' }} />
+                style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ราคาที่ซื้อ (บาท)
               <input className="form-input" type="number" min={0} value={form.purchase_price ?? ''}
                 onChange={e => setForm(f => ({ ...f, purchase_price: e.target.value ? +e.target.value : undefined }))}
-                placeholder="0" style={{ marginTop: '0.25rem' }} />
+                placeholder="0" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมายเหตุ
               <textarea className="form-input" rows={2} value={form.note}
                 onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                placeholder="Serial no., ยี่ห้อ, รุ่น..." style={{ marginTop: '0.25rem', resize: 'vertical' }} />
+                placeholder="Serial no., ยี่ห้อ, รุ่น..." style={{ marginTop: '0.375rem', width: '100%', resize: 'vertical' }} />
             </label>
           </div>
           {saveError && (
@@ -196,29 +196,34 @@ export default function AssetsTab({ uid, buildingId, rooms }: Props) {
                     <button className="btn btn-secondary btn-sm" onClick={() => setDeleteId(null)}>ยกเลิก</button>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text)' }}>{a.name}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.1rem 0.4rem', borderRadius: '5px' }}>
-                          {a.category}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: cond.color, background: `${cond.color}18`, padding: '0.1rem 0.4rem', borderRadius: '5px' }}>
-                          {cond.label}
-                        </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                          <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>{a.name}</span>
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                            {a.category}
+                          </span>
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: cond.color, background: `${cond.color}18`, padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                            {cond.label}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                          <FieldRow label="ตำแหน่ง" value={a.room_number ? `ห้อง ${a.room_number}` : 'ส่วนกลาง'} />
+                          {a.purchase_date && <FieldRow label="ซื้อวันที่" value={fmtDate(a.purchase_date)} />}
+                          {a.purchase_price != null && <FieldRow label="ราคา" value={`฿${fmtBaht(a.purchase_price)}`} />}
+                        </div>
+                        {a.note && <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.5rem 0 0' }}>{a.note}</p>}
                       </div>
-                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        <FieldRow label="ตำแหน่ง" value={a.room_number ? `ห้อง ${a.room_number}` : 'ส่วนกลาง'} />
-                        {a.purchase_date && <FieldRow label="ซื้อวันที่" value={fmtDate(a.purchase_date)} />}
-                        {a.purchase_price != null && <FieldRow label="ราคา" value={`฿${fmtBaht(a.purchase_price)}`} />}
-                      </div>
-                      {a.note && <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '0.375rem 0 0' }}>{a.note}</p>}
                     </div>
-                    <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(a)}><Edit2 size={13} /></button>
-                      <button className="btn btn-sm" onClick={() => setDeleteId(a.id)}
+                    <div style={{ 
+                      display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', 
+                      borderTop: '1px solid var(--color-border)', paddingTop: '0.875rem' 
+                    }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(a)} title="แก้ไข"><Edit2 size={15} /></button>
+                      <button className="btn btn-sm" onClick={() => setDeleteId(a.id)} title="ลบ"
                         style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                        <Trash2 size={13} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>

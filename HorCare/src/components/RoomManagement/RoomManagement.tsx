@@ -39,7 +39,7 @@ export default function RoomManagement({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [editValue, setEditValue] = useState('');
     const [editRentAmount, setEditRentAmount] = useState('');
-    const [editRentType, setEditRentType] = useState<'monthly' | 'semester'>('monthly');
+    const [editRentType, setEditRentType] = useState<Room['rent_type']>('monthly');
     const [editRoomType, setEditRoomType] = useState<'dormitory' | 'commercial'>('dormitory');
     const [editTenantCount, setEditTenantCount] = useState<string>('1');
     const [editCustomElecRate, setEditCustomElecRate] = useState('');
@@ -93,7 +93,7 @@ export default function RoomManagement({
         setEditingRoom(room.id);
         setEditValue(room.room_number);
         setEditRentAmount(room.rent_amount.toString());
-        setEditRentType(room.rent_type);
+        setEditRentType(room.rent_type || 'monthly');
         setEditRoomType(room.room_type || 'dormitory');
         setEditTenantCount((room.tenant_count || 1).toString());
         setEditCustomElecRate(room.custom_electricity_rate?.toString() || '');
@@ -402,7 +402,7 @@ export default function RoomManagement({
                         )}
                     </div>
                 ) : (
-                    <div className="flex gap-4 items-center">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
                         <input
                             type="text"
                             className="form-input mono"
@@ -650,15 +650,21 @@ export default function RoomManagement({
                                                     className="form-input"
                                                     style={{ width: '130px' }}
                                                     value={editRentType}
-                                                    onChange={e => setEditRentType(e.target.value as 'monthly' | 'semester')}
+                                                    onChange={e => setEditRentType(e.target.value as Room['rent_type'])}
                                                 >
                                                     <option value="monthly">รายเดือน</option>
                                                     <option value="semester">รายเทอม</option>
+                                                    <option value="yearly">รายปี</option>
+                                                    <option value="daily">รายวัน</option>
                                                 </select>
                                             ) : (
-                                                <span className={`badge ${room.rent_type === 'semester' ? 'badge-warning' : 'badge-success'}`}>
+                                                <span className={`badge ${room.rent_type === 'semester' || room.rent_type === 'yearly' ? 'badge-warning' : room.rent_type === 'daily' ? 'badge-info' : 'badge-success'}`}>
                                                     {room.rent_type === 'semester' ? (
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarDays size={12} /> รายเทอม</span>
+                                                    ) : room.rent_type === 'yearly' ? (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarDays size={12} /> รายปี</span>
+                                                    ) : room.rent_type === 'daily' ? (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายวัน</span>
                                                     ) : (
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายเดือน</span>
                                                     )}

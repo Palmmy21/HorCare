@@ -86,7 +86,7 @@ export function getEffectiveRates(
     // Water config priority: room custom > room-type default > global
     const isCommercial = (room.room_type || 'dormitory') === 'commercial';
     // Resort and hotel buildings reuse commercial_water_config as their default rate
-    const isCommercialBuilding = ['commercial', 'resort', 'hotel'].includes(config.building_type);
+    const isCommercialBuilding = ['commercial', 'resort', 'hotel', 'office', 'market'].includes(config.building_type);
     const defaultWaterConfig = (isCommercial || isCommercialBuilding)
         ? (config.commercial_water_config ?? config.water_config)
         : config.water_config;
@@ -111,7 +111,8 @@ export function calculateFullBill(
     roomElecRate?: number,
     roomWaterConfig?: WaterConfig,
     globalCommonFees: CommonFee[] = [],
-    roomCommonFeeOverrides: Record<string, { amount?: number; is_active?: boolean }> = {}
+    roomCommonFeeOverrides: Record<string, { amount?: number; is_active?: boolean }> = {},
+    billMonth?: string // Format: 'YYYY-MM'
 ): BillCalculation {
     const elecRate = roomElecRate ?? config.electricity_rate;
     const waterCfg = roomWaterConfig ?? config.water_config;
@@ -122,15 +123,30 @@ export function calculateFullBill(
     let common_fee = 0;
     const applied_common_fees: { id: string; name: string; amount: number }[] = [];
 
+    // Parse bill month (e.g., '2026-07' -> month 7)
+    const currentMonthNum = billMonth ? parseInt(billMonth.split('-')[1], 10) : null;
+
     for (const fee of globalCommonFees) {
         const override = roomCommonFeeOverrides[fee.id];
         // Determine if active for this room
         const isActive = override?.is_active ?? fee.is_active;
         if (isActive) {
-            const amount = override?.amount ?? fee.amount;
-            if (amount > 0) {
-                common_fee += amount;
-                applied_common_fees.push({ id: fee.id, name: fee.name, amount });
+            // Check charge cycle for yearly fees
+            if (fee.charge_cycle === 'yearly' && fee.charge_month && currentMonthNum) {
+                if (fee.charge_month !== currentMonthNum) {
+                    continue; // Skip this fee if it's not the designated charge month
+                }
+            }
+
+            // Calculate amount based on per-room or per-person
+            let baseAmount = override?.amount ?? fee.amount;
+            if (fee.charge_type === 'per_person') {
+                baseAmount = baseAmount * Math.max(1, tenantCount);
+            }
+
+            if (baseAmount > 0) {
+                common_fee += baseAmount;
+                applied_common_fees.push({ id: fee.id, name: fee.name, amount: baseAmount });
             }
         }
     }

@@ -167,8 +167,42 @@ body {
   top: 0;
   z-index: 100;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
-  transition: background 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.sidebar.collapsed {
+  width: 80px;
+  padding: var(--space-5) var(--space-2);
+}
+
+.sidebar.collapsed .sidebar-logo span,
+.sidebar.collapsed .nav-item .nav-label,
+.sidebar.collapsed .nav-item-badge,
+.sidebar.collapsed .nav-item-lock,
+.sidebar.collapsed .sidebar-upgrade-nudge,
+.sidebar.collapsed .sidebar-user-info span,
+.sidebar.collapsed .sidebar-user-info .app-version {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item {
+  padding: var(--space-3);
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-logo img,
+.sidebar.collapsed .sidebar-logo svg {
+  margin: 0;
+}
+
+.sidebar.collapsed .sidebar-building-switcher {
+  display: none;
+}
+
 
 .sidebar-logo {
   display: flex;
@@ -241,6 +275,7 @@ body {
 .main-content {
   flex: 1;
   margin-left: 240px;
+  transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   /* Center the content column (max 1200px) in the space right of the
      sidebar, keeping a min 2rem side gutter — fixes left-stuck content
      with empty space on wide / ultrawide screens. (1440 = 1200 content
@@ -248,6 +283,11 @@ body {
   padding: var(--space-8) max(var(--space-8), calc((100% - 1440px) / 2));
   background-color: var(--color-gray-50);
   min-height: 100vh;
+}
+
+.main-content.collapsed {
+  margin-left: 80px;
+  padding: var(--space-8) max(var(--space-8), calc((100% - 1280px) / 2));
 }
 
 /* Mobile header - hidden by default, shown on mobile */

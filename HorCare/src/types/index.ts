@@ -66,7 +66,7 @@ export interface BillCustomization {
 }
 
 export interface DormConfig {
-  building_type: 'dormitory' | 'commercial' | 'resort' | 'hotel' | 'other';
+  building_type: 'dormitory' | 'commercial' | 'resort' | 'hotel' | 'apartment' | 'condo' | 'house' | 'office' | 'market' | 'other';
   electricity_rate: number;
   water_config: WaterConfig; // Default for dormitory rooms
   commercial_water_config?: WaterConfig; // Default for commercial / resort / hotel rooms
@@ -86,7 +86,7 @@ export interface Room {
   current_meter_water: number;
   is_active: boolean;
   rent_amount: number;
-  rent_type: 'monthly' | 'semester';
+  rent_type: 'monthly' | 'semester' | 'yearly' | 'daily';
   // Per-room rate overrides (used in commercial mode)
   custom_electricity_rate?: number | null;
   custom_water_config?: WaterConfig | null;
@@ -335,6 +335,9 @@ export interface CommonFee {
   name: string;
   amount: number;
   is_active: boolean;
+  charge_cycle?: 'monthly' | 'yearly';
+  charge_month?: number; // 1-12
+  charge_type?: 'per_room' | 'per_person';
   note?: string;
   created_at: string;
   updated_at?: string;

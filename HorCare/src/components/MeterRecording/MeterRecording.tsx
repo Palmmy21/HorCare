@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
     ChevronLeft, ChevronRight, Home, Banknote, FileText,
-    Download, Upload, X, Layers, Camera, Check,
+    Download, Upload, X, Layers, Camera, Check, Search, Filter,
 } from 'lucide-react';
 import MeterPhotoReader, { type MeterReadResult } from './MeterPhotoReader';
 import type { Room, DormConfig, MonthlyBill, CommonFee } from '../../types';
@@ -91,6 +91,8 @@ export default function MeterRecording({
     canUseMeterPhoto = false,
 }: MeterRecordingProps) {
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterStatus, setFilterStatus] = useState<'all' | 'saved' | 'unsaved'>('all');
     const [savingRooms, setSavingRooms] = useState<Record<string, boolean>>({});
     const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
     const [importResult, setImportResult] = useState<{ updated: number; skipped: string[] } | null>(null);
@@ -213,7 +215,7 @@ export default function MeterRecording({
         const currElec = parseInt(state.currElec) || 0;
         const currWater = parseInt(state.currWater) || 0;
 
-        const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+        const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
         const { electricityRate, waterConfig } = getEffectiveRates(room, config);
 
         const calculation = calculateFullBill(
@@ -227,7 +229,8 @@ export default function MeterRecording({
             electricityRate,
             waterConfig,
             commonFees,
-            room.common_fee_overrides
+            room.common_fee_overrides,
+            currentMonth
         );
 
         const bill: MonthlyBill = {
@@ -305,9 +308,9 @@ export default function MeterRecording({
             const prevWater = parseInt(state.prevWater) || 0;
             const currElec = parseInt(state.currElec) || 0;
             const currWater = parseInt(state.currWater) || 0;
-            const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+            const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
             const { electricityRate, waterConfig } = getEffectiveRates(room, config);
-            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig, commonFees, room.common_fee_overrides);
+            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig, commonFees, room.common_fee_overrides, currentMonth);
             const bill: MonthlyBill = {
                 id: `bill_${room.id}_${currentMonth}`,
                 room_id: room.id,
@@ -461,12 +464,12 @@ export default function MeterRecording({
         const elecValidation = state.currElec ? validateReading(prevElec, currElec) : { valid: true };
         const waterValidation = state.currWater ? validateReading(prevWater, currWater) : { valid: true };
 
-        const effectiveRentPreview = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+        const effectiveRentPreview = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
         const { electricityRate: roomElecRate, waterConfig: roomWaterCfg } = getEffectiveRates(room, config);
 
         // Calculate preview
         const calculation = state.currElec && state.currWater
-            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg, commonFees, room.common_fee_overrides)
+            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg, commonFees, room.common_fee_overrides, currentMonth)
             : null;
 
         // prevElec/prevWater อาจเป็น '' (แทน 0) ถือว่า valid — ตรวจแค่ currElec/currWater ต้องกรอก
@@ -671,7 +674,7 @@ export default function MeterRecording({
                 )}
 
                 {/* Save & Clear Buttons */}
-                <div className="room-card-actions flex gap-2">
+                <div className="room-card-actions flex flex-wrap gap-2">
                     <button
                         className="btn btn-outline btn-danger"
                         onClick={() => handleClear(room.id)}
@@ -717,6 +720,17 @@ export default function MeterRecording({
     };
 
     const activeRooms = rooms.filter(r => r.is_active);
+
+    const filteredRooms = activeRooms.filter(room => {
+        if (searchQuery && !room.room_number.toLowerCase().includes(searchQuery.toLowerCase())) {
+            return false;
+        }
+        const state = recordingState[room.id];
+        const isSaved = state?.isSaved || state?.isLocked;
+        if (filterStatus === 'saved' && !isSaved) return false;
+        if (filterStatus === 'unsaved' && isSaved) return false;
+        return true;
+    });
 
     return (
         <div>
@@ -832,7 +846,7 @@ export default function MeterRecording({
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
                     <p className="page-subtitle">กรอกเลขมิเตอร์และกดบันทึกแต่ละห้อง</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
                     {(() => {
                         const pendingCount = rooms.filter(r => r.is_active).filter(room => {
                             const state = recordingState[room.id];
@@ -923,15 +937,72 @@ export default function MeterRecording({
                 </button>
             </div>
 
-            {activeRooms.length === 0 ? (
+            {/* Search and Filter Bar */}
+            <div className="card mb-6" style={{ padding: '0.75rem 0.875rem', display: 'flex', flexWrap: 'wrap', gap: '0.625rem', alignItems: 'center' }}>
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    background: 'var(--color-gray-50, #F9FAFB)',
+                    border: '1px solid var(--color-border, #E5E7EB)',
+                    borderRadius: '10px', padding: '0.5rem 0.75rem', flex: 1, minWidth: '200px'
+                }}>
+                    <Search size={15} color="var(--color-text-muted, #9CA3AF)" />
+                    <input
+                        type="text"
+                        placeholder="ค้นหาเลขห้อง..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        style={{
+                            border: 'none', background: 'none', outline: 'none',
+                            flex: 1, fontSize: '0.875rem', color: 'var(--color-text, #111827)',
+                        }}
+                    />
+                    {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-muted, #9CA3AF)', display: 'flex' }}>
+                            <X size={15} />
+                        </button>
+                    )}
+                </div>
+
+                <div style={{
+                    display: 'flex', background: 'var(--color-gray-100, #F3F4F6)',
+                    borderRadius: '10px', padding: '3px', gap: '2px', flexWrap: 'wrap'
+                }}>
+                    {([
+                        { id: 'all', label: 'ทั้งหมด' },
+                        { id: 'unsaved', label: 'รอบันทึก' },
+                        { id: 'saved', label: 'บันทึกแล้ว' },
+                    ] as const).map(f => {
+                        const active = filterStatus === f.id;
+                        return (
+                            <button
+                                key={f.id}
+                                onClick={() => setFilterStatus(f.id)}
+                                style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    gap: '0.3rem', padding: '0.45rem 0.75rem', borderRadius: '8px',
+                                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.78rem',
+                                    fontWeight: active ? 700 : 500, transition: 'all 0.15s',
+                                    background: active ? '#fff' : 'transparent',
+                                    color: active ? 'var(--color-primary, #8B5CF6)' : 'var(--color-text-muted, #6B7280)',
+                                    boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                                }}
+                            >
+                                {f.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {filteredRooms.length === 0 ? (
                 <div className="card empty-state">
                     <div><Home size={48} color="#9CA3AF" style={{ margin: '0 auto 1rem' }} /></div>
-                    <h3>ยังไม่มีห้องพัก</h3>
-                    <p>กรุณาเพิ่มห้องพักในหน้า "จัดการห้อง" ก่อน</p>
+                    <h3>ไม่พบห้องพัก</h3>
+                    <p>ไม่มีห้องพักที่ตรงกับเงื่อนไขการค้นหา</p>
                 </div>
             ) : (
                 <div className="room-grid">
-                    {activeRooms.map(renderRoomCard)}
+                    {filteredRooms.map(renderRoomCard)}
                 </div>
             )}
         </div>

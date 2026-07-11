@@ -616,57 +616,11 @@ export default function Summary({
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {/* 1. Send Bills System */}
-                <div className="card text-center" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                    <div className="card-body" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--primary-color)' }}>
-                            <Send size={20} />
-                            <h3 style={{ margin: 0 }}>ระบบส่งบิล</h3>
-                        </div>
-                        
-                        <p className="text-muted mb-4" style={{ fontSize: '0.875rem' }}>
-                            พิมพ์หรือบันทึกใบแจ้งหนี้ของทุกห้อง เพื่อส่งให้ผู้เช่า
-                        </p>
-
-                        {!stats.isAllSaved && !isLocked && (
-                            <p className="text-warning mb-4" style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>
-                                *กรุณาจดมิเตอร์ให้ครบทุกห้องก่อน ({stats.savedCount}/{stats.totalRooms} ห้อง)
-                            </p>
-                        )}
-                        
-                        {sendComplete ? (
-                            <div className="text-success font-bold mb-4 flex justify-center items-center gap-2">
-                                <CheckCircle size={18} /> พิมพ์บิลเรียบร้อยแล้ว!
-                            </div>
-                        ) : null}
-
-                        <button
-                            className={`btn ${stats.isAllSaved ? 'btn-primary' : 'btn-outline'}`}
-                            onClick={handleSendBills}
-                            disabled={isSending || !stats.isAllSaved}
-                            style={{ width: '100%' }}
-                        >
-                            {isSending ? (
-                                <>
-                                    <span className="loading-spinner"></span>
-                                    กำลังดำเนินการ...
-                                </>
-                            ) : (
-                                <>
-                                    <FileText size={18} />
-                                    พิมพ์ใบแจ้งหนี้ทั้งหมด
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* 2. Close Month System */}
-                <div className={`card text-center ${isLocked ? 'saved' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                <div className={`card text-center ${isLocked ? 'saved' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: '400px', width: '100%' }}>
                     <h3 className="card-title mb-2 flex justify-center items-center gap-2">
-                        <Lock size={20} color={isLocked ? "var(--color-success)" : "var(--color-warning)"} />
-                        ระบบปิดยอดเดือน
+                        <Send size={20} color={isLocked ? "var(--color-success)" : "#10B981"} />
+                        ระบบส่งบิล
                     </h3>
                     <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
                         ล็อคข้อมูลบิลทั้งหมดของเดือนนี้ เพื่อป้องกันการแก้ไข
@@ -676,23 +630,23 @@ export default function Summary({
                         <>
                             {!stats.isAllSaved && (
                                 <p className="text-warning mb-4" style={{ fontSize: '0.875rem', fontWeight: 'bold' }}>
-                                    *กรุณาจดมิเตอร์ให้ครบทุกห้องก่อนปิดยอด
+                                    *กรุณาจดมิเตอร์ให้ครบทุกห้องก่อนส่งบิล
                                 </p>
                             )}
                             <button
-                                className="btn btn-warning w-full mt-auto"
+                                className="btn w-full mt-auto"
                                 disabled={!stats.isAllSaved || isSending}
                                 onClick={() => setShowConfirm(true)}
-                                style={{ color: 'white' }}
+                                style={{ background: '#10B981', borderColor: '#10B981', color: 'white' }}
                             >
-                                <Lock size={18} />
-                                ปิดยอดเดือนนี้
+                                <Send size={18} />
+                                ส่งบิล
                             </button>
                         </>
                     ) : (
                         <div>
                             <div className="text-success font-bold mb-3 flex justify-center items-center gap-2">
-                                <CheckCircle size={18} /> ปิดยอดเรียบร้อยแล้ว
+                                <CheckCircle size={18} /> ส่งบิลและปิดยอดเรียบร้อยแล้ว
                             </div>
                             <button
                                 className="btn btn-outline btn-danger w-full"

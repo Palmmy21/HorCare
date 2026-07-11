@@ -78,6 +78,51 @@ const BUILDING_TYPES = [
         desc: 'สำหรับโรงแรมและที่พักแบบมืออาชีพ',
     },
     {
+        key: 'apartment',
+        icon: Building2,
+        iconBg: '#EDE9FE',
+        iconColor: '#8B5CF6',
+        title: 'อพาร์ทเมนต์',
+        subtitle: '(Apartment)',
+        desc: 'คล้ายหอพัก เหมาะสำหรับผู้เช่าระยะยาว',
+    },
+    {
+        key: 'condo',
+        icon: Building2,
+        iconBg: '#E0F2FE',
+        iconColor: '#0284C7',
+        title: 'คอนโดมิเนียม',
+        subtitle: '(Condo)',
+        desc: 'บริหารจัดการนิติบุคคลหรือปล่อยเช่าส่วนตัว',
+    },
+    {
+        key: 'house',
+        icon: Home,
+        iconBg: '#FCE7F3',
+        iconColor: '#DB2777',
+        title: 'บ้านเช่า / ทาวน์โฮม',
+        subtitle: '(House / Townhouse)',
+        desc: 'ให้เช่าบ้านเป็นหลังพร้อมจัดการบิล',
+    },
+    {
+        key: 'office',
+        icon: LayoutGrid,
+        iconBg: '#E0E7FF',
+        iconColor: '#4338CA',
+        title: 'พื้นที่เช่า / สำนักงาน',
+        subtitle: '(Workspace / Office)',
+        desc: 'ออฟฟิศให้เช่ารายเดือนพร้อมค่าน้ำไฟ',
+    },
+    {
+        key: 'market',
+        icon: LayoutGrid,
+        iconBg: '#FEF08A',
+        iconColor: '#CA8A04',
+        title: 'พื้นที่ขายของ / ตลาดนัด',
+        subtitle: '(Market / Stall)',
+        desc: 'จัดการแผงค้าและค่าเช่าพื้นที่',
+    },
+    {
         key: 'other',
         icon: LayoutGrid,
         iconBg: '#F3F4F6',
@@ -89,6 +134,7 @@ const BUILDING_TYPES = [
 ];
 
 export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade }: SettingsProps) {
+    const [activeTab, setActiveTab] = useState<'general' | 'billing' | 'integrations' | 'account'>('general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,
@@ -449,8 +495,42 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 <p className="page-subtitle">กำหนดอัตราค่าบริการและค่าเช่า</p>
             </div>
 
+            {/* Tab Navigation */}
+            <div style={{
+                display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-gray-200)',
+                marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.5rem'
+            }}>
+                {(['general', 'billing', 'integrations', 'account'] as const).map(tab => {
+                    const label = tab === 'general' ? 'ทั่วไป (General)' :
+                                  tab === 'billing' ? 'ค่าใช้จ่าย (Billing & Utilities)' :
+                                  tab === 'integrations' ? 'การเชื่อมต่อ (Integrations)' :
+                                  'บัญชี (Account & Security)';
+                    const Icon = tab === 'general' ? SettingsIcon :
+                                 tab === 'billing' ? Zap :
+                                 tab === 'integrations' ? Share2 : Lock;
+                    return (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                padding: '0.75rem 1.25rem', background: 'none',
+                                border: 'none', cursor: 'pointer',
+                                borderBottom: activeTab === tab ? '3px solid var(--color-primary)' : '3px solid transparent',
+                                color: activeTab === tab ? 'var(--color-primary-dark)' : 'var(--color-gray-500)',
+                                fontWeight: activeTab === tab ? 700 : 500,
+                                fontSize: '0.9375rem', transition: 'all 0.2s',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            <Icon size={18} /> {label}
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* ── Email Verification Banner ── */}
-            {!emailVerified && (
+            {activeTab === 'account' && !emailVerified && (
                 <div style={{
                     background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(239,68,68,0.06))',
                     border: '1.5px solid rgba(245,158,11,0.35)',
@@ -534,7 +614,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             )}
 
             {/* ── Email Verified Badge ── */}
-            {emailVerified && (
+            {activeTab === 'account' && emailVerified && (
                 <div style={{
                     background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.05))',
                     border: '1.5px solid rgba(16,185,129,0.3)',
@@ -551,8 +631,11 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 </div>
             )}
 
-            {/* Supported Building Types (Static Display) */}
-            <div className="settings-section">
+            {/* General Tab */}
+            {activeTab === 'general' && (
+                <>
+                {/* Supported Building Types (Static Display) */}
+                <div className="settings-section">
                 <h3 className="settings-title">
                     <Building2 size={20} color="#6366F1" />
                     ประเภทอาคารที่รองรับ
@@ -603,10 +686,15 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                         );
                     })}
                 </div>
-            </div>
+                </div>
+                </>
+            )}
 
-            {/* Electricity Settings */}
-            <div className="settings-section">
+            {/* Billing Tab */}
+            {activeTab === 'billing' && (
+                <>
+                {/* Electricity Settings */}
+                <div className="settings-section">
                 <h3 className="settings-title">
                     <Zap size={20} color="#F59E0B" />
                     {formData.building_type === 'commercial' ? 'ค่าไฟฟ้า (เริ่มต้น)' : 'ค่าไฟฟ้า'}
@@ -825,7 +913,12 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     </div>
                 </div>
             </div>
+            </>
+            )}
 
+            {/* Integrations Tab */}
+            {activeTab === 'integrations' && (
+                <>
             {/* LINE Integration */}
             <div className="settings-section" style={{ position: 'relative' }}>
             {!isPaid && (
@@ -1234,9 +1327,13 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     )}
                 </div>
             </div>
+            </>
+            )}
 
-            {/* Theme Settings */}
-            <div className="settings-section">
+
+            {/* Theme Settings (General Tab) */}
+            {activeTab === 'general' && (
+                <div className="settings-section">
                 <h3 className="settings-title">
                     <Palette size={20} color="#8B5CF6" />
                     ธีมและสีสัน
@@ -1373,10 +1470,13 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                         );
                     })}
                 </div>
-            </div>
+                </div>
+            )}
 
 
-            {/* Push Notifications */}
+            {/* Push Notifications (Integrations Tab) */}
+            {activeTab === 'integrations' && (
+            <>
             <div className="settings-section">
                 <h3 className="settings-title">
                     <Bell size={20} color="#8B5CF6" />
@@ -1514,9 +1614,13 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     </div>
                 )}
             </div>
+            </>
+            )}
 
-            {/* Save Button */}
+
+            {activeTab !== 'account' && (
             <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
+                {/* Save Button */}
                 <button
                     className="btn btn-primary"
                     onClick={handleSave}
@@ -1537,7 +1641,11 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     </div>
                 )}
             </div>
+            )}
 
+            {/* Account Tab */}
+            {activeTab === 'account' && (
+            <>
             {/* Change Password */}
             <div className="settings-section" style={{ borderTop: '1px solid var(--color-gray-200)', paddingTop: 'var(--space-6)' }}>
                 <h3 className="settings-title">
@@ -1644,6 +1752,8 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     {passwordStatus === 'loading' ? 'กำลังเปลี่ยน...' : 'เปลี่ยนรหัสผ่าน'}
                 </button>
             </div>
+            </>
+            )}
         </div>
     );
 }

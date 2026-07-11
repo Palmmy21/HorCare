@@ -124,47 +124,47 @@ export default function ExpensesTab({ uid, buildingId }: Props) {
           <h3 style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
             {editId ? 'แก้ไขรายจ่าย' : 'เพิ่มรายจ่าย'}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               วันที่
               <input className="form-input" type="date" value={form.date}
                 onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                style={{ marginTop: '0.25rem' }} />
+                style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               จำนวนเงิน (บาท) *
               <input className="form-input" type="number" min={0} value={form.amount || ''}
                 onChange={e => setForm(f => ({ ...f, amount: +e.target.value || 0 }))}
-                placeholder="0" style={{ marginTop: '0.25rem' }} />
+                placeholder="0" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมวดหมู่
               <select className="form-input" value={form.category}
                 onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ผู้รับเหมา/ร้าน
               <select className="form-input" value={form.vendor_id}
                 onChange={e => handleVendorChange(e.target.value)}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 <option value="">—</option>
                 {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </label>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               รายละเอียด *
               <input className="form-input" value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="เช่น เปลี่ยนหลอดไฟห้อง 101" style={{ marginTop: '0.25rem' }} />
+                placeholder="เช่น เปลี่ยนหลอดไฟห้อง 101" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมายเหตุ
               <input className="form-input" value={form.note}
                 onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                placeholder="เลขที่ใบเสร็จ, หมายเหตุเพิ่มเติม" style={{ marginTop: '0.25rem' }} />
+                placeholder="เลขที่ใบเสร็จ, หมายเหตุเพิ่มเติม" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
           </div>
           {saveError && (
@@ -204,31 +204,36 @@ export default function ExpensesTab({ uid, buildingId }: Props) {
                   <button className="btn btn-secondary btn-sm" onClick={() => setDeleteId(null)}>ยกเลิก</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text)' }}>{e.description}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.1rem 0.4rem', borderRadius: '5px' }}>
-                        {e.category}
-                      </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
+                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>{e.description}</span>
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                          {e.category}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{fmtDate(e.date)}</span>
+                        {e.vendor_name && <span style={{ fontSize: '0.875rem', color: '#4F46E5', fontWeight: 600 }}>{e.vendor_name}</span>}
+                        {e.note && <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{e.note}</span>}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{fmtDate(e.date)}</span>
-                      {e.vendor_name && <span style={{ fontSize: '0.8rem', color: '#4F46E5', fontWeight: 600 }}>{e.vendor_name}</span>}
-                      {e.note && <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{e.note}</span>}
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#DC2626', fontFamily: 'monospace' }}>
+                        ฿{fmtBaht(e.amount)}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#DC2626', fontFamily: 'monospace' }}>
-                      ฿{fmtBaht(e.amount)}
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem', justifyContent: 'flex-end' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(e)}><Edit2 size={12} /></button>
-                      <button className="btn btn-sm" onClick={() => setDeleteId(e.id)}
-                        style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
+                  <div style={{ 
+                    display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', 
+                    borderTop: '1px solid var(--color-border)', paddingTop: '0.875rem' 
+                  }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => openEdit(e)} title="แก้ไข"><Edit2 size={15} /></button>
+                    <button className="btn btn-sm" onClick={() => setDeleteId(e.id)} title="ลบ"
+                      style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
               )}

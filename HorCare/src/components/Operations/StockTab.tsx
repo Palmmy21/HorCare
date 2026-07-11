@@ -101,44 +101,44 @@ export default function StockTab({ uid, buildingId }: Props) {
           <h3 style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
             {editId ? 'แก้ไขรายการ' : 'เพิ่มรายการสต็อก'}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ชื่อรายการ *
               <input className="form-input" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="เช่น หลอด LED, ท่อ PVC" style={{ marginTop: '0.25rem' }} />
+                placeholder="เช่น หลอด LED, ท่อ PVC" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมวดหมู่
               <select className="form-input" value={form.category}
                 onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 {STOCK_CATEGORIES.map(c => <option key={c}>{c}</option>)}
               </select>
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หน่วย
               <input className="form-input" value={form.unit}
                 onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
-                placeholder="ชิ้น, กล่อง, เมตร" style={{ marginTop: '0.25rem' }} />
+                placeholder="ชิ้น, กล่อง, เมตร" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               จำนวนปัจจุบัน
               <input className="form-input" type="number" min={0} value={form.quantity}
                 onChange={e => setForm(f => ({ ...f, quantity: +e.target.value || 0 }))}
-                style={{ marginTop: '0.25rem' }} />
+                style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               แจ้งเตือนเมื่อเหลือ (ขั้นต่ำ)
               <input className="form-input" type="number" min={0} value={form.min_quantity}
                 onChange={e => setForm(f => ({ ...f, min_quantity: +e.target.value || 0 }))}
-                style={{ marginTop: '0.25rem' }} />
+                style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมายเหตุ
               <input className="form-input" value={form.note}
                 onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                placeholder="ยี่ห้อ, แหล่งซื้อ..." style={{ marginTop: '0.25rem' }} />
+                placeholder="ยี่ห้อ, แหล่งซื้อ..." style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
           </div>
           {saveError && (
@@ -183,60 +183,65 @@ export default function StockTab({ uid, buildingId }: Props) {
                     <button className="btn btn-secondary btn-sm" onClick={() => setDeleteId(null)}>ยกเลิก</button>
                   </div>
                 ) : (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text)' }}>{it.name}</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.1rem 0.4rem', borderRadius: '5px' }}>
+                          <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>{it.name}</span>
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
                             {it.category}
                           </span>
                           {isLow && (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '0.1rem 0.4rem', borderRadius: '5px' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={10} /> ใกล้หมด</span>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={14} /> ใกล้หมด</span>
                             </span>
                           )}
                         </div>
-                        {it.note && <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '0.25rem 0 0' }}>{it.note}</p>}
+                        {it.note && <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.375rem 0 0' }}>{it.note}</p>}
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: isLow ? '#D97706' : 'var(--color-text)', fontFamily: 'monospace', lineHeight: 1 }}>
+                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: isLow ? '#D97706' : 'var(--color-text)', fontFamily: 'monospace', lineHeight: 1 }}>
                           {it.quantity}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{it.unit}</div>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{it.unit}</div>
                       </div>
                     </div>
 
-                    {adjId === it.id ? (
-                      <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>ปรับจำนวน (+ หรือ -):</span>
-                        <input
-                          type="number"
-                          value={adjDelta}
-                          onChange={e => setAdjDelta(e.target.value)}
-                          placeholder="เช่น 5 หรือ -2"
-                          className="form-input"
-                          style={{ width: 100 }}
-                        />
-                        <button className="btn btn-primary btn-sm" onClick={() => handleAdjust(it)} disabled={!adjDelta}>
-                          <Check size={13} /> ยืนยัน
-                        </button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => { setAdjId(null); setAdjDelta(''); }}>ยกเลิก</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '0.375rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                        <button className="btn btn-secondary btn-sm"
-                          onClick={() => { setAdjId(it.id); setAdjDelta(''); }}>
-                          <ChevronUp size={13} /> / <ChevronDown size={13} /> ปรับจำนวน
-                        </button>
-                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(it)}><Edit2 size={13} /></button>
-                        <button className="btn btn-sm" onClick={() => setDeleteId(it.id)}
-                          style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </>
+                    <div style={{ 
+                      display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', 
+                      borderTop: '1px solid var(--color-border)', paddingTop: '0.875rem' 
+                    }}>
+                      {adjId === it.id ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', width: '100%', justifyContent: 'flex-end' }}>
+                          <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>ปรับจำนวน (+ หรือ -):</span>
+                          <input
+                            type="number"
+                            value={adjDelta}
+                            onChange={e => setAdjDelta(e.target.value)}
+                            placeholder="เช่น 5 หรือ -2"
+                            className="form-input"
+                            style={{ width: 120 }}
+                          />
+                          <button className="btn btn-primary btn-sm" onClick={() => handleAdjust(it)} disabled={!adjDelta}>
+                            <Check size={15} /> ยืนยัน
+                          </button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => { setAdjId(null); setAdjDelta(''); }}>ยกเลิก</button>
+                        </div>
+                      ) : (
+                        <>
+                          <button className="btn btn-secondary btn-sm"
+                            onClick={() => { setAdjId(it.id); setAdjDelta(''); }}>
+                            <ChevronUp size={15} /> / <ChevronDown size={15} /> ปรับจำนวน
+                          </button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(it)} title="แก้ไข"><Edit2 size={15} /></button>
+                          <button className="btn btn-sm" onClick={() => setDeleteId(it.id)} title="ลบ"
+                            style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                            <Trash2 size={15} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             );

@@ -137,11 +137,11 @@ service cloud.firestore {
         }
         // ── ค่าปรับ (owner only) ─────────────────────────────────────────
         match /fines/{docId} {
-          allow read, write: if true;
+          allow read, write: if isOwner(userId) && isNotBanned();
         }
         // ── ค่าบริการส่วนกลาง (owner only) ──────────────────────────────
         match /common_fees/{docId} {
-          allow read, write: if true;
+          allow read, write: if isOwner(userId) && isNotBanned();
         }
       }
 
@@ -182,7 +182,8 @@ service cloud.firestore {
       allow read: if false;  // backend only
       allow write: if isAdmin()
         || (isSignedIn() && isNotBanned()
-            && request.resource.data.uid == request.auth.uid);
+            && request.resource.data.uid == request.auth.uid
+            && (!exists(/databases/$(database)/documents/dorm_codes/$(code)) || get(/databases/$(database)/documents/dorm_codes/$(code)).data.uid == request.auth.uid));
     }
 
     // ── Deny all other paths ─────────────────────────────────────────────

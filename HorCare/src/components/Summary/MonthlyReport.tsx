@@ -1,5 +1,4 @@
 import { forwardRef } from 'react';
-import { Zap, Droplets, Home, Banknote } from 'lucide-react';
 import type { MonthlyBill, DormConfig, BillCustomization } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 
@@ -17,7 +16,7 @@ function formatThaiMonthFull(monthStr: string): string {
         'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
     ];
     const thaiYear = year + 543;
-    return `${thaiMonths[month - 1]} ${thaiYear}`;
+    return `${thaiMonths[month - 1]} พ.ศ. ${thaiYear}`;
 }
 
 function formatThaiDateFull(date: Date): string {
@@ -51,290 +50,205 @@ const MonthlyReport = forwardRef<HTMLDivElement, MonthlyReportProps>(
                 width: '210mm',
                 minHeight: '297mm',
                 background: '#fff',
-                color: '#1a1a1a',
-                fontFamily: '"Sarabun", "Noto Sans Thai", sans-serif',
+                color: '#000',
+                fontFamily: '"TH Sarabun PSK", "TH Sarabun New", "Sarabun", "Noto Sans Thai", sans-serif',
                 padding: '20mm 15mm',
                 boxSizing: 'border-box' as const,
-                fontSize: '13px',
-                lineHeight: '1.6',
+                fontSize: '15px',
+                lineHeight: '1.5',
             },
-            header: {
-                textAlign: 'center' as const,
+            headerContainer: {
+                position: 'relative' as const,
                 marginBottom: '24px',
-                borderBottom: '2px solid #1a1a1a',
-                paddingBottom: '16px',
+                textAlign: 'center' as const,
             },
-            dormName: {
-                fontSize: '22px',
-                fontWeight: 800,
-                marginBottom: '4px',
-                letterSpacing: '0.5px',
+            dateText: {
+                position: 'absolute' as const,
+                top: '0',
+                right: '0',
+                fontSize: '14px',
             },
-            dormAddress: {
-                fontSize: '12px',
-                color: '#555',
-                marginBottom: '2px',
+            title: {
+                fontSize: '24px',
+                fontWeight: 'bold' as const,
+                marginBottom: '8px',
             },
-            reportTitle: {
+            subtitle: {
                 fontSize: '18px',
-                fontWeight: 700,
-                marginTop: '12px',
+                fontWeight: 'bold' as const,
                 marginBottom: '4px',
             },
-            reportSubtitle: {
-                fontSize: '13px',
-                color: '#666',
+            addressText: {
+                fontSize: '15px',
+                marginBottom: '16px',
             },
             table: {
                 width: '100%',
                 borderCollapse: 'collapse' as const,
-                fontSize: '12.5px',
-                marginBottom: '20px',
+                border: '1px solid #000',
+                marginBottom: '24px',
             },
             th: {
-                padding: '12px 10px',
-                textAlign: 'left' as const,
-                borderBottom: '2px solid #e2e8f0',
-                background: '#f8fafc',
-                fontWeight: 600,
-                fontSize: '12.5px',
-                color: '#475569',
-                textTransform: 'uppercase' as const,
-                whiteSpace: 'nowrap' as const,
-            },
-            thRight: {
-                padding: '12px 10px',
-                textAlign: 'right' as const,
-                borderBottom: '2px solid #e2e8f0',
-                background: '#f8fafc',
-                fontWeight: 600,
-                fontSize: '12.5px',
-                color: '#475569',
-                textTransform: 'uppercase' as const,
-                whiteSpace: 'nowrap' as const,
-            },
-            thCenter: {
-                padding: '12px 10px',
+                border: '1px solid #000',
+                padding: '8px 4px',
                 textAlign: 'center' as const,
-                borderBottom: '2px solid #e2e8f0',
-                background: '#f8fafc',
-                fontWeight: 600,
-                fontSize: '12.5px',
-                color: '#475569',
-                textTransform: 'uppercase' as const,
-                whiteSpace: 'nowrap' as const,
+                fontWeight: 'bold' as const,
+                background: '#f8f8f8',
             },
             td: {
-                padding: '8px',
-                borderBottom: '1px solid #e5e5e5',
-            },
-            tdRight: {
-                padding: '8px',
-                borderBottom: '1px solid #e5e5e5',
-                textAlign: 'right' as const,
-                fontVariantNumeric: 'tabular-nums' as const,
+                border: '1px solid #000',
+                padding: '6px 8px',
             },
             tdCenter: {
-                padding: '8px',
-                borderBottom: '1px solid #e5e5e5',
-                textAlign: 'center' as const,
-                fontVariantNumeric: 'tabular-nums' as const,
-            },
-            totalRow: {
-                borderTop: '2px solid #333',
-                fontWeight: 700,
-                fontSize: '14px',
-            },
-            totalLabel: {
-                padding: '12px 8px',
-                textAlign: 'right' as const,
-            },
-            totalValue: {
-                padding: '12px 8px',
-                textAlign: 'right' as const,
-                fontSize: '16px',
-                fontVariantNumeric: 'tabular-nums' as const,
-            },
-            summaryGrid: {
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '16px',
-                marginTop: '24px',
-                padding: '16px',
-                background: '#f8f8f8',
-                borderRadius: '8px',
-                border: '1px solid #e5e5e5',
-            },
-            summaryItem: {
+                border: '1px solid #000',
+                padding: '6px 8px',
                 textAlign: 'center' as const,
             },
-            summaryLabel: {
-                fontSize: '11px',
-                color: '#888',
-                marginBottom: '4px',
+            tdRight: {
+                border: '1px solid #000',
+                padding: '6px 8px',
+                textAlign: 'right' as const,
             },
-            summaryValue: {
+            summaryBox: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginTop: '16px',
+            },
+            summaryTable: {
+                width: '350px',
+                borderCollapse: 'collapse' as const,
+                border: '1px solid #000',
+            },
+            summaryTitle: {
                 fontSize: '16px',
-                fontWeight: 700,
-                fontVariantNumeric: 'tabular-nums' as const,
+                fontWeight: 'bold' as const,
+                marginBottom: '8px',
+                textAlign: 'center' as const,
+            },
+            signatureArea: {
+                display: 'flex',
+                justifyContent: 'space-around',
+                marginTop: '60px',
+            },
+            signatureBlock: {
+                textAlign: 'center' as const,
+                width: '200px',
+            },
+            signatureLine: {
+                borderBottom: '1px dashed #000',
+                height: '30px',
+                marginBottom: '8px',
             },
             footer: {
-                marginTop: '32px',
-                paddingTop: '16px',
-                borderTop: '1px solid #ddd',
-                fontSize: '11px',
-                color: '#999',
+                marginTop: '40px',
+                fontSize: '12px',
                 textAlign: 'center' as const,
-            },
-            breakdownGrid: {
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: '12px',
-                marginTop: '16px',
-                padding: '14px 16px',
-                background: '#fafafa',
-                borderRadius: '8px',
-                border: '1px solid #eee',
-            },
-            breakdownItem: {
-                textAlign: 'center' as const,
-            },
-            breakdownLabel: {
-                fontSize: '11px',
-                color: '#888',
-                marginBottom: '2px',
-            },
-            breakdownValue: {
-                fontSize: '14px',
-                fontWeight: 700,
-                fontVariantNumeric: 'tabular-nums' as const,
-            },
+                color: '#555',
+            }
         };
 
         return (
             <div ref={ref} style={styles.page}>
-                {/* Header */}
-                <div style={styles.header}>
-                    <div style={styles.dormName}>{dormName}</div>
-                    {billCustomization?.dorm_address && (
-                        <div style={styles.dormAddress}>{billCustomization.dorm_address}</div>
-                    )}
-                    {billCustomization?.dorm_phone && (
-                        <div style={styles.dormAddress}>โทร. {billCustomization.dorm_phone}</div>
-                    )}
-                    <div style={styles.reportTitle}>สรุปรายรับประจำเดือน</div>
-                    <div style={styles.reportSubtitle}>
-                        เดือน {formatThaiMonthFull(currentMonth)} | ออกเอกสาร {formatThaiDateFull(new Date())}
+                <div style={styles.headerContainer}>
+                    <div style={styles.dateText}>วันที่พิมพ์: {formatThaiDateFull(new Date())}</div>
+                    <div style={styles.title}>รายงานสรุปรายรับประจำเดือน</div>
+                    <div style={styles.subtitle}>หอพัก: {dormName}</div>
+                    <div style={styles.addressText}>
+                        ประจำเดือน {formatThaiMonthFull(currentMonth)}
+                        {billCustomization?.dorm_address ? ` | ${billCustomization.dorm_address}` : ''}
+                        {billCustomization?.dorm_phone ? ` | โทร: ${billCustomization.dorm_phone}` : ''}
                     </div>
                 </div>
 
-                {/* Table */}
                 <table style={styles.table}>
                     <thead>
                         <tr>
-                            <th style={{ ...styles.th, width: '50px' }}>#</th>
-                            <th style={styles.th}>ห้อง</th>
-                            <th style={styles.thCenter}>ไฟฟ้า (หน่วย)</th>
-                            <th style={styles.thRight}>ค่าไฟ</th>
-                            <th style={styles.thCenter}>น้ำ (หน่วย)</th>
-                            <th style={styles.thRight}>ค่าน้ำ</th>
-                            <th style={styles.thRight}>ค่าห้อง</th>
-                            <th style={styles.thRight}>รวม</th>
+                            <th style={{ ...styles.th, width: '40px' }}>ลำดับ</th>
+                            <th style={styles.th}>ห้องพัก</th>
+                            <th style={styles.th}>ไฟฟ้า (หน่วย)</th>
+                            <th style={styles.th}>ค่าไฟฟ้า (บาท)</th>
+                            <th style={styles.th}>น้ำประปา (หน่วย)</th>
+                            <th style={styles.th}>ค่าน้ำประปา (บาท)</th>
+                            <th style={styles.th}>ค่าเช่าห้อง (บาท)</th>
+                            <th style={styles.th}>รวมเงิน (บาท)</th>
                         </tr>
                     </thead>
                     <tbody>
                         {monthBills.map((bill, idx) => (
-                            <tr key={bill.id} style={idx % 2 === 1 ? { background: '#fafafa' } : {}}>
-                                <td style={styles.td}>{idx + 1}</td>
-                                <td style={{ ...styles.td, fontWeight: 600 }}>{bill.room_number}</td>
+                            <tr key={bill.id}>
+                                <td style={styles.tdCenter}>{idx + 1}</td>
+                                <td style={styles.tdCenter}>{bill.room_number}</td>
                                 <td style={styles.tdCenter}>{bill.elec_units}</td>
-                                <td style={styles.tdRight}>{bill.elec_bill.toLocaleString()}</td>
+                                <td style={styles.tdRight}>{formatCurrency(bill.elec_bill)}</td>
                                 <td style={styles.tdCenter}>{bill.water_units}</td>
-                                <td style={styles.tdRight}>{bill.water_bill.toLocaleString()}</td>
-                                <td style={styles.tdRight}>{bill.room_rent.toLocaleString()}</td>
-                                <td style={{ ...styles.tdRight, fontWeight: 600 }}>{bill.total_bill.toLocaleString()}</td>
+                                <td style={styles.tdRight}>{formatCurrency(bill.water_bill)}</td>
+                                <td style={styles.tdRight}>{formatCurrency(bill.room_rent)}</td>
+                                <td style={{ ...styles.tdRight, fontWeight: 'bold' }}>{formatCurrency(bill.total_bill)}</td>
                             </tr>
                         ))}
                     </tbody>
                     <tfoot>
-                        <tr style={styles.totalRow}>
-                            <td colSpan={2} style={styles.totalLabel}>
-                                รวม ({monthBills.length} ห้อง)
-                            </td>
-                            <td style={{ ...styles.totalLabel, textAlign: 'center' }}>
-                                {totalElecUnits.toLocaleString()}
-                            </td>
-                            <td style={styles.totalLabel}>
-                                {totalElecBill.toLocaleString()}
-                            </td>
-                            <td style={{ ...styles.totalLabel, textAlign: 'center' }}>
-                                {totalWaterUnits.toLocaleString()}
-                            </td>
-                            <td style={styles.totalLabel}>
-                                {totalWaterBill.toLocaleString()}
-                            </td>
-                            <td style={styles.totalLabel}>
-                                {totalRoomRent.toLocaleString()}
-                            </td>
-                            <td style={styles.totalValue}>
-                                {formatCurrency(totalRevenue)}
-                            </td>
+                        <tr style={{ fontWeight: 'bold', background: '#f8f8f8' }}>
+                            <td colSpan={2} style={styles.tdCenter}>รวมทั้งสิ้น ({monthBills.length} ห้อง)</td>
+                            <td style={styles.tdCenter}>{totalElecUnits.toLocaleString()}</td>
+                            <td style={styles.tdRight}>{formatCurrency(totalElecBill)}</td>
+                            <td style={styles.tdCenter}>{totalWaterUnits.toLocaleString()}</td>
+                            <td style={styles.tdRight}>{formatCurrency(totalWaterBill)}</td>
+                            <td style={styles.tdRight}>{formatCurrency(totalRoomRent)}</td>
+                            <td style={styles.tdRight}>{formatCurrency(totalRevenue)}</td>
                         </tr>
                     </tfoot>
                 </table>
 
-                {/* Revenue Breakdown */}
-                <div style={styles.breakdownGrid}>
-                    <div style={styles.breakdownItem}>
-                        <div style={{ ...styles.breakdownLabel, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}><Zap size={14} color="#D97706" /> ค่าไฟฟ้ารวม</div>
-                        <div style={{ ...styles.breakdownValue, color: '#D97706' }}>
-                            {formatCurrency(totalElecBill)}
-                        </div>
+                <div style={styles.summaryBox}>
+                    <div style={{ flex: 1, paddingRight: '20px' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>หมายเหตุ:</div>
+                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px' }}>
+                            <li>อัตราค่าไฟฟ้า: {config.electricity_rate} บาท/หน่วย</li>
+                            <li>อัตราค่าน้ำประปา: {
+                                config.water_config.type === 'normal'
+                                    ? `${config.water_config.unit_rate} บาท/หน่วย`
+                                    : `เหมา ${config.water_config.flat_price} บาท/${config.water_config.flat_limit_unit} หน่วย`
+                            }</li>
+                            <li>เอกสารนี้ใช้สำหรับสรุปยอดภายในเท่านั้น</li>
+                        </ul>
                     </div>
-                    <div style={styles.breakdownItem}>
-                        <div style={{ ...styles.breakdownLabel, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}><Droplets size={14} color="#2563EB" /> ค่าน้ำรวม</div>
-                        <div style={{ ...styles.breakdownValue, color: '#2563EB' }}>
-                            {formatCurrency(totalWaterBill)}
-                        </div>
-                    </div>
-                    <div style={styles.breakdownItem}>
-                        <div style={{ ...styles.breakdownLabel, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}><Home size={14} color="#16A34A" /> ค่าห้องรวม</div>
-                        <div style={{ ...styles.breakdownValue, color: '#16A34A' }}>
-                            {formatCurrency(totalRoomRent)}
-                        </div>
-                    </div>
-                    <div style={styles.breakdownItem}>
-                        <div style={{ ...styles.breakdownLabel, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}><Banknote size={14} color="#7C3AED" /> รายรับทั้งสิ้น</div>
-                        <div style={{ ...styles.breakdownValue, color: '#7C3AED', fontSize: '18px' }}>
-                            {formatCurrency(totalRevenue)}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stats Summary */}
-                <div style={styles.summaryGrid}>
-                    <div style={styles.summaryItem}>
-                        <div style={styles.summaryLabel}>จำนวนห้อง</div>
-                        <div style={styles.summaryValue}>{monthBills.length} ห้อง</div>
-                    </div>
-                    <div style={styles.summaryItem}>
-                        <div style={styles.summaryLabel}>หน่วยไฟฟ้ารวม</div>
-                        <div style={styles.summaryValue}>{totalElecUnits.toLocaleString()} หน่วย</div>
-                    </div>
-                    <div style={styles.summaryItem}>
-                        <div style={styles.summaryLabel}>หน่วยน้ำรวม</div>
-                        <div style={styles.summaryValue}>{totalWaterUnits.toLocaleString()} หน่วย</div>
+                    <div>
+                        <div style={styles.summaryTitle}>สรุปรายการรายรับ</div>
+                        <table style={styles.summaryTable}>
+                            <tbody>
+                                <tr>
+                                    <td style={styles.td}>ค่าไฟฟ้ารวม</td>
+                                    <td style={styles.tdRight}>{formatCurrency(totalElecBill)} บาท</td>
+                                </tr>
+                                <tr>
+                                    <td style={styles.td}>ค่าน้ำประปารวม</td>
+                                    <td style={styles.tdRight}>{formatCurrency(totalWaterBill)} บาท</td>
+                                </tr>
+                                <tr>
+                                    <td style={styles.td}>ค่าเช่าห้องพักรวม</td>
+                                    <td style={styles.tdRight}>{formatCurrency(totalRoomRent)} บาท</td>
+                                </tr>
+                                <tr style={{ fontWeight: 'bold', background: '#f8f8f8' }}>
+                                    <td style={styles.td}>รวมรายรับทั้งสิ้น</td>
+                                    <td style={styles.tdRight}>{formatCurrency(totalRevenue)} บาท</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div style={styles.footer}>
-                    <p>เอกสารนี้สร้างโดยระบบ HorCare — {dormName}</p>
-                    <p>อัตราค่าไฟ {config.electricity_rate} บาท/หน่วย | ค่าน้ำ {
-                        config.water_config.type === 'normal'
-                            ? `${config.water_config.unit_rate} บาท/หน่วย`
-                            : `เหมา ${config.water_config.flat_price} บาท/${config.water_config.flat_limit_unit} หน่วย`
-                    }</p>
+                <div style={styles.signatureArea}>
+                    <div style={styles.signatureBlock}>
+                        <div style={styles.signatureLine}></div>
+                        <div>( ..................................................... )</div>
+                        <div style={{ marginTop: '4px' }}>ผู้จัดทำรายงาน</div>
+                    </div>
+                    <div style={styles.signatureBlock}>
+                        <div style={styles.signatureLine}></div>
+                        <div>( ..................................................... )</div>
+                        <div style={{ marginTop: '4px' }}>ผู้ตรวจสอบ</div>
+                    </div>
                 </div>
             </div>
         );

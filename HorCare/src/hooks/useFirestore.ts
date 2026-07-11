@@ -227,7 +227,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
         const newRoom = { ...currentRoom, ...updates };
 
-        const effectiveRent = newRoom.rent_type === 'semester' ? 0 : (newRoom.rent_amount ?? config.room_rent);
+        const effectiveRent = ['semester', 'yearly', 'daily'].includes(newRoom.rent_type) ? 0 : (newRoom.rent_amount ?? config.room_rent);
         const { electricityRate, waterConfig } = getEffectiveRates(newRoom, config);
 
         const monthsToRecalc = [...new Set([getCurrentMonth(), anchorMonth].filter(Boolean))] as string[];
@@ -248,7 +248,8 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 electricityRate,
                 waterConfig,
                 commonFees,
-                newRoom.common_fee_overrides
+                newRoom.common_fee_overrides,
+                month
             );
 
             const updatedBill: Partial<MonthlyBill> = {
@@ -304,7 +305,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             // Recalculate next month's bill with new previous readings
             const room = rooms.find(r => r.id === bill.room_id);
             if (room) {
-                const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
+                const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
                 const { electricityRate, waterConfig } = getEffectiveRates(room, config);
 
                 const calculation = calculateFullBill(
@@ -318,7 +319,8 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                     electricityRate,
                     waterConfig,
                     commonFees,
-                    room.common_fee_overrides
+                    room.common_fee_overrides,
+                    nextMonth
                 );
 
                 const updatedNextBill: Partial<MonthlyBill> = {

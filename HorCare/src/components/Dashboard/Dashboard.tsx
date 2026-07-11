@@ -328,7 +328,7 @@ export default function Dashboard({
                     </div>
 
                     {/* 3-column summary */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: expenseByCategory.length > 0 ? '1rem' : 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: expenseByCategory.length > 0 ? '1rem' : 0 }}>
                         <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '0.875rem', border: '1px solid #BBF7D0' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: '#059669', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
                                 <ArrowUpRight size={14} /> รายได้จริง
@@ -508,7 +508,7 @@ export default function Dashboard({
                             <Settings size={18} /> อัตราค่าบริการปัจจุบัน
                         </span>
                     </div>
-                    <div className="settings-grid">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                         <div>
                             <div className="stat-label">ค่าไฟฟ้า</div>
                             <div className="stat-value" style={{ fontSize: '1.25rem' }}>{config.electricity_rate} บาท/หน่วย</div>

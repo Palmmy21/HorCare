@@ -79,32 +79,32 @@ export default function VendorsTab({ uid, buildingId }: Props) {
           <h3 style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
             {editId ? 'แก้ไขข้อมูล' : 'เพิ่มผู้รับเหมา'}
           </h3>
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ชื่อ *
               <input className="form-input" value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="ชื่อผู้รับเหมา / ร้าน" style={{ marginTop: '0.25rem' }} />
+                placeholder="ชื่อผู้รับเหมา / ร้าน" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               เบอร์โทร
               <input className="form-input" value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="0812345678" inputMode="tel" style={{ marginTop: '0.25rem' }} />
+                placeholder="0812345678" inputMode="tel" style={{ marginTop: '0.375rem', width: '100%' }} />
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ความชำนาญ
               <select className="form-input" value={form.specialty}
                 onChange={e => setForm(f => ({ ...f, specialty: e.target.value }))}
-                style={{ marginTop: '0.25rem' }}>
+                style={{ marginTop: '0.375rem', width: '100%' }}>
                 {SPECIALTIES.map(s => <option key={s}>{s}</option>)}
               </select>
             </label>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมายเหตุ
               <textarea className="form-input" rows={2} value={form.note}
                 onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                placeholder="ราคา, เวลา, ข้อสังเกต..." style={{ marginTop: '0.25rem', resize: 'vertical' }} />
+                placeholder="ราคา, เวลา, ข้อสังเกต..." style={{ marginTop: '0.375rem', width: '100%', resize: 'vertical' }} />
             </label>
           </div>
           {saveError && (
@@ -143,40 +143,45 @@ export default function VendorsTab({ uid, buildingId }: Props) {
                   <button className="btn btn-secondary btn-sm" onClick={() => setDeleteId(null)}>ยกเลิก</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '10px', flexShrink: 0,
-                    background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <HardHat size={18} color="#fff" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text)', marginBottom: '0.25rem' }}>
-                      {v.name}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '12px', flexShrink: 0,
+                      background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <HardHat size={22} color="#fff" />
                     </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      {v.phone && (
-                        <a href={`tel:${v.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8125rem', color: '#4F46E5', textDecoration: 'none', fontWeight: 600 }}>
-                          <Phone size={13} /> {v.phone}
-                        </a>
-                      )}
-                      <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                        {v.specialty}
-                      </span>
-                      {v.created_at && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                          เพิ่มเมื่อ {fmtDate(v.created_at)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)', marginBottom: '0.375rem' }}>
+                        {v.name}
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        {v.phone && (
+                          <a href={`tel:${v.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: '#4F46E5', textDecoration: 'none', fontWeight: 600 }}>
+                            <Phone size={14} /> {v.phone}
+                          </a>
+                        )}
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+                          {v.specialty}
                         </span>
-                      )}
+                        {v.created_at && (
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+                            เพิ่มเมื่อ {fmtDate(v.created_at)}
+                          </span>
+                        )}
+                      </div>
+                      {v.note && <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.5rem 0 0', lineHeight: 1.5 }}>{v.note}</p>}
                     </div>
-                    {v.note && <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', margin: '0.375rem 0 0', lineHeight: 1.5 }}>{v.note}</p>}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
-                    <button className="btn btn-secondary btn-sm" onClick={() => openEdit(v)}><Edit2 size={13} /></button>
-                    <button className="btn btn-sm" onClick={() => setDeleteId(v.id)}
+                  <div style={{ 
+                    display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', 
+                    borderTop: '1px solid var(--color-border)', paddingTop: '0.875rem' 
+                  }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => openEdit(v)} title="แก้ไข"><Edit2 size={15} /></button>
+                    <button className="btn btn-sm" onClick={() => setDeleteId(v.id)} title="ลบ"
                       style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                      <Trash2 size={13} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>

@@ -12,6 +12,9 @@ const EMPTY_FORM: FeeForm = {
   name: '',
   amount: 0,
   is_active: true,
+  charge_cycle: 'monthly',
+  charge_type: 'per_room',
+  charge_month: 1,
   note: '',
 };
 
@@ -44,7 +47,15 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
   };
 
   const openEdit = (fee: CommonFee) => {
-    setForm({ name: fee.name, amount: fee.amount, is_active: fee.is_active, note: fee.note ?? '' });
+    setForm({ 
+      name: fee.name, 
+      amount: fee.amount, 
+      is_active: fee.is_active,
+      charge_cycle: fee.charge_cycle || 'monthly',
+      charge_type: fee.charge_type || 'per_room',
+      charge_month: fee.charge_month || 1,
+      note: fee.note ?? '' 
+    });
     setEditId(fee.id);
     setSaveError('');
     setShowForm(true);
@@ -132,19 +143,19 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
             </h3>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               ชื่อรายการ *
               <input
                 className="form-input"
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="เช่น ค่าอินเทอร์เน็ต, ค่าดูแลสวน"
-                style={{ marginTop: '0.25rem' }}
+                style={{ marginTop: '0.375rem', width: '100%' }}
               />
             </label>
 
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               จำนวนเงิน (บาท/ห้อง) *
               <input
                 className="form-input"
@@ -153,11 +164,62 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                 value={form.amount || ''}
                 onChange={e => setForm(f => ({ ...f, amount: +e.target.value || 0 }))}
                 placeholder="0"
-                style={{ marginTop: '0.25rem' }}
+                style={{ marginTop: '0.375rem', width: '100%' }}
               />
             </label>
 
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              ประเภทการเก็บ *
+              <select
+                className="form-input"
+                value={form.charge_type || 'per_room'}
+                onChange={e => setForm(f => ({ ...f, charge_type: e.target.value as 'per_room' | 'per_person' }))}
+                style={{ marginTop: '0.375rem', width: '100%' }}
+              >
+                <option value="per_room">เหมาต่อห้อง</option>
+                <option value="per_person">คิดตามจำนวนคน</option>
+              </select>
+            </label>
+
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              รอบการเรียกเก็บ *
+              <select
+                className="form-input"
+                value={form.charge_cycle || 'monthly'}
+                onChange={e => setForm(f => ({ ...f, charge_cycle: e.target.value as 'monthly' | 'yearly' }))}
+                style={{ marginTop: '0.375rem', width: '100%' }}
+              >
+                <option value="monthly">รายเดือน (เรียกเก็บทุกบิล)</option>
+                <option value="yearly">รายปี (เรียกเก็บเฉพาะเดือนที่กำหนด)</option>
+              </select>
+            </label>
+
+            {form.charge_cycle === 'yearly' && (
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                เดือนที่เรียกเก็บ (สำหรับรายปี) *
+                <select
+                  className="form-input"
+                  value={form.charge_month || 1}
+                  onChange={e => setForm(f => ({ ...f, charge_month: parseInt(e.target.value, 10) }))}
+                  style={{ marginTop: '0.375rem', width: '100%' }}
+                >
+                  <option value="1">มกราคม</option>
+                  <option value="2">กุมภาพันธ์</option>
+                  <option value="3">มีนาคม</option>
+                  <option value="4">เมษายน</option>
+                  <option value="5">พฤษภาคม</option>
+                  <option value="6">มิถุนายน</option>
+                  <option value="7">กรกฎาคม</option>
+                  <option value="8">สิงหาคม</option>
+                  <option value="9">กันยายน</option>
+                  <option value="10">ตุลาคม</option>
+                  <option value="11">พฤศจิกายน</option>
+                  <option value="12">ธันวาคม</option>
+                </select>
+              </label>
+            )}
+
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
               สถานะ
               <button
                 type="button"
@@ -166,10 +228,11 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
                   background: form.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)',
                   border: `1.5px solid ${form.is_active ? 'rgba(16,185,129,0.35)' : 'rgba(107,114,128,0.2)'}`,
-                  borderRadius: '10px', padding: '0.5rem 0.75rem',
+                  borderRadius: '10px', padding: '0.625rem 0.875rem',
                   color: form.is_active ? '#059669' : '#6B7280',
-                  fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer',
+                  fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
                   transition: 'all 0.15s',
+                  width: '100%'
                 }}
               >
                 {form.is_active
@@ -179,14 +242,14 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
               </button>
             </label>
 
-            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+            <label style={{ gridColumn: '1 / -1', fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
               หมายเหตุ
               <input
                 className="form-input"
                 value={form.note}
                 onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
                 placeholder="หมายเหตุเพิ่มเติม"
-                style={{ marginTop: '0.25rem' }}
+                style={{ marginTop: '0.375rem', width: '100%' }}
               />
             </label>
           </div>
@@ -252,69 +315,70 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                   <button className="btn btn-secondary btn-sm" onClick={() => setDeleteId(null)}>ยกเลิก</button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text)' }}>
-                        {fee.name}
-                      </span>
-                      <span style={{
-                        fontSize: '0.7rem', fontWeight: 700,
-                        padding: '0.1rem 0.45rem', borderRadius: '5px',
-                        background: fee.is_active ? 'rgba(79,70,229,0.12)' : 'rgba(107,114,128,0.1)',
-                        color: fee.is_active ? '#4F46E5' : '#6B7280',
-                      }}>
-                        {fee.is_active ? 'เปิดใช้งาน' : 'ปิด'}
-                      </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>
+                          {fee.name}
+                        </span>
+                        <span style={{
+                          fontSize: '0.8125rem', fontWeight: 700,
+                          padding: '0.25rem 0.625rem', borderRadius: '6px',
+                          background: fee.is_active ? 'rgba(79,70,229,0.12)' : 'rgba(107,114,128,0.1)',
+                          color: fee.is_active ? '#4F46E5' : '#6B7280',
+                        }}>
+                          {fee.is_active ? 'เปิดใช้งาน' : 'ปิด'}
+                        </span>
+                      </div>
+                      {fee.note && (
+                        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>{fee.note}</div>
+                      )}
+                      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+                        {fee.charge_type === 'per_person' ? 'เรียกเก็บรายบุคคล (ตามจำนวนผู้เช่า)' : 'เหมาต่อห้อง'}
+                        {' · '}
+                        {fee.charge_cycle === 'yearly' ? `รายปี (เฉพาะบิลเดือน ${fee.charge_month})` : 'รายเดือน (ทุกบิล)'}
+                      </div>
                     </div>
-                    {fee.note && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{fee.note}</div>
-                    )}
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.125rem' }}>
-                      เรียกเก็บจากทุกห้อง
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{
+                        fontSize: '1.25rem', fontWeight: 800,
+                        color: fee.is_active ? '#4F46E5' : '#9CA3AF',
+                        fontFamily: 'monospace',
+                      }}>
+                        ฿{fmtBaht(fee.amount)}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{
-                      fontSize: '1.15rem', fontWeight: 800,
-                      color: fee.is_active ? '#4F46E5' : '#9CA3AF',
-                      fontFamily: 'monospace',
-                    }}>
-                      ฿{fmtBaht(fee.amount)}
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.375rem', justifyContent: 'flex-end' }}>
-                      {/* Toggle active */}
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => handleToggle(fee)}
-                        title={fee.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-                        style={{
-                          color: fee.is_active ? '#059669' : '#6B7280',
-                          background: fee.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)',
-                          border: `1px solid ${fee.is_active ? 'rgba(16,185,129,0.25)' : 'rgba(107,114,128,0.2)'}`,
-                          padding: '0.2rem 0.4rem',
-                        }}
-                      >
-                        {fee.is_active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-                      </button>
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => openEdit(fee)}
-                        style={{ padding: '0.2rem 0.4rem' }}
-                      >
-                        <Edit2 size={12} />
-                      </button>
-                      <button
-                        className="btn btn-sm"
-                        onClick={() => setDeleteId(fee.id)}
-                        style={{
-                          color: '#DC2626', background: 'rgba(220,38,38,0.08)',
-                          border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.4rem',
-                        }}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
+
+                  {/* Actions Row */}
+                  <div style={{ 
+                    display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', 
+                    borderTop: '1px solid var(--color-border)', paddingTop: '0.875rem' 
+                  }}>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => handleToggle(fee)}
+                      title={fee.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                      style={{
+                        color: fee.is_active ? '#059669' : '#6B7280',
+                        background: fee.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)',
+                        border: `1px solid ${fee.is_active ? 'rgba(16,185,129,0.25)' : 'rgba(107,114,128,0.2)'}`,
+                      }}
+                    >
+                      {fee.is_active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => openEdit(fee)} title="แก้ไข">
+                      <Edit2 size={15} />
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => setDeleteId(fee.id)}
+                      title="ลบ"
+                      style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)' }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
               )}
