@@ -32,7 +32,7 @@ interface Props {
   onDelete: (fineId: string) => Promise<void>;
 }
 
-export default function FinesTab({ rooms, fines, onAdd, onUpdate, onDelete }: Props) {
+export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdate, onDelete }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FineForm>(EMPTY_FORM);

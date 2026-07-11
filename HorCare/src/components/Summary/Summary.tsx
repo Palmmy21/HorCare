@@ -3,7 +3,7 @@ import {
     CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer, BarChart3,
     Home, Zap, Droplets, Banknote, ClipboardList, Calendar, MapPin,
-    MessageCircle
+    MessageCircle, Building2
 } from 'lucide-react';
 import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room } from '../../types';
