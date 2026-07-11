@@ -120,6 +120,21 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                             <td style={tdR}>{n(bill.water_bill)}</td>
                         </tr>
                     )}
+
+                    {/* ค่าส่วนกลาง */}
+                    {bill.common_fee ? (
+                        <tr>
+                            <td style={tdL}>
+                                ค่าส่วนกลาง
+                                {bill.applied_common_fees && bill.applied_common_fees.length > 0 && (
+                                    <div style={{ fontSize: 9, color: '#555' }}>
+                                        {bill.applied_common_fees.map(f => f.name).join(', ')}
+                                    </div>
+                                )}
+                            </td>
+                            <td style={tdR}>{n(bill.common_fee)}</td>
+                        </tr>
+                    ) : null}
                 </tbody>
             </table>
 

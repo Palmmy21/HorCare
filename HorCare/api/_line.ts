@@ -142,6 +142,12 @@ export function buildBillFlex(
                         { type: 'text', text: '🏠 ค่าเช่าห้อง', color: '#555555', size: 'sm', flex: 3 },
                         { type: 'text', text: `฿${(bill.room_rent as number).toLocaleString()}`, size: 'sm', align: 'end', flex: 2 },
                     ] },
+                    ...(bill.common_fee ? [{
+                        type: 'box', layout: 'horizontal', contents: [
+                            { type: 'text', text: '🏢 ค่าส่วนกลาง', color: '#555555', size: 'sm', flex: 3 },
+                            { type: 'text', text: `฿${(bill.common_fee as number).toLocaleString()}`, size: 'sm', align: 'end', flex: 2 },
+                        ]
+                    }] : []),
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
                         { type: 'text', text: 'ยอดรวม', size: 'md', weight: 'bold', flex: 2 },
@@ -258,6 +264,7 @@ export function buildReceiptFlex(
                     row(`⚡ ค่าไฟ (${bill.elec_units ?? 0} หน่วย)`, `฿${Number(bill.elec_bill ?? 0).toLocaleString()}`, { margin: 'md' }),
                     row(`💧 ค่าน้ำ (${bill.water_units ?? 0} หน่วย)`, `฿${Number(bill.water_bill ?? 0).toLocaleString()}`),
                     row('🏠 ค่าเช่าห้อง', `฿${Number(bill.room_rent ?? 0).toLocaleString()}`),
+                    ...(bill.common_fee ? [row('🏢 ค่าส่วนกลาง', `฿${Number(bill.common_fee).toLocaleString()}`)] : []),
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
                         { type: 'text', text: 'ยอดที่ชำระ', size: 'md', weight: 'bold', flex: 2 },
