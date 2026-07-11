@@ -182,6 +182,23 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                 <td className="invoice-td text-right mono">{bill.water_bill.toLocaleString()}</td>
                             </tr>
                         )}
+
+                        {/* ค่าส่วนกลาง */}
+                        {bill.common_fee > 0 && (
+                            <tr className="invoice-row">
+                                <td className="invoice-td">
+                                    <div style={{ fontWeight: 500 }}>ค่าส่วนกลาง</div>
+                                    {bill.applied_common_fees && bill.applied_common_fees.length > 0 && (
+                                        <div className="invoice-detail">
+                                            {bill.applied_common_fees.map(f => f.name).join(', ')}
+                                        </div>
+                                    )}
+                                </td>
+                                <td className="invoice-td text-center">—</td>
+                                <td className="invoice-td text-right">—</td>
+                                <td className="invoice-td text-right mono">{bill.common_fee.toLocaleString()}</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
 
