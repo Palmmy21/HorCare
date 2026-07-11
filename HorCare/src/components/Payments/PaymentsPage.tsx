@@ -396,7 +396,12 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                         )}
                                         {s === 'pending' && b.verify_note && (() => {
                                             const good = b.verify_note.startsWith('ตรวจ QR ผ่าน');
-                                            return <div style={{ fontSize: '0.72rem', color: good ? '#059669' : '#D97706', marginTop: 2 }}>{good ? '✓' : '⚠'} {b.verify_note}</div>;
+                                            return (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: good ? '#059669' : '#D97706', marginTop: 2 }}>
+                                                    {good ? <CheckCircle2 size={11} /> : <TriangleAlert size={11} />}
+                                                    {b.verify_note}
+                                                </div>
+                                            );
                                         })()}
                                     </div>
                                 </div>

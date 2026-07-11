@@ -192,7 +192,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                         borderRadius: '999px', padding: '0.3rem 0.9rem', marginTop: '0.4rem',
                         fontSize: '0.78rem', fontWeight: 700, color: '#059669',
                     }}>
-                        <span>✓ ใช้ฟรี</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle2 size={12} /> ใช้ฟรี</span>
                         <span style={{ opacity: 0.4 }}>|</span>
                         <span>เพิ่ม LINE ส่งบิล ฿79/เดือน</span>
                     </div>

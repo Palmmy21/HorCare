@@ -143,7 +143,7 @@ export default function StockTab({ uid, buildingId }: Props) {
           </div>
           {saveError && (
             <div style={{ marginTop: '0.75rem', padding: '0.625rem 0.875rem', background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: '8px', fontSize: '0.8125rem', color: '#DC2626', fontWeight: 600 }}>
-              ⚠️ {saveError}
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={14} /> {saveError}</span>
             </div>
           )}
           <div style={{ display: 'flex', gap: '0.625rem', marginTop: '0.75rem' }}>
@@ -193,7 +193,7 @@ export default function StockTab({ uid, buildingId }: Props) {
                           </span>
                           {isLow && (
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '0.1rem 0.4rem', borderRadius: '5px' }}>
-                              ⚠️ ใกล้หมด
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={10} /> ใกล้หมด</span>
                             </span>
                           )}
                         </div>

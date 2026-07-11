@@ -42,7 +42,7 @@ export function useTenantProfile(
   // Real-time listener — profile document
   useEffect(() => {
     if (!uid || !buildingId || !roomId) {
-      setProfile(null);
+      setProfile(null); // eslint-disable-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }
@@ -54,7 +54,7 @@ export function useTenantProfile(
         setProfile(snap.exists() ? (snap.data() as TenantProfile) : null);
         setLoading(false);
       },
-      _err => {
+      () => {
         // Silently ignore permission/not-found errors — treat as no profile
         setProfile(null);
         setLoading(false);
@@ -65,14 +65,14 @@ export function useTenantProfile(
 
   // Real-time listener — events sub-collection
   useEffect(() => {
-    if (!uid || !buildingId || !roomId) { setEvents([]); return; }
+    if (!uid || !buildingId || !roomId) { setEvents([]); return; } // eslint-disable-line react-hooks/set-state-in-effect
     const q = query(eventsColRef(uid, buildingId, roomId), orderBy('date', 'desc'));
     const unsub = onSnapshot(
       q,
       snap => {
         setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() } as TenantEvent)));
       },
-      _err => {
+      () => {
         setEvents([]);
       },
     );

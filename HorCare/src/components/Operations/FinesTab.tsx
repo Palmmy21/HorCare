@@ -1,0 +1,392 @@
+import { useState } from 'react';
+import type { Fine, FineStatus, Room } from '../../types';
+import { AlertTriangle, Plus, Edit2, Trash2, Check, X, Filter } from 'lucide-react';
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+function fmtBaht(n: number) {
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+type FineForm = Omit<Fine, 'id' | 'created_at' | 'updated_at'>;
+
+const EMPTY_FORM: FineForm = {
+  room_id: '',
+  room_number: '',
+  reason: '',
+  amount: 0,
+  date: new Date().toISOString().slice(0, 10),
+  status: 'unpaid',
+  note: '',
+};
+
+interface Props {
+  uid: string;
+  buildingId: string;
+  rooms: Room[];
+  fines: Fine[];
+  onAdd: (data: Omit<Fine, 'id' | 'created_at'>) => Promise<void>;
+  onUpdate: (fineId: string, updates: Partial<Fine>) => Promise<void>;
+  onDelete: (fineId: string) => Promise<void>;
+}
+
+export default function FinesTab({ rooms, fines, onAdd, onUpdate, onDelete }: Props) {
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<FineForm>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<FineStatus | 'all'>('all');
+  const [filterRoomId, setFilterRoomId] = useState('');
+
+  const activeRooms = rooms.filter(r => r.is_active !== false);
+
+  const handleRoomChange = (roomId: string) => {
+    const r = activeRooms.find(x => x.id === roomId);
+    setForm(f => ({ ...f, room_id: roomId, room_number: r?.room_number ?? '' }));
+  };
+
+  const openAdd = () => {
+    setForm({ ...EMPTY_FORM, date: new Date().toISOString().slice(0, 10) });
+    setEditId(null);
+    setSaveError('');
+    setShowForm(true);
+  };
+
+  const openEdit = (f: Fine) => {
+    setForm({
+      room_id: f.room_id,
+      room_number: f.room_number,
+      reason: f.reason,
+      amount: f.amount,
+      date: f.date,
+      status: f.status,
+      note: f.note ?? '',
+    });
+    setEditId(f.id);
+    setSaveError('');
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.room_id || !form.reason.trim() || form.amount <= 0) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      if (editId) {
+        await onUpdate(editId, form);
+      } else {
+        await onAdd({ ...form });
+      }
+      setShowForm(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setSaveError(msg.includes('permission') ? 'ไม่มีสิทธิ์บันทึก' : `บันทึกไม่สำเร็จ: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleMarkPaid = async (fine: Fine) => {
+    await onUpdate(fine.id, { status: 'paid' });
+  };
+
+  const handleMarkUnpaid = async (fine: Fine) => {
+    await onUpdate(fine.id, { status: 'unpaid' });
+  };
+
+  const handleDelete = async (id: string) => {
+    await onDelete(id);
+    setDeleteId(null);
+  };
+
+  const filtered = fines.filter(f => {
+    if (filterStatus !== 'all' && f.status !== filterStatus) return false;
+    if (filterRoomId && f.room_id !== filterRoomId) return false;
+    return true;
+  });
+
+  const totalUnpaid = fines.filter(f => f.status === 'unpaid').reduce((s, f) => s + f.amount, 0);
+  const totalPaid = fines.filter(f => f.status === 'paid').reduce((s, f) => s + f.amount, 0);
+
+  return (
+    <div>
+      {/* Summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #DC2626, #EF4444)',
+          borderRadius: '14px', padding: '1rem 1.125rem', color: '#fff',
+        }}>
+          <div style={{ fontSize: '0.75rem', opacity: 0.85, marginBottom: '0.25rem' }}>ค้างชำระ</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+            ฿{fmtBaht(totalUnpaid)}
+          </div>
+          <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '0.125rem' }}>
+            {fines.filter(f => f.status === 'unpaid').length} รายการ
+          </div>
+        </div>
+        <div style={{
+          background: 'linear-gradient(135deg, #059669, #10B981)',
+          borderRadius: '14px', padding: '1rem 1.125rem', color: '#fff',
+        }}>
+          <div style={{ fontSize: '0.75rem', opacity: 0.85, marginBottom: '0.25rem' }}>ชำระแล้ว</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+            ฿{fmtBaht(totalPaid)}
+          </div>
+          <div style={{ fontSize: '0.7rem', opacity: 0.7, marginTop: '0.125rem' }}>
+            {fines.filter(f => f.status === 'paid').length} รายการ
+          </div>
+        </div>
+      </div>
+
+      {/* Filters + Add button */}
+      <div style={{ display: 'flex', gap: '0.625rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <Filter size={15} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+        <select
+          className="form-input"
+          value={filterRoomId}
+          onChange={e => setFilterRoomId(e.target.value)}
+          style={{ width: 'auto', flex: 1, minWidth: 100 }}
+        >
+          <option value="">ทุกห้อง</option>
+          {activeRooms.map(r => <option key={r.id} value={r.id}>ห้อง {r.room_number}</option>)}
+        </select>
+        <select
+          className="form-input"
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value as FineStatus | 'all')}
+          style={{ width: 'auto' }}
+        >
+          <option value="all">ทุกสถานะ</option>
+          <option value="unpaid">ค้างชำระ</option>
+          <option value="paid">ชำระแล้ว</option>
+        </select>
+        <button className="btn btn-primary btn-sm" onClick={openAdd} style={{ flexShrink: 0 }}>
+          <Plus size={15} /> เพิ่มค่าปรับ
+        </button>
+      </div>
+
+      {/* Add / Edit form */}
+      {showForm && (
+        <div className="card mb-4" style={{ padding: '1.25rem', border: '1.5px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <AlertTriangle size={18} color="#EF4444" />
+            <h3 style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text)', margin: 0 }}>
+              {editId ? 'แก้ไขค่าปรับ' : 'เพิ่มค่าปรับ'}
+            </h3>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              ห้อง *
+              <select
+                className="form-input"
+                value={form.room_id}
+                onChange={e => handleRoomChange(e.target.value)}
+                style={{ marginTop: '0.25rem' }}
+              >
+                <option value="">— เลือกห้อง —</option>
+                {activeRooms.map(r => <option key={r.id} value={r.id}>ห้อง {r.room_number}</option>)}
+              </select>
+            </label>
+
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              วันที่
+              <input
+                className="form-input"
+                type="date"
+                value={form.date}
+                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                style={{ marginTop: '0.25rem' }}
+              />
+            </label>
+
+            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              เหตุผล / รายละเอียด *
+              <input
+                className="form-input"
+                value={form.reason}
+                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+                placeholder="เช่น ทำประตูห้องพักเสียหาย"
+                style={{ marginTop: '0.25rem' }}
+              />
+            </label>
+
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              จำนวนเงิน (บาท) *
+              <input
+                className="form-input"
+                type="number"
+                min={0}
+                value={form.amount || ''}
+                onChange={e => setForm(f => ({ ...f, amount: +e.target.value || 0 }))}
+                placeholder="0"
+                style={{ marginTop: '0.25rem' }}
+              />
+            </label>
+
+            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              สถานะ
+              <select
+                className="form-input"
+                value={form.status}
+                onChange={e => setForm(f => ({ ...f, status: e.target.value as FineStatus }))}
+                style={{ marginTop: '0.25rem' }}
+              >
+                <option value="unpaid">ค้างชำระ</option>
+                <option value="paid">ชำระแล้ว</option>
+              </select>
+            </label>
+
+            <label style={{ gridColumn: '1/-1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+              หมายเหตุ
+              <input
+                className="form-input"
+                value={form.note}
+                onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                placeholder="หมายเหตุเพิ่มเติม"
+                style={{ marginTop: '0.25rem' }}
+              />
+            </label>
+          </div>
+
+          {saveError && (
+            <div style={{
+              marginTop: '0.75rem', padding: '0.625rem 0.875rem',
+              background: '#FEE2E2', border: '1px solid #FCA5A5',
+              borderRadius: '8px', fontSize: '0.8125rem', color: '#DC2626', fontWeight: 600,
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={14} /> {saveError}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.625rem', marginTop: '0.875rem' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleSave}
+              disabled={saving || !form.room_id || !form.reason.trim() || form.amount <= 0}
+              style={{ background: 'linear-gradient(135deg, #DC2626, #EF4444)', borderColor: 'transparent' }}
+            >
+              <Check size={14} /> {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>
+              <X size={14} /> ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* List */}
+      {filtered.length === 0 ? (
+        <div className="empty-state">
+          <AlertTriangle size={48} />
+          <h3>ไม่มีรายการค่าปรับ</h3>
+          <p>{filterStatus === 'all' && !filterRoomId ? 'กดปุ่มเพิ่มค่าปรับเพื่อเริ่มต้น' : 'ไม่พบรายการที่ตรงกับตัวกรอง'}</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {filtered.map(fine => (
+            <div
+              key={fine.id}
+              className="card"
+              style={{
+                padding: '0.875rem 1.125rem',
+                borderLeft: `4px solid ${fine.status === 'unpaid' ? '#EF4444' : '#10B981'}`,
+              }}
+            >
+              {deleteId === fine.id ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#DC2626', fontWeight: 600, flex: 1 }}>
+                    ยืนยันลบรายการนี้?
+                  </span>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => handleDelete(fine.id)}
+                    style={{ background: '#DC2626', color: '#fff', border: 'none' }}
+                  >
+                    ลบ
+                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setDeleteId(null)}>ยกเลิก</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                      {/* Room badge */}
+                      <span style={{
+                        background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                        color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+                        padding: '0.15rem 0.5rem', borderRadius: '6px',
+                      }}>
+                        ห้อง {fine.room_number}
+                      </span>
+                      {/* Status badge */}
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 700,
+                        padding: '0.15rem 0.5rem', borderRadius: '6px',
+                        background: fine.status === 'unpaid' ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)',
+                        color: fine.status === 'unpaid' ? '#DC2626' : '#059669',
+                        border: `1px solid ${fine.status === 'unpaid' ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                      }}>
+                        {fine.status === 'unpaid' ? 'ค้างชำระ' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Check size={12} /> ชำระแล้ว</span>}
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text)', marginBottom: '0.2rem' }}>
+                      {fine.reason}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                      <span>{fmtDate(fine.date)}</span>
+                      {fine.note && <span>· {fine.note}</span>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{
+                      fontSize: '1.15rem', fontWeight: 800,
+                      color: fine.status === 'unpaid' ? '#DC2626' : '#059669',
+                      fontFamily: 'monospace',
+                    }}>
+                      ฿{fmtBaht(fine.amount)}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.375rem', justifyContent: 'flex-end' }}>
+                      {fine.status === 'unpaid' ? (
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => handleMarkPaid(fine)}
+                          title="ทำเครื่องหมายว่าชำระแล้ว"
+                          style={{ color: '#059669', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                        >
+                          <Check size={11} /> ชำระแล้ว
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => handleMarkUnpaid(fine)}
+                          title="ย้อนกลับเป็นค้างชำระ"
+                          style={{ color: '#6B7280', background: 'rgba(107,114,128,0.08)', border: '1px solid rgba(107,114,128,0.2)', fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
+                        >
+                          ยกเลิก
+                        </button>
+                      )}
+                      <button className="btn btn-secondary btn-sm" onClick={() => openEdit(fine)} style={{ padding: '0.2rem 0.4rem' }}>
+                        <Edit2 size={12} />
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => setDeleteId(fine.id)}
+                        style={{ color: '#DC2626', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.4rem' }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

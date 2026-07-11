@@ -467,9 +467,12 @@ function TenantCard({
             color: riskLevel === 'high' ? '#F87171' : '#FCD34D',
             border: `1px solid ${riskLevel === 'high' ? 'rgba(220,38,38,0.3)' : 'rgba(245,158,11,0.3)'}`,
           }}>
-            ⚠️ {moveOutDays !== null && moveOutDays >= 0
-              ? `ย้ายออกใน ${moveOutDays} วัน`
-              : `สัญญาหมดใน ${contractDays} วัน`}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+              <AlertTriangle size={12} />
+              {moveOutDays !== null && moveOutDays >= 0
+                ? `ย้ายออกใน ${moveOutDays} วัน`
+                : `สัญญาหมดใน ${contractDays} วัน`}
+            </span>
           </span>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

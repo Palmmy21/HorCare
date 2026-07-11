@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import horcareLogo from '../../assets/horcare_logo.png';
+import { ClipboardList, AlertTriangle } from 'lucide-react';
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   interface Window { liff: any; }
 }
 
@@ -136,7 +138,7 @@ export default function TenantGateway() {
       <div style={cardStyle}>
         <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
         <div style={boxStyle}>
-          <div style={{ fontSize: '2.25rem', marginBottom: '0.75rem' }}>📋</div>
+          <div style={{ marginBottom: '0.75rem', color: '#6B7280' }}><ClipboardList size={40} /></div>
           <h2 style={{ fontWeight: 800, color: '#fff', margin: '0 0 0.5rem', fontSize: '1.2rem' }}>ยังไม่ได้ลงทะเบียน</h2>
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.875rem', lineHeight: 1.65, margin: '0 0 1.5rem' }}>
             คุณยังไม่ได้แจ้งห้องในระบบ<br />
@@ -182,7 +184,7 @@ export default function TenantGateway() {
     <div style={cardStyle}>
       <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
       <div style={boxStyle}>
-        <div style={{ fontSize: '2.25rem', marginBottom: '0.75rem' }}>⚠️</div>
+        <div style={{ marginBottom: '0.75rem', color: '#EF4444' }}><AlertTriangle size={40} /></div>
         <h2 style={{ fontWeight: 800, color: '#fff', margin: '0 0 0.5rem', fontSize: '1.2rem' }}>เกิดข้อผิดพลาด</h2>
         <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.875rem', lineHeight: 1.65, margin: '0 0 1.25rem' }}>
           {(state as { status: 'error'; message: string }).message}

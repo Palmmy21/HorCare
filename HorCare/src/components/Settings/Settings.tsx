@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeSVG } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
@@ -154,7 +154,6 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             setVerifyMsg('ส่งอีเมลยืนยันแล้ว! กรุณาตรวจสอบกล่องจดหมายของคุณ');
             startCooldown(remaining);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
@@ -866,7 +865,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     เชื่อมต่อ LINE (ส่งบิลผ่าน LINE)
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-5)' }}>
-                    สร้าง Invite Link แล้วส่งให้ลูกหอ — กดลิ้งก์เดียว พิมพ์เลขห้อง แล้วจบ ✅
+                    สร้าง Invite Link แล้วส่งให้ลูกหอ — กดลิ้งก์เดียว พิมพ์เลขห้อง แล้วจบ <CheckCircle2 size={14} color="#059669" style={{ display: 'inline', verticalAlign: 'text-bottom' }} />
                 </p>
 
                 {/* Dorm Code row */}
@@ -1141,7 +1140,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                                         }}
                                                         onClick={() => window.print()}
                                                     >
-                                                        🖨️ พิมพ์ QR Code
+                                                        <Printer size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> พิมพ์ QR Code
                                                     </button>
                                                 </div>
                                             )}
@@ -1162,7 +1161,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                                 <li>ลูกหอกดลิ้งก์ → LINE เปิดขึ้นมาพร้อมรหัสหอ → พิมพ์แค่เลขห้อง → เสร็จ</li>
                                             </ol>
                                             <div style={{ marginTop: '0.375rem', color: 'var(--color-gray-400)', fontSize: '0.775rem' }}>
-                                                💡 ลูกหอใหม่ลงทะเบียนห้องเดิม → คนเก่าออกจากระบบอัตโนมัติ
+                                                <Lightbulb size={14} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> ลูกหอใหม่ลงทะเบียนห้องเดิม → คนเก่าออกจากระบบอัตโนมัติ
                                             </div>
                                         </div>
                                     </>
@@ -1288,9 +1287,9 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                         })}
                     </div>
                     <p className="form-hint" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }}>
-                        {mode === 'system' ? '⚙️ ตามโหมดของอุปกรณ์ — เปลี่ยนอัตโนมัติเมื่อ OS สลับ' :
-                         mode === 'dark'   ? '🌙 โหมดมืด — ถนอมสายตาในที่มืด' :
-                                            '☀️ โหมดสว่าง — ค่าเริ่มต้น'}
+                        {mode === 'system' ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><SettingsIcon size={14} /> ตามโหมดของอุปกรณ์ — เปลี่ยนอัตโนมัติเมื่อ OS สลับ</span> :
+                         mode === 'dark'   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Moon size={14} /> โหมดมืด — ถนอมสายตาในที่มืด</span> :
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Sun size={14} /> โหมดสว่าง — ค่าเริ่มต้น</span>}
                     </p>
                 </div>
 

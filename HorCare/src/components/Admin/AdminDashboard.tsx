@@ -401,7 +401,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         >
                             {verifyingEmail ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : emailVerifyDone ? <CheckCircle size={13} /> : <MailCheck size={13} />}
                             <span>
-                                <span style={{ display: 'block' }}>{emailVerifyDone ? 'ยืนยันอีเมลแล้ว ✓' : 'ยืนยันอีเมลแทนผู้ใช้'}</span>
+                                <span style={{ display: 'block' }}>{emailVerifyDone ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>ยืนยันอีเมลแล้ว <CheckCircle size={12} /></span> : 'ยืนยันอีเมลแทนผู้ใช้'}</span>
                                 <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>force-verify ผ่าน Firebase Admin SDK</span>
                             </span>
                         </button>
@@ -554,7 +554,7 @@ export default function AdminDashboard() {
         if (!selectedUser) return;
         const updated = users.find(u => u.uid === selectedUser.uid);
         if (updated) setSelectedUser(updated);
-    }, [users]);
+    }, [users]); // eslint-disable-line react-hooks/exhaustive-deps -- selectedUser intentionally omitted to avoid loop
 
     // ── Stats ──
     const stats = useMemo(() => {
@@ -695,7 +695,7 @@ export default function AdminDashboard() {
                 method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` },
             });
             const data = await res.json() as { created: number };
-            alert(`✅ สร้างแล้ว ${data.created} profiles`);
+            alert(`[สำเร็จ] สร้างแล้ว ${data.created} profiles`);
             await loadUsers(true);
         } catch (err) { alert('Error: ' + (err as Error).message); }
         finally { setBackfilling(false); }

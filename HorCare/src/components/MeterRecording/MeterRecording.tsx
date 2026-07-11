@@ -3,10 +3,10 @@ import { flushSync } from 'react-dom';
 import {
     Zap, Droplets, CheckCircle, Clock, ArrowRight, Save, AlertTriangle,
     ChevronLeft, ChevronRight, Home, Banknote, FileText,
-    Download, Upload, X, Layers, Camera,
+    Download, Upload, X, Layers, Camera, Check,
 } from 'lucide-react';
 import MeterPhotoReader, { type MeterReadResult } from './MeterPhotoReader';
-import type { Room, DormConfig, MonthlyBill } from '../../types';
+import type { Room, DormConfig, MonthlyBill, CommonFee } from '../../types';
 import {
     calculateFullBill,
     formatCurrency,
@@ -20,6 +20,7 @@ import {
 interface MeterRecordingProps {
     rooms: Room[];
     config: DormConfig;
+    commonFees: CommonFee[];
     currentMonth: string;
     onSaveBill: (bill: MonthlyBill) => Promise<MonthlyBill | void> | void;
     getBillForRoom: (roomId: string, month: string) => MonthlyBill | undefined;
@@ -80,6 +81,7 @@ function removeDraft(key: string, roomId: string) {
 export default function MeterRecording({
     rooms,
     config,
+    commonFees,
     currentMonth,
     onSaveBill,
     getBillForRoom,
@@ -106,7 +108,7 @@ export default function MeterRecording({
         } else {
             setModalIn(false);
         }
-    }, [!!bulkProgress]);
+    }, [bulkProgress != null]); // eslint-disable-line react-hooks/exhaustive-deps -- depend on presence not value
 
     const draftKey = `${DRAFT_PREFIX}${buildingId || 'local'}_${currentMonth}`;
 
@@ -223,7 +225,9 @@ export default function MeterRecording({
             effectiveRent,
             room.tenant_count,
             electricityRate,
-            waterConfig
+            waterConfig,
+            commonFees,
+            room.common_fee_overrides
         );
 
         const bill: MonthlyBill = {
@@ -242,6 +246,8 @@ export default function MeterRecording({
             water_flat_amount: calculation.water_flat_amount,
             water_excess_units: calculation.water_excess_units,
             water_excess_amount: calculation.water_excess_amount,
+            common_fee: calculation.common_fee,
+            applied_common_fees: calculation.applied_common_fees,
             room_rent: effectiveRent,
             total_bill: calculation.total_bill,
             is_saved: true,
@@ -301,7 +307,7 @@ export default function MeterRecording({
             const currWater = parseInt(state.currWater) || 0;
             const effectiveRent = room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent);
             const { electricityRate, waterConfig } = getEffectiveRates(room, config);
-            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig);
+            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig, commonFees, room.common_fee_overrides);
             const bill: MonthlyBill = {
                 id: `bill_${room.id}_${currentMonth}`,
                 room_id: room.id,
@@ -314,6 +320,8 @@ export default function MeterRecording({
                 water_flat_amount: calculation.water_flat_amount,
                 water_excess_units: calculation.water_excess_units,
                 water_excess_amount: calculation.water_excess_amount,
+                common_fee: calculation.common_fee,
+                applied_common_fees: calculation.applied_common_fees,
                 room_rent: effectiveRent,
                 total_bill: calculation.total_bill,
                 is_saved: true, is_locked: false, is_notified: false,
@@ -361,7 +369,7 @@ export default function MeterRecording({
         const reader = new FileReader();
         reader.onload = e => {
             try {
-                const text = (e.target?.result as string).replace(/^﻿/, ''); // strip BOM
+                const text = (e.target?.result as string).replace(/^\uFEFF/, ''); // strip BOM
                 const lines = text.split(/\r?\n/).filter(l => l.trim());
                 if (lines.length < 2) return;
 
@@ -458,7 +466,7 @@ export default function MeterRecording({
 
         // Calculate preview
         const calculation = state.currElec && state.currWater
-            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg)
+            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg, commonFees, room.common_fee_overrides)
             : null;
 
         // prevElec/prevWater อาจเป็น '' (แทน 0) ถือว่า valid — ตรวจแค่ currElec/currWater ต้องกรอก
@@ -649,6 +657,12 @@ export default function MeterRecording({
                             </span>
                             <span className="bill-value">{formatCurrency(effectiveRentPreview)}</span>
                         </div>
+                        {calculation.common_fee > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                <div style={{ color: 'var(--color-text-muted)' }}>ส่วนกลาง</div>
+                                <div style={{ color: 'var(--color-text)', fontWeight: 600 }}>฿{formatCurrency(calculation.common_fee)}</div>
+                            </div>
+                        )}
                         <div className="bill-row total">
                             <span className="bill-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Banknote size={16} /> รวมทั้งสิ้น</span>
                             <span className="bill-value">{formatCurrency(calculation.total_bill)}</span>
@@ -681,7 +695,7 @@ export default function MeterRecording({
                         ) : state.isSaved ? (
                             <>
                                 <CheckCircle size={18} />
-                                บันทึกแล้ว ✓
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>บันทึกแล้ว <Check size={14} /></span>
                             </>
                         ) : (
                             <>
@@ -754,7 +768,7 @@ export default function MeterRecording({
                     </div>
                     <div style={{ fontSize: '0.8125rem', color: 'rgba(165,180,252,0.7)', marginBottom: '1.5rem', minHeight: '1.3em' }}>
                         {bulkProgress.done
-                            ? `สำเร็จ ${bulkProgress.total - bulkProgress.failed} ห้อง${bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed}` : ' ✅'}`
+                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>สำเร็จ {bulkProgress.total - bulkProgress.failed} ห้อง{bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed}` : <CheckCircle size={12} color="#4ADE80" />}</span>
                             : `ห้อง ${bulkProgress.roomNumber}`}
                     </div>
 

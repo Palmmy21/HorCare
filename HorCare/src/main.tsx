@@ -37,6 +37,7 @@ const params = new URLSearchParams(window.location.search);
 const isTenantGateway = window.location.pathname === '/portal';
 const isTenantPortal = params.has('uid') && params.has('bid') && params.has('rid');
 
+// eslint-disable-next-line react-refresh/only-export-components
 function Root() {
   if (isTenantGateway) return <TenantGateway />;
   if (isTenantPortal) return <TenantPortalPage />;

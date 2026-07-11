@@ -90,6 +90,8 @@ export interface Room {
   // Per-room rate overrides (used in commercial mode)
   custom_electricity_rate?: number | null;
   custom_water_config?: WaterConfig | null;
+  // Common fee overrides (maps fee.id to room-specific settings)
+  common_fee_overrides?: Record<string, { amount?: number; is_active?: boolean }>;
   // Room occupancy status — set manually by owner
   // 'occupied' = มีผู้เช่า, 'vacant' = ว่าง, 'reserved' = ติดจอง
   room_status?: 'occupied' | 'vacant' | 'reserved';
@@ -111,6 +113,8 @@ export interface MonthlyBill {
   water_flat_amount: number;
   water_excess_units: number;
   water_excess_amount: number;
+  common_fee: number; // Sum of applied common fees
+  applied_common_fees?: { id: string; name: string; amount: number }[]; // Breakdown of applied common fees
   room_rent: number;
   total_bill: number;
   is_saved: boolean;
@@ -153,6 +157,8 @@ export interface BillCalculation {
   water_flat_amount: number;
   water_excess_units: number;
   water_excess_amount: number;
+  common_fee: number;
+  applied_common_fees?: { id: string; name: string; amount: number }[];
   total_bill: number;
 }
 
@@ -307,3 +313,29 @@ export interface Expense {
   created_at: string;
 }
 
+// ─── Fines (ค่าปรับรายห้อง) ───────────────────────────────────────────────────
+export type FineStatus = 'unpaid' | 'paid';
+
+export interface Fine {
+  id: string;
+  room_id: string;
+  room_number: string;
+  reason: string;
+  amount: number;
+  date: string;
+  status: FineStatus;
+  note?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// ─── Common Fees (ค่าบริการส่วนกลาง) ─────────────────────────────────────────
+export interface CommonFee {
+  id: string;
+  name: string;
+  amount: number;
+  is_active: boolean;
+  note?: string;
+  created_at: string;
+  updated_at?: string;
+}

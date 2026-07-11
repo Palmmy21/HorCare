@@ -14,7 +14,8 @@ interface Toast {
 
 function playNotificationSound() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioContextClass();
     const now = ctx.currentTime;
     const notes = [880, 1100];
     notes.forEach((freq, i) => {
@@ -153,7 +154,7 @@ export default function SlipNotificationToast({
                 )}
               </div>
               <button
-                onClick={() => { dismiss(toast.id); isSlip ? onGoToPayments() : onGoToMaintenance(); }}
+                onClick={() => { dismiss(toast.id); if (isSlip) { onGoToPayments(); } else { onGoToMaintenance(); } }}
                 style={{
                   marginTop: 8, fontSize: '0.75rem', fontWeight: 600,
                   color: accent, background: 'none', border: 'none',

@@ -13,7 +13,7 @@ import {
   User, Calendar, Banknote,
   Plus, Trash2, Edit2, Check, X,
   Clock, LogIn, LogOut, RefreshCw, FileText, Lock, Zap,
-  Heart, GraduationCap,
+  Heart, GraduationCap, ClipboardList, AlertTriangle,
 } from 'lucide-react';
 import type { Room, TenantProfile, TenantEvent } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
@@ -195,7 +195,7 @@ export default function TenantProfilePage({
                 borderRadius: '8px', padding: '0.2rem 0.5rem',
                 fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
               }}>
-                ⚠️ ย้ายออกใน {moveOutDays} วัน
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={12} /> ย้ายออกใน {moveOutDays} วัน</span>
               </span>
             )}
             {contractDays !== null && contractDays <= 30 && contractDays >= 0 && (
@@ -204,7 +204,7 @@ export default function TenantProfilePage({
                 color: '#93C5FD', borderRadius: '8px', padding: '0.2rem 0.5rem',
                 fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
               }}>
-                📋 สัญญาหมดใน {contractDays} วัน
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><ClipboardList size={12} /> สัญญาหมดใน {contractDays} วัน</span>
               </span>
             )}
           </div>
@@ -302,7 +302,7 @@ export default function TenantProfilePage({
                             ? <input className="form-input" type="date" value={form.birthdate ?? ''} onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))} />
                             : <Value>{formatDate(profile?.birthdate)}</Value>}
                         </Field>
-                        <Field label="เลขบัตรประชาชน ⚠️">
+                        <Field label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>เลขบัตรประชาชน <AlertTriangle size={12} /></span>}>
                           {isEditing
                             ? <input className="form-input mono" value={form.id_card_number ?? ''} onChange={e => setForm(f => ({ ...f, id_card_number: e.target.value }))} placeholder="X-XXXX-XXXXX-XX-X" maxLength={17} />
                             : <Value>{profile?.id_card_number ? `${profile.id_card_number.slice(0,1)}-XXXX-XXXXX-XX-${profile.id_card_number.slice(-1)}` : '—'}</Value>}
@@ -624,7 +624,7 @@ function FormGrid({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
+function Field({ label, children, required }: { label: React.ReactNode; children: React.ReactNode; required?: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
       <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-text-muted, #6B7280)' }}>

@@ -12,7 +12,7 @@ export function useMaintenanceRequests(
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!uid || !buildingId) { setLoading(false); return; }
+    if (!uid || !buildingId) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
 
     const col = collection(db, `users/${uid}/buildings/${buildingId}/maintenance`);
     const q = roomId
@@ -91,7 +91,7 @@ export function useStockItems(uid: string | null, buildingId: string | null) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!uid || !buildingId) { setLoading(false); return; }
+    if (!uid || !buildingId) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
     const unsub = onSnapshot(
       collection(db, `users/${uid}/buildings/${buildingId}/stock`),
       snap => {
@@ -126,7 +126,7 @@ export function useAssets(uid: string | null, buildingId: string | null) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!uid || !buildingId) { setLoading(false); return; }
+    if (!uid || !buildingId) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
     const unsub = onSnapshot(
       collection(db, `users/${uid}/buildings/${buildingId}/assets`),
       snap => {
@@ -154,7 +154,7 @@ export function useVendors(uid: string | null, buildingId: string | null) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!uid || !buildingId) { setLoading(false); return; }
+    if (!uid || !buildingId) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
     const unsub = onSnapshot(
       collection(db, `users/${uid}/buildings/${buildingId}/vendors`),
       snap => {

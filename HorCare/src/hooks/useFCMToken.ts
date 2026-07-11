@@ -77,20 +77,20 @@ export function useFCMToken(uid: string | null) {
                     if (cancelled) return;
                     const title = payload.notification?.title || 'HorCare';
                     const body  = payload.notification?.body  || '';
-                    const url   = (payload.data as any)?.url || '/';
+                    const url   = (payload.data as Record<string, string>)?.url || '/';
                     if (Notification.permission === 'granted') {
                         const n = new Notification(title, {
                             body,
                             icon: '/logo-icon.png',
                             badge: '/logo-icon.png',
-                            // @ts-ignore — vibrate is valid in mobile browsers
+                            // @ts-expect-error — vibrate is valid in mobile browsers but missing from TS lib
                             vibrate: [200, 100, 200],
                         });
                         n.onclick = () => { n.close(); window.focus(); window.location.href = url; };
                     }
                 });
-            } catch (e: any) {
-                if (!cancelled) setError(e.message);
+            } catch (e: unknown) {
+                if (!cancelled) setError((e as Error)?.message ?? String(e));
             }
         }
 

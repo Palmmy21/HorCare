@@ -86,7 +86,7 @@ export function useLocalStorage() {
         localStorage.setItem(STORAGE_KEYS.ROOMS, JSON.stringify(updatedRooms));
         setRoomsState(updatedRooms);
         return newRoom;
-    }, [rooms]);
+    }, [rooms, config.building_type, config.room_rent]);
 
     const updateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
         const updatedRooms = rooms.map(room =>

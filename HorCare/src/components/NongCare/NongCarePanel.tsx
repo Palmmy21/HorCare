@@ -4,7 +4,7 @@ import { auth } from '../../firebase/config';
 import ReactMarkdown from 'react-markdown';
 
 interface NongCarePanelProps {
-    contextData: any;
+    contextData: Record<string, unknown>;
     isPro: boolean;
     onUpgrade: () => void;
 }
@@ -68,9 +68,10 @@ export default function NongCarePanel({ contextData, isPro, onUpgrade }: NongCar
             }
 
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: data.reply }]);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
-            if (err.message === 'pro_required') {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            if (errMsg === 'pro_required') {
                 setMessages(prev => [...prev, { 
                     id: Date.now().toString(), 
                     role: 'assistant', 
@@ -80,7 +81,7 @@ export default function NongCarePanel({ contextData, isPro, onUpgrade }: NongCar
                 setMessages(prev => [...prev, { 
                     id: Date.now().toString(), 
                     role: 'assistant', 
-                    text: `ขออภัยค่ะ ระบบมีปัญหา: ${err.message}` 
+                    text: `ขออภัยค่ะ ระบบมีปัญหา: ${errMsg}` 
                 }]);
             }
         } finally {

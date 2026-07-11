@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Zap, Droplets, Settings as SettingsIcon, ChevronDown, ChevronUp, RotateCcw, Calculator, BarChart3, Save, Banknote } from 'lucide-react';
+import { Zap, Droplets, Settings as SettingsIcon, ChevronDown, ChevronUp, RotateCcw, Calculator, BarChart3, Save, Banknote, Check } from 'lucide-react';
 
 const LS_KEY = 'horcare_meter_calc_settings';
 
@@ -226,8 +226,8 @@ export default function MeterCalculator() {
                                     <Save size={18} style={{ display: 'inline', marginRight: 4 }} /> บันทึกอัตรา
                                 </button>
                                 {settingsSaved && (
-                                    <span style={{ color: 'var(--color-success)', fontWeight: 600, alignSelf: 'center', fontSize: '0.875rem' }}>
-                                        ✓ บันทึกแล้ว!
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'var(--color-success)', fontWeight: 600, alignSelf: 'center', fontSize: '0.875rem' }}>
+                                        <Check size={14} /> บันทึกแล้ว!
                                     </span>
                                 )}
                             </div>

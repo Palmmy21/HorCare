@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp
+    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { DormConfig, Room, MonthlyBill, UserProfile } from '../types';
+import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee } from '../types';
 import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth } from '../utils/calculations';
 
 // How many months of bills the realtime listener keeps in memory, anchored on the
@@ -32,6 +32,8 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
     const [config, setConfigState] = useState<DormConfig>(DEFAULT_CONFIG);
     const [rooms, setRoomsState] = useState<Room[]>([]);
     const [bills, setBillsState] = useState<MonthlyBill[]>([]);
+    const [fines, setFinesState] = useState<Fine[]>([]);
+    const [commonFees, setCommonFeesState] = useState<CommonFee[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Base path scoped to the active building
@@ -50,10 +52,12 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
     }, [anchorMonth]);
 
     // Loading coordination across config/rooms (per building) and bills (per window).
-    const loadedRef = useRef({ config: false, rooms: false, bills: false });
+    const loadedRef = useRef({ config: false, rooms: false, bills: false, fines: false, commonFees: false });
+    // Track whether we've already run self-heal for this building session.
+    const syncedDormCodeRef = useRef<string | null>(null);
     const settle = () => {
         const l = loadedRef.current;
-        if (l.config && l.rooms && l.bills) setLoading(false);
+        if (l.config && l.rooms && l.bills && l.fines && l.commonFees) setLoading(false);
     };
 
     // Config + rooms — re-subscribe only when the active building changes.
@@ -65,20 +69,46 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
         // New building → show the loading screen until its data arrives.
         setLoading(true);
-        loadedRef.current = { config: false, rooms: false, bills: false };
+        loadedRef.current = { config: false, rooms: false, bills: false, fines: false, commonFees: false };
 
-        const unsubConfig = onSnapshot(doc(db, userPath, 'data', 'config'), (snap) => {
+        const unsubConfig = onSnapshot(doc(db, userPath, 'data', 'config'), async (snap) => {
             if (snap.exists()) {
                 // Always merge with DEFAULT_CONFIG so missing fields (old data) never crash
                 const raw = snap.data() as Partial<DormConfig>;
-                setConfigState({
+                const merged: DormConfig = {
                     ...DEFAULT_CONFIG,
                     ...raw,
                     water_config: { ...DEFAULT_CONFIG.water_config, ...raw.water_config },
                     commercial_water_config: raw.commercial_water_config
                         ? { ...DEFAULT_CONFIG.water_config, ...raw.commercial_water_config }
                         : undefined,
-                });
+                };
+                setConfigState(merged);
+
+                // ── Self-heal: ลูกค้าเก่าที่มี dorm_code แต่ dorm_codes collection ว่าง ──
+                // (เกิดจาก Firestore rules เดิมที่ block การเขียน)
+                // ตรวจครั้งเดียวต่อ building session เพื่อไม่ให้ query ซ้ำซ้อน
+                const dc = merged.dorm_code;
+                if (dc && userId && buildingId && syncedDormCodeRef.current !== dc) {
+                    syncedDormCodeRef.current = dc;
+                    try {
+                        const codeDoc = await getDoc(doc(db, 'dorm_codes', dc));
+                        if (!codeDoc.exists()) {
+                            // ยังไม่มีใน dorm_codes → sync ให้เลย
+                            await setDoc(doc(db, 'dorm_codes', dc), {
+                                uid: userId,
+                                building_id: buildingId,
+                                dorm_name: merged.bill_customization?.dorm_name || '',
+                                due_day: merged.bill_customization?.due_day || 5,
+                                updated_at: serverTimestamp(),
+                            });
+                            console.info('[HorCare] Self-healed dorm_code:', dc);
+                        }
+                    } catch (e) {
+                        // ไม่ block การโหลดแอป — log เพื่อ debug เท่านั้น
+                        console.warn('[HorCare] dorm_code self-heal failed:', e);
+                    }
+                }
             } else {
                 setDoc(doc(db, userPath, 'data', 'config'), DEFAULT_CONFIG);
                 setConfigState(DEFAULT_CONFIG);
@@ -96,11 +126,31 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             settle();
         });
 
+        const finesRef = collection(db, userPath, 'fines');
+        const unsubFines = onSnapshot(finesRef, (snap) => {
+            const list: Fine[] = snap.docs.map(d => ({ ...d.data(), id: d.id } as Fine));
+            list.sort((a, b) => b.date.localeCompare(a.date));
+            setFinesState(list);
+            loadedRef.current.fines = true;
+            settle();
+        }, () => { loadedRef.current.fines = true; settle(); });
+
+        const commonFeesRef = collection(db, userPath, 'common_fees');
+        const unsubCommonFees = onSnapshot(commonFeesRef, (snap) => {
+            const list: CommonFee[] = snap.docs.map(d => ({ ...d.data(), id: d.id } as CommonFee));
+            list.sort((a, b) => a.created_at.localeCompare(b.created_at));
+            setCommonFeesState(list);
+            loadedRef.current.commonFees = true;
+            settle();
+        }, () => { loadedRef.current.commonFees = true; settle(); });
+
         return () => {
             unsubConfig();
             unsubRooms();
+            unsubFines();
+            unsubCommonFees();
         };
-    }, [userPath]);
+    }, [userPath]); // eslint-disable-line react-hooks/exhaustive-deps -- buildingId/userId captured via userPath
 
     // Bills — re-subscribe when the building OR the month window changes. Navigating
     // to an older month re-anchors the window silently (no full-screen reload).
@@ -380,10 +430,46 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         await updateDoc(doc(db, 'users', targetUid), updates);
     }, []);
 
+    // ── Fines CRUD ──────────────────────────────────────────────────────────────
+    const addFine = useCallback(async (data: Omit<Fine, 'id' | 'created_at'>) => {
+        if (!userPath) return;
+        const now = new Date().toISOString();
+        await addDoc(collection(db, userPath, 'fines'), { ...data, created_at: now });
+    }, [userPath]);
+
+    const updateFine = useCallback(async (fineId: string, updates: Partial<Fine>) => {
+        if (!userPath) return;
+        await updateDoc(doc(db, userPath, 'fines', fineId), { ...updates, updated_at: new Date().toISOString() });
+    }, [userPath]);
+
+    const deleteFine = useCallback(async (fineId: string) => {
+        if (!userPath) return;
+        await deleteDoc(doc(db, userPath, 'fines', fineId));
+    }, [userPath]);
+
+    // ── Common Fees CRUD ────────────────────────────────────────────────────────
+    const addCommonFee = useCallback(async (data: Omit<CommonFee, 'id' | 'created_at'>) => {
+        if (!userPath) return;
+        const now = new Date().toISOString();
+        await addDoc(collection(db, userPath, 'common_fees'), { ...data, created_at: now });
+    }, [userPath]);
+
+    const updateCommonFee = useCallback(async (feeId: string, updates: Partial<CommonFee>) => {
+        if (!userPath) return;
+        await updateDoc(doc(db, userPath, 'common_fees', feeId), { ...updates, updated_at: new Date().toISOString() });
+    }, [userPath]);
+
+    const deleteCommonFee = useCallback(async (feeId: string) => {
+        if (!userPath) return;
+        await deleteDoc(doc(db, userPath, 'common_fees', feeId));
+    }, [userPath]);
+
     return {
         config,
         rooms,
         bills,
+        fines,
+        commonFees,
         loading,
         saveConfig,
         addRoom,
@@ -399,6 +485,12 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         unlockMonth,
         getMonthStats,
         getAllUsers,
-        updateUserLicense
+        updateUserLicense,
+        addFine,
+        updateFine,
+        deleteFine,
+        addCommonFee,
+        updateCommonFee,
+        deleteCommonFee,
     };
 }

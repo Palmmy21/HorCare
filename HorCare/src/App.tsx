@@ -88,7 +88,7 @@ function App() {
     const stored = buildingStorageKey ? localStorage.getItem(buildingStorageKey) : null;
     const valid = stored && buildings.some(b => b.id === stored);
     const next = valid ? stored : buildings[0].id;
-    setActiveBuildingId(next);
+    setActiveBuildingId(next); // eslint-disable-line react-hooks/set-state-in-effect
   }, [buildingsLoading, buildings, buildingStorageKey]);
 
   // Handle Stripe redirect: ?payment=success|cancel
@@ -96,7 +96,7 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const result = params.get('payment');
     if (result === 'success' || result === 'cancel') {
-      setPaymentToast(result as 'success' | 'cancel');
+      setPaymentToast(result as 'success' | 'cancel'); // eslint-disable-line react-hooks/set-state-in-effect
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setPaymentToast(null), result === 'success' ? 6000 : 3000);
     }
@@ -109,8 +109,8 @@ function App() {
     if (pending) {
       localStorage.removeItem('horcare_pending_plan');
       try {
-        setPendingPlan(JSON.parse(pending));
-      } catch {}
+        setPendingPlan(JSON.parse(pending)); // eslint-disable-line react-hooks/set-state-in-effect
+      } catch { /* ignore malformed pending plan JSON */ }
       setCurrentView('pricing');
     }
   }, [user]);
@@ -166,6 +166,8 @@ function App() {
     config,
     rooms,
     bills,
+    fines,
+    commonFees,
     loading: dataLoading,
     saveConfig,
     addRoom,
@@ -179,8 +181,15 @@ function App() {
     unlockMonth,
     getMonthStats,
     deleteBill,
-    updateBillPayment
+    updateBillPayment,
+    addFine,
+    updateFine,
+    deleteFine,
+    addCommonFee,
+    updateCommonFee,
+    deleteCommonFee,
   } = useFirestore(user?.uid ?? null, activeBuildingId, currentMonth);
+
 
   // Auto-clean orphaned bills (e.g. from deleted rooms)
   useEffect(() => {
@@ -888,6 +897,7 @@ function App() {
           <RoomManagement
             rooms={rooms}
             config={config}
+            commonFees={commonFees}
             onAddRoom={addRoom}
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
@@ -924,6 +934,14 @@ function App() {
             buildingId={activeBuildingId}
             rooms={rooms}
             lowStockCount={lowStockCount}
+            fines={fines}
+            commonFees={commonFees}
+            onAddFine={addFine}
+            onUpdateFine={updateFine}
+            onDeleteFine={deleteFine}
+            onAddCommonFee={addCommonFee}
+            onUpdateCommonFee={updateCommonFee}
+            onDeleteCommonFee={deleteCommonFee}
           />
         )}
 
@@ -931,6 +949,7 @@ function App() {
           <MeterRecording
             rooms={rooms}
             config={config}
+            commonFees={commonFees}
             currentMonth={currentMonth}
             onSaveBill={saveBill}
             getBillForRoom={getBillForRoom}

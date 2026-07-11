@@ -13,7 +13,7 @@ export function useBuildings(userId: string | null) {
     const migratedRef = useRef(false);
 
     useEffect(() => {
-        if (!userId) { setLoading(false); return; }
+        if (!userId) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
 
         const buildingsRef = collection(db, `users/${userId}/buildings`);
         const q = query(buildingsRef, orderBy('order'));

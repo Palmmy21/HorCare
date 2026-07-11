@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload } from 'lucide-react';
-import type { Room, DormConfig } from '../../types';
+import type { Room, DormConfig, CommonFee } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface RoomManagementProps {
     rooms: Room[];
     config: DormConfig;
+    commonFees: CommonFee[];
     onAddRoom: (roomNumber: string) => void;
     onUpdateRoom: (roomId: string, updates: Partial<Room>) => Promise<void>;
     onDeleteRoom: (roomId: string) => void;
@@ -21,6 +22,7 @@ interface RoomManagementProps {
 export default function RoomManagement({
     rooms,
     config,
+    commonFees,
     onAddRoom,
     onUpdateRoom,
     onDeleteRoom,
@@ -42,6 +44,7 @@ export default function RoomManagement({
     const [editTenantCount, setEditTenantCount] = useState<string>('1');
     const [editCustomElecRate, setEditCustomElecRate] = useState('');
     const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
+    const [editCommonFeeOverrides, setEditCommonFeeOverrides] = useState<Record<string, { amount?: number; is_active?: boolean }>>({});
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
     const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -101,6 +104,7 @@ export default function RoomManagement({
                     : '')
                 : ''
         );
+        setEditCommonFeeOverrides(room.common_fee_overrides || {});
     };
 
     const saveEdit = async (roomId: string) => {
@@ -112,18 +116,24 @@ export default function RoomManagement({
             room_type: editRoomType,
             tenant_count: Number(editTenantCount) || 1
         };
-        if (editRoomType === 'commercial') {
-            updates.custom_electricity_rate = editCustomElecRate
-                ? Number(editCustomElecRate)
-                : null;
-            updates.custom_water_config = editCustomWaterRate
-                ? { type: 'normal' as const, unit_rate: Number(editCustomWaterRate) }
-                : null;
+        
+        if (editCustomElecRate.trim() && !isNaN(Number(editCustomElecRate))) {
+            updates.custom_electricity_rate = Number(editCustomElecRate);
         } else {
-            // Clear custom rates when switching to dormitory
             updates.custom_electricity_rate = null;
+        }
+
+        if (editCustomWaterRate.trim() && !isNaN(Number(editCustomWaterRate))) {
+            updates.custom_water_config = {
+                type: 'normal',
+                unit_rate: Number(editCustomWaterRate)
+            };
+        } else {
             updates.custom_water_config = null;
         }
+
+        updates.common_fee_overrides = editCommonFeeOverrides;
+
         try {
             await onUpdateRoom(roomId, updates);
             setEditingRoom(null);
@@ -153,7 +163,7 @@ export default function RoomManagement({
     const toggleSelect = (id: string) => {
         setSelectedRooms(prev => {
             const s = new Set(prev);
-            s.has(id) ? s.delete(id) : s.add(id);
+            if (s.has(id)) { s.delete(id); } else { s.add(id); }
             return s;
         });
     };
@@ -197,7 +207,7 @@ export default function RoomManagement({
     // ── CSV import ─────────────────────────────────────────────────────────────
     const handleImportFile = async (file: File) => {
         const text = await file.text();
-        const lines = text.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+        const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
         if (lines.length < 2) return;
 
         const parseRow = (line: string) =>
@@ -550,7 +560,8 @@ export default function RoomManagement({
                             </thead>
                             <tbody>
                                 {filteredRooms.map((room, index) => (
-                                    <tr key={room.id} style={selectedRooms.has(room.id) ? { background: 'rgba(96,165,250,0.06)' } : undefined}>
+                                    <Fragment key={room.id}>
+                                    <tr style={selectedRooms.has(room.id) ? { background: 'rgba(96,165,250,0.06)' } : undefined}>
                                         <td style={{ textAlign: 'center' }}>
                                             <button
                                                 onClick={() => editingRoom !== room.id && toggleSelect(room.id)}
@@ -783,6 +794,61 @@ export default function RoomManagement({
                                             )}
                                         </td>
                                     </tr>
+                                    {editingRoom === room.id && commonFees.length > 0 && (
+                                        <tr key={`${room.id}-fees`} style={{ background: 'rgba(96,165,250,0.06)' }}>
+                                            <td colSpan={hasAnyCommercial ? 10 : 9} style={{ padding: '0.75rem 2rem', borderTop: 'none' }}>
+                                                <div style={{ background: 'var(--color-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
+                                                    <div style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <Building2 size={16} color="#4F46E5" />
+                                                        ตั้งค่าค่าบริการส่วนกลางรายห้อง
+                                                    </div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                                                        {commonFees.filter(f => f.is_active).map(fee => {
+                                                            const override = editCommonFeeOverrides[fee.id] || {};
+                                                            const isActive = override.is_active ?? fee.is_active;
+                                                            const amount = override.amount ?? fee.amount;
+                                                            return (
+                                                                <div key={fee.id} style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                                                    padding: '0.5rem 0.75rem', borderRadius: '8px',
+                                                                    background: isActive ? 'rgba(16,185,129,0.05)' : 'rgba(107,114,128,0.05)',
+                                                                    border: `1px solid ${isActive ? 'rgba(16,185,129,0.2)' : 'rgba(107,114,128,0.2)'}`,
+                                                                    opacity: isActive ? 1 : 0.6
+                                                                }}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isActive}
+                                                                        onChange={e => setEditCommonFeeOverrides(prev => ({
+                                                                            ...prev,
+                                                                            [fee.id]: { ...prev[fee.id], is_active: e.target.checked }
+                                                                        }))}
+                                                                    />
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text)' }}>{fee.name}</div>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                                        <input
+                                                                            type="number"
+                                                                            disabled={!isActive}
+                                                                            className="form-input mono"
+                                                                            style={{ width: '70px', padding: '0.2rem 0.4rem', fontSize: '0.8rem', textAlign: 'right' }}
+                                                                            value={amount}
+                                                                            onChange={e => setEditCommonFeeOverrides(prev => ({
+                                                                                ...prev,
+                                                                                [fee.id]: { ...prev[fee.id], amount: Number(e.target.value) }
+                                                                            }))}
+                                                                        />
+                                                                        <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>บ.</span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
                                 ))}
                             </tbody>
                         </table>

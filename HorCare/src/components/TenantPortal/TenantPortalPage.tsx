@@ -702,9 +702,9 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
       setShowForm(false);
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 4000);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      alert('Error submitting request: ' + e.message);
+      alert('Error submitting request: ' + ((e as Error)?.message ?? String(e)));
     } finally {
       setSubmitting(false);
     }

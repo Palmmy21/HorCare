@@ -21,7 +21,7 @@ export default function InstallPrompt() {
         if (isStandalone || localStorage.getItem('pwa_install_dismissed') === 'true') return;
 
         if (ios) {
-            setIsIOS(true);
+            setIsIOS(true); // eslint-disable-line react-hooks/set-state-in-effect
             const timer = setTimeout(() => setShowBanner(true), 3000);
             return () => clearTimeout(timer);
         }

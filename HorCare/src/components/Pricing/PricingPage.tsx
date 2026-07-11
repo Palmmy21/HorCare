@@ -372,7 +372,7 @@ const PlanCard = memo(function PlanCard({
         ? Math.round((1 - plan.yearlyPrice / plan.originalYearlyPrice) * 100)
         : 0;
 
-    useEffect(() => { setPriceKey(k => k + 1); }, [cycle]);
+    useEffect(() => { setPriceKey(k => k + 1); }, [cycle]); // eslint-disable-line react-hooks/set-state-in-effect
 
     return (
         <div className={`plan-card ${plan.id}${plan.popular ? ' popular' : ''}`}>
@@ -680,10 +680,11 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
             else window.location.href = data.url;
 
             setSelectedPlan(null);
-        } catch (err: any) {
+        } catch (err: unknown) {
             if (checkoutTab) checkoutTab.close();
             console.error('Checkout error:', err);
-            alert(`เกิดข้อผิดพลาด: ${err.message}`);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            alert(`เกิดข้อผิดพลาด: ${errMsg}`);
             setSelectedPlan(null);
         } finally {
             setProcessing(false);

@@ -1,5 +1,5 @@
 // DormUtility Pro - Core Calculation Logic
-import type { DormConfig, BillCalculation, WaterConfig, Room } from '../types';
+import type { DormConfig, BillCalculation, WaterConfig, Room, CommonFee } from '../types';
 
 /**
  * Calculate electricity bill
@@ -109,13 +109,31 @@ export function calculateFullBill(
     roomRent: number,
     tenantCount: number = 1,
     roomElecRate?: number,
-    roomWaterConfig?: WaterConfig
+    roomWaterConfig?: WaterConfig,
+    globalCommonFees: CommonFee[] = [],
+    roomCommonFeeOverrides: Record<string, { amount?: number; is_active?: boolean }> = {}
 ): BillCalculation {
     const elecRate = roomElecRate ?? config.electricity_rate;
     const waterCfg = roomWaterConfig ?? config.water_config;
 
     const elec = calculateElectricity(prevElec, currElec, elecRate);
     const water = calculateWater(prevWater, currWater, waterCfg, tenantCount);
+
+    let common_fee = 0;
+    const applied_common_fees: { id: string; name: string; amount: number }[] = [];
+
+    for (const fee of globalCommonFees) {
+        const override = roomCommonFeeOverrides[fee.id];
+        // Determine if active for this room
+        const isActive = override?.is_active ?? fee.is_active;
+        if (isActive) {
+            const amount = override?.amount ?? fee.amount;
+            if (amount > 0) {
+                common_fee += amount;
+                applied_common_fees.push({ id: fee.id, name: fee.name, amount });
+            }
+        }
+    }
 
     return {
         elec_units: elec.units,
@@ -125,7 +143,9 @@ export function calculateFullBill(
         water_flat_amount: water.flatAmount,
         water_excess_units: water.excessUnits,
         water_excess_amount: water.excessAmount,
-        total_bill: elec.bill + water.bill + roomRent
+        common_fee,
+        applied_common_fees,
+        total_bill: elec.bill + water.bill + roomRent + common_fee
     };
 }
 
