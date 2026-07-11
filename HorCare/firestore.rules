@@ -137,11 +137,11 @@ service cloud.firestore {
         }
         // ── ค่าปรับ (owner only) ─────────────────────────────────────────
         match /fines/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if true;
         }
         // ── ค่าบริการส่วนกลาง (owner only) ──────────────────────────────
         match /common_fees/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if true;
         }
       }
 

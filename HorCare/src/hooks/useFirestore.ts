@@ -246,7 +246,9 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 effectiveRent,
                 newRoom.tenant_count,
                 electricityRate,
-                waterConfig
+                waterConfig,
+                commonFees,
+                newRoom.common_fee_overrides
             );
 
             const updatedBill: Partial<MonthlyBill> = {
@@ -314,7 +316,9 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                     effectiveRent,
                     room.tenant_count,
                     electricityRate,
-                    waterConfig
+                    waterConfig,
+                    commonFees,
+                    room.common_fee_overrides
                 );
 
                 const updatedNextBill: Partial<MonthlyBill> = {
