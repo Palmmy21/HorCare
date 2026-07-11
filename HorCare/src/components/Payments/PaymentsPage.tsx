@@ -116,7 +116,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     const exportCSV = () => {
         const THAI_STATUS: Record<PaymentStatus, string> = { paid: 'จ่ายแล้ว', pending: 'รอตรวจสอบ', unpaid: 'ยังไม่จ่าย' };
         const rows = [
-            ['เดือน', 'ห้อง', 'ค่าไฟ (หน่วย)', 'ค่าไฟ (บาท)', 'ค่าน้ำ (หน่วย)', 'ค่าน้ำ (บาท)', 'ค่าเช่า (บาท)', 'รวม (บาท)', 'สถานะ', 'ยอดสลิป', 'วันที่ชำระ'],
+            ['เดือน', 'ห้อง', 'ค่าไฟ (หน่วย)', 'ค่าไฟ (บาท)', 'ค่าน้ำ (หน่วย)', 'ค่าน้ำ (บาท)', 'ค่าเช่า (บาท)', 'ค่าส่วนกลาง (บาท)', 'รวม (บาท)', 'สถานะ', 'ยอดสลิป', 'วันที่ชำระ'],
             ...monthBills.map(b => [
                 monthLabel(b.month),
                 b.room_number,
@@ -125,6 +125,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                 b.water_units,
                 b.water_bill,
                 b.room_rent,
+                b.common_fee || 0,
                 b.total_bill,
                 THAI_STATUS[statusOf(b)],
                 b.slip_amount ?? '',

@@ -408,6 +408,7 @@ export default function Summary({
                                         <th className="text-center">ไฟฟ้า</th>
                                         <th className="text-center">น้ำประปา</th>
                                         <th className="text-right">ค่าห้อง</th>
+                                        <th className="text-right">ส่วนกลาง</th>
                                         <th className="text-right">ยอดรวม</th>
                                         <th className="text-center">สถานะ</th>
                                         <th className="text-center">ใบแจ้งยอด</th>
@@ -448,6 +449,11 @@ export default function Summary({
                                             </td>
                                             <td className="text-right mono">
                                                 {formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}
+                                            </td>
+                                            <td className="text-right mono">
+                                                {hasBill && bill.common_fee ? (
+                                                    <span style={{ color: 'var(--color-primary)' }}>+{formatCurrency(bill.common_fee)}</span>
+                                                ) : <span className="text-muted">-</span>}
                                             </td>
                                             <td className="text-right mono font-bold">
                                                 {hasBill ? formatCurrency(bill.total_bill) : <span className="text-muted">-</span>}
@@ -509,7 +515,7 @@ export default function Summary({
                                 </tbody>
                                 <tfoot>
                                     <tr style={{ background: 'var(--color-gray-50)' }}>
-                                        <td colSpan={4} className="text-right font-bold">รวมทั้งสิ้น</td>
+                                        <td colSpan={5} className="text-right font-bold">รวมทั้งสิ้น</td>
                                         <td className="text-right mono font-bold" style={{ fontSize: '1.125rem', color: 'var(--color-primary)' }}>
                                             {formatCurrency(stats.totalRevenue)}
                                         </td>
@@ -560,6 +566,12 @@ export default function Summary({
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#16A34A" /> ค่าห้อง</span>
                                             <span className="mono">{formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}</span>
                                         </div>
+                                        {hasBill && bill.common_fee ? (
+                                            <div className="summary-bill-card-row">
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Building2 size={14} color="#4F46E5" /> ส่วนกลาง</span>
+                                                <span className="mono" style={{ color: 'var(--color-primary)' }}>+{formatCurrency(bill.common_fee)}</span>
+                                            </div>
+                                        ) : null}
                                     </div>
                                     <div className="summary-bill-card-footer">
                                         <div className="summary-bill-card-total">
