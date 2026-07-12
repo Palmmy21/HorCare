@@ -29,10 +29,50 @@
   <meta http-equiv="X-Frame-Options" content="DENY" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
+  <style>
+    body { margin: 0; background-color: #f9fafb; font-family: 'Inter', sans-serif; }
+    .splash-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      width: 100vw;
+    }
+    .splash-logo-container {
+      perspective: 1000px;
+    }
+    .splash-logo-container img {
+      width: 140px;
+      height: 140px;
+      object-fit: contain;
+      animation: cool-spin-entry 3s cubic-bezier(0.2, 0.8, 0.2, 1.1) infinite alternate;
+      transform-style: preserve-3d;
+    }
+    @keyframes cool-spin-entry {
+      0% { transform: rotateY(-540deg) scale(0.3); opacity: 0; filter: blur(10px); }
+      60% { transform: rotateY(20deg) scale(1.1); opacity: 1; filter: blur(0px); }
+      80% { transform: rotateY(-10deg) scale(0.95); }
+      100% { transform: rotateY(0deg) scale(1); }
+    }
+    .splash-text {
+      margin-top: 1.5rem;
+      font-size: 1rem;
+      color: #9ca3af;
+      font-weight: 500;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div class="splash-screen">
+      <div class="splash-logo-container">
+        <img src="/logo.png" alt="HorCare" />
+      </div>
+      <div class="splash-text">กำลังโหลด...</div>
+    </div>
+  </div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

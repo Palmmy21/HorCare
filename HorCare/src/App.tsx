@@ -48,6 +48,13 @@ function PageLoader() {
 type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'settings' | 'admin' | 'pricing';
 
 function App() {
+  const [minSplashDone, setMinSplashDone] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashDone(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed] = useState(false);
@@ -295,7 +302,7 @@ function App() {
   };
 
   // Loading state
-  if (authLoading) {
+  if (authLoading || !minSplashDone) {
     return (
       <div style={{
         display: 'flex',
@@ -305,8 +312,10 @@ function App() {
         flexDirection: 'column',
         gap: '1rem'
       }}>
-        <div className="loading-spinner" style={{ width: 40, height: 40 }}></div>
-        <p>กำลังโหลด...</p>
+        <div className="login-logo" style={{ marginBottom: 0 }}>
+          <img src="/logo.png" alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain' }} />
+        </div>
+        <p style={{ color: 'var(--color-gray-400)', fontWeight: 500 }}>กำลังโหลด...</p>
       </div>
     );
   }

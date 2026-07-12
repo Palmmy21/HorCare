@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import type { DormConfig, WaterConfig } from '../../types';
@@ -1214,7 +1214,19 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                                     padding: 'var(--space-6)',
                                                     border: '1px solid var(--color-gray-200)',
                                                 }}>
-                                                    <QRCodeSVG value={inviteLink!} size={192} level="M" marginSize={2} />
+                                                    <QRCodeCanvas 
+                                                        id="invite-qr-canvas"
+                                                        value={inviteLink!} 
+                                                        size={192} 
+                                                        level="H" 
+                                                        marginSize={2} 
+                                                        imageSettings={{
+                                                            src: "/logo-icon.png",
+                                                            height: 32,
+                                                            width: 32,
+                                                            excavate: true,
+                                                        }}
+                                                    />
                                                     <div style={{ textAlign: 'center' }}>
                                                         <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#111' }}>
                                                             {billForm.dorm_name || 'หอพัก'}
@@ -1223,18 +1235,68 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                                             สแกน QR เพื่อรับบิลผ่าน LINE
                                                         </div>
                                                     </div>
-                                                    <button
-                                                        style={{
-                                                            display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                                                            background: 'transparent', color: '#555',
-                                                            border: '1px solid #ddd', borderRadius: 8,
-                                                            padding: '0.5rem 1rem', fontSize: '0.8125rem',
-                                                            cursor: 'pointer',
-                                                        }}
-                                                        onClick={() => window.print()}
-                                                    >
-                                                        <Printer size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> พิมพ์ QR Code
-                                                    </button>
+
+                                                    {/* Hidden Print Area */}
+                                                    <div className="qr-print-wrapper">
+                                                        <div style={{ textAlign: 'center', fontFamily: 'Sarabun, "TH Sarabun New", sans-serif' }}>
+                                                            <h1 style={{ fontSize: '2.5rem', marginBottom: '0.25rem', color: '#111' }}>{billForm.dorm_name || 'หอพัก'}</h1>
+                                                            <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#444' }}>
+                                                                สแกน QR Code แล้วพิมพ์รหัสเพื่อลงทะเบียน
+                                                            </h2>
+                                                            <div style={{ margin: '1.5rem auto', padding: '1rem', background: '#fff', borderRadius: '1.5rem', border: '2px solid #eee', display: 'inline-block' }}>
+                                                                <QRCodeCanvas 
+                                                                    value={inviteLink!} 
+                                                                    size={360} 
+                                                                    level="H" 
+                                                                    imageSettings={{ src: "/logo-icon.png", height: 60, width: 60, excavate: true }}
+                                                                />
+                                                            </div>
+                                                            <div style={{ fontSize: '1.25rem', color: '#555', marginTop: '0.5rem' }}>
+                                                                รหัสลงทะเบียน: <strong style={{ fontSize: '2.25rem', color: '#10B981', letterSpacing: '4px', background: '#ecfdf5', padding: '0.5rem 1.5rem', borderRadius: '1rem', display: 'inline-block', border: '2px dashed #10b981' }}>{dormCode}</strong>
+                                                            </div>
+                                                            
+                                                            <div style={{ display: 'flex', gap: '3rem', justifyContent: 'center', alignItems: 'center', marginTop: '2rem' }}>
+                                                                <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" style={{ height: 65 }} alt="LINE" />
+                                                                <div style={{ width: '2px', height: '50px', background: '#ddd' }}></div>
+                                                                <img src="/logo.png" style={{ height: 60 }} alt="HorCare" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                                        <button
+                                                            style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                                                                background: 'transparent', color: '#555',
+                                                                border: '1px solid #ddd', borderRadius: 8,
+                                                                padding: '0.5rem 1rem', fontSize: '0.8125rem',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                            onClick={() => window.print()}
+                                                        >
+                                                            <Printer size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> พิมพ์
+                                                        </button>
+                                                        <button
+                                                            style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                                                                background: '#10B981', color: '#fff',
+                                                                border: 'none', borderRadius: 8,
+                                                                padding: '0.5rem 1rem', fontSize: '0.8125rem',
+                                                                cursor: 'pointer',
+                                                            }}
+                                                            onClick={() => {
+                                                                const canvas = document.getElementById('invite-qr-canvas') as HTMLCanvasElement;
+                                                                if (canvas) {
+                                                                    const url = canvas.toDataURL('image/png');
+                                                                    const a = document.createElement('a');
+                                                                    a.href = url;
+                                                                    a.download = 'horcare-invite-qr.png';
+                                                                    a.click();
+                                                                }
+                                                            }}
+                                                        >
+                                                            <ImageIcon size={16} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> โหลดเป็น PNG
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

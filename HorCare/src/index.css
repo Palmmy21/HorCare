@@ -1771,8 +1771,25 @@ body {
   .print-only-area,
   .print-only-area *,
   .invoice-modal .modal-body,
-  .invoice-modal .modal-body * {
+  .invoice-modal .modal-body *,
+  .qr-print-wrapper,
+  .qr-print-wrapper * {
     visibility: visible;
+  }
+
+  .qr-print-wrapper {
+    display: flex !important;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100vh;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
   }
 
   /* ── Compact slip grid (2 per row, auto rows) ── */
@@ -2864,6 +2881,10 @@ body {
   gap: var(--space-4);
 }
 
+.qr-print-wrapper {
+  display: none;
+}
+
 /* ===== Login Page ===== */
 .login-page {
   min-height: 100vh;
@@ -2887,6 +2908,31 @@ body {
 .login-logo {
   text-align: center;
   margin-bottom: var(--space-6);
+  perspective: 1000px;
+}
+
+@keyframes cool-spin-entry {
+  0% {
+    transform: rotateY(-540deg) scale(0.3);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  60% {
+    transform: rotateY(20deg) scale(1.1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  80% {
+    transform: rotateY(-10deg) scale(0.95);
+  }
+  100% {
+    transform: rotateY(0deg) scale(1);
+  }
+}
+
+.login-logo img {
+  animation: cool-spin-entry 3s cubic-bezier(0.2, 0.8, 0.2, 1.1) forwards;
+  transform-style: preserve-3d;
 }
 
 .login-logo-icon {

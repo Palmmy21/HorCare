@@ -220,6 +220,13 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                 <QRCodeSVG 
                                     value={generatePayload(billCustomization.promptpay_number, { amount: bill.total_bill })}
                                     size={140}
+                                    level="H"
+                                    imageSettings={{
+                                        src: "https://commons.wikimedia.org/wiki/Special:FilePath/PromptPay-logo.png",
+                                        height: 20,
+                                        width: 50,
+                                        excavate: true,
+                                    }}
                                 />
                             </div>
                             {billCustomization.promptpay_name && (
