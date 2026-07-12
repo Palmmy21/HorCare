@@ -12,6 +12,8 @@ import {
   Bath, Armchair, Send, Pencil, Camera, X as XIcon,
 } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
+import { QRCodeSVG } from 'qrcode.react';
+import generatePayload from 'promptpay-qr';
 
 // ── Image compression (canvas) ────────────────────────────────────────────────
 async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
@@ -171,8 +173,6 @@ function PaymentStatus({ status }: { status?: string }) {
 
 // ── PromptPay QR ─────────────────────────────────────────────────────────────
 function PromptPayCard({ number, name, amount }: { number: string; name: string; amount: number }) {
-  const ppNum = number.replace(/-/g, '');
-  const qrUrl = `https://promptpay.io/${ppNum}/${amount}.png`;
   return (
     <div style={{
       background: 'linear-gradient(135deg, #F0F9FF, #EFF6FF)',
@@ -182,10 +182,19 @@ function PromptPayCard({ number, name, amount }: { number: string; name: string;
       <p style={{ fontSize: '0.8125rem', color: '#1D4ED8', margin: '0 0 0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}>
         <CreditCard size={14} /> สแกน QR ชำระเงิน
       </p>
-      <img src={qrUrl} alt="PromptPay QR"
-        style={{ width: 160, height: 160, borderRadius: '8px', imageRendering: 'pixelated', display: 'block', margin: '0 auto' }}
-        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-      />
+      <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', display: 'inline-block', margin: '0 auto' }}>
+        <QRCodeSVG 
+          value={generatePayload(number, { amount })}
+          size={160}
+          level="H"
+          imageSettings={{
+            src: "https://commons.wikimedia.org/wiki/Special:FilePath/PromptPay-logo.png",
+            height: 24,
+            width: 60,
+            excavate: true,
+          }}
+        />
+      </div>
       <div style={{ marginTop: '0.875rem', fontWeight: 800, fontSize: '1.125rem', color: 'var(--color-gray-800)' }}>
         {fmtCurrency(amount)}
       </div>
