@@ -66,6 +66,8 @@ export default function Summary({
     const [captureTarget, setCaptureTarget] = useState<MonthlyBill | null>(null);
     const [showMonthlyReport, setShowMonthlyReport] = useState(false);
     const [isExportingReport, setIsExportingReport] = useState(false);
+    const [preparedFiles, setPreparedFiles] = useState<File[]>([]);
+    const [showShareModal, setShowShareModal] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
     const captureRef = useRef<HTMLDivElement>(null);
     const monthlyReportRef = useRef<HTMLDivElement>(null);
@@ -181,7 +183,7 @@ export default function Summary({
         }, 300);
     };
 
-    const captureAndDownload = async (bill: MonthlyBill): Promise<void> => {
+    const captureAndDownload = async (bill: MonthlyBill, useShare: boolean = false): Promise<void> => {
         setCaptureTarget(bill);
 
         // Poll via rAF until React commits the hidden InvoiceBill, with a 3-second timeout
@@ -207,18 +209,44 @@ export default function Summary({
             backgroundColor: '#ffffff',
         });
 
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `bill_${bill.room_number}_${currentMonth}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const fileName = `bill_${bill.room_number}_${currentMonth}.png`;
+        let shared = false;
+
+        const nav = navigator as any;
+        if (useShare && nav.share && nav.canShare) {
+            try {
+                const blob = await (await fetch(dataUrl)).blob();
+                const file = new File([blob], fileName, { type: 'image/png' });
+                if (nav.canShare({ files: [file] })) {
+                    await nav.share({
+                        files: [file],
+                        title: `บิลห้อง ${bill.room_number}`,
+                    });
+                    shared = true;
+                }
+            } catch (err: any) {
+                if (err.name !== 'AbortError') {
+                    console.error('Share failed, falling back to download:', err);
+                } else {
+                    shared = true; // User cancelled share sheet, don't download
+                }
+            }
+        }
+
+        if (!shared) {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     };
 
     const handleDownloadBill = async (bill: MonthlyBill) => {
         setDownloadingBillId(bill.id);
         try {
-            await captureAndDownload(bill);
+            await captureAndDownload(bill, true);
         } catch (err) {
             console.error('Download failed:', err);
             alert('ดาวน์โหลดไม่สำเร็จ กรุณาลองใช้ปุ่มพิมพ์แทน');
@@ -232,11 +260,46 @@ export default function Summary({
         if (monthBills.length === 0) return;
         setIsDownloadingAll(true);
         setDownloadAllProgress(0);
+        
+        const nav = navigator as any;
+        const canShareFiles = nav.share && nav.canShare && nav.canShare({
+            files: [new File([''], 'test.png', { type: 'image/png' })]
+        });
+
+        const files: File[] = [];
         const failed: string[] = [];
+        
         try {
             for (let i = 0; i < monthBills.length; i++) {
                 try {
-                    await captureAndDownload(monthBills[i]);
+                    const bill = monthBills[i];
+                    setCaptureTarget(bill);
+                    await new Promise<void>((resolve, reject) => {
+                        const deadline = Date.now() + 3000;
+                        const check = () => {
+                            if (captureRef.current) resolve();
+                            else if (Date.now() > deadline) reject(new Error('Capture element not mounted'));
+                            else requestAnimationFrame(check);
+                        };
+                        requestAnimationFrame(check);
+                    });
+
+                    const el = captureRef.current;
+                    if (!el) throw new Error('Capture element not mounted');
+
+                    const dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: '#ffffff' });
+                    
+                    if (canShareFiles) {
+                        const blob = await (await fetch(dataUrl)).blob();
+                        files.push(new File([blob], `bill_${bill.room_number}_${currentMonth}.png`, { type: 'image/png' }));
+                    } else {
+                        const a = document.createElement('a');
+                        a.href = dataUrl;
+                        a.download = `bill_${bill.room_number}_${currentMonth}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }
                 } catch (err) {
                     console.error(`Download failed for room ${monthBills[i].room_number}:`, err);
                     failed.push(monthBills[i].room_number);
@@ -245,12 +308,36 @@ export default function Summary({
                 setDownloadAllProgress(i + 1);
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
+            
+            if (canShareFiles && files.length > 0) {
+                setPreparedFiles(files);
+                setShowShareModal(true);
+            }
         } finally {
             setIsDownloadingAll(false);
             setCaptureTarget(null);
             setDownloadAllProgress(0);
             if (failed.length > 0) {
                 alert(`ดาวน์โหลดไม่สำเร็จ ${failed.length} ห้อง: ${failed.join(', ')}`);
+            }
+        }
+    };
+
+    const handleShareAll = async () => {
+        try {
+            await navigator.share({
+                files: preparedFiles,
+                title: `บิลทั้งหมดรอบเดือน ${formatMonthThai(currentMonth)}`
+            });
+            setShowShareModal(false);
+            setPreparedFiles([]);
+        } catch (err: any) {
+            if (err.name !== 'AbortError') {
+                console.error('Share all failed:', err);
+                alert('เกิดข้อผิดพลาดในการแชร์');
+            } else {
+                setShowShareModal(false);
+                setPreparedFiles([]);
             }
         }
     };
@@ -961,6 +1048,51 @@ export default function Summary({
                                     ดูแพ็กเกจ
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Share Multiple Bills Modal */}
+            {showShareModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <div style={{
+                                width: '48px', height: '48px',
+                                borderRadius: '50%',
+                                background: 'rgba(16,185,129,0.1)',
+                                color: '#10B981',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                margin: '0 auto 1rem auto'
+                            }}>
+                                <CheckCircle size={24} />
+                            </div>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text, #111827)', marginBottom: '0.5rem' }}>
+                                เตรียมรูปภาพสำเร็จ {preparedFiles.length} รูป
+                            </h3>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-light, #6B7280)' }}>
+                                คุณสามารถบันทึกรูปลงอัลบั้มบนเครื่องได้ทันที
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => {
+                                    setShowShareModal(false);
+                                    setPreparedFiles([]);
+                                }}
+                                style={{ flex: 1 }}
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleShareAll}
+                                style={{ flex: 1, background: '#10B981', borderColor: '#10B981', color: '#fff' }}
+                            >
+                                <Download size={16} />
+                                บันทึกลงเครื่อง
+                            </button>
                         </div>
                     </div>
                 </div>

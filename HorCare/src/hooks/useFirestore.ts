@@ -177,6 +177,54 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
     const saveConfig = useCallback(async (newConfig: DormConfig) => {
         if (!userPath || !userId || !buildingId) return;
         await setDoc(doc(db, userPath, 'data', 'config'), newConfig);
+
+        // Recalculate all unlocked bills for the current UI month and calendar month
+        // to reflect the new global settings
+        const monthsToRecalc = [...new Set([getCurrentMonth(), anchorMonth].filter(Boolean))] as string[];
+
+        for (const month of monthsToRecalc) {
+            const billsInMonth = bills.filter(b => b.month === month && !b.is_locked);
+            for (const existingBill of billsInMonth) {
+                const room = rooms.find(r => r.id === existingBill.room_id);
+                if (!room) continue;
+
+                const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? newConfig.room_rent);
+                const { electricityRate, waterConfig } = getEffectiveRates(room, newConfig);
+
+                const calculation = calculateFullBill(
+                    existingBill.prev_elec,
+                    existingBill.curr_elec,
+                    existingBill.prev_water,
+                    existingBill.curr_water,
+                    newConfig,
+                    effectiveRent,
+                    room.tenant_count,
+                    electricityRate,
+                    waterConfig,
+                    commonFees,
+                    room.common_fee_overrides,
+                    month
+                );
+
+                const updatedBill: Partial<MonthlyBill> = {
+                    elec_units: calculation.elec_units,
+                    elec_bill: calculation.elec_bill,
+                    water_units: calculation.water_units,
+                    water_bill: calculation.water_bill,
+                    water_flat_amount: calculation.water_flat_amount,
+                    water_excess_units: calculation.water_excess_units,
+                    water_excess_amount: calculation.water_excess_amount,
+                    room_rent: effectiveRent,
+                    common_fee: calculation.common_fee,
+                    applied_common_fees: calculation.applied_common_fees,
+                    total_bill: calculation.total_bill,
+                    updated_at: new Date().toISOString()
+                };
+
+                await updateDoc(doc(db, userPath, 'bills', existingBill.id), updatedBill);
+            }
+        }
+
         // Sync dorm_code lookup table so LINE webhook can find this building
         if (newConfig.dorm_code) {
             try {
@@ -192,7 +240,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 throw e; // re-throw ให้ UI แสดง error ได้
             }
         }
-    }, [userPath, userId, buildingId]);
+    }, [userPath, userId, buildingId, bills, rooms, commonFees, anchorMonth]);
 
     // Room operations
     const addRoom = useCallback(async (roomNumber: string) => {

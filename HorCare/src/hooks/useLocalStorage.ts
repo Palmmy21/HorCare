@@ -1,7 +1,7 @@
 // LocalStorage-based data hook (Firebase integration ready)
 import { useState, useEffect, useCallback } from 'react';
 import type { DormConfig, Room, MonthlyBill } from '../types';
-import { getCurrentMonth } from '../utils/calculations';
+import { getCurrentMonth, calculateFullBill, getEffectiveRates } from '../utils/calculations';
 
 // Default configuration
 const DEFAULT_CONFIG: DormConfig = {
@@ -66,7 +66,55 @@ export function useLocalStorage() {
     const saveConfig = useCallback((newConfig: DormConfig) => {
         localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(newConfig));
         setConfigState(newConfig);
-    }, []);
+
+        // Recalculate all unlocked bills for the current month
+        setBillsState(prevBills => {
+            const currentMonth = getCurrentMonth();
+            const updatedBills = prevBills.map(bill => {
+                if (bill.month === currentMonth && !bill.is_locked) {
+                    const room = rooms.find(r => r.id === bill.room_id);
+                    if (!room) return bill;
+
+                    const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? newConfig.room_rent);
+                    const { electricityRate, waterConfig } = getEffectiveRates(room, newConfig);
+
+                    const calculation = calculateFullBill(
+                        bill.prev_elec,
+                        bill.curr_elec,
+                        bill.prev_water,
+                        bill.curr_water,
+                        newConfig,
+                        effectiveRent,
+                        room.tenant_count,
+                        electricityRate,
+                        waterConfig,
+                        [],
+                        room.common_fee_overrides,
+                        currentMonth
+                    );
+
+                    return {
+                        ...bill,
+                        elec_units: calculation.elec_units,
+                        elec_bill: calculation.elec_bill,
+                        water_units: calculation.water_units,
+                        water_bill: calculation.water_bill,
+                        water_flat_amount: calculation.water_flat_amount,
+                        water_excess_units: calculation.water_excess_units,
+                        water_excess_amount: calculation.water_excess_amount,
+                        room_rent: effectiveRent,
+                        common_fee: calculation.common_fee,
+                        applied_common_fees: calculation.applied_common_fees,
+                        total_bill: calculation.total_bill,
+                        updated_at: new Date().toISOString()
+                    };
+                }
+                return bill;
+            });
+            localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(updatedBills));
+            return updatedBills;
+        });
+    }, [rooms]);
 
     // Room operations
     const addRoom = useCallback((roomNumber: string) => {
