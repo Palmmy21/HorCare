@@ -314,8 +314,6 @@ export interface Expense {
 }
 
 // ─── Fines (ค่าปรับรายห้อง) ───────────────────────────────────────────────────
-export type FineStatus = 'unpaid' | 'paid';
-
 export interface Fine {
   id: string;
   room_id: string;
@@ -323,10 +321,20 @@ export interface Fine {
   reason: string;
   amount: number;
   date: string;
-  status: FineStatus;
+  status: PaymentStatus;
   note?: string;
   created_at: string;
   updated_at?: string;
+
+  // Slip tracking
+  slip_image?: boolean;
+  slip_amount?: number;
+  slip_ref?: string;
+  slip_sender?: string;
+  slip_submitted_at?: string;
+  verify_note?: string;
+  paid_at?: string;
+  paid_method?: 'auto' | 'manual';
 }
 
 // ─── Common Fees (ค่าบริการส่วนกลาง) ─────────────────────────────────────────

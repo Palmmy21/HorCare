@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Fine, FineStatus, Room } from '../../types';
+import type { Fine, PaymentStatus, Room } from '../../types';
+import toast from 'react-hot-toast';
 import { AlertTriangle, Plus, Edit2, Trash2, Check, X, Filter, MessageCircle, Loader2 } from 'lucide-react';
 import { auth } from '../../firebase/config';
 
@@ -39,9 +40,10 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<FineStatus | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<PaymentStatus | 'all'>('all');
   const [filterRoomId, setFilterRoomId] = useState('');
   const [sendingLineId, setSendingLineId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const activeRooms = rooms.filter(r => r.is_active !== false);
 
@@ -91,12 +93,10 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
     }
   };
 
-  const handleMarkPaid = async (fine: Fine) => {
-    await onUpdate(fine.id, { status: 'paid' });
-  };
-
-  const handleMarkUnpaid = async (fine: Fine) => {
-    await onUpdate(fine.id, { status: 'unpaid' });
+  const handleUpdateStatus = async (fineId: string, newStatus: Fine['status']) => {
+    setProcessingId(fineId);
+    await onUpdate(fineId, { status: newStatus });
+    setProcessingId(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -118,9 +118,9 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send LINE notification');
-      alert('ส่งแจ้งเตือนผ่าน LINE เรียบร้อยแล้ว');
+      toast.success('ส่งแจ้งเตือนผ่าน LINE เรียบร้อยแล้ว');
     } catch (e: any) {
-      alert(`ไม่สามารถส่ง LINE ได้: ${e.message}`);
+      toast.error(`ไม่สามารถส่ง LINE ได้: ${e.message}`);
     } finally {
       setSendingLineId(null);
     }
@@ -133,6 +133,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
   });
 
   const totalUnpaid = fines.filter(f => f.status === 'unpaid').reduce((s, f) => s + f.amount, 0);
+  const totalPending = fines.filter(f => f.status === 'pending').reduce((s, f) => s + f.amount, 0);
   const totalPaid = fines.filter(f => f.status === 'paid').reduce((s, f) => s + f.amount, 0);
 
   return (
@@ -150,6 +151,19 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
           </div>
           <div style={{ fontSize: '0.8125rem', opacity: 0.8, marginTop: '0.25rem' }}>
             {fines.filter(f => f.status === 'unpaid').length} รายการ
+          </div>
+        </div>
+        <div style={{
+          background: 'linear-gradient(135deg, #F59E0B, #D97706)',
+          borderRadius: '14px', padding: '1rem 1.25rem', color: '#fff',
+          boxShadow: '0 4px 12px rgba(245,158,11,0.2)'
+        }}>
+          <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.375rem' }}>รอตรวจสอบ</div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+            ฿{fmtBaht(totalPending)}
+          </div>
+          <div style={{ fontSize: '0.8125rem', opacity: 0.8, marginTop: '0.25rem' }}>
+            {fines.filter(f => f.status === 'pending').length} รายการ
           </div>
         </div>
         <div style={{
@@ -182,11 +196,12 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
         <select
           className="form-input"
           value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as FineStatus | 'all')}
+          onChange={e => setFilterStatus(e.target.value as PaymentStatus | 'all')}
           style={{ width: 'auto' }}
         >
           <option value="all">ทุกสถานะ</option>
           <option value="unpaid">ค้างชำระ</option>
+          <option value="pending">รอตรวจสอบ</option>
           <option value="paid">ชำระแล้ว</option>
         </select>
         <button className="btn btn-primary btn-sm" onClick={openAdd} style={{ flexShrink: 0 }}>
@@ -258,10 +273,11 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
               <select
                 className="form-input"
                 value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value as FineStatus }))}
+                onChange={e => setForm(f => ({ ...f, status: e.target.value as PaymentStatus }))}
                 style={{ marginTop: '0.375rem', width: '100%' }}
               >
                 <option value="unpaid">ค้างชำระ</option>
+                <option value="pending">รอตรวจสอบ</option>
                 <option value="paid">ชำระแล้ว</option>
               </select>
             </label>
@@ -319,7 +335,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
               className="card"
               style={{
                 padding: '0.875rem 1.125rem',
-                borderLeft: `4px solid ${fine.status === 'unpaid' ? '#EF4444' : '#10B981'}`,
+                borderLeft: `4px solid ${fine.status === 'unpaid' ? '#EF4444' : fine.status === 'pending' ? '#F59E0B' : '#10B981'}`,
               }}
             >
               {deleteId === fine.id ? (
@@ -353,11 +369,11 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
                         <span style={{
                           fontSize: '0.8125rem', fontWeight: 700,
                           padding: '0.25rem 0.625rem', borderRadius: '6px',
-                          background: fine.status === 'unpaid' ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.12)',
-                          color: fine.status === 'unpaid' ? '#DC2626' : '#059669',
-                          border: `1px solid ${fine.status === 'unpaid' ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                          background: fine.status === 'unpaid' ? 'rgba(239,68,68,0.12)' : fine.status === 'pending' ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)',
+                          color: fine.status === 'unpaid' ? '#DC2626' : fine.status === 'pending' ? '#D97706' : '#059669',
+                          border: `1px solid ${fine.status === 'unpaid' ? 'rgba(239,68,68,0.3)' : fine.status === 'pending' ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`,
                         }}>
-                          {fine.status === 'unpaid' ? 'ค้างชำระ' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Check size={14} /> ชำระแล้ว</span>}
+                          {fine.status === 'unpaid' ? 'ค้างชำระ' : fine.status === 'pending' ? 'รอตรวจสอบ' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Check size={14} /> ชำระแล้ว</span>}
                         </span>
                       </div>
                       <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)', marginBottom: '0.375rem' }}>
@@ -372,7 +388,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{
                         fontSize: '1.25rem', fontWeight: 800,
-                        color: fine.status === 'unpaid' ? '#DC2626' : '#059669',
+                        color: fine.status === 'unpaid' ? '#DC2626' : fine.status === 'pending' ? '#D97706' : '#059669',
                         fontFamily: 'monospace',
                       }}>
                         ฿{fmtBaht(fine.amount)}
@@ -385,7 +401,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
                     display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', 
                     borderTop: '1px solid var(--color-border)', paddingTop: '0.875rem' 
                   }}>
-                    {fine.status === 'unpaid' ? (
+                    {fine.status !== 'paid' ? (
                       <>
                         <button
                           className="btn btn-sm"
@@ -398,21 +414,23 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
                         </button>
                         <button
                           className="btn btn-sm"
-                          onClick={() => handleMarkPaid(fine)}
+                          onClick={() => handleUpdateStatus(fine.id, 'paid')}
+                          disabled={processingId === fine.id}
                           title="ทำเครื่องหมายว่าชำระแล้ว"
                           style={{ color: '#059669', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)' }}
                         >
-                          <Check size={15} /> ชำระแล้ว
+                          {processingId === fine.id ? <Loader2 size={15} className="spin" /> : <Check size={15} />} ชำระแล้ว
                         </button>
                       </>
                     ) : (
                       <button
                         className="btn btn-sm"
-                        onClick={() => handleMarkUnpaid(fine)}
+                        onClick={() => handleUpdateStatus(fine.id, 'unpaid')}
+                        disabled={processingId === fine.id}
                         title="ย้อนกลับเป็นค้างชำระ"
                         style={{ color: '#6B7280', background: 'rgba(107,114,128,0.08)', border: '1px solid rgba(107,114,128,0.2)' }}
                       >
-                        ยกเลิกการชำระ
+                        {processingId === fine.id ? <Loader2 size={15} className="spin" /> : 'ยกเลิกการชำระ'}
                       </button>
                     )}
                     <button className="btn btn-secondary btn-sm" onClick={() => openEdit(fine)} title="แก้ไข">

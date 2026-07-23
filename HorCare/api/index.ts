@@ -10,6 +10,7 @@ import remindBillsHandler from './_remind-bills.js';
 import sendLineBillsHandler from './_send-line-bills.js';
 import sendLineFineHandler from './_send-line-fine.js';
 import sendVerifyEmailHandler from './_send-verify-email.js';
+import uploadSlipHandler from './_upload-slip.js';
 
 // Apply the maximum duration config globally to this API gateway
 export const config = { maxDuration: 60 };
@@ -30,6 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'send-line-bills': return sendLineBillsHandler(req, res);
         case 'send-line-fine': return sendLineFineHandler(req, res);
         case 'send-verify-email': return sendVerifyEmailHandler(req, res);
+        case 'upload-slip': return uploadSlipHandler(req, res);
         default:
             res.status(404).json({ error: `API route not found: ${route}` });
             return;

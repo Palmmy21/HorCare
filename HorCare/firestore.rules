@@ -135,9 +135,10 @@ service cloud.firestore {
         match /expenses/{docId} {
           allow read, write: if isOwner(userId) && isNotBanned();
         }
-        // ── ค่าปรับ (owner only) ─────────────────────────────────────────
+        // ── ค่าปรับ (owner only + public read for portal) ─────────────────────
         match /fines/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read: if isOwner(userId) && isNotBanned() || true;
+          allow write: if isOwner(userId) && isNotBanned();
         }
         // ── ค่าบริการส่วนกลาง (owner only) ──────────────────────────────
         match /common_fees/{docId} {

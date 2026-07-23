@@ -215,6 +215,21 @@ async function getLatestSavedBill(
     return saved[0] ?? null;
 }
 
+async function getOldestUnpaidFine(
+    uid: string,
+    buildingId: string,
+    roomId: string,
+): Promise<FirebaseFirestore.QueryDocumentSnapshot | null> {
+    const snap = await db
+        .collection(`users/${uid}/buildings/${buildingId}/fines`)
+        .where('room_id', '==', roomId)
+        .get();
+    const unpaid = snap.docs
+        .filter(d => d.data().status !== 'paid')
+        .sort((a, b) => String(a.data().date).localeCompare(String(b.data().date)));
+    return unpaid[0] ?? null;
+}
+
 /** รับรหัสหอ HC-XXXXXX แล้วย้ายไป step รอเลขห้อง */
 async function handleDormCode(lineUserId: string, replyToken: string, dormCode: string) {
     const codeSnap = await db.collection('dorm_codes').doc(dormCode).get();
@@ -424,13 +439,22 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     }
 
     const bill = billDoc.data();
+    let targetDoc = billDoc;
+    let targetData = bill;
+    let isFine = false;
 
     if (bill.payment_status === 'paid') {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `✅ บิลห้อง ${room_number} รอบล่าสุดชำระเรียบร้อยแล้วค่ะ ขอบคุณค่ะ 🙏`,
-        }]);
-        return;
+        const fineDoc = await getOldestUnpaidFine(uid, building_id, room_id);
+        if (!fineDoc) {
+            await lineReply(replyToken, [{
+                type: 'text',
+                text: `✅ บิลห้อง ${room_number} รอบล่าสุดชำระเรียบร้อยแล้วค่ะ ขอบคุณค่ะ 🙏`,
+            }]);
+            return;
+        }
+        targetDoc = fineDoc;
+        targetData = fineDoc.data();
+        isFine = true;
     }
 
     // 3. โหลดรูปสลิปจาก LINE
@@ -454,7 +478,7 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
         const refDoc = db.doc(`users/${uid}/buildings/${building_id}/slip_refs/${fingerprint}`);
         try {
             await refDoc.create({
-                bill_id: billDoc.id,
+                bill_id: targetDoc.id,
                 room_id,
                 room_number,
                 created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -481,10 +505,10 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     // 6. ย่อ+เก็บภาพสลิปเป็น base64 ใน Firestore (ฟรี ไม่ต้องเปิด Storage) ให้เจ้าของเปิดดูบนเว็บ
     const dataUrl = await compressSlipToDataUrl(img.buffer);
     if (dataUrl) {
-        await db.doc(`users/${uid}/buildings/${building_id}/slip_images/${billDoc.id}`).set({
+        await db.doc(`users/${uid}/buildings/${building_id}/slip_images/${targetDoc.id}`).set({
             data_url: dataUrl,
             room_number,
-            bill_id: billDoc.id,
+            bill_id: targetDoc.id,
             created_at: admin.firestore.FieldValue.serverTimestamp(),
         });
     }
@@ -540,7 +564,8 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
                             const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
                             const parsed = JSON.parse(cleanJson);
                             geminiAmount = parsed.amount;
-                            if (typeof geminiAmount === 'number' && geminiAmount === bill.total_bill) {
+                            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
+                            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
                                 autoVerified = true;
                             }
                         } catch (e) {
@@ -557,14 +582,15 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     // 8. ตั้งเป็น "รอตรวจสอบ" ให้เจ้าของยืนยันยอด หรือ "จ่ายแล้ว" (ถ้าออโต้ผ่าน)
     const now = new Date().toISOString();
     const qrPassed = !!qr.payload;
+    const statusField = isFine ? 'status' : 'payment_status';
 
-    await billDoc.ref.update({
-        payment_status: autoVerified ? 'paid' : 'pending',
+    await targetDoc.ref.update({
+        [statusField]: autoVerified ? 'paid' : 'pending',
         slip_submitted_at: now,
-        ...(autoVerified ? { payment_date: now.split('T')[0] } : {}),
+        ...(autoVerified ? { paid_at: now, payment_date: now.split('T')[0] } : {}),
         ...(dataUrl ? { slip_image: true } : {}),
         ...(fingerprint ? { slip_ref: fingerprint.slice(0, 12) } : {}),
-        ...(geminiAmount !== null ? { slip_ai_amount: geminiAmount } : {}),
+        ...(geminiAmount !== null ? { slip_amount: geminiAmount, slip_ai_amount: geminiAmount } : {}),
         verify_note: autoVerified 
             ? 'อนุมัติอัตโนมัติด้วย AI (ยอดเงินตรง)'
             : qrPassed
@@ -575,7 +601,7 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     if (autoVerified) {
         await lineReply(replyToken, [{
             type: 'text',
-            text: `[ระบบอัตโนมัติ] ได้รับยอดชำระ ${geminiAmount} บาท เรียบร้อยแล้วค่ะ\n\nบิลของห้อง ${room_number} ถูกอัปเดตสถานะเป็น "จ่ายแล้ว" โดยอัตโนมัติ ขอบคุณค่ะ`,
+            text: `[ระบบอัตโนมัติ] ได้รับยอดชำระ ${geminiAmount} บาท เรียบร้อยแล้วค่ะ\n\nรายการของห้อง ${room_number} ถูกอัปเดตสถานะเป็น "จ่ายแล้ว" โดยอัตโนมัติ ขอบคุณค่ะ`,
         }]);
     } else {
         await lineReply(replyToken, [{

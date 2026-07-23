@@ -3,7 +3,7 @@ import {
   collection, doc, onSnapshot, query, where, addDoc, setDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import type { Room, DormConfig, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory } from '../../types';
+import type { Room, DormConfig, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory, Fine } from '../../types';
 import {
   Home, Zap, Droplets, Phone, ChevronDown, ChevronUp,
   CheckCircle2, XCircle, Clock, AlertCircle, Link2Off,
@@ -14,6 +14,7 @@ import {
 import horcareLogo from '../../assets/horcare_logo.png';
 import { QRCodeSVG } from 'qrcode.react';
 import generatePayload from 'promptpay-qr';
+import toast from 'react-hot-toast';
 
 // ── Image compression (canvas) ────────────────────────────────────────────────
 async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
@@ -102,11 +103,12 @@ interface PortalData {
   config: DormConfig | null;
   profile: TenantProfile | null;
   bills: MonthlyBill[];
+  fines: Fine[];
   buildingName: string;
 }
 
 function useTenantData(uid: string, buildingId: string, roomId: string) {
-  const [data, setData] = useState<PortalData>({ room: null, config: null, profile: null, bills: [], buildingName: '' });
+  const [data, setData] = useState<PortalData>({ room: null, config: null, profile: null, bills: [], fines: [], buildingName: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -143,7 +145,16 @@ function useTenantData(uid: string, buildingId: string, roomId: string) {
     const u5 = onSnapshot(doc(db, `users/${uid}/buildings`, buildingId),
       s => { if (s.exists()) setData(d => ({ ...d, buildingName: s.data().name ?? '' })); });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); };
+    const u6 = onSnapshot(
+      query(collection(db, basePath, 'fines'), where('room_id', '==', roomId)),
+      s => {
+        const allFines = s.docs.map(d => ({ ...d.data(), id: d.id } as Fine));
+        allFines.sort((a, b) => b.date.localeCompare(a.date));
+        setData(d => ({ ...d, fines: allFines }));
+      }
+    );
+
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
   }, [uid, buildingId, roomId, basePath]);
 
   return { data, loading, error };
@@ -172,7 +183,7 @@ function PaymentStatus({ status }: { status?: string }) {
 }
 
 // ── PromptPay QR ─────────────────────────────────────────────────────────────
-function PromptPayCard({ number, name, amount }: { number: string; name: string; amount: number }) {
+function PromptPayCard({ number, name, amount, title }: { number: string; name: string; amount: number; title?: string }) {
   return (
     <div style={{
       background: 'linear-gradient(135deg, #F0F9FF, #EFF6FF)',
@@ -180,7 +191,7 @@ function PromptPayCard({ number, name, amount }: { number: string; name: string;
       border: '1px solid #BFDBFE', textAlign: 'center',
     }}>
       <p style={{ fontSize: '0.8125rem', color: '#1D4ED8', margin: '0 0 0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}>
-        <CreditCard size={14} /> สแกน QR ชำระเงิน
+        <CreditCard size={14} /> {title || 'สแกน QR ชำระเงิน'}
       </p>
       <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', display: 'inline-block', margin: '0 auto' }}>
         <QRCodeSVG 
@@ -198,15 +209,69 @@ function PromptPayCard({ number, name, amount }: { number: string; name: string;
       <div style={{ marginTop: '0.875rem', fontWeight: 800, fontSize: '1.125rem', color: 'var(--color-gray-800)' }}>
         {fmtCurrency(amount)}
       </div>
-      <div style={{ fontSize: '0.775rem', color: 'var(--color-gray-500)', marginTop: '0.2rem' }}>{name} · {number}</div>
+      <div style={{ fontSize: '0.775rem', color: '#1D4ED8', marginTop: '0.2rem' }}>{name} · {number}</div>
+    </div>
+  );
+}
+
+// ── Slip Uploader ─────────────────────────────────────────────────────────────
+function SlipUploader({ uid, buildingId, roomId, itemId, itemType }: {
+  uid: string; buildingId: string; roomId: string; itemId: string; itemType: 'bill' | 'fine';
+}) {
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoading(true);
+    try {
+      const base64 = await compressImageToBase64(file);
+      const res = await fetch('/api/upload-slip?route=upload-slip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid, buildingId, roomId, itemId, itemType, base64 })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      
+      toast.success(data.autoVerified ? 'ชำระเงินเรียบร้อยแล้ว (ตรวจสอบอัตโนมัติ)' : 'ส่งสลิปเรียบร้อย รอเจ้าของหอตรวจสอบ');
+    } catch (err: any) {
+      toast.error(`อัปโหลดไม่สำเร็จ: ${err.message}`);
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} />
+      <button 
+        disabled={loading}
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          width: '100%', padding: '0.75rem', borderRadius: '12px',
+          background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+          color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.875rem',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+          opacity: loading ? 0.7 : 1
+        }}
+      >
+        {loading ? <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> : <Camera size={16} />}
+        {loading ? 'กำลังอัปโหลด...' : 'อัปโหลดสลิป'}
+      </button>
     </div>
   );
 }
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
-function BillCard({ bill, defaultOpen, promptpay }: {
-  bill: MonthlyBill; config?: DormConfig | null;
+function BillCard({ bill, defaultOpen, promptpay, portalIds }: {
+  bill: MonthlyBill;
   defaultOpen: boolean; promptpay: { number: string; name: string };
+  portalIds: { uid: string, buildingId: string, roomId: string };
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const isUnpaid = !bill.payment_status || bill.payment_status === 'unpaid';
@@ -305,6 +370,18 @@ function BillCard({ bill, defaultOpen, promptpay }: {
           {isUnpaid && promptpay.number && (
             <div style={{ marginTop: '1rem' }}>
               <PromptPayCard number={promptpay.number} name={promptpay.name} amount={bill.total_bill} />
+              <SlipUploader 
+                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId} 
+                itemId={bill.id} itemType="bill" 
+              />
+            </div>
+          )}
+
+          {/* Pending confirmation */}
+          {bill.payment_status === 'pending' && (
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#FEF9C3', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock size={16} color="#B45309" />
+              <span style={{ fontSize: '0.8125rem', color: '#92400E', fontWeight: 600 }}>รอเจ้าของหอพักตรวจสอบสลิป</span>
             </div>
           )}
 
@@ -315,6 +392,89 @@ function BillCard({ bill, defaultOpen, promptpay }: {
               <span style={{ fontSize: '0.8125rem', color: '#15803D', fontWeight: 600 }}>
                 ชำระแล้วเมื่อ {bill.paid_at ? new Date(bill.paid_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
                 {bill.paid_method === 'auto' ? ' (อัตโนมัติ)' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Fine Card ─────────────────────────────────────────────────────────────────
+function FineCard({ fine, promptpay, portalIds }: { fine: Fine; promptpay: { number: string; name: string }; portalIds: { uid: string, buildingId: string, roomId: string } }) {
+  const [open, setOpen] = useState(fine.status !== 'paid');
+  const isUnpaid = !fine.status || fine.status === 'unpaid';
+  const isPaid = fine.status === 'paid';
+
+  const accentColor = isPaid ? '#16A34A' : isUnpaid ? '#DC2626' : '#92400E';
+  const borderColor = isPaid ? '#BBF7D0' : isUnpaid ? '#FECACA' : '#FDE047';
+
+  return (
+    <div style={{
+      background: 'var(--color-white)', borderRadius: '16px',
+      border: `1.5px solid ${borderColor}`,
+      overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
+      marginTop: '0.75rem'
+    }}>
+      {/* Header row */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+          padding: '1rem 1.125rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+        }}
+      >
+        <div style={{ textAlign: 'left' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={15} color={accentColor} />
+            <span style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)' }}>ค่าปรับ: {fine.reason}</span>
+          </div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)', marginTop: '0.2rem' }}>
+            รวม {fmtCurrency(fine.amount)}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+          <PaymentStatus status={fine.status} />
+          {open ? <ChevronUp size={16} color="#9CA3AF" /> : <ChevronDown size={16} color="#9CA3AF" />}
+        </div>
+      </button>
+
+      {/* Expanded detail */}
+      {open && (
+        <div style={{ padding: '0 1.125rem 1.125rem', borderTop: '1px solid var(--color-gray-100)' }}>
+          <div style={{ marginTop: '0.875rem', fontSize: '0.875rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
+            <strong>วันที่:</strong> {new Date(fine.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}<br/>
+            {fine.note && <><strong style={{ color: '#DC2626' }}>หมายเหตุ:</strong> {fine.note}</>}
+          </div>
+
+          {/* QR for unpaid */}
+          {isUnpaid && promptpay.number && (
+            <div style={{ marginTop: '1rem' }}>
+              <PromptPayCard number={promptpay.number} name={promptpay.name} amount={fine.amount} title="สแกน QR ชำระค่าปรับ" />
+              <SlipUploader 
+                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId} 
+                itemId={fine.id} itemType="fine" 
+              />
+            </div>
+          )}
+
+          {/* Pending confirmation */}
+          {fine.status === 'pending' && (
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#FEF9C3', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock size={16} color="#B45309" />
+              <span style={{ fontSize: '0.8125rem', color: '#92400E', fontWeight: 600 }}>รอเจ้าของหอพักตรวจสอบสลิป</span>
+            </div>
+          )}
+
+          {/* Paid confirmation */}
+          {isPaid && (
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#F0FDF4', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CheckCircle2 size={16} color="#16A34A" />
+              <span style={{ fontSize: '0.8125rem', color: '#15803D', fontWeight: 600 }}>
+                ชำระแล้วเมื่อ {fine.paid_at ? new Date(fine.paid_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                {fine.paid_method === 'auto' ? ' (อัตโนมัติ)' : ''}
               </span>
             </div>
           )}
@@ -341,6 +501,8 @@ export default function TenantPortalPage() {
   const currentMonth = getCurrentMonth();
   const currentBill = bills.find(b => b.month === currentMonth);
   const prevBills = bills.filter(b => b.month !== currentMonth);
+  const pendingFines = data.fines.filter(f => f.status !== 'paid');
+  const paidFines = data.fines.filter(f => f.status === 'paid');
 
   const promptpay = {
     number: config?.bill_customization?.promptpay_number ?? '',
@@ -545,7 +707,7 @@ export default function TenantPortalPage() {
         <section>
           <SectionLabel icon={<Receipt size={14} />} label={`บิลเดือน ${fmtMonth(currentMonth)}`} />
           {currentBill ? (
-            <BillCard bill={currentBill} config={config} defaultOpen={true} promptpay={promptpay} />
+            <BillCard bill={currentBill} defaultOpen={true} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} />
           ) : (
             <div style={{
               background: 'var(--color-white)', borderRadius: '16px', padding: '1.5rem',
@@ -568,13 +730,28 @@ export default function TenantPortalPage() {
           </section>
         )}
 
-        {/* History */}
-        {prevBills.length > 0 && (
+        {/* Pending Fines */}
+        {pendingFines.length > 0 && (
           <section>
-            <SectionLabel icon={<CalendarDays size={14} />} label={`ประวัติบิล (${prevBills.length} เดือน)`} />
+            <SectionLabel icon={<AlertTriangle size={14} />} label={`ค่าปรับค้างชำระ (${pendingFines.length} รายการ)`} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              {pendingFines.map(f => (
+                <FineCard key={f.id} fine={f} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* History */}
+        {(prevBills.length > 0 || paidFines.length > 0) && (
+          <section>
+            <SectionLabel icon={<CalendarDays size={14} />} label={`ประวัติย้อนหลัง`} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              {paidFines.map(f => (
+                <FineCard key={f.id} fine={f} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} />
+              ))}
               {prevBills.map(b => (
-                <BillCard key={b.id} bill={b} config={config} defaultOpen={false} promptpay={promptpay} />
+                <BillCard key={b.id} bill={b} defaultOpen={false} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} />
               ))}
             </div>
           </section>

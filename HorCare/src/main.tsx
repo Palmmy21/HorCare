@@ -44,11 +44,14 @@ function Root() {
   return <App />;
 }
 
+import { Toaster } from 'react-hot-toast';
+
 // NOTE: StrictMode removed — React 18 StrictMode double-mounts effects in dev,
 // which causes Firebase listeners to cycle create→destroy→create faster than
 // Firestore's Watch stream can handle, triggering INTERNAL ASSERTION errors.
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
     <Root />
+    <Toaster position="top-center" toastOptions={{ duration: 4000, style: { background: '#333', color: '#fff', borderRadius: '12px', fontSize: '14px', fontWeight: 500 } }} />
   </ErrorBoundary>,
 )
