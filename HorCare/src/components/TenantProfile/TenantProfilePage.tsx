@@ -11,7 +11,7 @@ function useMobile(breakpoint = 640): boolean {
 }
 import {
   User, Calendar, Banknote,
-  Plus, Trash2, Edit2, Check, X,
+  Plus, Trash2, Edit2, Check, X, CheckCircle2,
   Clock, LogIn, LogOut, RefreshCw, FileText, Lock, Zap,
   Heart, GraduationCap, ClipboardList, AlertTriangle,
 } from 'lucide-react';
@@ -278,7 +278,7 @@ export default function TenantProfilePage({
                       <Field label="ชื่อ LINE">
                         {isEditing
                           ? <input className="form-input" value={form.line_display_name ?? ''} onChange={e => setForm(f => ({ ...f, line_display_name: e.target.value }))} placeholder="ชื่อที่แสดงใน LINE" />
-                          : <Value>{profile?.line_display_name || room.line_user_id ? '🟢 เชื่อมต่อแล้ว' : '—'}</Value>}
+                          : <Value>{profile?.line_display_name || room.line_user_id ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#10B981', fontWeight: 600 }}><CheckCircle2 size={13} /> เชื่อมต่อแล้ว</span> : '—'}</Value>}
                       </Field>
                       <Field label="อาชีพ / สถานศึกษา">
                         {isEditing

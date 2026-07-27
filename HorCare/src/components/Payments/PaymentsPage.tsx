@@ -444,7 +444,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                         {b.slip_submitted_at && (
                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 2, fontSize: '0.72rem', color: 'var(--color-gray-500)' }}>
                                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Receipt size={11} />ส่งสลิปแล้ว</span>
-                                                {b.slip_ref && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#059669', fontWeight: 700 }}><CheckCircle2 size={11} />QR ✓ ไม่ซ้ำ</span>}
+                                                {b.slip_ref && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#059669', fontWeight: 700 }}><CheckCircle2 size={11} />QR Verified</span>}
                                                 {b.slip_amount != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Banknote size={11} />฿{b.slip_amount.toLocaleString()}</span>}
                                                 {b.slip_sender && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><User size={11} />{b.slip_sender}</span>}
                                             </div>
