@@ -420,24 +420,26 @@ export default function Summary({
                                 : 'ดาวน์โหลดทุกห้อง'}
                         </button>
                         {uid && buildingId && config.dorm_code && (
-                            <button
-                                className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
-                                onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
-                                disabled={canSendLine && (lineStatus === 'sending' || remindStatus === 'sending')}
-                                style={canSendLine ? undefined : { opacity: 0.75 }}
-                            >
-                                {canSendLine ? <MessageCircle size={15} /> : <Lock size={15} />}
-                                {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
-                            </button>
-                            <button
-                                className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
-                                onClick={canSendLine ? handleRemindManualBills : () => setShowLineUpgradeModal(true)}
-                                disabled={canSendLine && (remindStatus === 'sending' || lineStatus === 'sending')}
-                                style={canSendLine ? { backgroundColor: '#EF4444', borderColor: '#EF4444' } : { opacity: 0.75 }}
-                            >
-                                {canSendLine ? <AlertTriangle size={15} /> : <Lock size={15} />}
-                                {remindStatus === 'sending' ? 'กำลังทวง...' : 'ทวงบิลค้างชำระ'}
-                            </button>
+                            <>
+                                <button
+                                    className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
+                                    onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
+                                    disabled={canSendLine && (lineStatus === 'sending' || remindStatus === 'sending')}
+                                    style={canSendLine ? undefined : { opacity: 0.75 }}
+                                >
+                                    {canSendLine ? <MessageCircle size={15} /> : <Lock size={15} />}
+                                    {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
+                                    onClick={canSendLine ? handleRemindManualBills : () => setShowLineUpgradeModal(true)}
+                                    disabled={canSendLine && (remindStatus === 'sending' || lineStatus === 'sending')}
+                                    style={canSendLine ? { backgroundColor: '#EF4444', borderColor: '#EF4444' } : { opacity: 0.75 }}
+                                >
+                                    {canSendLine ? <AlertTriangle size={15} /> : <Lock size={15} />}
+                                    {remindStatus === 'sending' ? 'กำลังทวง...' : 'ทวงบิลค้างชำระ'}
+                                </button>
+                            </>
                         )}
                         <button className="btn btn-primary btn-sm" onClick={() => setShowMonthlyReport(true)}>
                             <BarChart3 size={15} /> สรุปรายเดือน
