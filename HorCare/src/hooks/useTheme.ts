@@ -23,7 +23,8 @@ function applyMode(mode: ThemeMode) {
 export interface ThemePreset {
   id: string;
   name: string;
-  emoji: string;
+  icon: string;
+  emoji?: string;
   vars: Record<string, string>;
   swatch: string;
   swatchSecondary: string;
@@ -33,6 +34,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'default',
     name: 'Ocean Blue',
+    icon: 'Waves',
     emoji: '🌊',
     swatch: '#3B6ECD',
     swatchSecondary: '#5B8EEF',
@@ -49,6 +51,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'purple',
     name: 'Purple Night',
+    icon: 'Sparkles',
     emoji: '🔮',
     swatch: '#7C3AED',
     swatchSecondary: '#A78BFA',
@@ -65,6 +68,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'emerald',
     name: 'Emerald',
+    icon: 'Leaf',
     emoji: '🌿',
     swatch: '#059669',
     swatchSecondary: '#34D399',
@@ -81,6 +85,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'rose',
     name: 'Rose Gold',
+    icon: 'Flower2',
     emoji: '🌹',
     swatch: '#E11D48',
     swatchSecondary: '#FB7185',
@@ -97,6 +102,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'sunset',
     name: 'Sunset',
+    icon: 'Sun',
     emoji: '🌅',
     swatch: '#EA580C',
     swatchSecondary: '#FB923C',
@@ -113,6 +119,7 @@ export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'midnight',
     name: 'Midnight',
+    icon: 'Moon',
     emoji: '🌙',
     swatch: '#475569',
     swatchSecondary: '#94A3B8',

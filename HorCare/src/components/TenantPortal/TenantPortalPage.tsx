@@ -1120,8 +1120,8 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber }: {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               building_id: buildingId,
-              title: `🔧 แจ้งซ่อมใหม่ ห้อง ${roomNumber}`,
-              body: `[${catLabel}${form.urgency === 'urgent' ? ' ⚡ด่วน' : ''}] ${form.description.trim().slice(0, 80)}`,
+              title: `แจ้งซ่อมใหม่ ห้อง ${roomNumber}`,
+              body: `[${catLabel}${form.urgency === 'urgent' ? ' (ด่วน)' : ''}] ${form.description.trim().slice(0, 80)}`,
               url: '/',
             }),
           }).catch(() => { /* best-effort */ });

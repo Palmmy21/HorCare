@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2 } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Waves, Sparkles, Leaf, Flower2 } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeCanvas } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
@@ -1573,9 +1573,13 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                 </div>
                                 <div style={{
                                     padding: '0.5rem 0.625rem',
-                                    display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
                                 }}>
-                                    <span style={{ fontSize: '0.9rem' }}>{preset.emoji}</span>
+                                    {(() => {
+                                        const themeIconMap: Record<string, any> = { Waves, Sparkles, Leaf, Flower2, Sun, Moon };
+                                        const ThemeIconComp = themeIconMap[preset.icon] || Waves;
+                                        return <ThemeIconComp size={14} color={isActive ? preset.swatch : 'var(--color-gray-600)'} />;
+                                    })()}
                                     <span style={{
                                         fontSize: '0.8rem', fontWeight: isActive ? 700 : 500,
                                         color: isActive ? preset.swatch : 'var(--color-gray-700)',

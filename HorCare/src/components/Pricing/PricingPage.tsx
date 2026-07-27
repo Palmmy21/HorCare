@@ -321,8 +321,8 @@ const PLANS: Plan[] = [
             'ระบบจัดการ (สต็อก / ทรัพย์สิน / ค่าใช้จ่าย)',
             'หน้าจัดการการชำระเงิน',
             'Export PDF / สรุปยอดรายเดือน',
-            '❌ Multi-หอ',
-            '❌ ข้อมูลผู้เช่าเต็มรูปแบบ',
+            '[no] Multi-หอ',
+            '[no] ข้อมูลผู้เช่าเต็มรูปแบบ',
         ],
     },
     {
@@ -451,8 +451,8 @@ const PlanCard = memo(function PlanCard({
             }}>
                 {plan.features.map(f => {
                     const coming = f.startsWith('[soon]');
-                    const unavailable = !coming && f.startsWith('❌');
-                    const label = coming ? f.slice(7) : (unavailable ? f.slice(2) : f);
+                    const unavailable = !coming && (f.startsWith('[no]') || f.startsWith('❌'));
+                    const label = coming ? f.slice(7) : (f.startsWith('[no]') ? f.slice(5) : (f.startsWith('❌') ? f.slice(2) : f));
                     return (
                         <li key={f} style={{
                             display: 'flex', alignItems: 'flex-start',

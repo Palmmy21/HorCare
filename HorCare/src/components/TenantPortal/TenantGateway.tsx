@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import horcareLogo from '../../assets/horcare_logo.png';
-import { ClipboardList, AlertTriangle } from 'lucide-react';
+import { ClipboardList, AlertTriangle, Home, Smartphone } from 'lucide-react';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
