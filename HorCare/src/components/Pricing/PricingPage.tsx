@@ -309,7 +309,7 @@ interface Plan {
 const PLANS: Plan[] = [
     {
         id: 'small', name: 'Start', icon: Home, roomRange: 'สูงสุด 50 ห้อง · 1 หอ',
-        monthlyPrice: 79, yearlyPrice: 790, originalYearlyPrice: 948,
+        monthlyPrice: 149, yearlyPrice: 950, originalYearlyPrice: 1788,
         gradient: 'linear-gradient(135deg,#3B82F6,#6366F1)',
         glowColor: 'rgba(99,102,241,0.45)',
         features: [
@@ -327,7 +327,7 @@ const PLANS: Plan[] = [
     },
     {
         id: 'medium', name: 'Plus', icon: Building, roomRange: 'สูงสุด 150 ห้อง · 5 หอ',
-        monthlyPrice: 259, yearlyPrice: 1990, originalYearlyPrice: 3108,
+        monthlyPrice: 259, yearlyPrice: 1590, originalYearlyPrice: 3108,
         gradient: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
         glowColor: 'rgba(139,92,246,0.45)',
         popular: true,
@@ -513,6 +513,14 @@ const PlanCard = memo(function PlanCard({
                     )}
                 <Zap size={15} />
             </button>
+
+            {/* LINE Support Discount Note */}
+            <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.85)', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                <span style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem', color: '#10B981' }}>🎁 คุ้มกว่าเมื่อสมัครผ่าน LINE Support</span>
+                {plan.id === 'small' && 'เพียง ฿79/เดือน หรือ ฿790/ปี'}
+                {plan.id === 'medium' && 'เพียง ฿199/เดือน หรือ ฿1190/ปี'}
+                {plan.id === 'large' && 'เพียง ฿299/เดือน หรือ ฿1990/ปี'}
+            </div>
         </div>
     );
 });
