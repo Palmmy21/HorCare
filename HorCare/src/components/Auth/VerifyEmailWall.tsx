@@ -22,7 +22,7 @@ export default function VerifyEmailWall({ email, onResend, onRefresh, onLogout }
         setMsg(null);
         try {
             await onResend();
-            setMsg({ text: '📨 ส่งอีเมลยืนยันใหม่แล้ว — เช็กกล่องจดหมาย (รวมถึง Junk/Spam)', tone: 'ok' });
+            setMsg({ text: 'ส่งอีเมลยืนยันใหม่แล้ว — เช็กกล่องจดหมาย (รวมถึง Junk/Spam)', tone: 'ok' });
         } catch (e: unknown) {
             const code = (e as { code?: string }).code;
             setMsg({

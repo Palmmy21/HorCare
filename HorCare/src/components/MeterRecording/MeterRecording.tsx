@@ -778,7 +778,7 @@ export default function MeterRecording({
 
                     {/* Title */}
                     <div style={{ fontWeight: 800, fontSize: '1.125rem', color: '#fff', marginBottom: '0.25rem' }}>
-                        {bulkProgress.done ? '🎉 เสร็จสิ้น!' : 'กำลังบันทึก...'}
+                        {bulkProgress.done ? 'บันทึกเรียบร้อยแล้ว!' : 'กำลังบันทึก...'}
                     </div>
                     <div style={{ fontSize: '0.8125rem', color: 'rgba(165,180,252,0.7)', marginBottom: '1.5rem', minHeight: '1.3em' }}>
                         {bulkProgress.done

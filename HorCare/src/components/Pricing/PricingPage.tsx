@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import {
-    Check, Zap, Sparkles, Shield, Clock, CreditCard, X,
+    Check, Zap, Sparkles, Shield, Clock, CreditCard, X, Gift, Heart,
     ChevronLeft, Infinity as InfinityIcon,
     Home, Building, Building2, Package, PartyPopper, QrCode,
 } from 'lucide-react';
@@ -525,7 +525,9 @@ const PlanCard = memo(function PlanCard({
                     onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'; }}
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'; }}
                 >
-                    <span style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem', color: '#10B981' }}>🎁 คุ้มกว่าเมื่อสมัครผ่าน LINE Support</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600, marginBottom: '0.25rem', color: '#10B981' }}>
+                        <Gift size={14} /> คุ้มกว่าเมื่อสมัครผ่าน LINE Support
+                    </span>
                     {plan.id === 'small' && 'เพียง ฿79/เดือน หรือ ฿790/ปี'}
                     {plan.id === 'medium' && 'เพียง ฿199/เดือน หรือ ฿1190/ปี'}
                     {plan.id === 'large' && 'เพียง ฿299/เดือน หรือ ฿1990/ปี'}
@@ -621,8 +623,8 @@ function SuccessScreen({ plan, cycle, onBack }: { plan: Plan; cycle: BillingCycl
                 อัปเกรดเป็นแผน <strong style={{ color: '#fff' }}>{plan.name}</strong>{' '}
                 ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'}) เรียบร้อยแล้ว
             </p>
-            <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '0.8rem', marginBottom: '2rem' }}>
-                ขอบคุณที่อุดหนุน HorCare 💜
+            <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '0.8rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                ขอบคุณที่อุดหนุน HorCare <Heart size={13} color="#EC4899" fill="#EC4899" />
             </p>
             <button onClick={onBack} style={{
                 background: 'linear-gradient(135deg,#10B981,#059669)',

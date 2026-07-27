@@ -10,7 +10,7 @@ import {
   Building2, CalendarDays, CreditCard, Receipt,
   Wrench, Plus, AlertTriangle, Plug, Wind, DoorOpen,
   Bath, Armchair, Send, Pencil, Camera, X as XIcon,
-  User, Save, Heart,
+  User, Save, Heart, Lock,
 } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
 import { QRCodeSVG } from 'qrcode.react';
@@ -811,7 +811,7 @@ export default function TenantPortalPage() {
           width: '100%', maxWidth: 340, textAlign: 'center',
           animation: pinError ? 'shake 0.4s ease' : 'none',
         }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔒</div>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}><Lock size={26} color="#fff" /></div>
           <h2 style={{ fontWeight: 800, color: '#fff', margin: '0 0 0.375rem', fontSize: '1.25rem' }}>ยืนยันตัวตน</h2>
           <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.875rem', margin: '0 0 1.5rem' }}>กรอก PIN 4 หลักที่ได้รับจากเจ้าของหอพัก</p>
           <input

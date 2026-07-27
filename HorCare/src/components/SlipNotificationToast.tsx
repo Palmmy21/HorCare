@@ -143,7 +143,7 @@ export default function SlipNotificationToast({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>
-                {isSlip ? '💳 ได้รับสลิปใหม่' : `🔧 แจ้งซ่อมใหม่${toast.urgency === 'urgent' ? ' ⚡ด่วน' : ''}`}
+                {isSlip ? 'ได้รับสลิปใหม่' : `แจ้งซ่อมใหม่${toast.urgency === 'urgent' ? ' (ด่วน!)' : ''}`}
               </div>
               <div style={{ fontSize: '0.8125rem', color: '#555', marginTop: 2 }}>
                 ห้อง <strong>{toast.roomNumber}</strong>

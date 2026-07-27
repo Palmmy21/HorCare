@@ -116,7 +116,7 @@ export default function TenantGateway() {
       <div style={cardStyle}>
         <img src={horcareLogo} alt="HorCare" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: '1.75rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
         <div style={boxStyle}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🏠</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', color: '#fff' }}><Home size={40} /></div>
           <h2 style={{ fontWeight: 800, color: '#fff', margin: '0 0 0.375rem', fontSize: '1.25rem' }}>พบข้อมูลแล้ว!</h2>
           {state.dormName && (
             <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.875rem', margin: '0 0 0.25rem' }}>{state.dormName}</p>
@@ -168,7 +168,7 @@ export default function TenantGateway() {
       <div style={cardStyle}>
         <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
         <div style={boxStyle}>
-          <div style={{ fontSize: '2.25rem', marginBottom: '0.75rem' }}>📱</div>
+          <div style={{ marginBottom: '0.75rem', color: '#fff' }}><Smartphone size={40} /></div>
           <h2 style={{ fontWeight: 800, color: '#fff', margin: '0 0 0.5rem', fontSize: '1.2rem' }}>เปิดใน LINE</h2>
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.875rem', lineHeight: 1.65, margin: 0 }}>
             กรุณาเปิดหน้านี้ผ่าน LINE<br />

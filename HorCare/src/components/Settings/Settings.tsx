@@ -615,7 +615,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                 color: verifyStatus === 'error' ? '#DC2626' : '#059669',
                                 fontWeight: 500,
                             }}>
-                                {verifyStatus === 'sent' && '📨 '}{verifyMsg}
+                                {verifyMsg}
                             </div>
                         )}
                     </div>
@@ -1751,8 +1751,8 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     บันทึกการตั้งค่า
                 </button>
                 {saved && (
-                    <div className="text-success font-bold" style={{ marginTop: 'var(--space-3)', fontSize: '1rem' }}>
-                        ✓ บันทึกเรียบร้อยแล้ว!
+                    <div className="text-success font-bold" style={{ marginTop: 'var(--space-3)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Check size={16} /> บันทึกเรียบร้อยแล้ว!
                     </div>
                 )}
             </div>
