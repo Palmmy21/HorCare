@@ -105,34 +105,34 @@ async function getDefaultMenuId() {
     });
     console.log('');
 
-    // ── 4. Clone areas แล้วเปลี่ยนเฉพาะปุ่ม "ดูบิล" ─────────────
-    // ค้นหาปุ่มที่มี text = "บิล" หรือ label = "ดูบิล"
+    // ── 4. Clone areas แล้วเปลี่ยนเฉพาะปุ่ม "ตรวจสอบอายุแพ็กเกจ" ──────
+    // ค้นหาปุ่มที่มี text = "ตรวจสอบอายุแพ็กเกจ"
     let replaced = 0;
     const newAreas = oldMenu.areas.map(area => {
       const a = area.action;
-      const isViewBill =
-        (a.type === 'message' && (a.text === 'บิล' || a.text === 'ดูบิล')) ||
-        (a.label === 'ดูบิล');
+      const isTarget =
+        (a.type === 'message' && (a.text === 'ตรวจสอบอายุแพ็กเกจ' || a.text === 'ดูบิล' || a.text === 'บิล')) ||
+        (a.label === 'ตรวจสอบอายุแพ็กเกจ' || a.label === 'ดูบิล');
 
-      if (!isViewBill) return area;
+      if (!isTarget) return area;
 
       replaced++;
       return {
         ...area,
         action: {
           type: 'message',
-          label: 'พอร์ทัล',
-          text: 'พอร์ทัล',
+          label: 'ตรวจสอบแพ็กเกจ',
+          text: 'ตรวจสอบแพ็กเกจ',
         },
       };
     });
 
     if (replaced === 0) {
-      console.warn('⚠️  ไม่พบปุ่ม "ดูบิล" (text="บิล"/"ดูบิล" หรือ label="ดูบิล") ใน menu นี้');
-      console.warn('   ตรวจสอบ areas ข้างต้น แล้วแก้ไขเงื่อนไขใน script ตรง isViewBill\n');
+      console.warn('⚠️  ไม่พบปุ่ม "ตรวจสอบอายุแพ็กเกจ" หรือ "ดูบิล" ใน menu นี้');
+      console.warn('   ตรวจสอบ areas ข้างต้น แล้วแก้ไขเงื่อนไขใน script ตรง isTarget\n');
       process.exit(1);
     }
-    console.log(`🔄 เปลี่ยนปุ่ม "ดูบิล" → "พอร์ทัล" (${replaced} ปุ่ม)\n`);
+    console.log(`🔄 เปลี่ยนปุ่ม → "ตรวจสอบแพ็กเกจ" (${replaced} ปุ่ม)\n`);
 
     // ── 5. ดาวน์โหลดภาพเดิม ──────────────────────────────────────
     console.log('🖼  ดาวน์โหลดภาพ rich menu เดิม...');
@@ -170,8 +170,8 @@ async function getDefaultMenuId() {
     await lineAPI('DELETE', `/richmenu/${targetId}`);
     console.log(`🗑  ลบ menu เก่า (${targetId}) แล้ว`);
 
-    console.log('\n🎉 เสร็จสิ้น! ปุ่ม "ดูบิล" ถูกเปลี่ยนเป็น "พอร์ทัล" แล้ว');
-    console.log('   ลูกหอกดปุ่ม → bot ตอบลิงก์พอร์ทัลส่วนตัวพร้อมปุ่มเปิดได้เลย');
+    console.log('\n🎉 เสร็จสิ้น! ปุ่มถูกเปลี่ยนเป็น "ตรวจสอบแพ็กเกจ" แล้ว');
+    console.log('   ผู้ใช้กดปุ่ม → bot แสดงสถานะแพ็กเกจ / ราคาแพ็กเกจ');
   } catch (err) {
     console.error('\n❌ เกิดข้อผิดพลาด:', err.message);
     if (err.body) console.error('   Detail:', JSON.stringify(err.body, null, 2));

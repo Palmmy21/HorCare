@@ -514,13 +514,24 @@ const PlanCard = memo(function PlanCard({
                 <Zap size={15} />
             </button>
 
-            {/* LINE Support Discount Note */}
-            <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.85)', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                <span style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem', color: '#10B981' }}>🎁 คุ้มกว่าเมื่อสมัครผ่าน LINE Support</span>
-                {plan.id === 'small' && 'เพียง ฿79/เดือน หรือ ฿790/ปี'}
-                {plan.id === 'medium' && 'เพียง ฿199/เดือน หรือ ฿1190/ปี'}
-                {plan.id === 'large' && 'เพียง ฿299/เดือน หรือ ฿1990/ปี'}
-            </div>
+            {/* LINE Support Discount Note – clickable link to LINE chat with pre-filled "สมัคร" */}
+            <a
+                href={`https://line.me/R/oaMessage/${encodeURIComponent('@127qwwfi')}/?${encodeURIComponent('สมัคร')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none', display: 'block', marginTop: '1rem' }}
+            >
+                <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.85)', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'; }}
+                >
+                    <span style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem', color: '#10B981' }}>🎁 คุ้มกว่าเมื่อสมัครผ่าน LINE Support</span>
+                    {plan.id === 'small' && 'เพียง ฿79/เดือน หรือ ฿790/ปี'}
+                    {plan.id === 'medium' && 'เพียง ฿199/เดือน หรือ ฿1190/ปี'}
+                    {plan.id === 'large' && 'เพียง ฿299/เดือน หรือ ฿1990/ปี'}
+                    <span style={{ display: 'block', fontSize: '0.7rem', marginTop: '0.375rem', color: 'rgba(255,255,255,0.5)' }}>แตะเพื่อสมัครผ่าน LINE ▸</span>
+                </div>
+            </a>
         </div>
     );
 });

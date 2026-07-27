@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  collection, doc, onSnapshot, query, where, addDoc, setDoc,
+  collection, doc, onSnapshot, query, where, addDoc, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import type { Room, DormConfig, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory, Fine } from '../../types';
@@ -10,6 +10,7 @@ import {
   Building2, CalendarDays, CreditCard, Receipt,
   Wrench, Plus, AlertTriangle, Plug, Wind, DoorOpen,
   Bath, Armchair, Send, Pencil, Camera, X as XIcon,
+  User, Save, Heart,
 } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
 import { QRCodeSVG } from 'qrcode.react';
@@ -484,6 +485,244 @@ function FineCard({ fine, promptpay, portalIds }: { fine: Fine; promptpay: { num
   );
 }
 
+// ── Tenant Profile Section (self-service personal info) ──────────────────────
+function TenantProfileSection({ uid, buildingId, roomId, profile }: {
+  uid: string; buildingId: string; roomId: string; profile: TenantProfile | null;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    full_name: '', nickname: '', phone: '', occupation: '',
+    emergency_name: '', emergency_phone: '', emergency_relation: '',
+  });
+
+  // Sync form with profile
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        full_name: profile.full_name ?? '',
+        nickname: profile.nickname ?? '',
+        phone: profile.phone ?? '',
+        occupation: profile.occupation ?? '',
+        emergency_name: profile.emergency_name ?? '',
+        emergency_phone: profile.emergency_phone ?? '',
+        emergency_relation: profile.emergency_relation ?? '',
+      });
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const ref = doc(db, `users/${uid}/buildings/${buildingId}/tenants`, roomId);
+      const now = new Date().toISOString();
+      const payload = {
+        full_name: form.full_name.trim(),
+        nickname: form.nickname.trim(),
+        phone: form.phone.trim(),
+        occupation: form.occupation.trim(),
+        emergency_name: form.emergency_name.trim(),
+        emergency_phone: form.emergency_phone.trim(),
+        emergency_relation: form.emergency_relation.trim(),
+        updated_at: now,
+      };
+      if (profile) {
+        await updateDoc(ref, payload);
+      } else {
+        await setDoc(ref, {
+          ...payload,
+          id: roomId,
+          room_id: roomId,
+          building_id: buildingId,
+          created_at: now,
+        });
+      }
+      toast.success('บันทึกข้อมูลเรียบร้อยแล้ว');
+      setEditing(false);
+    } catch {
+      toast.error('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasData = profile?.full_name || profile?.phone;
+
+  const inputStyle = {
+    width: '100%', padding: '0.625rem 0.75rem', borderRadius: '10px',
+    border: '1.5px solid var(--color-gray-200)', fontSize: '0.875rem',
+    fontFamily: "'Sarabun', sans-serif", background: 'var(--color-white)',
+    outline: 'none', boxSizing: 'border-box' as const,
+    transition: 'border-color 0.15s',
+  };
+  const labelStyle = {
+    fontSize: '0.75rem', fontWeight: 600 as const, color: 'var(--color-gray-500)',
+    marginBottom: '0.25rem', display: 'block' as const,
+  };
+  const valueStyle = {
+    fontSize: '0.875rem', color: 'var(--color-gray-800)', fontWeight: 600 as const,
+  };
+
+  return (
+    <div style={{
+      background: 'var(--color-white)', borderRadius: '16px', padding: '1.25rem',
+      border: '1px solid var(--color-gray-200)', boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: editing ? '1rem' : hasData ? '0.875rem' : '0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <User size={16} color="#fff" />
+          </div>
+          <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-gray-800)' }}>ข้อมูลส่วนตัว</span>
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            style={{
+              background: 'var(--color-gray-100)', border: '1px solid var(--color-gray-200)',
+              borderRadius: '8px', padding: '0.35rem 0.75rem',
+              fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-gray-600)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',
+              transition: 'all 0.15s',
+            }}
+          >
+            <Pencil size={12} /> {hasData ? 'แก้ไข' : 'เพิ่มข้อมูล'}
+          </button>
+        )}
+      </div>
+
+      {/* View Mode */}
+      {!editing && hasData && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          {profile?.full_name && (
+            <div><span style={labelStyle}>ชื่อ-นามสกุล</span><span style={valueStyle}>{profile.full_name}</span></div>
+          )}
+          {profile?.nickname && (
+            <div><span style={labelStyle}>ชื่อเล่น</span><span style={valueStyle}>{profile.nickname}</span></div>
+          )}
+          {profile?.phone && (
+            <div><span style={labelStyle}>เบอร์โทร</span><span style={valueStyle}>{profile.phone}</span></div>
+          )}
+          {profile?.occupation && (
+            <div><span style={labelStyle}>อาชีพ</span><span style={valueStyle}>{profile.occupation}</span></div>
+          )}
+          {(profile?.emergency_name || profile?.emergency_phone) && (
+            <div style={{ gridColumn: '1 / -1', marginTop: '0.25rem', padding: '0.625rem', background: '#FEF2F2', borderRadius: '10px', border: '1px solid #FECACA' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.375rem' }}>
+                <Heart size={12} color="#DC2626" />
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#DC2626' }}>ผู้ติดต่อฉุกเฉิน</span>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                {profile?.emergency_name && <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-700)' }}>{profile.emergency_name}{profile?.emergency_relation ? ` (${profile.emergency_relation})` : ''}</span>}
+                {profile?.emergency_phone && <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-700)' }}><Phone size={11} style={{ verticalAlign: '-1px' }} /> {profile.emergency_phone}</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!editing && !hasData && (
+        <div style={{ textAlign: 'center', padding: '0.75rem 0 0.25rem', color: 'var(--color-gray-400)', fontSize: '0.8125rem' }}>
+          ยังไม่มีข้อมูลส่วนตัว กดปุ่ม "เพิ่มข้อมูล" เพื่อเริ่มต้น
+        </div>
+      )}
+
+      {/* Edit Mode */}
+      {editing && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div>
+            <label style={labelStyle}>ชื่อ-นามสกุล *</label>
+            <input style={inputStyle} placeholder="เช่น สมชาย ใจดี" value={form.full_name}
+              onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={labelStyle}>ชื่อเล่น</label>
+              <input style={inputStyle} placeholder="เช่น ชาย" value={form.nickname}
+                onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>เบอร์โทรศัพท์ *</label>
+              <input style={inputStyle} type="tel" placeholder="08x-xxx-xxxx" value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>อาชีพ</label>
+            <input style={inputStyle} placeholder="เช่น นักศึกษา, พนักงานบริษัท" value={form.occupation}
+              onChange={e => setForm(f => ({ ...f, occupation: e.target.value }))} />
+          </div>
+
+          {/* Emergency contact */}
+          <div style={{ padding: '0.875rem', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.625rem' }}>
+              <Heart size={13} color="#DC2626" />
+              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#DC2626' }}>ผู้ติดต่อฉุกเฉิน</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
+                <div>
+                  <label style={labelStyle}>ชื่อผู้ติดต่อ</label>
+                  <input style={{ ...inputStyle, background: '#fff' }} placeholder="เช่น คุณแม่" value={form.emergency_name}
+                    onChange={e => setForm(f => ({ ...f, emergency_name: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={labelStyle}>ความสัมพันธ์</label>
+                  <input style={{ ...inputStyle, background: '#fff' }} placeholder="เช่น แม่, พ่อ" value={form.emergency_relation}
+                    onChange={e => setForm(f => ({ ...f, emergency_relation: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>เบอร์โทรฉุกเฉิน</label>
+                <input style={{ ...inputStyle, background: '#fff' }} type="tel" placeholder="08x-xxx-xxxx" value={form.emergency_phone}
+                  onChange={e => setForm(f => ({ ...f, emergency_phone: e.target.value }))} />
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+            <button
+              onClick={() => { setEditing(false); if (profile) setForm({ full_name: profile.full_name ?? '', nickname: profile.nickname ?? '', phone: profile.phone ?? '', occupation: profile.occupation ?? '', emergency_name: profile.emergency_name ?? '', emergency_phone: profile.emergency_phone ?? '', emergency_relation: profile.emergency_relation ?? '' }); }}
+              style={{
+                flex: 1, padding: '0.75rem', borderRadius: '12px',
+                border: '1.5px solid var(--color-gray-200)', background: 'var(--color-white)',
+                fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-gray-600)',
+                cursor: 'pointer',
+              }}
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !form.full_name.trim() || !form.phone.trim()}
+              style={{
+                flex: 2, padding: '0.75rem', borderRadius: '12px', border: 'none',
+                background: saving || !form.full_name.trim() || !form.phone.trim()
+                  ? 'var(--color-gray-300)'
+                  : 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+                color: '#fff', fontWeight: 700, fontSize: '0.875rem',
+                cursor: saving || !form.full_name.trim() || !form.phone.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              }}
+            >
+              {saving
+                ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />บันทึก...</>
+                : <><Save size={15} />บันทึกข้อมูล</>}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function TenantPortalPage() {
   const params = new URLSearchParams(window.location.search);
@@ -702,6 +941,12 @@ export default function TenantPortalPage() {
 
       {/* ── Bills section ── */}
       <div style={{ padding: '0 1rem 2.5rem', marginTop: '0' }}>
+
+        {/* Personal info */}
+        <section>
+          <SectionLabel icon={<User size={14} />} label="ข้อมูลส่วนตัว" />
+          <TenantProfileSection uid={uid} buildingId={buildingId} roomId={roomId} profile={profile} />
+        </section>
 
         {/* Current month */}
         <section>
