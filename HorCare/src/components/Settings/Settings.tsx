@@ -8,6 +8,7 @@ import type { DormConfig, WaterConfig } from '../../types';
 import { generateDormCode } from '../../utils/calculations';
 import { THEME_PRESETS } from '../../hooks/useTheme';
 import type { ThemeMode } from '../../hooks/useTheme';
+import { toast } from 'react-hot-toast';
 
 async function compressLogoToBase64(file: File, maxPx = 400, quality = 0.85): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -550,14 +551,14 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     }}>
                         <div>
                             <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Owner ID (รหัสเจ้าของหอ)</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <div className="mono" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-primary-700)' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                <div className="mono" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-primary-700)', wordBreak: 'break-all' }}>
                                     {uid}
                                 </div>
                                 <button
                                     onClick={() => {
-                                        navigator.clipboard.writeText(uid);
-                                        alert('คัดลอก Owner ID เรียบร้อยแล้ว');
+                                        navigator.clipboard.writeText(uid || '');
+                                        toast.success('คัดลอก Owner ID เรียบร้อยแล้ว');
                                     }}
                                     style={{
                                         background: 'none', border: 'none', cursor: 'pointer',
