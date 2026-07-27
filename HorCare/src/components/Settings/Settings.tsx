@@ -38,6 +38,7 @@ interface SettingsProps {
     onRefreshEmailVerified: () => Promise<boolean>;
     isPaid?: boolean;
     onUpgrade?: () => void;
+    uid?: string;
 }
 
 const BUILDING_TYPES = [
@@ -133,7 +134,7 @@ const BUILDING_TYPES = [
     },
 ];
 
-export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade }: SettingsProps) {
+export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid }: SettingsProps) {
     const [activeTab, setActiveTab] = useState<'general' | 'billing' | 'integrations' | 'account'>('general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
@@ -528,6 +529,57 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     );
                 })}
             </div>
+
+            {/* ── Account Info (Owner ID) ── */}
+            {activeTab === 'account' && uid && (
+                <div className="card mb-6">
+                    <div className="card-header">
+                        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <ShieldCheck size={18} /> ข้อมูลบัญชีผู้ใช้
+                        </h2>
+                        <p className="card-subtitle">ข้อมูลประจำตัวสำหรับยืนยันสิทธิ์กับ LINE Support</p>
+                    </div>
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '1rem',
+                        background: 'var(--color-gray-50)',
+                        padding: '1.25rem',
+                        borderRadius: '12px',
+                        border: '1px solid var(--color-gray-200)',
+                    }}>
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Owner ID (รหัสเจ้าของหอ)</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div className="mono" style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-primary-700)' }}>
+                                    {uid}
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(uid);
+                                        alert('คัดลอก Owner ID เรียบร้อยแล้ว');
+                                    }}
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'var(--color-primary-500)', display: 'flex', alignItems: 'center', padding: '0.25rem'
+                                    }}
+                                    title="คัดลอก Owner ID"
+                                >
+                                    <Copy size={16} />
+                                </button>
+                            </div>
+                            <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)', marginTop: '0.25rem' }}>
+                                โปรดแจ้งรหัสนี้แก่ทีม Support เพื่อความรวดเร็วในการให้บริการ
+                            </div>
+                        </div>
+                        <div style={{ borderTop: '1px dashed var(--color-gray-200)' }}></div>
+                        <div>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-gray-500)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Email</div>
+                            <div style={{ fontSize: '0.9375rem', color: 'var(--color-gray-800)' }}>{userEmail}</div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Email Verification Banner ── */}
             {activeTab === 'account' && !emailVerified && (

@@ -53,6 +53,8 @@ export default function Summary({
     const [isSending, setIsSending] = useState(false);
     const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
     const [lineResult, setLineResult] = useState<{ sent: number; skipped: number; message?: string; results?: string[] } | null>(null);
+    const [remindStatus, setRemindStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+    const [remindResult, setRemindResult] = useState<{ sent: number; skipped: number; message?: string; results?: string[] } | null>(null);
     const [showLineUpgradeModal, setShowLineUpgradeModal] = useState(false);
     const [billDate, setBillDate] = useState(() => {
         const now = new Date();
@@ -114,6 +116,39 @@ export default function Summary({
             console.error('Send LINE bills error:', error);
             setLineStatus('error');
             alert(`ส่งบิลไม่สำเร็จ: ${(error as Error).message}`);
+        }
+    };
+
+    const handleRemindManualBills = async () => {
+        if (!uid || !buildingId) return;
+        setRemindStatus('sending');
+        setRemindResult(null);
+        try {
+            const { getAuth } = await import('firebase/auth');
+            const auth = getAuth(app);
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) throw new Error('Not authenticated');
+
+            const res = await fetch('/api/remind-manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    building_id: buildingId,
+                    month: currentMonth
+                })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+            setRemindResult(json.data);
+            setRemindStatus('done');
+        } catch (error) {
+            console.error('Manual remind LINE bills error:', error);
+            setRemindStatus('error');
+            alert(`ทวงบิลไม่สำเร็จ: ${(error as Error).message}`);
         }
     };
 
@@ -388,11 +423,20 @@ export default function Summary({
                             <button
                                 className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
                                 onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
-                                disabled={canSendLine && lineStatus === 'sending'}
+                                disabled={canSendLine && (lineStatus === 'sending' || remindStatus === 'sending')}
                                 style={canSendLine ? undefined : { opacity: 0.75 }}
                             >
                                 {canSendLine ? <MessageCircle size={15} /> : <Lock size={15} />}
                                 {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
+                            </button>
+                            <button
+                                className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
+                                onClick={canSendLine ? handleRemindManualBills : () => setShowLineUpgradeModal(true)}
+                                disabled={canSendLine && (remindStatus === 'sending' || lineStatus === 'sending')}
+                                style={canSendLine ? { backgroundColor: '#EF4444', borderColor: '#EF4444' } : { opacity: 0.75 }}
+                            >
+                                {canSendLine ? <AlertTriangle size={15} /> : <Lock size={15} />}
+                                {remindStatus === 'sending' ? 'กำลังทวง...' : 'ทวงบิลค้างชำระ'}
                             </button>
                         )}
                         <button className="btn btn-primary btn-sm" onClick={() => setShowMonthlyReport(true)}>
@@ -415,7 +459,23 @@ export default function Summary({
                     )}
                     {lineStatus === 'error' && (
                         <div className="line-send-result error">
-                            <XCircle size={14} /> เกิดข้อผิดพลาด กรุณาลองใหม่
+                            <XCircle size={14} /> เกิดข้อผิดพลาดในการส่งบิล กรุณาลองใหม่
+                        </div>
+                    )}
+                    {remindStatus === 'done' && remindResult && (
+                        <div className="line-send-result success">
+                            <CheckCircle size={14} />
+                            ทวงบิลสำเร็จ {remindResult.sent} ห้อง
+                            {remindResult.skipped > 0 && ` · ข้าม ${remindResult.skipped} ห้อง`}
+                            {remindResult.message && ` · ${remindResult.message}`}
+                            {remindResult.results && remindResult.results.length > 0 && (
+                                <span style={{ fontSize: '0.72rem', opacity: 0.85 }}> · {remindResult.results.join(' · ')}</span>
+                            )}
+                        </div>
+                    )}
+                    {remindStatus === 'error' && (
+                        <div className="line-send-result error">
+                            <XCircle size={14} /> เกิดข้อผิดพลาดในการทวงบิล กรุณาลองใหม่
                         </div>
                     )}
                     {canSendLine && unlinkedLineCount > 0 && lineStatus === 'idle' && (

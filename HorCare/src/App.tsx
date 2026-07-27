@@ -1024,6 +1024,7 @@ function App() {
             onRefreshEmailVerified={refreshEmailVerified}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
+            uid={user?.uid}
           />
         )}
 

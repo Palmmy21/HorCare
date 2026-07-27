@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const AMOUNTS: Record<string, number> = {
             monthly_small:  79,  yearly_small:  790,
             monthly_medium: 259, yearly_medium: 1990,
-            monthly_large:  399, yearly_large:  3990,
+            monthly_large:  399, yearly_large:  2590,
         };
 
         const amount = AMOUNTS[licenseKey];

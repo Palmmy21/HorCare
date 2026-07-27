@@ -345,7 +345,7 @@ const PLANS: Plan[] = [
     },
     {
         id: 'large', name: 'Pro', icon: Building2, roomRange: 'ไม่จำกัดห้อง · 10 หอ',
-        monthlyPrice: 399, yearlyPrice: 3990, originalYearlyPrice: 4788,
+        monthlyPrice: 399, yearlyPrice: 2590, originalYearlyPrice: 4788,
         gradient: 'linear-gradient(135deg,#F59E0B,#EF4444)',
         glowColor: 'rgba(245,158,11,0.45)',
         features: [

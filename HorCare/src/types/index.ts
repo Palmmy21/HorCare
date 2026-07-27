@@ -29,6 +29,7 @@ export interface UserProfile {
   plan_name?: PlanName;
   billing_cycle?: BillingCycle;
   stripe_customer_id?: string;
+  line_support_user_id?: string; // LINE User ID from the Support OA
 }
 
 export interface Dorm {
