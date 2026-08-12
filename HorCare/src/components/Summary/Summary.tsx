@@ -1079,7 +1079,7 @@ export default function Summary({
                             }}>
                                 <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
                                 <span style={{ fontSize: '0.8125rem', color: 'var(--color-text, #111827)', lineHeight: 1.5 }}>
-                                    เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
+                                    เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿399/เดือน</strong> สำหรับแพ็กเกจ HorCare
                                 </span>
                             </div>
 

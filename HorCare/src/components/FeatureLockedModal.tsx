@@ -75,7 +75,7 @@ export default function FeatureLockedModal({ featureName, onClose, onUpgrade }: 
           }}>
             <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
             <span style={{ fontSize: '0.8125rem', color: '#111827', lineHeight: 1.5 }}>
-              เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿79/เดือน</strong> สำหรับแพ็กเกจหอเล็ก
+              เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿399/เดือน</strong> สำหรับแพ็กเกจ Pro
             </span>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>

@@ -790,7 +790,7 @@ function App() {
               <span style={{ fontWeight: 700, fontSize: '0.8125rem' }}>อัปเกรดแผน</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'rgba(196,181,253,0.7)', lineHeight: 1.4 }}>
-              Start ฿79 · Plus ฿199/เดือน
+              HorCare ฿399/เดือน · ฟีเจอร์ครบ
             </div>
           </button>
         )}

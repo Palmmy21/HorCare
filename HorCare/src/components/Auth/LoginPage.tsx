@@ -194,7 +194,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                     }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle2 size={12} /> ใช้ฟรี</span>
                         <span style={{ opacity: 0.4 }}>|</span>
-                        <span>เพิ่ม LINE ส่งบิล ฿79/เดือน</span>
+                        <span>เพิ่ม LINE ส่งบิล ฿399/เดือน</span>
                     </div>
                 </div>
 
@@ -372,7 +372,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                 {mode === 'login' && (
                     <div className="login-features">
                         <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Smartphone size={16} /> จดมิเตอร์ & ออกบิลอัตโนมัติ</div>
-                        <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Zap size={16} /> LINE ส่งบิล ฿79/เดือน</div>
+                        <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Zap size={16} /> LINE ส่งบิล ฿399/เดือน</div>
                         <div className="login-feature" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Cloud size={16} /> ข้อมูลปลอดภัยบน Cloud</div>
                     </div>
                 )}

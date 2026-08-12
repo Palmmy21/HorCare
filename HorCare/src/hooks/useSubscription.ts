@@ -34,7 +34,7 @@ export function getMaxRooms(license: LicenseType): number {
 export const PLAN_PRICES = {
     small:  { monthly: 79,  yearly: 790  },
     medium: { monthly: 199, yearly: 1990 },
-    large:  { monthly: 399, yearly: 2590 },
+    large:  { monthly: 399, yearly: 2990 },
 } as const;
 
 /** Build license key from plan + cycle */

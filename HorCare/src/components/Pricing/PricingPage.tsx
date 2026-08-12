@@ -84,10 +84,10 @@ const CSS = `
 
 /* -- Card grid, equal height -- */
 .pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  display: flex;
+  justify-content: center;
   gap: 1.5rem;
-  align-items: stretch;   /* ← equal height */
+  align-items: stretch;
 }
 
 /* -- Plan card -- */
@@ -109,14 +109,14 @@ const CSS = `
   transform: translateY(-4px);
 }
 .plan-card.popular {
-  background: linear-gradient(160deg, #1a1040 0%, #0f0a24 100%);
+  background: linear-gradient(160deg, #091325 0%, #061821 100%);
 }
 
 /* Glow ring for popular */
 .plan-card.popular::before {
   content: '';
   position: absolute; inset: -2px; border-radius: 26px; z-index: -1;
-  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  background: linear-gradient(135deg, #0EA5E9, #10B981);
   animation: p-float 3s ease-in-out infinite alternate;
   will-change: transform;
   opacity: 0.75;
@@ -124,8 +124,8 @@ const CSS = `
 
 /* -- CTA button inside card, CSS hover only -- */
 .plan-cta {
-  width: 100%; padding: 0.9rem; border-radius: 14px; border: none;
-  font-weight: 700; font-size: 0.9375rem; cursor: pointer; letter-spacing: -0.01em;
+  width: 100%; padding: 1rem; border-radius: 14px; border: none;
+  font-weight: 700; font-size: 0.95rem; cursor: pointer; letter-spacing: -0.01em;
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   color: #fff;
   background: rgba(255,255,255,0.07);
@@ -137,16 +137,16 @@ const CSS = `
 .plan-cta:active { transform: translateY(0); }
 .plan-cta.small  { --glow: rgba(99,102,241,0.45); }
 .plan-cta.medium { --glow: rgba(139,92,246,0.45); }
-.plan-cta.large  { --glow: rgba(245,158,11,0.45); }
+.plan-cta.large  { --glow: rgba(16,185,129,0.45); }
 
 .plan-card:hover .plan-cta.small  { background: linear-gradient(135deg,#3B82F6,#6366F1); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
 .plan-card:hover .plan-cta.medium { background: linear-gradient(135deg,#8B5CF6,#EC4899); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
-.plan-card:hover .plan-cta.large  { background: linear-gradient(135deg,#F59E0B,#EF4444); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
+.plan-card:hover .plan-cta.large  { background: linear-gradient(135deg,#0EA5E9,#10B981); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
 
 /* -- Card hover shadows -- */
 .plan-card.small:hover  { box-shadow: 0 24px 60px rgba(99,102,241,0.3),  0 4px 16px rgba(0,0,0,0.4); border-color: rgba(99,102,241,0.45); }
 .plan-card.medium:hover { box-shadow: 0 24px 60px rgba(139,92,246,0.35), 0 4px 16px rgba(0,0,0,0.4); border-color: rgba(236,72,153,0.5); }
-.plan-card.large:hover  { box-shadow: 0 24px 60px rgba(245,158,11,0.3),  0 4px 16px rgba(0,0,0,0.4); border-color: rgba(239,68,68,0.45); }
+.plan-card.large:hover  { box-shadow: 0 24px 60px rgba(16,185,129,0.3),  0 4px 16px rgba(0,0,0,0.4); border-color: rgba(16,185,129,0.45); }
 
 /* -- Price text -- */
 .price-number {
@@ -158,7 +158,7 @@ const CSS = `
 }
 .price-number.small  { background-image: linear-gradient(135deg,#3B82F6,#6366F1); }
 .price-number.medium { background-image: linear-gradient(135deg,#8B5CF6,#EC4899); }
-.price-number.large  { background-image: linear-gradient(135deg,#F59E0B,#EF4444); }
+.price-number.large  { background-image: linear-gradient(135deg,#0EA5E9,#10B981); }
 
 /* -- Price pop on key change -- */
 .price-pop { animation: p-pop 0.32s cubic-bezier(0.16,1,0.3,1) both; }
@@ -170,7 +170,7 @@ const CSS = `
 }
 .feat-check.small  { background: linear-gradient(135deg,#3B82F6,#6366F1); box-shadow: 0 2px 8px rgba(99,102,241,0.35); }
 .feat-check.medium { background: linear-gradient(135deg,#8B5CF6,#EC4899); box-shadow: 0 2px 8px rgba(139,92,246,0.35); }
-.feat-check.large  { background: linear-gradient(135deg,#F59E0B,#EF4444); box-shadow: 0 2px 8px rgba(245,158,11,0.35); }
+.feat-check.large  { background: linear-gradient(135deg,#0EA5E9,#10B981); box-shadow: 0 2px 8px rgba(16,185,129,0.35); }
 
 /* -- Popular shimmer badge -- */
 .popular-badge {
@@ -330,7 +330,6 @@ const PLANS: Plan[] = [
         monthlyPrice: 259, yearlyPrice: 1590, originalYearlyPrice: 3108,
         gradient: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
         glowColor: 'rgba(139,92,246,0.45)',
-        popular: true,
         features: [
             'ห้องสูงสุด 150 ห้อง · 5 หอพัก',
             'ทุกอย่างของ Start',
@@ -344,15 +343,19 @@ const PLANS: Plan[] = [
         ],
     },
     {
-        id: 'large', name: 'Pro', icon: Building2, roomRange: 'ไม่จำกัดห้อง · 10 หอ',
-        monthlyPrice: 399, yearlyPrice: 2590, originalYearlyPrice: 4788,
-        gradient: 'linear-gradient(135deg,#F59E0B,#EF4444)',
-        glowColor: 'rgba(245,158,11,0.45)',
+        id: 'large', name: 'HorCare', icon: Building2, roomRange: 'ไม่จำกัดห้อง · 10 หอ',
+        monthlyPrice: 399, yearlyPrice: 2990, originalYearlyPrice: 4788,
+        gradient: 'linear-gradient(135deg,#0EA5E9,#10B981)',
+        glowColor: 'rgba(16,185,129,0.45)',
+        popular: true,
         features: [
             'ห้องไม่จำกัด · สูงสุด 10 หอพัก',
-            'ทุกอย่างของ Plus',
             'ผู้ช่วย AI ส่วนตัว "น้องแคร์"',
             'ตรวจสอบสลิปอัตโนมัติด้วย AI',
+            'จดมิเตอร์ไฟ / น้ำ + ออกบิลอัตโนมัติ',
+            'ส่งบิลและแจ้งเตือนผ่าน LINE อัตโนมัติ',
+            'QR PromptPay ในบิล สลิปเข้าอัตโนมัติ',
+            'อ่านมิเตอร์จากรูปถ่ายด้วย AI',
             'ติดต่อทีมงานแบบ real-time (LINE)',
             'ทีมงาน HorCare ดูแลเซ็ตอัพให้',
             '[soon] ทีมงานไม่จำกัด (RBAC)',
@@ -402,7 +405,7 @@ const PlanCard = memo(function PlanCard({
                     marginTop: '0.35rem', background: 'rgba(255,255,255,0.07)',
                     border: '1px solid rgba(255,255,255,0.09)',
                     borderRadius: '999px', padding: '0.2rem 0.7rem',
-                    fontSize: '0.76rem', color: 'rgba(255,255,255,0.55)',
+                    fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)',
                 }}>
                     <Package size={11} /> {plan.roomRange}
                 </div>
@@ -413,15 +416,15 @@ const PlanCard = memo(function PlanCard({
                 <div key={priceKey} className="price-pop" style={{
                     display: 'flex', alignItems: 'flex-end', gap: '0.2rem',
                 }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)', paddingBottom: '0.6rem' }}>฿</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', paddingBottom: '0.6rem' }}>฿</span>
                     <span className={`price-number ${plan.id}`}>{price.toLocaleString()}</span>
-                    <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', paddingBottom: '0.5rem' }}>
                         {cycle === 'monthly' ? '/เดือน' : '/ปี'}
                     </span>
                 </div>
                 {cycle === 'yearly' ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
-                        <span style={{ textDecoration: 'line-through', color: 'rgba(255,255,255,0.22)', fontSize: '0.875rem' }}>
+                        <span style={{ textDecoration: 'line-through', color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem' }}>
                             ฿{plan.originalYearlyPrice.toLocaleString()}
                         </span>
                         <span style={{
@@ -431,7 +434,7 @@ const PlanCard = memo(function PlanCard({
                         }}>ประหยัด {savings}%</span>
                     </div>
                 ) : (
-                    <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.3)', marginTop: '0.35rem' }}>
+                    <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.6)', marginTop: '0.35rem' }}>
                         หรือ ฿{plan.yearlyPrice.toLocaleString()}/ปี (ประหยัดกว่า)
                     </div>
                 )}
@@ -456,8 +459,8 @@ const PlanCard = memo(function PlanCard({
                     return (
                         <li key={f} style={{
                             display: 'flex', alignItems: 'flex-start',
-                            gap: '0.6rem', fontSize: '0.86rem',
-                            color: (unavailable || coming) ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.72)',
+                            gap: '0.6rem', fontSize: '0.88rem', fontWeight: 500,
+                            color: (unavailable || coming) ? 'rgba(255,255,255,0.5)' : '#ffffff',
                         }}>
                             {coming ? (
                                 <div style={{
@@ -499,40 +502,20 @@ const PlanCard = memo(function PlanCard({
                 })}
             </ul>
 
-            {/* CTA, purely CSS hover, no JS state */}
-            <button
+            {/* CTA — direct to LINE Support */}
+            <a
                 id={`pricing-btn-${plan.id}`}
                 className={`plan-cta ${plan.id}`}
-                onClick={() => onSelect(plan)}
+                href={`https://line.me/R/oaMessage/${encodeURIComponent('@127qwwfi')}/?${encodeURIComponent('สนใจสมัครแพ็กเกจ HorCare')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none' }}
             >
                 {currentPlanId === plan.id 
                     ? 'ต่ออายุแพ็กเกจ' 
-                    : (currentPlanId 
-                        ? (plan.monthlyPrice > (PLANS.find(p => p.id === currentPlanId)?.monthlyPrice ?? 0) ? 'อัปเกรดเป็นแผนนี้' : 'เปลี่ยนเป็นแผนนี้') 
-                        : 'เลือกแผนนี้'
-                    )}
+                    : 'สมัครผ่าน LINE'
+                }
                 <Zap size={15} />
-            </button>
-
-            {/* LINE Support Discount Note – clickable link to LINE chat with pre-filled "สมัคร" */}
-            <a
-                href={`https://line.me/R/oaMessage/${encodeURIComponent('@127qwwfi')}/?${encodeURIComponent('สมัคร')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: 'none', display: 'block', marginTop: '1rem' }}
-            >
-                <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.85)', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.15)'; e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'; }}
-                >
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600, marginBottom: '0.25rem', color: '#10B981' }}>
-                        <Gift size={14} /> คุ้มกว่าเมื่อสมัครผ่าน LINE Support
-                    </span>
-                    {plan.id === 'small' && 'เพียง ฿79/เดือน หรือ ฿790/ปี'}
-                    {plan.id === 'medium' && 'เพียง ฿199/เดือน หรือ ฿1190/ปี'}
-                    {plan.id === 'large' && 'เพียง ฿299/เดือน หรือ ฿1990/ปี'}
-                    <span style={{ display: 'block', fontSize: '0.7rem', marginTop: '0.375rem', color: 'rgba(255,255,255,0.5)' }}>แตะเพื่อสมัครผ่าน LINE ▸</span>
-                </div>
             </a>
         </div>
     );
@@ -809,56 +792,6 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                             </div>
                         </div>
 
-                        {/* Free tier banner */}
-                        {!currentPlanId && (
-                            <div className="p-anim-2" style={{ marginBottom: '2rem' }}>
-                                <div style={{
-                                    border: '1px solid rgba(16,185,129,0.25)',
-                                    borderRadius: '16px',
-                                    padding: '1.1rem 1.5rem',
-                                    background: 'rgba(16,185,129,0.05)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    flexWrap: 'wrap',
-                                    gap: '1rem',
-                                }}>
-                                    <div>
-                                        <div style={{ color: '#34D399', fontWeight: 700, fontSize: '1rem', marginBottom: '0.25rem' }}>
-                                            ฟรี — ไม่มีค่าใช้จ่าย
-                                        </div>
-                                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem' }}>
-                                            จดมิเตอร์ · ออกบิล · ดาวน์โหลด PDF · Dashboard · ข้อมูลบน Cloud
-                                        </div>
-                                    </div>
-                                    {profile?.license === 'free' ? (
-                                        <div style={{
-                                            background: 'rgba(16,185,129,0.15)',
-                                            border: '1px solid rgba(16,185,129,0.3)',
-                                            color: '#34D399', borderRadius: '999px',
-                                            padding: '0.375rem 1rem', fontSize: '0.8rem', fontWeight: 700,
-                                        }}>
-                                            แผนของคุณ
-                                        </div>
-                                    ) : (
-                                        <button
-                                            onClick={() => isGuest ? onNeedAuth?.('free', cycle) : onBack?.()}
-                                            style={{
-                                                background: 'rgba(16,185,129,0.08)',
-                                                border: '1px solid rgba(16,185,129,0.22)',
-                                                color: '#34D399', borderRadius: '12px',
-                                                padding: '0.6rem 1.25rem', fontSize: '0.875rem', fontWeight: 600,
-                                                cursor: 'pointer', whiteSpace: 'nowrap',
-                                            }}
-                                        >
-                                            เริ่มใช้งานฟรี →
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Cards grid, align-items:stretch = equal height */}
                         {currentPlanId && currentPlan ? (
                             <>
                                 <div className="pricing-section" style={{ marginBottom: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -876,33 +809,29 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                     </div>
                                 </div>
 
-                                <div className="pricing-section" style={{ marginBottom: '2rem' }}>
-                                    <h3 style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1rem', marginBottom: '1.25rem', fontWeight: 600, textAlign: 'center' }}>
-                                        หรือเลือกแพ็กเกจอื่นที่คุ้มค่ากว่า
-                                    </h3>
-                                    <div className="pricing-grid">
-                                        {otherPlans.map(plan => (
+                                {currentPlanId !== 'large' && (
+                                    <div className="pricing-section" style={{ marginBottom: '2rem' }}>
+                                        <h3 style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1rem', marginBottom: '1.25rem', fontWeight: 600, textAlign: 'center' }}>
+                                            อัปเกรดเป็นแพ็กเกจ HorCare เพื่อฟีเจอร์ที่ครบกว่า
+                                        </h3>
+                                        <div className="pricing-grid" style={{ maxWidth: 440, margin: '0 auto' }}>
                                             <PlanCard
-                                                key={plan.id}
-                                                plan={plan}
+                                                plan={PLANS.find(p => p.id === 'large')!}
                                                 cycle={cycle}
                                                 currentPlanId={currentPlanId}
                                                 onSelect={handlePlanSelect}
                                             />
-                                        ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </>
                         ) : (
-                            <div className="pricing-grid pricing-section">
-                                {PLANS.map(plan => (
-                                    <PlanCard
-                                        key={plan.id}
-                                        plan={plan}
-                                        cycle={cycle}
-                                        onSelect={handlePlanSelect}
-                                    />
-                                ))}
+                            <div className="pricing-grid pricing-section" style={{ maxWidth: 560, margin: '0 auto' }}>
+                                <PlanCard
+                                    plan={PLANS.find(p => p.id === 'large')!}
+                                    cycle={cycle}
+                                    onSelect={handlePlanSelect}
+                                />
                             </div>
                         )}
 
