@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import {
-    Check, Zap, Sparkles, Shield, Clock, CreditCard, X, Gift, Heart,
+    Check, Zap, Sparkles, Shield, Clock, CreditCard, X, Heart,
     ChevronLeft, Infinity as InfinityIcon,
     Home, Building, Building2, Package, PartyPopper, QrCode,
 } from 'lucide-react';
@@ -367,8 +367,8 @@ const PLANS: Plan[] = [
 
 /* ----------- PlanCard (memo = skip re-render unless props change) ----------- */
 const PlanCard = memo(function PlanCard({
-    plan, cycle, currentPlanId, onSelect,
-}: { plan: Plan; cycle: BillingCycle; currentPlanId?: string; onSelect: (p: Plan) => void }) {
+    plan, cycle, currentPlanId,
+}: { plan: Plan; cycle: BillingCycle; currentPlanId?: string; onSelect?: (p: Plan) => void }) {
     const [priceKey, setPriceKey] = useState(0);
     const price = cycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
     const savings = cycle === 'yearly'
@@ -697,7 +697,6 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
     const currentPlanId = profile && profile.license !== 'free' ? profile.plan_name : undefined;
     const currentPlan = PLANS.find(p => p.id === currentPlanId);
-    const otherPlans = PLANS.filter(p => p.id !== currentPlanId);
 
     return (
         <div className="pricing-page">
