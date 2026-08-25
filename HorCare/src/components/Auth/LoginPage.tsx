@@ -207,6 +207,34 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                     </div>
                 </div>
 
+                {/* Tabs */}
+                <div style={{ display: 'flex', width: '100%', marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color, #e5e7eb)' }}>
+                    <button
+                        type="button"
+                        onClick={() => switchMode('login')}
+                        style={{
+                            flex: 1, padding: '0.75rem', background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '1rem', fontWeight: 600, color: mode === 'login' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
+                            borderBottom: mode === 'login' ? '2px solid var(--primary)' : 'none',
+                            marginBottom: '-2px'
+                        }}
+                    >
+                        เข้าสู่ระบบ
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => switchMode('register')}
+                        style={{
+                            flex: 1, padding: '0.75rem', background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '1rem', fontWeight: 600, color: mode === 'register' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
+                            borderBottom: mode === 'register' ? '2px solid var(--primary)' : 'none',
+                            marginBottom: '-2px'
+                        }}
+                    >
+                        สมัครสมาชิก
+                    </button>
+                </div>
+
                 {/* Form */}
                 <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {mode === 'register' && (
@@ -385,19 +413,6 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                     </button>
                 </form>
 
-                {/* Toggle */}
-                <div className="login-toggle">
-                    <span className="login-toggle-text">
-                        {mode === 'register' ? 'มีบัญชีอยู่แล้ว?' : 'ยังไม่มีบัญชี?'}
-                    </span>
-                    <button
-                        className="login-toggle-btn"
-                        onClick={() => switchMode(mode === 'register' ? 'login' : 'register')}
-                        type="button"
-                    >
-                        {mode === 'register' ? 'เข้าสู่ระบบ' : 'สมัครใช้งานฟรี'}
-                    </button>
-                </div>
                 {mode === 'login' && (
                     <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>
                         <button

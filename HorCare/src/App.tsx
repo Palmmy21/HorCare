@@ -32,6 +32,7 @@ const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
 const InstallPrompt   = lazy(() => import('./components/PWA/InstallPrompt'));
 const FeatureLockedModal = lazy(() => import('./components/FeatureLockedModal'));
+const BranchSelector = lazy(() => import('./components/BranchSelector/BranchSelector'));
 
 import './index.css';
 
@@ -69,6 +70,7 @@ function App() {
   const [pendingPlan, setPendingPlan] = useState<{ planId: string; cycle: string } | null>(null);
   const [showFeatureLockedModal, setShowFeatureLockedModal] = useState<string | null>(null);
   const [deleteBuildingConfirm, setDeleteBuildingConfirm] = useState<string | null>(null);
+  const [hasSelectedBranch, setHasSelectedBranch] = useState(false);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -467,6 +469,27 @@ function App() {
   const lineEnabled = profile?.license ? canSendLine(profile.license) : true;
   const maxRooms = profile ? getMaxRooms(profile.license) : 5;
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
+
+  if (hasPaidSubscription && !hasSelectedBranch && buildings.length > 0) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <BranchSelector 
+          buildings={buildings}
+          onSelect={(id) => {
+            handleSwitchBuilding(id);
+            setHasSelectedBranch(true);
+          }}
+          canAddBuilding={canAddBuilding}
+          onAddBuilding={() => {
+            setAddBuildingMode(true);
+            setHasSelectedBranch(true);
+            setBuildingMenuOpen(true);
+          }}
+          userName={profile?.name || user.email?.split('@')[0] || 'User'}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="app-container">
