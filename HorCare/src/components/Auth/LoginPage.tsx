@@ -16,7 +16,11 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
     const [mode, setMode] = useState<PageMode>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [referralSources, setReferralSources] = useState<string[]>([]);
+    
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [resetSent, setResetSent] = useState(false);
@@ -26,7 +30,9 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
         setIsLoading(true);
         try {
             if (mode === 'register') {
-                await onRegister(email, password, name);
+                const fullName = `${firstName.trim()} ${lastName.trim()}`;
+                await onRegister(email, password, fullName);
+                // phone and referralSources can be saved here if backend supports it
             } else {
                 await onLogin(email, password);
             }
@@ -55,7 +61,10 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
         clearError();
         setEmail('');
         setPassword('');
-        setName('');
+        setFirstName('');
+        setLastName('');
+        setPhone('');
+        setReferralSources([]);
         setResetSent(false);
     };
 
@@ -199,75 +208,138 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="login-form">
+                <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {mode === 'register' && (
-                        <div className="login-field">
-                            <div className="login-input-wrapper">
-                                <User size={18} className="login-input-icon" />
+                        <>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>ชื่อ</label>
+                                    <input
+                                        type="text"
+                                        placeholder="สมชาย"
+                                        value={firstName}
+                                        onChange={e => setFirstName(e.target.value)}
+                                        required
+                                        style={{
+                                            width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
+                                            border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                            color: 'var(--text-primary)', outline: 'none'
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>นามสกุล</label>
+                                    <input
+                                        type="text"
+                                        placeholder="ใจดี"
+                                        value={lastName}
+                                        onChange={e => setLastName(e.target.value)}
+                                        required
+                                        style={{
+                                            width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
+                                            border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                            color: 'var(--text-primary)', outline: 'none'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>เบอร์โทรศัพท์</label>
                                 <input
-                                    type="text"
-                                    className="login-input"
-                                    placeholder="ชื่อ-นามสกุล"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
+                                    type="tel"
+                                    placeholder="08X-XXX-XXXX"
+                                    value={phone}
+                                    onChange={e => setPhone(e.target.value)}
                                     required
-                                    autoComplete="name"
+                                    style={{
+                                        width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
+                                        border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                        color: 'var(--text-primary)', outline: 'none'
+                                    }}
                                 />
                             </div>
-                        </div>
+                        </>
                     )}
 
-                    <div className="login-field">
-                        <div className="login-input-wrapper">
-                            <Mail size={18} className="login-input-icon" />
-                            <input
-                                type="email"
-                                className="login-input"
-                                placeholder="อีเมล"
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                                required
-                                autoComplete="email"
-                            />
-                        </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>อีเมล</label>
+                        <input
+                            type="email"
+                            placeholder="email@example.com"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            required
+                            autoComplete="email"
+                            style={{
+                                width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
+                                border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                color: 'var(--text-primary)', outline: 'none'
+                            }}
+                        />
                     </div>
 
-                    <div className="login-field">
-                        <div className="login-input-wrapper">
-                            <Lock size={18} className="login-input-icon" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>รหัสผ่าน</label>
+                        <div style={{ position: 'relative' }}>
                             <input
                                 type={showPassword ? "text" : "password"}
-                                className="login-input"
-                                placeholder="รหัสผ่าน"
+                                placeholder="อย่างน้อย 8 ตัวอักษร"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}
                                 required
-                                minLength={6}
+                                minLength={8}
                                 autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                                style={{ paddingRight: '40px' }}
+                                style={{
+                                    width: '100%', padding: '0.75rem 2.5rem 0.75rem 1rem', borderRadius: '8px',
+                                    border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                    color: 'var(--text-primary)', outline: 'none'
+                                }}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
                                 style={{
-                                    position: 'absolute',
-                                    right: '10px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    color: '#6B7280',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
+                                    position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                                    color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                 }}
                             >
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
                     </div>
+
+                    {mode === 'register' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                คุณรู้จักเราได้อย่างไร? <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(เลือกได้หลายข้อ)</span>
+                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                                {['Google', 'Facebook', 'เพื่อนแนะนำ', 'LINE', 'TikTok', 'อื่นๆ'].map(source => (
+                                    <label key={source} style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                        padding: '0.6rem 1rem', border: '1px solid var(--border-color, #e5e7eb)',
+                                        borderRadius: '8px', cursor: 'pointer', fontSize: '0.875rem'
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={referralSources.includes(source)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setReferralSources(prev => [...prev, source]);
+                                                } else {
+                                                    setReferralSources(prev => prev.filter(s => s !== source));
+                                                }
+                                            }}
+                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                                        />
+                                        {source}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Forgot password link — only shown on login mode */}
                     {mode === 'login' && (
