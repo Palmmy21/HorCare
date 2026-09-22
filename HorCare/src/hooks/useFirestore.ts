@@ -178,6 +178,16 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         if (!userPath || !userId || !buildingId) return;
         await setDoc(doc(db, userPath, 'data', 'config'), newConfig);
 
+        // Sync dorm logo to building document
+        try {
+            const logo = newConfig.bill_customization?.dorm_logo;
+            await updateDoc(doc(db, `users/${userId}/buildings`, buildingId), {
+                logo: logo || null
+            });
+        } catch (err) {
+            console.warn('Could not sync logo to building document:', err);
+        }
+
         // Recalculate all unlocked bills for the current UI month and calendar month
         // to reflect the new global settings
         const monthsToRecalc = [...new Set([getCurrentMonth(), anchorMonth].filter(Boolean))] as string[];

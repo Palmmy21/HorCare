@@ -6,13 +6,16 @@ import {
     MessageCircle, Building2
 } from 'lucide-react';
 import app from '../../firebase/config';
-import type { MonthlyBill, DormConfig, Room } from '../../types';
+import type { MonthlyBill, DormConfig, Room, BillLanguage } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
+import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import InvoiceBill from './InvoiceBill';
 import PrintBillSlip from './PrintBillSlip';
 import MonthlyReport from './MonthlyReport';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
+import { triggerFileDownload, dataUrlToBlob } from '../../utils/fileDownload';
 
 interface SummaryProps {
     bills: MonthlyBill[];
@@ -61,6 +64,7 @@ export default function Summary({
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     });
     const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
+    const [previewLang, setPreviewLang] = useState<BillLanguage | null>(null);
     const [showAllInvoices, setShowAllInvoices] = useState(false);
     const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
@@ -236,52 +240,61 @@ export default function Summary({
             requestAnimationFrame(check);
         });
 
+        // Small delay to ensure SVG QR code and DOM styles are completely painted
+        await new Promise(resolve => setTimeout(resolve, 150));
+
         const el = captureRef.current;
         if (!el) throw new Error('Capture element not mounted');
 
-        const dataUrl = await toPng(el, {
-            pixelRatio: 2,
-            backgroundColor: '#ffffff',
-        });
+        let dataUrl: string;
+        try {
+            dataUrl = await toPng(el, {
+                pixelRatio: 2,
+                backgroundColor: '#ffffff',
+                cacheBust: true,
+                skipFonts: true,
+            });
+        } catch (toPngErr) {
+            console.warn('toPng failed on mobile, attempting html2canvas fallback:', toPngErr);
+            const canvas = await html2canvas(el, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                logging: false,
+            });
+            dataUrl = canvas.toDataURL('image/png');
+        }
 
         const fileName = `bill_${bill.room_number}_${currentMonth}.png`;
-        let shared = false;
+        const blob = dataUrlToBlob(dataUrl);
 
         const nav = navigator as any;
         if (useShare && nav.share && nav.canShare) {
             try {
-                const blob = await (await fetch(dataUrl)).blob();
                 const file = new File([blob], fileName, { type: 'image/png' });
                 if (nav.canShare({ files: [file] })) {
                     await nav.share({
                         files: [file],
                         title: `บิลห้อง ${bill.room_number}`,
                     });
-                    shared = true;
+                    return;
                 }
             } catch (err: any) {
                 if (err.name !== 'AbortError') {
                     console.error('Share failed, falling back to download:', err);
-                } else {
-                    shared = true; // User cancelled share sheet, don't download
                 }
             }
         }
 
-        if (!shared) {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+        // Direct download using Blob & ObjectURL (reliable on Samsung Internet and Chrome Android)
+        triggerFileDownload(blob, fileName);
     };
 
     const handleDownloadBill = async (bill: MonthlyBill) => {
         setDownloadingBillId(bill.id);
         try {
-            await captureAndDownload(bill, true);
+            // Direct download on device
+            await captureAndDownload(bill, false);
         } catch (err) {
             console.error('Download failed:', err);
             alert('ดาวน์โหลดไม่สำเร็จ กรุณาลองใช้ปุ่มพิมพ์แทน');
@@ -319,21 +332,26 @@ export default function Summary({
                         requestAnimationFrame(check);
                     });
 
+                    await new Promise(r => setTimeout(r, 150));
+
                     const el = captureRef.current;
                     if (!el) throw new Error('Capture element not mounted');
 
-                    const dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: '#ffffff' });
+                    let dataUrl: string;
+                    try {
+                        dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true, skipFonts: true });
+                    } catch {
+                        const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+                        dataUrl = canvas.toDataURL('image/png');
+                    }
                     
+                    const fileName = `bill_${bill.room_number}_${currentMonth}.png`;
+                    const blob = dataUrlToBlob(dataUrl);
+
                     if (canShareFiles) {
-                        const blob = await (await fetch(dataUrl)).blob();
-                        files.push(new File([blob], `bill_${bill.room_number}_${currentMonth}.png`, { type: 'image/png' }));
+                        files.push(new File([blob], fileName, { type: 'image/png' }));
                     } else {
-                        const a = document.createElement('a');
-                        a.href = dataUrl;
-                        a.download = `bill_${bill.room_number}_${currentMonth}.png`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
+                        triggerFileDownload(blob, fileName);
                     }
                 } catch (err) {
                     console.error(`Download failed for room ${monthBills[i].room_number}:`, err);
@@ -359,22 +377,30 @@ export default function Summary({
     };
 
     const handleShareAll = async () => {
-        try {
-            await navigator.share({
-                files: preparedFiles,
-                title: `บิลทั้งหมดรอบเดือน ${formatMonthThai(currentMonth)}`
-            });
-            setShowShareModal(false);
-            setPreparedFiles([]);
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.error('Share all failed:', err);
-                alert('เกิดข้อผิดพลาดในการแชร์');
-            } else {
+        const nav = navigator as any;
+        if (nav.share && nav.canShare && nav.canShare({ files: preparedFiles })) {
+            try {
+                await nav.share({
+                    files: preparedFiles,
+                    title: `บิลทั้งหมดรอบเดือน ${formatMonthThai(currentMonth)}`
+                });
                 setShowShareModal(false);
                 setPreparedFiles([]);
+                return;
+            } catch (err: any) {
+                if (err.name !== 'AbortError') {
+                    console.warn('Share all failed, falling back to direct download:', err);
+                }
             }
         }
+
+        // Fallback: trigger downloads directly
+        for (const file of preparedFiles) {
+            triggerFileDownload(file, file.name);
+            await new Promise(r => setTimeout(r, 250));
+        }
+        setShowShareModal(false);
+        setPreparedFiles([]);
     };
 
     return (
@@ -806,19 +832,56 @@ export default function Summary({
             {selectedBill && (
                 <div className="modal-overlay" onClick={() => setSelectedBill(null)}>
                     <div className="modal invoice-modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={18} /> ใบเรียกเก็บ — ห้อง {selectedBill.room_number}</h3>
-                            <button
-                                className="btn btn-outline btn-sm btn-icon"
-                                onClick={() => setSelectedBill(null)}
-                            >
-                                <XCircle size={20} />
-                            </button>
+                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <FileText size={18} /> ใบเรียกเก็บ — ห้อง {selectedBill.room_number}
+                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {(() => {
+                                    const room = rooms.find(r => r.id === selectedBill.room_id);
+                                    const activeLang = previewLang || room?.language || billCustomization?.default_language || 'th';
+                                    return (
+                                        <div style={{ display: 'flex', gap: '2px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
+                                            {LANGUAGE_OPTIONS.map(opt => (
+                                                <button
+                                                    key={opt.code}
+                                                    type="button"
+                                                    onClick={() => setPreviewLang(opt.code)}
+                                                    title={`${opt.nativeName} (${opt.name})`}
+                                                    style={{
+                                                        border: 'none',
+                                                        background: activeLang === opt.code ? '#ffffff' : 'transparent',
+                                                        boxShadow: activeLang === opt.code ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                                        padding: '2px 6px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        fontSize: '12px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '2px',
+                                                        fontWeight: activeLang === opt.code ? 600 : 400
+                                                    }}
+                                                >
+                                                    <span>{opt.flag}</span>
+                                                    <span style={{ fontSize: '10px' }}>{opt.code.toUpperCase()}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                                <button
+                                    className="btn btn-outline btn-sm btn-icon"
+                                    onClick={() => { setSelectedBill(null); setPreviewLang(null); }}
+                                >
+                                    <XCircle size={20} />
+                                </button>
+                            </div>
                         </div>
                         <div className="modal-body">
                             {(() => {
                                 const room = rooms.find(r => r.id === selectedBill.room_id);
                                 const rates = room ? getEffectiveRates(room, config) : null;
+                                const activeLang = previewLang || room?.language || billCustomization?.default_language || 'th';
                                 return (
                                     <InvoiceBill
                                         bill={selectedBill}
@@ -827,12 +890,13 @@ export default function Summary({
                                         effectiveElecRate={rates?.electricityRate}
                                         effectiveWaterConfig={rates?.waterConfig}
                                         billCustomization={billCustomization}
+                                        language={activeLang}
                                     />
                                 );
                             })()}
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setSelectedBill(null)}>
+                            <button className="btn btn-secondary" onClick={() => { setSelectedBill(null); setPreviewLang(null); }}>
                                 ปิด
                             </button>
                             <button
@@ -896,6 +960,7 @@ export default function Summary({
                         {monthBills.map(bill => {
                             const room = rooms.find(r => r.id === bill.room_id);
                             const rates = room ? getEffectiveRates(room, config) : null;
+                            const roomLang = room?.language || billCustomization?.default_language || 'th';
                             return (
                                 <PrintBillSlip
                                     key={bill.id}
@@ -905,6 +970,7 @@ export default function Summary({
                                     effectiveElecRate={rates?.electricityRate}
                                     effectiveWaterConfig={rates?.waterConfig}
                                     billCustomization={billCustomization}
+                                    language={roomLang}
                                 />
                             );
                         })}
@@ -918,6 +984,7 @@ export default function Summary({
                 {captureTarget && (() => {
                     const room = rooms.find(r => r.id === captureTarget.room_id);
                     const rates = room ? getEffectiveRates(room, config) : null;
+                    const captureLang = previewLang || room?.language || billCustomization?.default_language || 'th';
                     return (
                         <InvoiceBill
                             ref={captureRef}
@@ -927,6 +994,7 @@ export default function Summary({
                             effectiveElecRate={rates?.electricityRate}
                             effectiveWaterConfig={rates?.waterConfig}
                             billCustomization={billCustomization}
+                            language={captureLang}
                         />
                     );
                 })()}

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { CreditCard, Wrench, X } from 'lucide-react';
-import type { MonthlyBill, MaintenanceRequest } from '../types';
+import { CreditCard, Wrench, Sparkles, X } from 'lucide-react';
+import type { MonthlyBill, MaintenanceRequest, CleaningRequest } from '../types';
+import { usePushNotification } from '../hooks/usePushNotification';
 
-type ToastKind = 'slip' | 'maintenance';
+type ToastKind = 'slip' | 'maintenance' | 'cleaning';
 
 interface Toast {
   id: string;
@@ -37,18 +38,23 @@ function playNotificationSound() {
 interface Props {
   bills: MonthlyBill[];
   maintenanceRequests: MaintenanceRequest[];
+  cleaningRequests?: CleaningRequest[];
   onGoToPayments: () => void;
   onGoToMaintenance: () => void;
+  onGoToCleaning?: () => void;
 }
 
 export default function SlipNotificationToast({
-  bills, maintenanceRequests, onGoToPayments, onGoToMaintenance,
+  bills, maintenanceRequests, cleaningRequests = [], onGoToPayments, onGoToMaintenance, onGoToCleaning,
 }: Props) {
+  const { notify } = usePushNotification();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seenSlips = useRef<Set<string>>(new Set());
   const seenMaint = useRef<Set<string>>(new Set());
+  const seenCleaning = useRef<Set<string>>(new Set());
   const slipInit = useRef(false);
   const maintInit = useRef(false);
+  const cleanInit = useRef(false);
 
   // ── Slip notifications ──
   useEffect(() => {
@@ -62,11 +68,17 @@ export default function SlipNotificationToast({
     if (!fresh.length) return;
     fresh.forEach(b => seenSlips.current.add(b.id));
     playNotificationSound();
+    fresh.forEach(b => {
+      notify(`มีสลิปชำระเงินใหม่ ห้อง ${b.room_number}`, {
+        body: 'ผู้เช่าได้แนบสลิปชำระเงินแล้ว คลิกเพื่อตรวจสอบ',
+        tag: `slip-${b.id}`,
+      });
+    });
     setToasts(prev => [
       ...prev,
       ...fresh.map(b => ({ id: `slip-${b.id}`, kind: 'slip' as ToastKind, roomNumber: b.room_number })),
     ]);
-  }, [bills]);
+  }, [bills, notify]);
 
   // ── Maintenance notifications ──
   useEffect(() => {
@@ -80,6 +92,12 @@ export default function SlipNotificationToast({
     if (!fresh.length) return;
     fresh.forEach(r => seenMaint.current.add(r.id));
     playNotificationSound();
+    fresh.forEach(r => {
+      notify(`มีรายการแจ้งซ่อมใหม่ ห้อง ${r.room_number}`, {
+        body: r.description ? r.description.slice(0, 60) : 'มีรายการแจ้งซ่อมใหม่',
+        tag: `maint-${r.id}`,
+      });
+    });
     setToasts(prev => [
       ...prev,
       ...fresh.map(r => ({
@@ -90,7 +108,36 @@ export default function SlipNotificationToast({
         urgency: r.urgency,
       })),
     ]);
-  }, [maintenanceRequests]);
+  }, [maintenanceRequests, notify]);
+
+  // ── Cleaning notifications ──
+  useEffect(() => {
+    const open = cleaningRequests.filter(r => r.status === 'pending' || r.status === 'open');
+    if (!cleanInit.current) {
+      open.forEach(r => seenCleaning.current.add(r.id));
+      cleanInit.current = true;
+      return;
+    }
+    const fresh = open.filter(r => !seenCleaning.current.has(r.id));
+    if (!fresh.length) return;
+    fresh.forEach(r => seenCleaning.current.add(r.id));
+    playNotificationSound();
+    fresh.forEach(r => {
+      notify(`มีงานทำความสะอาดใหม่ ห้อง ${r.room_number}`, {
+        body: r.description ? r.description.slice(0, 60) : 'มีคำขอทำความสะอาดใหม่',
+        tag: `clean-${r.id}`,
+      });
+    });
+    setToasts(prev => [
+      ...prev,
+      ...fresh.map(r => ({
+        id: `clean-${r.id}`,
+        kind: 'cleaning' as ToastKind,
+        roomNumber: r.room_number,
+        description: r.description?.slice(0, 60),
+      })),
+    ]);
+  }, [cleaningRequests, notify]);
 
   const dismiss = (id: string) => setToasts(prev => prev.filter(t => t.id !== id));
 
@@ -118,9 +165,26 @@ export default function SlipNotificationToast({
         }
       `}</style>
       {toasts.map(toast => {
-        const isSlip = toast.kind === 'slip';
-        const accent = isSlip ? '#059669' : '#D97706';
-        const bg = isSlip ? '#d1fae5' : '#FEF3C7';
+        let accent = '#059669';
+        let bg = '#d1fae5';
+        let title = 'ได้รับสลิปใหม่';
+        let linkText = 'ดูที่การชำระเงิน →';
+        let onAction = onGoToPayments;
+
+        if (toast.kind === 'maintenance') {
+          accent = '#D97706';
+          bg = '#FEF3C7';
+          title = `แจ้งซ่อมใหม่${toast.urgency === 'urgent' ? ' (ด่วน!)' : ''}`;
+          linkText = 'ดูที่แจ้งซ่อม →';
+          onAction = onGoToMaintenance;
+        } else if (toast.kind === 'cleaning') {
+          accent = '#0284C7';
+          bg = '#E0F2FE';
+          title = 'แจ้งทำความสะอาดใหม่';
+          linkText = 'ดูที่งานแม่บ้าน →';
+          onAction = onGoToCleaning ?? onGoToMaintenance;
+        }
+
         return (
           <div key={toast.id} style={{
             background: '#fff',
@@ -137,31 +201,31 @@ export default function SlipNotificationToast({
               background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
             }}>
-              {isSlip
-                ? <CreditCard size={18} color={accent} />
-                : <Wrench size={18} color={accent} />}
+              {toast.kind === 'slip' && <CreditCard size={18} color={accent} />}
+              {toast.kind === 'maintenance' && <Wrench size={18} color={accent} />}
+              {toast.kind === 'cleaning' && <Sparkles size={18} color={accent} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#111' }}>
-                {isSlip ? 'ได้รับสลิปใหม่' : `แจ้งซ่อมใหม่${toast.urgency === 'urgent' ? ' (ด่วน!)' : ''}`}
+                {title}
               </div>
               <div style={{ fontSize: '0.8125rem', color: '#555', marginTop: 2 }}>
                 ห้อง <strong>{toast.roomNumber}</strong>
-                {!isSlip && toast.description && (
+                {toast.description && (
                   <span style={{ display: 'block', fontSize: '0.75rem', color: '#777', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {toast.description}
                   </span>
                 )}
               </div>
               <button
-                onClick={() => { dismiss(toast.id); if (isSlip) { onGoToPayments(); } else { onGoToMaintenance(); } }}
+                onClick={() => { dismiss(toast.id); onAction(); }}
                 style={{
                   marginTop: 8, fontSize: '0.75rem', fontWeight: 600,
                   color: accent, background: 'none', border: 'none',
                   cursor: 'pointer', padding: 0,
                 }}
               >
-                {isSlip ? 'ดูที่การชำระเงิน →' : 'ดูที่แจ้งซ่อม →'}
+                {linkText}
               </button>
             </div>
             <button

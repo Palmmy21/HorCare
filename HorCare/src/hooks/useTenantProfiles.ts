@@ -98,6 +98,16 @@ export function useTenantProfile(
         updated_at: now,
       });
     }
+
+    // Sync tenant_count to the room document so billing and meter calculations update
+    if (data.tenant_count !== undefined) {
+      try {
+        const roomRef = doc(db, buildingPath(uid, buildingId), 'rooms', roomId);
+        await updateDoc(roomRef, { tenant_count: Number(data.tenant_count) || 1 });
+      } catch (err) {
+        console.warn('Could not sync tenant_count to room doc:', err);
+      }
+    }
   }, [uid, buildingId, roomId, profile]);
 
   /** เพิ่ม event (move_in, move_out, ฯลฯ) */

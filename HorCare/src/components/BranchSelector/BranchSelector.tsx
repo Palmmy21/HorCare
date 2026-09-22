@@ -4,6 +4,7 @@ import './BranchSelector.css';
 interface Building {
   id: string;
   name: string;
+  logo?: string;
 }
 
 interface BranchSelectorProps {
@@ -36,8 +37,12 @@ export default function BranchSelector({
               className="branch-card"
               onClick={() => onSelect(b.id)}
             >
-              <div className="branch-card-icon">
-                <Building2 size={28} />
+              <div className={`branch-card-icon ${b.logo ? 'has-logo' : ''}`}>
+                {b.logo ? (
+                  <img src={b.logo} alt={b.name} />
+                ) : (
+                  <Building2 size={28} />
+                )}
               </div>
               <div className="branch-card-content">
                 <h3>{b.name}</h3>

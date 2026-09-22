@@ -421,6 +421,11 @@ function TenantCard({
             <Home size={12} /> {room.room_number}
           </span>
 
+          {/* Tenant Count badge */}
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#0284C7', fontWeight: 600 }}>
+            <Users size={12} /> {profile?.tenant_count ?? room.tenant_count ?? 1} คน
+          </span>
+
           {/* Phone */}
           {profile?.phone && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

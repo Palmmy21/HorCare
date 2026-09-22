@@ -1,18 +1,21 @@
 import { useState, lazy, Suspense } from 'react';
-import { Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2, AlertTriangle, Smartphone, Cloud, Zap } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2, AlertTriangle, Smartphone, Cloud, Zap, Sparkles } from 'lucide-react';
+import { authenticateHousekeeper } from '../../hooks/useHousekeepers';
+import type { HousekeeperSession } from '../../types';
 const PricingPage = lazy(() => import('../Pricing/PricingPage'));
 
 interface LoginPageProps {
     onLogin: (email: string, password: string) => Promise<void>;
     onRegister: (email: string, password: string, name: string) => Promise<void>;
     onResetPassword: (email: string) => Promise<void>;
+    onMaidLogin?: (session: HousekeeperSession) => void;
     error: string | null;
     clearError: () => void;
 }
 
-type PageMode = 'login' | 'register' | 'forgot' | 'pricing';
+type PageMode = 'login' | 'register' | 'forgot' | 'pricing' | 'maid';
 
-export default function LoginPage({ onLogin, onRegister, onResetPassword, error, clearError }: LoginPageProps) {
+export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaidLogin, error, clearError }: LoginPageProps) {
     const [mode, setMode] = useState<PageMode>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -21,6 +24,11 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
     const [phone, setPhone] = useState('');
     const [referralSources, setReferralSources] = useState<string[]>([]);
     
+    // Maid login state
+    const [maidPhone, setMaidPhone] = useState('');
+    const [maidPasscode, setMaidPasscode] = useState('');
+    const [maidError, setMaidError] = useState<string | null>(null);
+
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [resetSent, setResetSent] = useState(false);
@@ -59,13 +67,38 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
     const switchMode = (newMode: PageMode) => {
         setMode(newMode);
         clearError();
+        setMaidError(null);
         setEmail('');
         setPassword('');
         setFirstName('');
         setLastName('');
         setPhone('');
+        setMaidPhone('');
+        setMaidPasscode('');
         setReferralSources([]);
         setResetSent(false);
+    };
+
+    const handleMaidSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setMaidError(null);
+        try {
+            const session = await authenticateHousekeeper(maidPhone, maidPasscode);
+            if (session) {
+                if (onMaidLogin) {
+                    onMaidLogin(session);
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                setMaidError('เบอร์โทรหรือรหัสผ่านไม่ถูกต้อง หรือบัญชีแม่บ้านถูกปิดใช้งาน');
+            }
+        } catch (err: any) {
+            setMaidError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบแม่บ้าน');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleGuestSelectPlan = (planId: string, cycle: string) => {
@@ -213,22 +246,36 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                         type="button"
                         onClick={() => switchMode('login')}
                         style={{
-                            flex: 1, padding: '0.75rem', background: 'none', border: 'none', cursor: 'pointer',
-                            fontSize: '1rem', fontWeight: 600, color: mode === 'login' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
+                            flex: 1, padding: '0.65rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'login' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
                             borderBottom: mode === 'login' ? '2px solid var(--primary)' : 'none',
-                            marginBottom: '-2px'
+                            marginBottom: '-2px', whiteSpace: 'nowrap',
                         }}
                     >
-                        เข้าสู่ระบบ
+                        เจ้าของหอพัก
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => switchMode('maid')}
+                        style={{
+                            flex: 1, padding: '0.65rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'maid' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
+                            borderBottom: mode === 'maid' ? '2px solid var(--primary)' : 'none',
+                            marginBottom: '-2px', whiteSpace: 'nowrap',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem'
+                        }}
+                    >
+                        <Sparkles size={14} color={mode === 'maid' ? 'var(--primary)' : '#6B7280'} />
+                        แม่บ้าน
                     </button>
                     <button
                         type="button"
                         onClick={() => switchMode('register')}
                         style={{
-                            flex: 1, padding: '0.75rem', background: 'none', border: 'none', cursor: 'pointer',
-                            fontSize: '1rem', fontWeight: 600, color: mode === 'register' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
+                            flex: 1, padding: '0.65rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'register' ? 'var(--primary)' : 'var(--text-secondary, #6B7280)',
                             borderBottom: mode === 'register' ? '2px solid var(--primary)' : 'none',
-                            marginBottom: '-2px'
+                            marginBottom: '-2px', whiteSpace: 'nowrap',
                         }}
                     >
                         สมัครสมาชิก
@@ -236,6 +283,83 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                 </div>
 
                 {/* Form */}
+                {mode === 'maid' ? (
+                    <form onSubmit={handleMaidSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '0.75rem 0.875rem', fontSize: '0.825rem', color: '#0369A1', lineHeight: 1.4 }}>
+                            สำหรับแม่บ้านประจำหอพัก เข้าสู่ระบบด้วยเบอร์โทรศัพท์และรหัสผ่านที่เจ้าของหอพักกำหนดให้
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>เบอร์โทรศัพท์</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="tel"
+                                    placeholder="เช่น 0812345678"
+                                    value={maidPhone}
+                                    onChange={e => setMaidPhone(e.target.value)}
+                                    required
+                                    autoComplete="tel"
+                                    style={{
+                                        width: '100%', padding: '0.75rem 1rem', borderRadius: '8px',
+                                        border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                        color: 'var(--text-primary)', outline: 'none'
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>รหัสผ่าน (Passcode)</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="รหัสผ่านที่ได้รับจากเจ้าของหอพัก"
+                                    value={maidPasscode}
+                                    onChange={e => setMaidPasscode(e.target.value)}
+                                    required
+                                    style={{
+                                        width: '100%', padding: '0.75rem 2.5rem 0.75rem 1rem', borderRadius: '8px',
+                                        border: '1px solid var(--border-color, #e5e7eb)', background: 'var(--bg-primary, #fff)',
+                                        color: 'var(--text-primary)', outline: 'none'
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{
+                                        position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                                        background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                                        color: '#6B7280', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    }}
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {maidError && (
+                            <div className="login-error">
+                                <AlertTriangle size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> {maidError}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            className="login-button"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? (
+                                <Loader2 size={20} className="spin" />
+                            ) : (
+                                <>
+                                    <Sparkles size={18} />
+                                    เข้าสู่ระบบแม่บ้าน
+                                    <ArrowRight size={18} />
+                                </>
+                            )}
+                        </button>
+                    </form>
+                ) : (
                 <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {mode === 'register' && (
                         <>
@@ -412,6 +536,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, error,
                         )}
                     </button>
                 </form>
+            )}
 
                 {mode === 'login' && (
                     <div style={{ textAlign: 'center', marginTop: '0.75rem' }}>

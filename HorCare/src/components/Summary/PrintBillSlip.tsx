@@ -1,4 +1,5 @@
-import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization } from '../../types';
+import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization, BillLanguage } from '../../types';
+import { t, tBilingual, formatBillDate, formatBillMonth, formatDueNotice } from '../../utils/i18n/billTranslations';
 
 interface Props {
     bill: MonthlyBill;
@@ -7,29 +8,25 @@ interface Props {
     effectiveElecRate?: number;
     effectiveWaterConfig?: WaterConfig;
     billCustomization?: BillCustomization;
+    language?: BillLanguage;
+    bilingualMode?: boolean;
+    secondaryLanguage?: BillLanguage;
 }
 
-const THAI_MONTHS = [
-    'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-    'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม',
-];
-function thaiMonth(m: string) {
-    const [y, mo] = m.split('-').map(Number);
-    return `${THAI_MONTHS[mo - 1]} ${y + 543}`;
-}
-function thaiDate(d: string) {
-    const [y, m, day] = d.split('-').map(Number);
-    return `${day} ${THAI_MONTHS[m - 1]} ${y + 543}`;
-}
 function n(v: number) { return v.toLocaleString('th-TH'); }
 
-export default function PrintBillSlip({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization }: Props) {
+export default function PrintBillSlip({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, language, bilingualMode, secondaryLanguage }: Props) {
+    const lang: BillLanguage = language ?? billCustomization?.default_language ?? 'th';
+    const isBilingual: boolean = bilingualMode ?? billCustomization?.bilingual_mode ?? false;
+    const secLang: BillLanguage = secondaryLanguage ?? billCustomization?.secondary_language ?? 'en';
+
     const elecRate = effectiveElecRate ?? config.electricity_rate;
     const waterCfg = effectiveWaterConfig ?? config.water_config;
-    const dormName = billCustomization?.dorm_name || 'ใบแจ้งหนี้';
+    const dormName = billCustomization?.dorm_name || tBilingual('invoice_or_receipt', lang, isBilingual, secLang);
     const phone    = billCustomization?.dorm_phone || '';
     const address  = billCustomization?.dorm_address || '';
-    const footer   = billCustomization?.footer_text || `กรุณาชำระภายในวันที่ ${billCustomization?.due_day ?? 5} ของทุกเดือน`;
+    const defaultFooter = formatDueNotice(billCustomization?.due_day ?? 5, lang, isBilingual, secLang);
+    const footer   = billCustomization?.footer_text || defaultFooter;
     const isFlat   = waterCfg.type === 'flat_rate_tier';
     const tenants  = Math.max(1, bill.tenant_count || 1);
 
@@ -37,29 +34,34 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
     const tdR: React.CSSProperties = { ...tdL, textAlign: 'right', whiteSpace: 'nowrap' };
     const divLine: React.CSSProperties = { borderTop: '1px solid #000', margin: '3px 0' };
 
+    const phonePrefix = isBilingual ? 'โทร. / Tel.' : (lang === 'en' ? 'Tel.' : (lang === 'zh' ? '电话:' : 'โทร.'));
+    const signLabel = isBilingual ? 'ลายเซ็นผู้รับเงิน / Authorized Signature' : (lang === 'en' ? 'Authorized Signature' : (lang === 'zh' ? '收款人签名' : (lang === 'my' ? 'ငွေလက်ခံသူ လက်မှတ်' : 'ลายเซ็นผู้รับเงิน')));
+
     return (
         <div className="print-slip-box">
             {/* Header */}
             <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: 4, marginBottom: 4 }}>
                 <div style={{ fontWeight: 700, fontSize: 13 }}>{dormName}</div>
                 {address && <div style={{ fontSize: 10, color: '#333' }}>{address}</div>}
-                {phone && <div style={{ fontSize: 10, color: '#333' }}>โทร. {phone}</div>}
-                <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2 }}>ใบแจ้งหนี้ / ใบเสร็จรับเงิน</div>
+                {phone && <div style={{ fontSize: 10, color: '#333' }}>{phonePrefix} {phone}</div>}
+                <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2 }}>
+                    {tBilingual('invoice_or_receipt', lang, isBilingual, secLang)}
+                </div>
             </div>
 
             {/* Room + date */}
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 4 }}>
                 <tbody>
                     <tr>
-                        <td style={tdL}><b>ห้อง:</b> {bill.room_number}</td>
-                        <td style={tdR}><b>เดือน:</b> {thaiMonth(bill.month)}</td>
+                        <td style={tdL}><b>{tBilingual('room', lang, isBilingual, secLang)}:</b> {bill.room_number}</td>
+                        <td style={tdR}><b>{tBilingual('month', lang, isBilingual, secLang)}:</b> {formatBillMonth(bill.month + '-01', lang)}</td>
                     </tr>
                     <tr>
-                        <td style={tdL} colSpan={2}><b>วันที่ออกบิล:</b> {thaiDate(billDate)}</td>
+                        <td style={tdL} colSpan={2}><b>{tBilingual('bill_date', lang, isBilingual, secLang)}:</b> {formatBillDate(billDate, lang)}</td>
                     </tr>
                     {tenants > 1 && (
                         <tr>
-                            <td style={tdL} colSpan={2}><b>จำนวนผู้เช่า:</b> {tenants} คน</td>
+                            <td style={tdL} colSpan={2}><b>{tBilingual('tenant_count', lang, isBilingual, secLang)}:</b> {tenants} {t('person_unit', lang)}</td>
                         </tr>
                     )}
                 </tbody>
@@ -71,16 +73,16 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                     <tr>
-                        <th style={{ ...tdL, fontWeight: 700, borderBottom: '1px solid #000' }}>รายการ</th>
-                        <th style={{ ...tdR, fontWeight: 700, borderBottom: '1px solid #000' }}>จำนวนเงิน</th>
+                        <th style={{ ...tdL, fontWeight: 700, borderBottom: '1px solid #000' }}>{tBilingual('item', lang, isBilingual, secLang)}</th>
+                        <th style={{ ...tdR, fontWeight: 700, borderBottom: '1px solid #000' }}>{tBilingual('amount_thb', lang, isBilingual, secLang)}</th>
                     </tr>
                 </thead>
                 <tbody>
                     {/* ค่าเช่า */}
                     <tr>
                         <td style={tdL}>
-                            ค่าเช่าห้อง
-                            {bill.room_rent === 0 && <span style={{ fontSize: 9, color: '#555' }}> (รายเทอม)</span>}
+                            {tBilingual('room_rent', lang, isBilingual, secLang)}
+                            {bill.room_rent === 0 && <span style={{ fontSize: 9, color: '#555' }}> ({tBilingual('semester_rent', lang, isBilingual, secLang)})</span>}
                         </td>
                         <td style={tdR}>{n(bill.room_rent)}</td>
                     </tr>
@@ -88,7 +90,7 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                     {/* ค่าไฟ */}
                     <tr>
                         <td style={tdL}>
-                            ค่าไฟฟ้า ({n(bill.elec_units)} หน่วย × {elecRate})
+                            {tBilingual('electricity', lang, isBilingual, secLang)} ({n(bill.elec_units)} {t('unit_label', lang)} × {elecRate})
                             <div style={{ fontSize: 9, color: '#555' }}>{n(bill.prev_elec)} → {n(bill.curr_elec)}</div>
                         </td>
                         <td style={tdR}>{n(bill.elec_bill)}</td>
@@ -99,14 +101,14 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                         <>
                             <tr>
                                 <td style={tdL}>
-                                    ค่าน้ำ (เหมา {n(bill.water_flat_amount)} บ.)
-                                    <div style={{ fontSize: 9, color: '#555' }}>{n(bill.prev_water)} → {n(bill.curr_water)} · {n(bill.water_units)} หน่วย</div>
+                                    {tBilingual('water_flat', lang, isBilingual, secLang)} ({n(bill.water_flat_amount)} {t('baht_label', lang)})
+                                    <div style={{ fontSize: 9, color: '#555' }}>{n(bill.prev_water)} → {n(bill.curr_water)} · {n(bill.water_units)} {t('unit_label', lang)}</div>
                                 </td>
                                 <td style={tdR}>{n(bill.water_flat_amount)}</td>
                             </tr>
                             {bill.water_excess_units > 0 && (
                                 <tr>
-                                    <td style={tdL}>ค่าน้ำส่วนเกิน ({n(bill.water_excess_units)} × {waterCfg.excess_unit_rate})</td>
+                                    <td style={tdL}>{tBilingual('water_excess', lang, isBilingual, secLang)} ({n(bill.water_excess_units)} × {waterCfg.excess_unit_rate})</td>
                                     <td style={tdR}>{n(bill.water_excess_amount)}</td>
                                 </tr>
                             )}
@@ -114,7 +116,7 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                     ) : (
                         <tr>
                             <td style={tdL}>
-                                ค่าน้ำ ({n(bill.water_units)} หน่วย × {waterCfg.unit_rate})
+                                {tBilingual('water', lang, isBilingual, secLang)} ({n(bill.water_units)} {t('unit_label', lang)} × {waterCfg.unit_rate})
                                 <div style={{ fontSize: 9, color: '#555' }}>{n(bill.prev_water)} → {n(bill.curr_water)}</div>
                             </td>
                             <td style={tdR}>{n(bill.water_bill)}</td>
@@ -125,7 +127,7 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                     {bill.common_fee ? (
                         <tr>
                             <td style={tdL}>
-                                ค่าส่วนกลาง
+                                {tBilingual('common_fee', lang, isBilingual, secLang)}
                                 {bill.applied_common_fees && bill.applied_common_fees.length > 0 && (
                                     <div style={{ fontSize: 9, color: '#555' }}>
                                         {bill.applied_common_fees.map(f => f.name).join(', ')}
@@ -144,8 +146,8 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                     <tr>
-                        <td style={{ ...tdL, fontWeight: 700, fontSize: 12 }}>รวมทั้งสิ้น</td>
-                        <td style={{ ...tdR, fontWeight: 700, fontSize: 13 }}>{n(bill.total_bill)} บาท</td>
+                        <td style={{ ...tdL, fontWeight: 700, fontSize: 12 }}>{tBilingual('total_amount', lang, isBilingual, secLang)}</td>
+                        <td style={{ ...tdR, fontWeight: 700, fontSize: 13 }}>{n(bill.total_bill)} {t('baht_label', lang)}</td>
                     </tr>
                 </tbody>
             </table>
@@ -159,7 +161,7 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
                     <div style={{ borderTop: '1px solid #000', width: 80, marginBottom: 2 }} />
-                    ลายเซ็นผู้รับเงิน
+                    {signLabel}
                 </div>
             </div>
         </div>

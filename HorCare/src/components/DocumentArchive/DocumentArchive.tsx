@@ -198,6 +198,7 @@ export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrad
                                     effectiveElecRate={rates?.electricityRate}
                                     effectiveWaterConfig={rates?.waterConfig}
                                     billCustomization={config.bill_customization}
+                                    language={room?.language || config.bill_customization?.default_language || 'th'}
                                 />
                             );
                         })}

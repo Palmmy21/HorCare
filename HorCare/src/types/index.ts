@@ -16,6 +16,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   display_name: string;
+  name?: string;
   license: LicenseType;
   role?: 'admin' | 'user';
   status?: 'active' | 'banned'; // 'banned' = blocked by admin
@@ -44,6 +45,7 @@ export interface Building {
   name: string;
   created_at: string;
   order: number;
+  logo?: string;
 }
 export interface WaterConfig {
   type: 'normal' | 'flat_rate_tier';
@@ -55,6 +57,8 @@ export interface WaterConfig {
   excess_unit_rate?: number;
 }
 
+export type BillLanguage = 'th' | 'en' | 'my' | 'zh' | 'lo' | 'vi';
+
 export interface BillCustomization {
   dorm_name: string;          // ชื่อหอพัก
   dorm_address: string;       // ที่อยู่
@@ -64,6 +68,9 @@ export interface BillCustomization {
   footer_text: string;        // ข้อความด้านล่างบิล
   due_day: number;            // กำหนดชำระวันที่
   dorm_logo?: string;         // base64 โลโก้หอพัก (แสดงในพอร์ทัลผู้เช่า)
+  default_language?: BillLanguage;   // ภาษาเริ่มต้นของบิลและการแจ้งเตือน (default: 'th')
+  bilingual_mode?: boolean;          // แสดงบิล 2 ภาษาคู่ขนาน (เช่น ไทย + อังกฤษ)
+  secondary_language?: BillLanguage; // ภาษาที่สองเมื่อเปิดโหมด 2 ภาษา (default: 'en')
 }
 
 export interface DormConfig {
@@ -96,6 +103,8 @@ export interface Room {
   // Room occupancy status — set manually by owner
   // 'occupied' = มีผู้เช่า, 'vacant' = ว่าง, 'reserved' = ติดจอง
   room_status?: 'occupied' | 'vacant' | 'reserved';
+  // ภาษาเฉพาะห้องสำหรับบิลและการแจ้งเตือน (ถ้าไม่ระบุจะใช้ค่าเริ่มต้นของหอพัก)
+  language?: BillLanguage;
 }
 
 export interface MonthlyBill {
@@ -181,6 +190,7 @@ export interface TenantProfile {
   nickname?: string;
   phone: string;
   line_display_name?: string;   // ชื่อใน LINE (sync จาก webhook)
+  tenant_count?: number;        // จำนวนผู้พักอาศัย (พักกี่คน)
 
   // ── สัญญา / วันที่ (ฟรี) ──
   move_in_date?: string;         // ISO date "YYYY-MM-DD"
@@ -251,6 +261,7 @@ export interface MaintenanceRequest {
   updated_at?: string;  // ISO
   admin_note?: string;
   has_photo?: boolean;  // true ถ้ามีรูปใน maintenance_images/{id}
+  photo_url?: string;
   // Assignment (set when moving to in_progress)
   vendor_id?: string;
   vendor_name?: string;
@@ -351,3 +362,71 @@ export interface CommonFee {
   created_at: string;
   updated_at?: string;
 }
+
+// ─── Housekeeping & Maid System (ระบบงานแม่บ้าน) ─────────────────────────────
+export type CleaningServiceType =
+  | 'general'
+  | 'general_cleaning'    // ทำความสะอาดทั่วไป
+  | 'bathroom'
+  | 'bathroom_cleaning'   // ล้างห้องน้ำ
+  | 'balcony'             // ล้างระเบียง / ซักล้าง
+  | 'bed_linen'           // เปลี่ยนผ้าปู / ซักรีด
+  | 'deep'
+  | 'deep_cleaning'       // บิ๊กคลีนนิ่ง
+  | 'checkout'
+  | 'move_out_cleaning'   // ทำความสะอาดก่อนย้ายออก
+  | 'other';              // อื่นๆ
+
+export type CleaningStatus = 'open' | 'pending' | 'assigned' | 'in_progress' | 'done' | 'completed' | 'cancelled';
+
+export interface CleaningRequest {
+  id: string;
+  room_id?: string;
+  room_number: string;
+  tenant_name?: string;
+  service_type: CleaningServiceType;
+  description?: string;
+  preferred_date?: string;          // YYYY-MM-DD
+  preferred_time_slot?: string;
+  status: CleaningStatus;
+  urgency?: 'normal' | 'urgent';
+  photo_url?: string | null;
+  image_url?: string | null;
+  has_photo?: boolean;
+  assigned_maid_id?: string;
+  assigned_maid_name?: string;
+  assigned_maid_phone?: string;
+  accepted_at?: string;
+  completed_at?: string;
+  completed_by?: 'maid' | 'landlord';
+  completion_notes?: string;
+  completed_note?: string;
+  completion_photo_url?: string | null;
+  fee?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Housekeeper {
+  id: string;
+  name: string;
+  phone: string;
+  passcode: string;                 // รหัสเข้าสู่ระบบ (4-8 หลัก)
+  status?: 'active' | 'busy' | 'off';
+  is_active: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface HousekeeperSession {
+  owner_uid: string;
+  building_id: string;
+  building_name?: string;
+  maid_id: string;
+  name?: string;
+  maid_name: string;
+  phone: string;
+}
+
+

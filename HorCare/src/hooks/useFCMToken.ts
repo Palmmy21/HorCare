@@ -73,20 +73,38 @@ export function useFCMToken(uid: string | null) {
                 }
 
                 // Foreground messages — show system notification while app is open
-                onMessage(messaging, (payload) => {
+                onMessage(messaging, async (payload) => {
                     if (cancelled) return;
                     const title = payload.notification?.title || 'HorCare';
                     const body  = payload.notification?.body  || '';
                     const url   = (payload.data as Record<string, string>)?.url || '/';
                     if (Notification.permission === 'granted') {
-                        const n = new Notification(title, {
-                            body,
-                            icon: '/logo-icon.png',
-                            badge: '/logo-icon.png',
-                            // @ts-expect-error — vibrate is valid in mobile browsers but missing from TS lib
-                            vibrate: [200, 100, 200],
-                        });
-                        n.onclick = () => { n.close(); window.focus(); window.location.href = url; };
+                        try {
+                            if (swReg) {
+                                await swReg.showNotification(title, {
+                                    body,
+                                    icon: '/logo-icon.png',
+                                    badge: '/logo-icon.png',
+                                    data: { url },
+                                    // @ts-expect-error — vibrate is valid in mobile browsers
+                                    vibrate: [200, 100, 200],
+                                });
+                                return;
+                            }
+                        } catch {
+                            // Fallback to desktop Notification if SW fails
+                        }
+
+                        try {
+                            const n = new Notification(title, {
+                                body,
+                                icon: '/logo-icon.png',
+                                badge: '/logo-icon.png',
+                            });
+                            n.onclick = () => { n.close(); window.focus(); window.location.href = url; };
+                        } catch {
+                            // silent
+                        }
                     }
                 });
             } catch (e: unknown) {

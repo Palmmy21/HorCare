@@ -85,9 +85,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dormName = cfg.bill_customization?.dorm_name || 'หอพัก';
             const dueDay = Number(cfg.bill_customization?.due_day) || 5;
             const lineByRoom = new Map<string, string>();
+            const langByRoom = new Map<string, any>();
             roomsSnap.docs.forEach(r => {
-                const lid = r.data().line_user_id;
-                if (lid) lineByRoom.set(r.id, lid);
+                const rdata = r.data();
+                if (rdata.line_user_id) lineByRoom.set(r.id, rdata.line_user_id);
+                if (rdata.language) langByRoom.set(r.id, rdata.language);
             });
 
             await runPooled(bills, PUSH_CONCURRENCY, async (billDoc) => {
@@ -125,10 +127,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
                 if (!text) { skipped++; return; }
 
+                const roomLang = langByRoom.get(bill.room_id) || cfg.bill_customization?.default_language || 'th';
+                const bilingual = !!cfg.bill_customization?.bilingual_mode;
+                const secLang = cfg.bill_customization?.secondary_language || 'en';
+
                 try {
                     await linePush(lineUserId, [
                         { type: 'text', text },
-                        buildBillFlex(bill, dormName, dueDay, bill.month as string),
+                        buildBillFlex(bill, dormName, dueDay, bill.month as string, { lang: roomLang, bilingual, secLang }),
                     ]);
                     await billDoc.ref.update({
                         last_reminded_at: new Date().toISOString(),

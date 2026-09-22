@@ -1,103 +1,233 @@
-import { useState, useEffect } from 'react';
-import { Download, X, Smartphone } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Download, X, Share, PlusSquare, CheckCircle2 } from 'lucide-react';
+import horcareLogo from '../../assets/horcare_logo.png';
 
 interface BeforeInstallPromptEvent extends Event {
-    prompt(): Promise<void>;
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+export function isPWAStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.matchMedia('(display-mode: minimal-ui)').matches ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+    document.referrer.includes('android-app://')
+  );
 }
 
 export default function InstallPrompt() {
-    const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-    const [showBanner, setShowBanner] = useState(false);
-    const [isIOS, setIsIOS] = useState(false);
-    const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showBanner, setShowBanner] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
-    useEffect(() => {
-        const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream;
-        const isStandalone =
-            window.matchMedia('(display-mode: standalone)').matches ||
-            (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  // Check if standalone or dismissed recently
+  const checkShouldShow = useCallback(() => {
+    if (isPWAStandalone()) return false;
 
-        if (isStandalone || localStorage.getItem('pwa_install_dismissed') === 'true') return;
+    const dismissedTime = localStorage.getItem('pwa_install_dismissed_time');
+    if (dismissedTime) {
+      const elapsedDays = (Date.now() - parseInt(dismissedTime, 10)) / (1000 * 60 * 60 * 24);
+      if (elapsedDays < 2) return false;
+    }
+    return true;
+  }, []);
 
-        if (ios) {
-            setIsIOS(true); // eslint-disable-line react-hooks/set-state-in-effect
-            const timer = setTimeout(() => setShowBanner(true), 3000);
-            return () => clearTimeout(timer);
-        }
+  useEffect(() => {
+    if (isPWAStandalone()) return;
 
-        const handler = (e: Event) => {
-            e.preventDefault();
-            setDeferredPrompt(e as BeforeInstallPromptEvent);
-            setShowBanner(true);
-        };
-        window.addEventListener('beforeinstallprompt', handler);
-        return () => window.removeEventListener('beforeinstallprompt', handler);
-    }, []);
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream;
+    if (ios) {
+      setIsIOS(true);
+      if (checkShouldShow()) {
+        const timer = setTimeout(() => setShowBanner(true), 2500);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
 
-    const handleInstall = async () => {
-        if (!deferredPrompt) return;
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') setShowBanner(false);
-        setDeferredPrompt(null);
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      if (checkShouldShow()) {
+        setShowBanner(true);
+      }
     };
 
-    const handleDismiss = () => {
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Allow manual trigger from sidebar/settings
+    const manualOpenHandler = () => {
+      setShowBanner(true);
+      if (ios) {
+        setShowIOSGuide(true);
+      }
+    };
+    window.addEventListener('open-pwa-install', manualOpenHandler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('open-pwa-install', manualOpenHandler);
+    };
+  }, [checkShouldShow]);
+
+  const handleInstall = async () => {
+    if (isIOS) {
+      setShowIOSGuide(true);
+      return;
+    }
+
+    if (!deferredPrompt) {
+      // Fallback for browsers that don't support beforeinstallprompt
+      alert('คุณสามารถติดตั้งได้โดยกดที่เมนูของเบราว์เซอร์ (⋮) แล้วเลือก "ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"');
+      return;
+    }
+
+    setInstalling(true);
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
         setShowBanner(false);
-        localStorage.setItem('pwa_install_dismissed', 'true');
-    };
+      }
+    } finally {
+      setInstalling(false);
+      setDeferredPrompt(null);
+    }
+  };
 
-    if (!showBanner) return null;
+  const handleDismiss = () => {
+    setShowBanner(false);
+    localStorage.setItem('pwa_install_dismissed_time', Date.now().toString());
+  };
 
-    return (
-        <>
-            <div className="install-prompt">
-                <div className="install-prompt-icon">
-                    <Smartphone size={20} />
-                </div>
-                <div className="install-prompt-text">
-                    <span className="install-prompt-title">ติดตั้ง HorCare</span>
-                    <span className="install-prompt-sub">ใช้งานเหมือนแอปพลิเคชัน ไม่ต้องเปิดเบราว์เซอร์</span>
-                </div>
-                <div className="install-prompt-actions">
-                    {isIOS ? (
-                        <button className="btn btn-primary btn-sm" onClick={() => setShowIOSGuide(true)}>
-                            วิธีติดตั้ง
-                        </button>
-                    ) : (
-                        <button className="btn btn-primary btn-sm" onClick={handleInstall}>
-                            <Download size={14} /> ติดตั้ง
-                        </button>
-                    )}
-                    <button className="btn-icon" onClick={handleDismiss} title="ปิด">
-                        <X size={16} />
-                    </button>
-                </div>
+  if (!showBanner || isPWAStandalone()) return null;
+
+  return (
+    <>
+      <div className="install-prompt-wrapper">
+        <div className="install-prompt-card">
+          {/* App Icon */}
+          <div className="install-prompt-logo-box">
+            <img src={horcareLogo} alt="HorCare" className="install-prompt-logo-img" />
+          </div>
+
+          {/* Info */}
+          <div className="install-prompt-info">
+            <div className="install-prompt-badge">
+              <CheckCircle2 size={11} color="#10B981" />
+              <span>แอปพลิเคชันทางการ</span>
+            </div>
+            <div className="install-prompt-title">ติดตั้ง HorCare</div>
+            <div className="install-prompt-desc">เปิดใช้งานเร็วขึ้น ลื่นไหลเหมือนแอปมือถือ ไม่ต้องเข้าเบราว์เซอร์</div>
+          </div>
+
+          {/* Actions */}
+          <div className="install-prompt-actions">
+            <button
+              onClick={handleInstall}
+              disabled={installing}
+              className="install-prompt-btn-install"
+            >
+              <Download size={14} />
+              <span>{isIOS ? 'วิธีติดตั้ง' : installing ? 'กำลังติดตั้ง...' : 'ติดตั้ง'}</span>
+            </button>
+            <button
+              onClick={handleDismiss}
+              className="install-prompt-btn-close"
+              title="ไว้คราวหลัง"
+              aria-label="ปิดการแจ้งเตือนติดตั้ง"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* iOS Installation Guide Modal */}
+      {showIOSGuide && (
+        <div className="modal-overlay" onClick={() => setShowIOSGuide(false)} style={{ zIndex: 9999 }}>
+          <div
+            className="modal"
+            style={{ maxWidth: '360px', padding: '1.5rem', borderRadius: '24px' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <img src={horcareLogo} alt="HorCare" style={{ width: 32, height: 32, borderRadius: 8 }} />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--color-gray-900)' }}>
+                  ติดตั้งบน iPhone / iPad
+                </h3>
+              </div>
+              <button className="btn-icon" onClick={() => setShowIOSGuide(false)}>
+                <X size={18} />
+              </button>
             </div>
 
-            {showIOSGuide && (
-                <div className="modal-overlay" onClick={() => setShowIOSGuide(false)}>
-                    <div className="modal" style={{ maxWidth: '320px' }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 style={{ margin: 0 }}>ติดตั้งบน iPhone / iPad</h3>
-                            <button className="btn-icon" onClick={() => setShowIOSGuide(false)}>
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="modal-body" style={{ fontSize: '0.9rem', lineHeight: 1.7 }}>
-                            <ol style={{ paddingLeft: '1.25rem', margin: 0 }}>
-                                <li>กดปุ่ม <strong>Share</strong> (กล่องลูกศรขึ้น) ด้านล่างของ Safari</li>
-                                <li>เลื่อนลงแล้วกด <strong>"Add to Home Screen"</strong></li>
-                                <li>กด <strong>Add</strong> ที่มุมบนขวา</li>
-                            </ol>
-                            <p style={{ marginTop: '0.75rem', color: 'var(--color-gray-500)', fontSize: '0.8rem', marginBottom: 0 }}>
-                                HorCare จะปรากฏบนหน้าจอหลักเหมือนแอปปกติ
-                            </p>
-                        </div>
-                    </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                background: 'var(--color-gray-50)', padding: '0.75rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.12)',
+                  color: '#0EA5E9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0
+                }}>
+                  1
                 </div>
-            )}
-        </>
-    );
+                <div style={{ fontSize: '0.875rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
+                  กดปุ่ม <strong>แชร์</strong> (<Share size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#0EA5E9' }} /> กล่องลูกศรขึ้น) ด้านล่างของเบราว์เซอร์ Safari
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                background: 'var(--color-gray-50)', padding: '0.75rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.12)',
+                  color: '#0EA5E9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0
+                }}>
+                  2
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
+                  เลื่อนลงมาแล้วกด <PlusSquare size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#10B981' }} /> <strong>"เพิ่มไปยังหน้าจอโฮม"</strong> (Add to Home Screen)
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                background: 'var(--color-gray-50)', padding: '0.75rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.12)',
+                  color: '#0EA5E9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem', flexShrink: 0
+                }}>
+                  3
+                </div>
+                <div style={{ fontSize: '0.875rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
+                  กด <strong>"เพิ่ม"</strong> (Add) ที่มุมบนขวา เป็นอันเสร็จสิ้น
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowIOSGuide(false)}
+              style={{
+                width: '100%', marginTop: '1.25rem', padding: '0.75rem',
+                borderRadius: '12px', background: 'linear-gradient(135deg, #0EA5E9, #10B981)',
+                color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+              }}
+            >
+              เข้าใจแล้ว
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

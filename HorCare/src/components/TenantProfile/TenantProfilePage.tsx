@@ -13,7 +13,7 @@ import {
   User, Calendar, Banknote,
   Plus, Trash2, Edit2, Check, X, CheckCircle2,
   Clock, LogIn, LogOut, RefreshCw, FileText, Lock, Zap,
-  Heart, GraduationCap, ClipboardList, AlertTriangle,
+  Heart, GraduationCap, ClipboardList, AlertTriangle, Users,
 } from 'lucide-react';
 import type { Room, TenantProfile, TenantEvent } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
@@ -54,6 +54,7 @@ function daysUntil(iso?: string): number | null {
 function emptyForm(): Omit<TenantProfile, 'id' | 'room_id' | 'building_id' | 'created_at' | 'updated_at'> {
   return {
     full_name: '', nickname: '', phone: '', line_display_name: '',
+    tenant_count: 1,
     move_in_date: '', contract_end_date: '', expected_move_out: '',
     deposit_amount: undefined, deposit_status: 'held', deposit_note: '',
     birthdate: '', id_card_number: '', occupation: '', university: '',
@@ -88,6 +89,7 @@ export default function TenantProfilePage({
         nickname: profile.nickname ?? '',
         phone: profile.phone ?? '',
         line_display_name: profile.line_display_name ?? '',
+        tenant_count: profile.tenant_count ?? room.tenant_count ?? 1,
         move_in_date: profile.move_in_date ?? '',
         contract_end_date: profile.contract_end_date ?? '',
         expected_move_out: profile.expected_move_out ?? '',
@@ -103,8 +105,10 @@ export default function TenantProfilePage({
         emergency_phone: profile.emergency_phone ?? '',
         emergency_relation: profile.emergency_relation ?? '',
       });
+    } else {
+      setForm(f => ({ ...f, tenant_count: room.tenant_count ?? 1 }));
     }
-  }, [profile]);
+  }, [profile, room.tenant_count]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -284,6 +288,39 @@ export default function TenantProfilePage({
                         {isEditing
                           ? <input className="form-input" value={form.occupation ?? ''} onChange={e => setForm(f => ({ ...f, occupation: e.target.value }))} placeholder="นักศึกษา / บริษัท XYZ" />
                           : <Value>{profile?.occupation || '—'}</Value>}
+                      </Field>
+                      <Field label="จำนวนผู้พักอาศัย (คน)">
+                        {isEditing ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                              className="form-input mono"
+                              type="number"
+                              min={1}
+                              max={20}
+                              value={form.tenant_count ?? room.tenant_count ?? 1}
+                              onChange={e => setForm(f => ({ ...f, tenant_count: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                              style={{ width: '100px' }}
+                            />
+                            <span style={{ fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>คน</span>
+                          </div>
+                        ) : (
+                          <Value>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              background: 'rgba(14, 165, 233, 0.1)',
+                              color: '#0284C7',
+                              fontWeight: 700,
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: '999px',
+                              fontSize: '0.85rem'
+                            }}>
+                              <Users size={13} />
+                              {(profile?.tenant_count ?? room.tenant_count ?? 1)} คน
+                            </span>
+                          </Value>
+                        )}
                       </Field>
                     </FormGrid>
                   </SectionCard>

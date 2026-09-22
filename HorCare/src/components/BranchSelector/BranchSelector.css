@@ -145,10 +145,32 @@
   z-index: 1;
 }
 
-.branch-card:hover .branch-card-icon {
+.branch-card-icon.has-logo {
+  background: #FFFFFF !important;
+  border-color: var(--color-gray-200);
+  padding: 2px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.branch-card-icon.has-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: calc(var(--radius-lg) - 2px);
+  display: block;
+}
+
+.branch-card:hover .branch-card-icon:not(.has-logo) {
   background: var(--gradient-primary, var(--color-primary));
   color: var(--color-white);
   border-color: transparent;
+}
+
+.branch-card:hover .branch-card-icon.has-logo {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25);
+  transform: scale(1.06);
 }
 
 .branch-card-content {

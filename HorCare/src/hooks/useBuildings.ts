@@ -22,6 +22,31 @@ export function useBuildings(userId: string | null) {
             const list = snap.docs.map(d => ({ ...d.data(), id: d.id } as Building));
             setBuildings(list);
 
+            // If any building is missing a logo, check if its config has bill_customization.dorm_logo
+            const missingLogo = list.some(b => !b.logo);
+            if (missingLogo) {
+                Promise.all(list.map(async (b) => {
+                    if (b.logo) return b;
+                    try {
+                        const cfgSnap = await getDoc(doc(db, `users/${userId}/buildings/${b.id}/data/config`));
+                        if (cfgSnap.exists()) {
+                            const cfgLogo = cfgSnap.data()?.bill_customization?.dorm_logo;
+                            if (cfgLogo) {
+                                updateDoc(doc(db, `users/${userId}/buildings/${b.id}`), { logo: cfgLogo }).catch(() => {});
+                                return { ...b, logo: cfgLogo };
+                            }
+                        }
+                    } catch {
+                        // ignore network or permission error
+                    }
+                    return b;
+                })).then((enriched) => {
+                    if (enriched.some((b, i) => b.logo !== list[i].logo)) {
+                        setBuildings(enriched);
+                    }
+                });
+            }
+
             // First load: if no buildings exist, check for legacy data and migrate
             if (!migratedRef.current && snap.empty) {
                 migratedRef.current = true;

@@ -4,7 +4,7 @@ import {
     TrendingUp, TrendingDown, CheckCircle, Clock,
     BarChart3, CheckSquare, FileText, LineChart, Settings, ClipboardList,
     SlidersHorizontal, X, Wallet, CircleDollarSign, AlertCircle, ChevronRight,
-    Receipt, ArrowUpRight, ArrowDownRight,
+    Receipt, ArrowUpRight, ArrowDownRight, Building2,
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -50,6 +50,7 @@ export default function Dashboard({
     const [showCustomize, setShowCustomize] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'ai'>('overview');
     const { allWidgets, toggle, isEnabled } = useDashboardPrefs(uid);
+    const dormLogo = config?.bill_customization?.dorm_logo;
 
     // ── Fetch expenses (last 6+ months) ──────────────────────────────────────
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -142,26 +143,40 @@ export default function Dashboard({
 
     return (
         <div>
-            <div className="page-header">
+            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
                 <div>
-                    {/* ชื่อหอพัก — แสดงโดดเด่นให้ผู้ใช้รู้สึกเป็นเจ้าของ */}
+                    {/* ชื่อหอพัก — สไตล์ Gen-Z Hi-Tech Cyber Badge */}
                     {buildingName && (
                         <div style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.4rem',
-                            background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.12))',
-                            border: '1px solid rgba(139,92,246,0.3)',
-                            borderRadius: '20px',
-                            padding: '0.25rem 0.75rem',
-                            marginBottom: '0.4rem',
-                            fontSize: '0.8rem',
+                            gap: '0.45rem',
+                            background: 'rgba(14, 165, 233, 0.08)',
+                            border: '1px solid rgba(14, 165, 233, 0.25)',
+                            borderRadius: '9999px',
+                            padding: '0.25rem 0.85rem',
+                            marginBottom: '0.5rem',
+                            fontSize: '0.8125rem',
                             fontWeight: 700,
-                            color: '#A78BFA',
-                            letterSpacing: '0.01em',
+                            color: '#0284C7',
+                            letterSpacing: '0.02em',
+                            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.12)',
+                            backdropFilter: 'blur(8px)',
                         }}>
-                            <Home size={12} style={{ opacity: 0.8 }} />
-                            {buildingName}
+                            <span style={{
+                                width: '6px', height: '6px', borderRadius: '50%',
+                                background: '#10B981', boxShadow: '0 0 8px #10B981', flexShrink: 0,
+                            }} />
+                            {dormLogo ? (
+                                <img
+                                    src={dormLogo}
+                                    alt={buildingName}
+                                    style={{ width: 16, height: 16, borderRadius: '4px', objectFit: 'contain', flexShrink: 0 }}
+                                />
+                            ) : (
+                                <Building2 size={13} style={{ color: '#0EA5E9', flexShrink: 0 }} />
+                            )}
+                            <span>{buildingName}</span>
                         </div>
                     )}
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -171,9 +186,48 @@ export default function Dashboard({
                         ภาพรวมหอพัก — รอบเดือน {formatMonthThai(currentMonth)}
                     </p>
                 </div>
-                <button className="btn btn-outline btn-sm" onClick={() => setShowCustomize(true)} style={{ visibility: activeTab === 'overview' ? 'visible' : 'hidden' }}>
-                    <SlidersHorizontal size={15} /> ปรับแต่ง
-                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {/* Dorm Logo Badge at Top-Right (as requested) */}
+                    {dormLogo && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            background: 'var(--color-white)',
+                            border: '1.5px solid var(--color-gray-200)',
+                            borderRadius: '16px',
+                            padding: '0.35rem 0.85rem 0.35rem 0.45rem',
+                            boxShadow: 'var(--shadow-sm)',
+                        }}>
+                            <img
+                                src={dormLogo}
+                                alt={buildingName || 'โลโก้หอพัก'}
+                                style={{
+                                    width: 46,
+                                    height: 46,
+                                    objectFit: 'contain',
+                                    borderRadius: '12px',
+                                    background: '#F8FAFC',
+                                    padding: '3px',
+                                    border: '1px solid var(--color-gray-100)',
+                                }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    สาขาปัจจุบัน
+                                </span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-gray-800)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {buildingName || config?.bill_customization?.dorm_name || 'หอพัก'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
+                    <button className="btn btn-outline btn-sm" onClick={() => setShowCustomize(true)} style={{ visibility: activeTab === 'overview' ? 'visible' : 'hidden' }}>
+                        <SlidersHorizontal size={15} /> ปรับแต่ง
+                    </button>
+                </div>
             </div>
 
             {/* ── Tabs ── */}

@@ -108,9 +108,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const portalUrl = appUrl
                     ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${bill.room_id}`
                     : undefined;
-                const messages: object[] = [buildBillFlex(bill, dormName, dueDay, month, { portalUrl })];
+                const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';
+                const bilingual = !!cfg.bill_customization?.bilingual_mode;
+                const secLang = cfg.bill_customization?.secondary_language || 'en';
+                const messages: object[] = [buildBillFlex(bill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })];
                 if (promptpayNumber) {
-                    messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, bill.total_bill as number));
+                    messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, bill.total_bill as number, roomLang));
                 }
                 await linePush(lineUserId, messages);
                 await billDoc.ref.update({ is_notified: true });

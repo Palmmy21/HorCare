@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Zap, Ban,
-  Building2, ChevronDown, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive
+  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
 import { useFCMToken } from './hooks/useFCMToken';
+import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 // Core pages — always needed, load eagerly
@@ -18,7 +19,10 @@ import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine, isPlusOrAbove } from './hooks/useSubscription';
 import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
+import { useCleaningRequests } from './hooks/useCleaningRequests';
 import SlipNotificationToast from './components/SlipNotificationToast';
+import InstallPrompt, { isPWAStandalone } from './components/PWA/InstallPrompt';
+import type { HousekeeperSession } from './types';
 // Heavy pages — lazy loaded so their chunks (jsPDF, html2canvas, Stripe, etc.)
 // are downloaded only when the user first navigates to them
 const Summary         = lazy(() => import('./components/Summary/Summary'));
@@ -26,11 +30,12 @@ const DocumentArchive = lazy(() => import('./components/DocumentArchive/Document
 const PaymentsPage    = lazy(() => import('./components/Payments/PaymentsPage'));
 const TenantsPage     = lazy(() => import('./components/TenantProfile/TenantsPage'));
 const MaintenancePage = lazy(() => import('./components/Maintenance/MaintenancePage'));
+const CleaningPage    = lazy(() => import('./components/Cleaning/CleaningPage'));
+const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'));
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
 
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
-const InstallPrompt   = lazy(() => import('./components/PWA/InstallPrompt'));
 const FeatureLockedModal = lazy(() => import('./components/FeatureLockedModal'));
 const BranchSelector = lazy(() => import('./components/BranchSelector/BranchSelector'));
 
@@ -46,7 +51,7 @@ function PageLoader() {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -58,7 +63,21 @@ function App() {
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('horcare_sidebar_collapsed') === 'true';
+  });
+
+  const handleToggleSidebar = () => {
+    if (window.innerWidth <= 768) {
+      setMobileMenuOpen(false);
+    } else {
+      setSidebarCollapsed(prev => {
+        const next = !prev;
+        localStorage.setItem('horcare_sidebar_collapsed', String(next));
+        return next;
+      });
+    }
+  };
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
   const [buildingMenuOpen, setBuildingMenuOpen] = useState(false);
   const [addBuildingMode, setAddBuildingMode] = useState(false);
@@ -86,21 +105,59 @@ function App() {
   // FCM push notification token — registers silently when permission is already granted
   useFCMToken(user?.uid ?? null);
 
-  // Buildings (multi-building support — Large plan)
-  const { buildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(user?.uid ?? null);
+  // Browser push notification permission state & request helper
+  const { permission: notifPermission, requestPermission: requestNotifPermission } = usePushNotification();
+  const [dismissedNotifBanner, setDismissedNotifBanner] = useState(() => {
+    return sessionStorage.getItem('horcare_dismiss_notif_banner') === 'true';
+  });
+
+  // Maid session state
+  const [maidSession, setMaidSession] = useState<HousekeeperSession | null>(() => {
+    try {
+      const raw = localStorage.getItem('horcare_maid_session');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleMaidLogout = () => {
+    localStorage.removeItem('horcare_maid_session');
+    setMaidSession(null);
+    setCurrentView('dashboard');
+  };
 
   // Active building — persisted per user in localStorage
   const buildingStorageKey = user ? `horcare_active_building_${user.uid}` : null;
-  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
+  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(() => maidSession?.building_id ?? null);
+
+  const effectiveUid = maidSession ? maidSession.owner_uid : (user?.uid ?? null);
+  const effectiveBuildingId = maidSession ? maidSession.building_id : activeBuildingId;
+
+  // Buildings (multi-building support — Large plan)
+  const { buildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(effectiveUid);
+
+  useEffect(() => {
+    if (maidSession?.building_id) {
+      setActiveBuildingId(maidSession.building_id);
+    }
+  }, [maidSession]);
+
+  useEffect(() => {
+    if (maidSession && currentView !== 'cleaning' && currentView !== 'recording') {
+      setCurrentView('cleaning');
+    }
+  }, [maidSession, currentView]);
 
   // Sync activeBuildingId when buildings load
   useEffect(() => {
+    if (maidSession?.building_id) return;
     if (buildingsLoading || buildings.length === 0) return;
     const stored = buildingStorageKey ? localStorage.getItem(buildingStorageKey) : null;
     const valid = stored && buildings.some(b => b.id === stored);
     const next = valid ? stored : buildings[0].id;
     setActiveBuildingId(next); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [buildingsLoading, buildings, buildingStorageKey]);
+  }, [buildingsLoading, buildings, buildingStorageKey, maidSession]);
 
   // Handle Stripe redirect: ?payment=success|cancel
   useEffect(() => {
@@ -199,7 +256,7 @@ function App() {
     addCommonFee,
     updateCommonFee,
     deleteCommonFee,
-  } = useFirestore(user?.uid ?? null, activeBuildingId, currentMonth);
+  } = useFirestore(effectiveUid, effectiveBuildingId, currentMonth);
 
 
   // Auto-clean orphaned bills (e.g. from deleted rooms)
@@ -218,39 +275,63 @@ function App() {
 
   // Maintenance badge — real-time count of open/in-progress requests
   const { requests: _maintenanceReqs } = useMaintenanceRequests(
-    user?.uid ?? null,
-    activeBuildingId,
+    effectiveUid,
+    effectiveBuildingId,
   );
   const pendingMaintenanceCount = _maintenanceReqs.filter(
     r => r.status === 'open' || r.status === 'in_progress'
   ).length;
 
+  // Cleaning requests badge — real-time count of open requests
+  const { requests: cleaningRequests } = useCleaningRequests(
+    effectiveUid,
+    effectiveBuildingId,
+  );
+  const pendingCleaningCount = cleaningRequests.filter(r => r.status === 'pending').length;
+
   // Payment slip badge — bills waiting for owner confirmation
   const pendingSlipCount = bills.filter(b => b.payment_status === 'pending').length;
 
   // Stock badge — real-time count of items below minimum quantity
-  const { items: _stockItems } = useStockItems(user?.uid ?? null, activeBuildingId);
+  const { items: _stockItems } = useStockItems(effectiveUid, effectiveBuildingId);
   const lowStockCount = _stockItems.filter(
     i => i.min_quantity > 0 && i.quantity <= i.min_quantity
   ).length;
+
+  // PWA standalone state
+  const [isStandalone, setIsStandalone] = useState(() => isPWAStandalone());
+  useEffect(() => {
+    const media = window.matchMedia('(display-mode: standalone)');
+    const onChange = () => setIsStandalone(isPWAStandalone());
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
 
   const stats = getMonthStats(currentMonth);
   const monthBills = getBillsForMonth(currentMonth);
 
   const navItems = [
-    { id: 'dashboard'  as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'rooms'      as ViewMode, icon: Home,            label: 'จัดการห้อง' },
-    { id: 'recording'    as ViewMode, icon: FileText,           label: 'จดมิเตอร์' },
+    { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'rooms'       as ViewMode, icon: Home,            label: 'จัดการห้อง' },
+    { id: 'recording'   as ViewMode, icon: FileText,        label: 'จดมิเตอร์' },
     { id: 'tenants'     as ViewMode, icon: Users,           label: 'ผู้เช่า' },
-    { id: 'maintenance'  as ViewMode, icon: Wrench,             label: 'แจ้งซ่อม' },
-    { id: 'operations'   as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
-    { id: 'payments'   as ViewMode, icon: CreditCard,       label: 'การชำระเงิน' },
-    { id: 'summary'    as ViewMode, icon: Send,            label: 'สรุปยอด' },
-    { id: 'archives'   as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
+    { id: 'maintenance' as ViewMode, icon: Wrench,          label: 'แจ้งซ่อม' },
+    { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: 'งานแม่บ้าน' },
+    { id: 'operations'  as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
+    { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
+    { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
+    { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
 
-    { id: 'settings'   as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
-    { id: 'pricing'    as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
+    { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
+    { id: 'pricing'     as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
+
+  const visibleNavItems = maidSession
+    ? [
+        { id: 'cleaning' as ViewMode, icon: Sparkles, label: 'งานแม่บ้าน' },
+        { id: 'recording' as ViewMode, icon: FileText, label: 'จดมิเตอร์' },
+      ]
+    : navItems;
 
   const isAdmin = profile?.role === 'admin';
 
@@ -270,7 +351,7 @@ function App() {
   };
 
   const handleNavClick = (view: ViewMode) => {
-    if (START_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
+    if (!maidSession && START_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
       setShowFeatureLockedModal(VIEW_LABELS[view] ?? view);
       setMobileMenuOpen(false);
       return;
@@ -430,12 +511,16 @@ function App() {
   }
 
   // Not logged in → show login page
-  if (!user) {
+  if (!user && !maidSession) {
     return (
       <LoginPage
         onLogin={handleLogin}
         onRegister={handleRegister}
         onResetPassword={resetPassword}
+        onMaidLogin={(session) => {
+          setMaidSession(session);
+          setCurrentView('cleaning');
+        }}
         error={authError}
         clearError={() => setError(null)}
       />
@@ -446,7 +531,7 @@ function App() {
   // A banner in Settings will prompt them to verify when convenient
 
   // Still loading data (buildings must resolve first so we have a valid buildingId)
-  if (buildingsLoading || dataLoading || !activeBuildingId) {
+  if (!maidSession && (buildingsLoading || dataLoading || !activeBuildingId)) {
     return (
       <div style={{
         display: 'flex',
@@ -462,6 +547,22 @@ function App() {
     );
   }
 
+  if (maidSession && (!activeBuildingId || dataLoading)) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <div className="loading-spinner" style={{ width: 40, height: 40 }}></div>
+        <p>กำลังโหลดข้อมูลแม่บ้าน...</p>
+      </div>
+    );
+  }
+
   // Plan tier checks
   const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
   const maxBuildings = profile ? getMaxBuildings(profile.license) : 1;
@@ -470,7 +571,7 @@ function App() {
   const maxRooms = profile ? getMaxRooms(profile.license) : 5;
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
 
-  if (hasPaidSubscription && !hasSelectedBranch && buildings.length > 0) {
+  if (!maidSession && hasPaidSubscription && !hasSelectedBranch && buildings.length > 0) {
     return (
       <Suspense fallback={<PageLoader />}>
         <BranchSelector 
@@ -485,7 +586,7 @@ function App() {
             setHasSelectedBranch(true);
             setBuildingMenuOpen(true);
           }}
-          userName={profile?.name || user.email?.split('@')[0] || 'User'}
+          userName={profile?.name || user?.email?.split('@')[0] || 'User'}
         />
       </Suspense>
     );
@@ -496,8 +597,10 @@ function App() {
       <SlipNotificationToast
         bills={bills}
         maintenanceRequests={_maintenanceReqs}
+        cleaningRequests={cleaningRequests}
         onGoToPayments={() => setCurrentView('payments')}
         onGoToMaintenance={() => setCurrentView('maintenance')}
+        onGoToCleaning={() => setCurrentView('cleaning')}
       />
       {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
       {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (
@@ -514,6 +617,7 @@ function App() {
           <Zap size={14} style={{ marginLeft: 'auto' }} />
         </div>
       )}
+
 
       {/* Mobile Header */}
       <div className="mobile-header">
@@ -541,37 +645,109 @@ function App() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-logo">
-          <img src="/logo-icon.png" alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain' }} />
-          <span>HorCare</span>
-
+        <div className="sidebar-logo" style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+          width: '100%',
+        }}>
+          {!sidebarCollapsed ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+                <img src="/logo-icon.png" alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
+                <span style={{ fontWeight: 700, letterSpacing: '-0.02em' }}>HorCare</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleSidebar}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.18)',
+                  border: '1px solid rgba(255, 255, 255, 0.35)',
+                  borderRadius: '8px',
+                  width: 26,
+                  height: 26,
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.32)';
+                  e.currentTarget.style.transform = 'scale(1.08)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                aria-label="ย่อแถบเมนู"
+                title="ย่อแถบเมนู"
+              >
+                <ChevronLeft size={16} strokeWidth={2.4} />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleToggleSidebar}
+              style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                padding: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '12px',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'scale(1.08)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.28)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+              }}
+              aria-label="ขยายแถบเมนู"
+              title="คลิกเพื่อขยายแถบเมนู"
+            >
+              <img src="/logo-icon.png" alt="HorCare" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            </button>
+          )}
         </div>
 
         {/* Building Switcher — Plus/Pro (multiple buildings) */}
-        {canAddBuilding && (
-          <div ref={buildingMenuRef} style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
+        {!sidebarCollapsed && canAddBuilding && (
+          <div ref={buildingMenuRef} className="sidebar-building-switcher" style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
             <button
               onClick={() => { setBuildingMenuOpen(v => !v); setAddBuildingMode(false); }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '10px', padding: '0.5rem 0.625rem', cursor: 'pointer',
-                color: 'rgba(255,255,255,0.85)', fontSize: '0.8125rem', fontWeight: 600,
+                background: 'rgba(255, 255, 255, 0.18)', border: '1px solid rgba(255, 255, 255, 0.35)',
+                borderRadius: '12px', padding: '0.55rem 0.75rem', cursor: 'pointer',
+                color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 700,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
-              <Building2 size={15} style={{ flexShrink: 0, opacity: 0.7 }} />
+              <Building2 size={15} style={{ flexShrink: 0, color: '#BAE6FD' }} />
               <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeBuilding?.name ?? '—'}
               </span>
-              <ChevronDown size={14} style={{ flexShrink: 0, opacity: 0.5, transform: buildingMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              <ChevronDown size={14} style={{ flexShrink: 0, color: '#BAE6FD', transform: buildingMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
             </button>
 
             {buildingMenuOpen && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 4px)', left: 'var(--space-3)', right: 'var(--space-3)',
-                background: '#1e2535', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '10px', overflow: 'hidden', zIndex: 200,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                background: '#0369A1', border: '1.5px solid rgba(255,255,255,0.3)',
+                borderRadius: '12px', overflow: 'hidden', zIndex: 200,
+                boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
               }}>
                 {buildings.map(b => (
                   <div key={b.id} style={{ display: 'flex', alignItems: 'center' }}>
@@ -585,11 +761,11 @@ function App() {
                           value={renamingName}
                           onChange={e => setRenamingName(e.target.value)}
                           style={{
-                            flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+                            flex: 1, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
                             borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0.25rem 0.5rem',
                           }}
                         />
-                        <button type="submit" style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: '0 0.25rem' }}>
+                        <button type="submit" style={{ background: 'none', border: 'none', color: '#BAE6FD', cursor: 'pointer', padding: '0 0.25rem' }}>
                           <Check size={14} />
                         </button>
                       </form>
@@ -598,19 +774,19 @@ function App() {
                         <button
                           onClick={() => handleSwitchBuilding(b.id)}
                           style={{
-                            flex: 1, textAlign: 'left', background: 'none', border: 'none',
-                            color: b.id === activeBuildingId ? '#60A5FA' : 'rgba(255,255,255,0.75)',
-                            fontSize: '0.8125rem', fontWeight: b.id === activeBuildingId ? 700 : 400,
+                            flex: 1, textAlign: 'left', background: b.id === activeBuildingId ? 'rgba(255,255,255,0.18)' : 'none', border: 'none',
+                            color: '#FFFFFF',
+                            fontSize: '0.8125rem', fontWeight: b.id === activeBuildingId ? 800 : 500,
                             padding: '0.5rem 0.75rem', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: '0.5rem',
                           }}
                         >
-                          {b.id === activeBuildingId && <Check size={12} />}
+                          {b.id === activeBuildingId && <Check size={12} color="#38BDF8" />}
                           <span style={{ marginLeft: b.id === activeBuildingId ? 0 : '1.25rem' }}>{b.name}</span>
                         </button>
                         <button
                           onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }}
-                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '0 0.25rem' }}
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', padding: '0 0.25rem' }}
                           title="เปลี่ยนชื่อ"
                         >
                           <Pencil size={12} />
@@ -618,7 +794,7 @@ function App() {
                         {buildings.length > 1 && (
                           <button
                             onClick={() => setDeleteBuildingConfirm(b.id)}
-                            style={{ background: 'none', border: 'none', color: 'rgba(239,68,68,0.5)', cursor: 'pointer', padding: '0 0.25rem' }}
+                            style={{ background: 'none', border: 'none', color: 'rgba(254,202,202,0.95)', cursor: 'pointer', padding: '0 0.25rem' }}
                             title="ลบตึก"
                           >
                             <TrashIcon size={12} />
@@ -669,8 +845,8 @@ function App() {
         )}
 
         {/* Single Building Name Bar — Start plan (1 building, no switcher) */}
-        {!canAddBuilding && activeBuilding && (
-          <div style={{ padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
+        {!sidebarCollapsed && !canAddBuilding && activeBuilding && (
+          <div className="sidebar-building-switcher" style={{ padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
             {renamingBuildingId === activeBuilding.id ? (
               <form
                 style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}
@@ -724,18 +900,21 @@ function App() {
                 onClick={() => { setRenamingBuildingId(activeBuilding.id); setRenamingName(activeBuilding.name); }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '10px', padding: '0.5rem 0.625rem', cursor: 'pointer',
-                  color: 'rgba(255,255,255,0.8)', fontSize: '0.8125rem', fontWeight: 600,
-                  transition: 'all 0.2s',
+                  background: 'rgba(255, 255, 255, 0.18)', border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                  borderRadius: '12px', padding: '0.55rem 0.75rem', cursor: 'pointer',
+                  color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 700,
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                  backdropFilter: 'blur(8px)',
                 }}
                 title="คลิกเพื่อเปลี่ยนชื่อหอพัก"
               >
-                <Building2 size={15} style={{ flexShrink: 0, opacity: 0.6 }} />
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981', flexShrink: 0 }} />
+                <Building2 size={15} style={{ flexShrink: 0, color: '#BAE6FD' }} />
                 <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {activeBuilding.name}
                 </span>
-                <Pencil size={12} style={{ flexShrink: 0, opacity: 0.4 }} />
+                <Pencil size={12} style={{ flexShrink: 0, color: 'rgba(255, 255, 255, 0.75)' }} />
               </button>
             )}
           </div>
@@ -743,14 +922,18 @@ function App() {
 
 
         <nav className="sidebar-nav">
-          {navItems.map(item => {
-            const isLocked = START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
-            const showBadge = hasPaidSubscription && (
-              (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
-              (item.id === 'operations' && lowStockCount > 0) ||
-              (item.id === 'payments' && pendingSlipCount > 0)
+          {visibleNavItems.map(item => {
+            const isLocked = !maidSession && START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
+            const showBadge = (
+              (item.id === 'cleaning' && pendingCleaningCount > 0) ||
+              (hasPaidSubscription && (
+                (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
+                (item.id === 'operations' && lowStockCount > 0) ||
+                (item.id === 'payments' && pendingSlipCount > 0)
+              ))
             );
-            const badgeCount = item.id === 'maintenance' ? pendingMaintenanceCount
+            const badgeCount = item.id === 'cleaning' ? pendingCleaningCount
+              : item.id === 'maintenance' ? pendingMaintenanceCount
               : item.id === 'payments' ? pendingSlipCount
               : lowStockCount;
             return (
@@ -767,7 +950,7 @@ function App() {
                       position: 'absolute', top: -3, right: -4,
                       width: 8, height: 8, borderRadius: '50%',
                       background: '#EF4444',
-                      border: '1.5px solid #1a2035',
+                      border: '1.5px solid #FFFFFF',
                       boxShadow: '0 0 6px rgba(239,68,68,0.7)',
                     }} />
                   )}
@@ -787,7 +970,7 @@ function App() {
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
-                {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', opacity: 0.5 }} />}
+                {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', color: '#BAE6FD', opacity: 0.8 }} />}
               </button>
             );
           })}
@@ -800,19 +983,21 @@ function App() {
             onClick={() => handleNavClick('pricing')}
             style={{
               margin: 'var(--space-4) var(--space-3) 0',
-              background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(236,72,153,0.15))',
-              border: '1px solid rgba(139,92,246,0.35)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.12))',
+              border: '1.5px solid rgba(255,255,255,0.35)',
               borderRadius: '12px',
               padding: '0.75rem',
               cursor: 'pointer', textAlign: 'left', width: 'calc(100% - calc(var(--space-3) * 2))',
-              color: '#C4B5FD',
+              color: '#FFFFFF',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <Zap size={14} color="#A78BFA" />
-              <span style={{ fontWeight: 700, fontSize: '0.8125rem' }}>อัปเกรดแผน</span>
+              <Zap size={14} color="#FDE047" />
+              <span style={{ fontWeight: 800, fontSize: '0.8125rem', color: '#FFFFFF' }}>อัปเกรดแผน</span>
             </div>
-            <div style={{ fontSize: '0.7rem', color: 'rgba(196,181,253,0.7)', lineHeight: 1.4 }}>
+            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', fontWeight: 600, lineHeight: 1.4 }}>
               HorCare ฿399/เดือน · ฟีเจอร์ครบ
             </div>
           </button>
@@ -822,74 +1007,137 @@ function App() {
         <div className="sidebar-user-info" style={{
           marginTop: 'auto',
           paddingTop: 'var(--space-4)',
-          borderTop: '1px solid rgba(255,255,255,0.08)'
+          borderTop: '1px solid rgba(255,255,255,0.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: sidebarCollapsed ? 'center' : 'stretch',
         }}>
-          <div style={{
-            color: 'rgba(255,255,255,0.6)',
-            fontSize: '0.75rem',
-            marginBottom: 'var(--space-2)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
-            {profile?.display_name || user.email}
-          </div>
+          {!sidebarCollapsed && (
+            <div style={{
+              color: '#FFFFFF',
+              fontWeight: 700,
+              fontSize: '0.8125rem',
+              marginBottom: 'var(--space-2)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {maidSession ? `แม่บ้าน: ${maidSession.maid_name}` : (profile?.display_name || user?.email)}
+            </div>
+          )}
+
+          {/* Install PWA Button (only when in web browser) */}
+          {!isStandalone && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
+              title="ติดตั้งแอป HorCare"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                gap: '0.625rem',
+                width: sidebarCollapsed ? '42px' : '100%',
+                height: sidebarCollapsed ? '42px' : 'auto',
+                padding: sidebarCollapsed ? '0' : '0.6rem 0.85rem',
+                marginBottom: '0.5rem',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#FFFFFF',
+                fontSize: '0.825rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                flexShrink: 0,
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.3)';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%)';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'none';
+              }}
+            >
+              <Smartphone size={17} style={{ flexShrink: 0, color: '#FDE047' }} />
+              {!sidebarCollapsed && <span>ติดตั้งแอป HorCare</span>}
+            </button>
+          )}
 
           {/* LINE Contact Button */}
           <a
             href="https://lin.ee/sBZQ5CF"
             target="_blank"
             rel="noopener noreferrer"
+            title="ติดต่อฝ่ายบริการ (LINE Support)"
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               gap: '0.625rem',
-              padding: '0.55rem 0.75rem',
-              marginBottom: '0.375rem',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, rgba(0,185,0,0.18), rgba(0,200,80,0.12))',
-              border: '1px solid rgba(0,200,80,0.35)',
-              color: '#4ade80',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
+              width: sidebarCollapsed ? '42px' : '100%',
+              height: sidebarCollapsed ? '42px' : 'auto',
+              padding: sidebarCollapsed ? '0' : '0.6rem 0.85rem',
+              marginBottom: '0.5rem',
+              borderRadius: '12px',
+              background: '#FFFFFF',
+              border: 'none',
+              color: '#15803D',
+              fontSize: '0.825rem',
+              fontWeight: 700,
               textDecoration: 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(0,185,0,0.12)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              flexShrink: 0,
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'linear-gradient(135deg, rgba(0,185,0,0.30), rgba(0,200,80,0.22))';
-              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 16px rgba(0,185,0,0.28)';
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(0,200,80,0.6)';
+              (e.currentTarget as HTMLAnchorElement).style.background = '#F0FDF4';
+              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 6px 18px rgba(0,0,0,0.15)';
+              (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'linear-gradient(135deg, rgba(0,185,0,0.18), rgba(0,200,80,0.12))';
-              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 2px 8px rgba(0,185,0,0.12)';
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(0,200,80,0.35)';
+              (e.currentTarget as HTMLAnchorElement).style.background = '#FFFFFF';
+              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+              (e.currentTarget as HTMLAnchorElement).style.transform = 'none';
             }}
           >
             {/* LINE icon SVG */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#4ade80" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#16A34A" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
               <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.627.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
             </svg>
-            ติดต่อฝ่ายบริการ
+            {!sidebarCollapsed && <span>ติดต่อฝ่ายบริการ</span>}
           </a>
 
           <button
             className="nav-item"
-            onClick={logout}
-            style={{ color: 'rgba(255,255,255,0.4)' }}
+            onClick={maidSession ? handleMaidLogout : logout}
+            style={{
+              color: 'rgba(255,255,255,0.95)',
+              fontWeight: 700,
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              width: sidebarCollapsed ? '42px' : '100%',
+              height: sidebarCollapsed ? '42px' : 'auto',
+              padding: sidebarCollapsed ? '0' : '0.55rem 0.85rem',
+              margin: '0',
+            }}
+            title="ออกจากระบบ"
           >
-            <LogOut size={18} />
-            ออกจากระบบ
+            <LogOut size={18} style={{ color: '#BAE6FD' }} />
+            {!sidebarCollapsed && <span>ออกจากระบบ</span>}
           </button>
-          <div className="app-version" style={{
-            color: 'rgba(255,255,255,0.3)',
-            fontSize: '0.6875rem',
-            marginTop: 'var(--space-2)'
-          }}>
-            HorCare v1.0
-          </div>
+          {!sidebarCollapsed && (
+            <div className="app-version" style={{
+              color: 'rgba(255,255,255,0.75)',
+              fontWeight: 600,
+              fontSize: '0.6875rem',
+              marginTop: 'var(--space-2)'
+            }}>
+              HorCare Property Care
+            </div>
+          )}
         </div>
       </aside>
 
@@ -908,6 +1156,81 @@ function App() {
 
       {/* Main Content */}
       <main className={`main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        {/* Browser Notification Permission Banner */}
+        {user && notifPermission === 'default' && !dismissedNotifBanner && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(16, 185, 129, 0.08))',
+            border: '1px solid rgba(14, 165, 233, 0.25)',
+            borderRadius: '14px',
+            padding: '0.75rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            boxShadow: '0 4px 16px rgba(14, 165, 233, 0.08)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '220px' }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '10px',
+                background: 'rgba(14, 165, 233, 0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <Bell size={18} color="#0EA5E9" />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-text)' }}>
+                  เปิดรับการแจ้งเตือนจากเบราว์เซอร์
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)', lineHeight: 1.4 }}>
+                  เพื่อให้ระบบเตือนทันทีเมื่อมีสลิปใหม่หรือลูกหอแจ้งซ่อม
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+              <button
+                onClick={async () => {
+                  await requestNotifPermission();
+                }}
+                className="btn btn-primary btn-sm"
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.8125rem',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+              >
+                <Bell size={14} /> เปิดแจ้งเตือน
+              </button>
+              <button
+                onClick={() => {
+                  setDismissedNotifBanner(true);
+                  sessionStorage.setItem('horcare_dismiss_notif_banner', 'true');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-gray-400)',
+                  cursor: 'pointer',
+                  padding: '0.35rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '6px',
+                }}
+                aria-label="ปิดการแจ้งเตือนนี้"
+                title="ปิดชั่วคราว"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       <Suspense fallback={<PageLoader />}>
         {currentView === 'dashboard' && (
           <Dashboard
@@ -958,6 +1281,24 @@ function App() {
             uid={user.uid}
             buildingId={activeBuildingId}
           />
+        )}
+
+        {currentView === 'cleaning' && (
+          maidSession ? (
+            <MaidPortalView
+              session={maidSession}
+              buildingName={activeBuilding?.name}
+              onGoToRecording={() => setCurrentView('recording')}
+              onLogout={handleMaidLogout}
+            />
+          ) : (
+            user && activeBuildingId && (
+              <CleaningPage
+                uid={user.uid}
+                buildingId={activeBuildingId}
+              />
+            )
+          )
         )}
 
         {currentView === 'operations' && user && activeBuildingId && (

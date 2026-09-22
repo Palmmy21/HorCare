@@ -38,7 +38,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                     gap: '1rem',
                     padding: '2rem',
                     textAlign: 'center',
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: "var(--font-sans)",
                     background: '#F9FAFB',
                 }}>
                     <div><AlertTriangle size={64} color="#EF4444" /></div>

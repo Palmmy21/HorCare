@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Waves, Sparkles, Leaf, Flower2 } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Globe, Upload } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeCanvas } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase/config';
-import type { DormConfig, WaterConfig } from '../../types';
+import type { DormConfig, WaterConfig, BillLanguage } from '../../types';
 import { generateDormCode } from '../../utils/calculations';
-import { THEME_PRESETS } from '../../hooks/useTheme';
+import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import type { ThemeMode } from '../../hooks/useTheme';
 import { toast } from 'react-hot-toast';
 
@@ -135,7 +135,8 @@ const BUILDING_TYPES = [
     },
 ];
 
-export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid }: SettingsProps) {
+export default function Settings(props: SettingsProps) {
+    const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid } = props;
     const [activeTab, setActiveTab] = useState<'general' | 'billing' | 'integrations' | 'account'>('general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
@@ -261,6 +262,9 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
         promptpay_name: config.bill_customization?.promptpay_name || '',
         footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
         due_day: config.bill_customization?.due_day || 5,
+        default_language: (config.bill_customization?.default_language || 'th') as BillLanguage,
+        bilingual_mode: config.bill_customization?.bilingual_mode || false,
+        secondary_language: (config.bill_customization?.secondary_language || 'en') as BillLanguage,
     });
     const [dormLogo, setDormLogo] = useState<string | undefined>(config.bill_customization?.dorm_logo);
     const [logoLoading, setLogoLoading] = useState(false);
@@ -293,6 +297,9 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             promptpay_name: config.bill_customization?.promptpay_name || '',
             footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
             due_day: config.bill_customization?.due_day || 5,
+            default_language: (config.bill_customization?.default_language || 'th') as BillLanguage,
+            bilingual_mode: config.bill_customization?.bilingual_mode || false,
+            secondary_language: (config.bill_customization?.secondary_language || 'en') as BillLanguage,
         });
         setDormLogo(config.bill_customization?.dorm_logo);
         setDormCode(config.dorm_code || '');
@@ -353,6 +360,9 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                 promptpay_name: billForm.promptpay_name,
                 footer_text: billForm.footer_text,
                 due_day: Number(billForm.due_day) || 5,
+                default_language: billForm.default_language,
+                bilingual_mode: billForm.bilingual_mode,
+                secondary_language: billForm.secondary_language,
                 ...(dormLogo ? { dorm_logo: dormLogo } : {}),
             },
             ...(dormCode ? { dorm_code: dormCode } : {}),
@@ -364,7 +374,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
         setTimeout(() => setSaved(false), 2000);
     };
 
-    const handleBillFormChange = (field: string, value: string | number) => {
+    const handleBillFormChange = (field: string, value: string | number | boolean) => {
         setBillForm(prev => ({ ...prev, [field]: value }));
         setSaved(false);
     };
@@ -687,10 +697,166 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             {/* General Tab */}
             {activeTab === 'general' && (
                 <>
+                {/* Dorm Logo Settings */}
+                <div className="settings-section">
+                    <h3 className="settings-title">
+                        <ImageIcon size={20} color="#0EA5E9" />
+                        โลโก้หอพัก (Dormitory Logo)
+                    </h3>
+                    <p className="form-hint" style={{ marginBottom: '1.25rem' }}>
+                        โลโก้นี้จะแสดงที่หน้าเลือกสาขาหอพัก, มุมบนหน้า Dashboard, พอร์ทัลผู้เช่า, และบนใบแจ้งหนี้
+                    </p>
+
+                    <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoChange} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                        {dormLogo ? (
+                            <div style={{ position: 'relative' }}>
+                                <img
+                                    src={dormLogo}
+                                    alt="โลโก้หอพัก"
+                                    style={{
+                                        width: 84,
+                                        height: 84,
+                                        objectFit: 'contain',
+                                        borderRadius: 16,
+                                        border: '1.5px solid var(--color-primary)',
+                                        background: '#FFFFFF',
+                                        padding: 4,
+                                        boxShadow: '0 4px 14px rgba(14, 165, 233, 0.18)'
+                                    }}
+                                />
+                            </div>
+                        ) : (
+                            <div style={{
+                                width: 84,
+                                height: 84,
+                                borderRadius: 16,
+                                border: '2px dashed var(--color-gray-300)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                color: 'var(--color-gray-400)',
+                                background: 'var(--color-gray-50)'
+                            }}>
+                                <ImageIcon size={28} />
+                                <span style={{ fontSize: '0.7rem' }}>ไม่มีโลโก้</span>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => logoInputRef.current?.click()}
+                                    disabled={logoLoading}
+                                    className="btn btn-primary btn-sm"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        fontWeight: 600,
+                                        opacity: logoLoading ? 0.7 : 1,
+                                    }}
+                                >
+                                    {logoLoading ? (
+                                        <span style={{ width: 14, height: 14, border: '2px solid rgba(255, 255, 255, 0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                                    ) : (
+                                        <Upload size={14} />
+                                    )}
+                                    {dormLogo ? 'เปลี่ยนโลโก้' : 'อัปโหลดโลโก้หอพัก'}
+                                </button>
+                                {dormLogo && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setDormLogo(undefined); setSaved(false); }}
+                                        className="btn btn-outline btn-sm"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            color: '#EF4444',
+                                            borderColor: '#FCA5A5'
+                                        }}
+                                    >
+                                        <Trash2 size={14} /> ลบโลโก้
+                                    </button>
+                                )}
+                            </div>
+                            <p className="form-hint" style={{ margin: 0, fontSize: '0.8rem' }}>
+                                รองรับ PNG หรือ JPG (แนะนำขนาด 400×400 px ขึ้นไป ระบบจะบีบอัดอัตโนมัติ)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Multi-Language Settings */}
+                <div className="settings-section">
+                    <h3 className="settings-title">
+                        <Globe size={20} color="#0EA5E9" />
+                        ภาษาของระบบและบิล (Language & Localization)
+                    </h3>
+                    <p className="form-hint" style={{ marginBottom: '1.25rem' }}>
+                        กำหนดภาษาหลักของหอพักสำหรับใบแจ้งหนี้, สลิปความร้อน, และข้อความแจ้งเตือนผ่าน LINE
+                    </p>
+
+                    <div className="settings-grid">
+                        <div className="form-group">
+                            <label className="form-label">ภาษาเริ่มต้นของหอพัก (Default Language)</label>
+                            <select
+                                className="form-input"
+                                style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                value={billForm.default_language}
+                                onChange={e => handleBillFormChange('default_language', e.target.value)}
+                            >
+                                {LANGUAGE_OPTIONS.map(opt => (
+                                    <option key={opt.code} value={opt.code}>
+                                        {opt.flag} {opt.name} ({opt.nativeName})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="form-hint">ภาษาหลักที่ใช้สร้างบิลและข้อความแจ้งเตือน</p>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>โหมด 2 ภาษา (Bilingual Invoices)</span>
+                                <input
+                                    type="checkbox"
+                                    checked={billForm.bilingual_mode}
+                                    onChange={e => handleBillFormChange('bilingual_mode', e.target.checked)}
+                                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0EA5E9' }}
+                                />
+                            </label>
+                            <p className="form-hint" style={{ marginTop: '0.25rem' }}>
+                                พิมพ์บิลพร้อมคำแปลภาษาที่สองคู่ขนาน (เช่น ไทย + English)
+                            </p>
+
+                            {billForm.bilingual_mode && (
+                                <div style={{ marginTop: '0.75rem' }}>
+                                    <label className="form-label" style={{ fontSize: '0.85rem' }}>ภาษาที่สอง (Secondary Language)</label>
+                                    <select
+                                        className="form-input"
+                                        style={{ padding: '0.6rem 0.85rem', fontSize: '0.9rem' }}
+                                        value={billForm.secondary_language}
+                                        onChange={e => handleBillFormChange('secondary_language', e.target.value)}
+                                    >
+                                        {LANGUAGE_OPTIONS.filter(o => o.code !== billForm.default_language).map(opt => (
+                                            <option key={opt.code} value={opt.code}>
+                                                {opt.flag} {opt.name} ({opt.nativeName})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Supported Building Types (Static Display) */}
                 <div className="settings-section">
                 <h3 className="settings-title">
-                    <Building2 size={20} color="#6366F1" />
+                    <Building2 size={20} color="#0EA5E9" />
                     ประเภทอาคารที่รองรับ
                 </h3>
                 <p className="form-hint" style={{ marginBottom: '1rem' }}>
@@ -786,8 +952,8 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             {/* Water Settings - Commercial */}
             <div className="settings-section">
                 <h3 className="settings-title">
-                    <Droplets size={20} color="#8B5CF6" />
-                    <Building2 size={20} color="#8B5CF6" style={{ marginRight: '8px' }} />
+                    <Droplets size={20} color="#0EA5E9" />
+                    <Building2 size={20} color="#0EA5E9" style={{ marginRight: '8px' }} />
                     ค่าน้ำประปา — อาคารพาณิชย์
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
@@ -818,7 +984,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             {/* Bill Customization */}
             <div className="settings-section">
                 <h3 className="settings-title">
-                    <FileText size={20} color="#8B5CF6" />
+                    <FileText size={20} color="#0EA5E9" />
                     ตั้งค่าใบแจ้งหนี้
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
@@ -853,7 +1019,7 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                                 }}
                             >
                                 {logoLoading
-                                    ? <span style={{ width: 14, height: 14, border: '2px solid #C4B5FD', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                                    ? <span style={{ width: 14, height: 14, border: '2px solid rgba(14, 165, 233, 0.3)', borderTopColor: '#0EA5E9', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
                                     : <ImageIcon size={14} />
                                 }
                                 {dormLogo ? 'เปลี่ยนโลโก้' : 'อัพโหลดโลโก้'}
@@ -1450,8 +1616,8 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
             {activeTab === 'general' && (
                 <div className="settings-section">
                 <h3 className="settings-title">
-                    <Palette size={20} color="#8B5CF6" />
-                    ธีมและสีสัน
+                    <Palette size={20} color="#0EA5E9" />
+                    ธีมและสีสันของระบบ
                 </h3>
 
                 {/* Mode Toggle — Light / Dark / System */}
@@ -1500,94 +1666,75 @@ export default function Settings({ config, onSaveConfig, themeId, onSetTheme, mo
                     </div>
                     <p className="form-hint" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }}>
                         {mode === 'system' ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><SettingsIcon size={14} /> ตามโหมดของอุปกรณ์ — เปลี่ยนอัตโนมัติเมื่อ OS สลับ</span> :
-                         mode === 'dark'   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Moon size={14} /> โหมดมืด — ถนอมสายตาในที่มืด</span> :
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Sun size={14} /> โหมดสว่าง — ค่าเริ่มต้น</span>}
+                         mode === 'dark'   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Moon size={14} /> โหมดมืดไฮเทค — ดีไซน์ Deep Navy ถนอมสายตา</span> :
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Sun size={14} /> โหมดสว่างมินิมอล — สะอาดตา คมชัด อ่านง่าย</span>}
                     </p>
                 </div>
 
-                {/* Theme color presets */}
-                <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-gray-600)', marginBottom: '0.5rem' }}>
-                    สีสันหลัก
-                </div>
-                <p className="form-hint" style={{ marginBottom: '1rem', fontSize: '0.8125rem' }}>
-                    เปลี่ยนทันที — ไม่ต้องกดบันทึก
-                </p>
+                {/* Brand Identity & Color System */}
                 <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                    gap: '0.75rem',
+                    background: 'var(--color-bg-alt)',
+                    border: '1px solid rgba(14, 165, 233, 0.2)',
+                    borderRadius: '14px',
+                    padding: '1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
                 }}>
-                    {THEME_PRESETS.map(preset => {
-                        const isActive = themeId === preset.id;
-                        return (
-                            <button
-                                key={preset.id}
-                                onClick={() => onSetTheme(preset.id)}
-                                style={{
-                                    position: 'relative',
-                                    border: isActive
-                                        ? `2px solid ${preset.swatch}`
-                                        : '2px solid var(--color-gray-200)',
-                                    borderRadius: '14px',
-                                    padding: '0',
-                                    cursor: 'pointer',
-                                    background: 'var(--color-white)',
-                                    overflow: 'hidden',
-                                    transition: 'all 0.18s ease',
-                                    boxShadow: isActive
-                                        ? `0 0 0 4px ${preset.swatch}22, 0 4px 16px ${preset.swatch}33`
-                                        : 'var(--shadow-sm)',
-                                    transform: isActive ? 'scale(1.03)' : 'scale(1)',
-                                }}
-                            >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                                width: 8, height: 8, borderRadius: '50%',
+                                background: '#10B981',
+                                boxShadow: '0 0 8px #10B981',
+                            }} />
+                            <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text)' }}>
+                                ธีมทางการ HorCare Gen Z Hi-Tech (Active Standard)
+                            </span>
+                        </div>
+                        <span style={{
+                            fontSize: '0.75rem', fontWeight: 600,
+                            padding: '0.2rem 0.6rem', borderRadius: '20px',
+                            background: 'rgba(14, 165, 233, 0.1)', color: '#0EA5E9',
+                            border: '1px solid rgba(14, 165, 233, 0.2)',
+                        }}>
+                            มาตรฐานสากลเดี่ยว
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                        {[
+                            { name: 'Deep Navy', code: '#080C14', desc: 'พื้นหลังหลัก/มิติ', color: '#0F172A' },
+                            { name: 'Electric Cyan', code: '#0EA5E9', desc: 'สีปุ่มและไอคอน', color: '#0EA5E9' },
+                            { name: 'Cyber Emerald', code: '#10B981', desc: 'สถานะและผลรวม', color: '#10B981' },
+                            { name: 'Neon Orange', code: '#F97316', desc: 'แจ้งเตือน/เน้นย้ำ', color: '#F97316' },
+                        ].map((swatch, idx) => (
+                            <div key={idx} style={{
+                                background: 'var(--color-card)',
+                                border: '1px solid var(--color-gray-200)',
+                                borderRadius: '10px',
+                                padding: '0.625rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.625rem',
+                            }}>
                                 <div style={{
-                                    height: '52px',
-                                    background: `linear-gradient(135deg, ${preset.swatch} 0%, ${preset.swatchSecondary} 100%)`,
-                                    position: 'relative',
-                                }}>
-                                    <div style={{
-                                        position: 'absolute', left: 0, top: 0, bottom: 0, width: '24px',
-                                        background: 'rgba(0,0,0,0.35)',
-                                        display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', paddingTop: '6px', gap: '4px',
-                                    }}>
-                                        {[0,1,2,3].map(i => (
-                                            <div key={i} style={{
-                                                width: '12px', height: '3px',
-                                                borderRadius: '2px',
-                                                background: i === 0 ? '#fff' : 'rgba(255,255,255,0.35)',
-                                            }} />
-                                        ))}
+                                    width: '28px', height: '28px', borderRadius: '8px',
+                                    background: swatch.color, flexShrink: 0,
+                                    border: '1px solid rgba(0,0,0,0.1)',
+                                    boxShadow: `0 2px 8px ${swatch.color}44`,
+                                }} />
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>
+                                        {swatch.name}
                                     </div>
-                                    {isActive && (
-                                        <div style={{
-                                            position: 'absolute', top: '6px', right: '6px',
-                                            width: '20px', height: '20px', borderRadius: '50%',
-                                            background: '#fff',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                                        }}>
-                                            <Check size={12} color={preset.swatch} strokeWidth={3} />
-                                        </div>
-                                    )}
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-gray-500)', fontFamily: 'monospace' }}>
+                                        {swatch.code}
+                                    </div>
                                 </div>
-                                <div style={{
-                                    padding: '0.5rem 0.625rem',
-                                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                                }}>
-                                    {(() => {
-                                        const themeIconMap: Record<string, any> = { Waves, Sparkles, Leaf, Flower2, Sun, Moon };
-                                        const ThemeIconComp = themeIconMap[preset.icon] || Waves;
-                                        return <ThemeIconComp size={14} color={isActive ? preset.swatch : 'var(--color-gray-600)'} />;
-                                    })()}
-                                    <span style={{
-                                        fontSize: '0.8rem', fontWeight: isActive ? 700 : 500,
-                                        color: isActive ? preset.swatch : 'var(--color-gray-700)',
-                                    }}>{preset.name}</span>
-                                </div>
-                            </button>
-                        );
-                    })}
+                            </div>
+                        ))}
+                    </div>
                 </div>
                 </div>
             )}

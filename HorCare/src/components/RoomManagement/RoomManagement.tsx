@@ -1,7 +1,8 @@
 import { useState, useRef, Fragment } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload } from 'lucide-react';
-import type { Room, DormConfig, CommonFee } from '../../types';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe } from 'lucide-react';
+import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
+import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface RoomManagementProps {
@@ -45,6 +46,7 @@ export default function RoomManagement({
     const [editCustomElecRate, setEditCustomElecRate] = useState('');
     const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
     const [editCommonFeeOverrides, setEditCommonFeeOverrides] = useState<Record<string, { amount?: number; is_active?: boolean }>>({});
+    const [editLanguage, setEditLanguage] = useState<BillLanguage | ''>('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
     const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -105,6 +107,7 @@ export default function RoomManagement({
                 : ''
         );
         setEditCommonFeeOverrides(room.common_fee_overrides || {});
+        setEditLanguage(room.language || '');
     };
 
     const saveEdit = async (roomId: string) => {
@@ -133,6 +136,7 @@ export default function RoomManagement({
         }
 
         updates.common_fee_overrides = editCommonFeeOverrides;
+        updates.language = editLanguage ? (editLanguage as BillLanguage) : undefined;
 
         try {
             await onUpdateRoom(roomId, updates);
@@ -152,6 +156,7 @@ export default function RoomManagement({
         setEditTenantCount('1');
         setEditCustomElecRate('');
         setEditCustomWaterRate('');
+        setEditLanguage('');
     };
 
     const confirmDelete = (roomId: string) => {
@@ -587,6 +592,14 @@ export default function RoomManagement({
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     <span className="mono font-bold">{room.room_number}</span>
+                                                    {room.language ? (
+                                                        <span
+                                                            title={`ภาษารับบิล: ${LANGUAGE_MAP[room.language]?.nativeName} (${LANGUAGE_MAP[room.language]?.name})`}
+                                                            style={{ fontSize: '1rem', cursor: 'help' }}
+                                                        >
+                                                            {LANGUAGE_MAP[room.language]?.flag}
+                                                        </span>
+                                                    ) : null}
                                                     {room.line_user_id && (
                                                         <span title="เชื่อมต่อ LINE แล้ว" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                                             <MessageCircle size={14} color="#06C755" />
@@ -800,6 +813,56 @@ export default function RoomManagement({
                                             )}
                                         </td>
                                     </tr>
+                                    {editingRoom === room.id && (
+                                        <tr key={`${room.id}-lang`} style={{ background: 'rgba(96,165,250,0.06)' }}>
+                                            <td colSpan={hasAnyCommercial ? 11 : 10} style={{ padding: '0.5rem 2rem 0.5rem', borderTop: 'none' }}>
+                                                <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                                    <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                        <Globe size={14} color="#0EA5E9" /> ภาษาบิล/แจ้งเตือนห้องนี้:
+                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditLanguage('')}
+                                                            className="btn btn-sm"
+                                                            style={{
+                                                                background: editLanguage === '' ? '#0EA5E9' : 'var(--color-gray-100)',
+                                                                color: editLanguage === '' ? '#ffffff' : 'var(--color-gray-700)',
+                                                                border: '1px solid var(--color-gray-300)',
+                                                                borderRadius: '6px',
+                                                                fontSize: '0.75rem',
+                                                                padding: '0.2rem 0.5rem'
+                                                            }}
+                                                        >
+                                                            ค่าเริ่มต้น ({LANGUAGE_MAP[config.bill_customization?.default_language || 'th']?.flag} {LANGUAGE_MAP[config.bill_customization?.default_language || 'th']?.nativeName})
+                                                        </button>
+                                                        {LANGUAGE_OPTIONS.map(opt => (
+                                                            <button
+                                                                key={opt.code}
+                                                                type="button"
+                                                                onClick={() => setEditLanguage(opt.code)}
+                                                                className="btn btn-sm"
+                                                                style={{
+                                                                    background: editLanguage === opt.code ? '#2563EB' : 'var(--color-gray-100)',
+                                                                    color: editLanguage === opt.code ? '#ffffff' : 'var(--color-gray-700)',
+                                                                    border: '1px solid var(--color-gray-300)',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '0.75rem',
+                                                                    padding: '0.2rem 0.5rem',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px'
+                                                                }}
+                                                            >
+                                                                <span>{opt.flag}</span>
+                                                                <span>{opt.nativeName}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
                                     {editingRoom === room.id && commonFees.length > 0 && (
                                         <tr key={`${room.id}-fees`} style={{ background: 'rgba(96,165,250,0.06)' }}>
                                             <td colSpan={hasAnyCommercial ? 10 : 9} style={{ padding: '0.75rem 2rem', borderTop: 'none' }}>

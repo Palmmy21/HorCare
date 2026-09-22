@@ -1,8 +1,10 @@
 import { forwardRef } from 'react';
-import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization } from '../../types';
+import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization, BillLanguage } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
+import { t, tBilingual, formatBillDate, formatBillMonth, formatDueNotice } from '../../utils/i18n/billTranslations';
 import generatePayload from 'promptpay-qr';
 import { QRCodeSVG } from 'qrcode.react';
+import { PROMPTPAY_LOGO_DATA_URI } from '../../assets/promptpayLogo';
 
 interface InvoiceBillProps {
     bill: MonthlyBill;
@@ -11,30 +13,17 @@ interface InvoiceBillProps {
     effectiveElecRate?: number;
     effectiveWaterConfig?: WaterConfig;
     billCustomization?: BillCustomization;
-}
-
-function formatThaiDate(dateStr: string): string {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const thaiMonths = [
-        'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-        'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-    ];
-    const thaiYear = year + 543;
-    return `${day} ${thaiMonths[month - 1]} ${thaiYear}`;
-}
-
-function formatThaiMonth(dateStr: string): string {
-    const [year, month] = dateStr.split('-').map(Number);
-    const thaiMonths = [
-        'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-        'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
-    ];
-    const thaiYear = year + 543;
-    return `${thaiMonths[month - 1]} ${thaiYear}`;
+    language?: BillLanguage;
+    bilingualMode?: boolean;
+    secondaryLanguage?: BillLanguage;
 }
 
 const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
-    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization }, ref) => {
+    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, language, bilingualMode, secondaryLanguage }, ref) => {
+        const lang: BillLanguage = language ?? billCustomization?.default_language ?? 'th';
+        const isBilingual: boolean = bilingualMode ?? billCustomization?.bilingual_mode ?? false;
+        const secLang: BillLanguage = secondaryLanguage ?? billCustomization?.secondary_language ?? 'en';
+
         const elecRate = effectiveElecRate ?? config.electricity_rate;
         const waterCfg = effectiveWaterConfig ?? config.water_config;
         const isWaterFlat = waterCfg.type === 'flat_rate_tier';
@@ -47,8 +36,10 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
             billCustomization.dorm_phone
         );
 
-        const footerText = billCustomization?.footer_text ||
-            `กรุณาชำระภายในวันที่ ${billCustomization?.due_day || 5} ของทุกเดือน`;
+        const defaultFooter = formatDueNotice(billCustomization?.due_day || 5, lang, isBilingual, secLang);
+        const footerText = billCustomization?.footer_text || defaultFooter;
+
+        const phoneLabel = isBilingual ? 'โทร. / Tel.' : (lang === 'en' ? 'Tel.' : (lang === 'zh' ? '电话:' : 'โทร.'));
 
         return (
             <div className="invoice-bill" ref={ref}>
@@ -64,17 +55,17 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                     <div className="invoice-address">{billCustomization!.dorm_address}</div>
                                 )}
                                 {billCustomization!.dorm_phone && (
-                                    <div className="invoice-address">โทร. {billCustomization!.dorm_phone}</div>
+                                    <div className="invoice-address">{phoneLabel} {billCustomization!.dorm_phone}</div>
                                 )}
                             </>
                         ) : (
-                            <div className="invoice-dorm-name">ใบแจ้งหนี้</div>
+                            <div className="invoice-dorm-name">{tBilingual('invoice_title', lang, isBilingual, secLang)}</div>
                         )}
                     </div>
                     <div className="invoice-details">
-                        <h2 className="invoice-title">ใบแจ้งหนี้</h2>
+                        <h2 className="invoice-title">{tBilingual('invoice_title', lang, isBilingual, secLang)}</h2>
                         <div className="invoice-meta">
-                            <div>วันที่ออกบิล: {formatThaiDate(billDate)}</div>
+                            <div>{tBilingual('bill_date', lang, isBilingual, secLang)}: {formatBillDate(billDate, lang)}</div>
                         </div>
                     </div>
                 </div>
@@ -82,12 +73,12 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 {/* Room & Month Tags */}
                 <div style={{ marginBottom: '32px' }}>
                     <div className="invoice-number-box">
-                        <span className="invoice-number-label">ห้องพัก</span>
+                        <span className="invoice-number-label">{tBilingual('room', lang, isBilingual, secLang)}</span>
                         <span className="invoice-number-value">{bill.room_number}</span>
                     </div>
                     <div className="invoice-number-box" style={{ marginLeft: '12px' }}>
-                        <span className="invoice-number-label">ประจำเดือน</span>
-                        <span className="invoice-number-value">{formatThaiMonth(bill.month + '-01')}</span>
+                        <span className="invoice-number-label">{tBilingual('month', lang, isBilingual, secLang)}</span>
+                        <span className="invoice-number-value">{formatBillMonth(bill.month + '-01', lang)}</span>
                     </div>
                 </div>
 
@@ -95,19 +86,19 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 <table className="invoice-table">
                     <thead>
                         <tr>
-                            <th className="invoice-th">รายการ</th>
-                            <th className="invoice-th text-center">หน่วยที่ใช้</th>
-                            <th className="invoice-th text-right">ค่าต่อหน่วย</th>
-                            <th className="invoice-th text-right">จำนวนเงิน (บาท)</th>
+                            <th className="invoice-th">{tBilingual('item', lang, isBilingual, secLang)}</th>
+                            <th className="invoice-th text-center">{tBilingual('units_used', lang, isBilingual, secLang)}</th>
+                            <th className="invoice-th text-right">{tBilingual('rate_per_unit', lang, isBilingual, secLang)}</th>
+                            <th className="invoice-th text-right">{tBilingual('amount_thb', lang, isBilingual, secLang)}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {/* ค่าเช่าห้อง */}
                         <tr className="invoice-row">
                             <td className="invoice-td">
-                                <div style={{ fontWeight: 500 }}>ค่าเช่าห้องพัก</div>
+                                <div style={{ fontWeight: 500 }}>{tBilingual('room_rent', lang, isBilingual, secLang)}</div>
                                 {bill.room_rent === 0 && (
-                                    <div className="invoice-detail">รายเทอม (ไม่คิดค่าเช่ารายเดือน)</div>
+                                    <div className="invoice-detail">{tBilingual('semester_rent', lang, isBilingual, secLang)}</div>
                                 )}
                             </td>
                             <td className="invoice-td text-center">—</td>
@@ -118,13 +109,13 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                         {/* ค่าไฟฟ้า */}
                         <tr className="invoice-row">
                             <td className="invoice-td">
-                                <div style={{ fontWeight: 500 }}>ค่าไฟฟ้า</div>
+                                <div style={{ fontWeight: 500 }}>{tBilingual('electricity', lang, isBilingual, secLang)}</div>
                                 <div className="invoice-detail">
-                                    เลขเดือนก่อน {bill.prev_elec.toLocaleString()} → เดือนนี้ {bill.curr_elec.toLocaleString()}
+                                    {t('prev_reading', lang)} {bill.prev_elec.toLocaleString()} → {t('curr_reading', lang)} {bill.curr_elec.toLocaleString()}
                                 </div>
                             </td>
-                            <td className="invoice-td text-center mono">{bill.elec_units} หน่วย</td>
-                            <td className="invoice-td text-right mono">{elecRate} บาท</td>
+                            <td className="invoice-td text-center mono">{bill.elec_units} {t('unit_label', lang)}</td>
+                            <td className="invoice-td text-right mono">{elecRate} {t('baht_label', lang)}</td>
                             <td className="invoice-td text-right mono">{bill.elec_bill.toLocaleString()}</td>
                         </tr>
 
@@ -134,21 +125,21 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                 {/* แบบเหมาจ่าย: แถวเหมาจ่าย */}
                                 <tr className="invoice-row">
                                     <td className="invoice-td">
-                                        <div style={{ fontWeight: 500 }}>ค่าน้ำประปา (เหมาจ่าย)</div>
+                                        <div style={{ fontWeight: 500 }}>{tBilingual('water_flat', lang, isBilingual, secLang)}</div>
                                         <div className="invoice-detail">
-                                            เลขเดือนก่อน {bill.prev_water.toLocaleString()} → เดือนนี้ {bill.curr_water.toLocaleString()}
+                                            {t('prev_reading', lang)} {bill.prev_water.toLocaleString()} → {t('curr_reading', lang)} {bill.curr_water.toLocaleString()}
                                         </div>
                                         <div className="invoice-detail">
-                                            ใช้ {bill.water_units} หน่วย (เหมา {adjustedFlatLimit} หน่วยแรก)
+                                            {t('units_used', lang)} {bill.water_units} {t('unit_label', lang)} ({adjustedFlatLimit} {t('unit_label', lang)})
                                         </div>
                                         {tenants > 1 && (
                                             <div className="invoice-detail" style={{ color: 'var(--color-info, #3B82F6)' }}>
-                                                พัก {tenants} คน (เหมา {waterCfg.flat_limit_unit}×{tenants}={adjustedFlatLimit} หน่วย, {waterCfg.flat_price?.toLocaleString()}×{tenants}={bill.water_flat_amount.toLocaleString()} บาท)
+                                                {tenants} {t('person_unit', lang)} ({waterCfg.flat_limit_unit}×{tenants}={adjustedFlatLimit} {t('unit_label', lang)}, {waterCfg.flat_price?.toLocaleString()}×{tenants}={bill.water_flat_amount.toLocaleString()} {t('baht_label', lang)})
                                             </div>
                                         )}
                                     </td>
-                                    <td className="invoice-td text-center mono">{bill.water_units} หน่วย</td>
-                                    <td className="invoice-td text-right mono">{bill.water_flat_amount.toLocaleString()} บาท</td>
+                                    <td className="invoice-td text-center mono">{bill.water_units} {t('unit_label', lang)}</td>
+                                    <td className="invoice-td text-right mono">{bill.water_flat_amount.toLocaleString()} {t('baht_label', lang)}</td>
                                     <td className="invoice-td text-right mono">{bill.water_flat_amount.toLocaleString()}</td>
                                 </tr>
                                 {/* ถ้ามีส่วนเกิน ให้แยกแถว */}
@@ -156,14 +147,14 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                     <tr className="invoice-row">
                                         <td className="invoice-td">
                                             <div style={{ fontWeight: 500, color: 'var(--color-warning, #F59E0B)' }}>
-                                                ค่าน้ำส่วนเกิน
+                                                {tBilingual('water_excess', lang, isBilingual, secLang)}
                                             </div>
                                             <div className="invoice-detail">
-                                                ใช้เกินจากเหมา {bill.water_excess_units} หน่วย
+                                                {t('water_excess_detail', lang)} {bill.water_excess_units} {t('unit_label', lang)}
                                             </div>
                                         </td>
-                                        <td className="invoice-td text-center mono">{bill.water_excess_units} หน่วย</td>
-                                        <td className="invoice-td text-right mono">{waterCfg.excess_unit_rate} บาท</td>
+                                        <td className="invoice-td text-center mono">{bill.water_excess_units} {t('unit_label', lang)}</td>
+                                        <td className="invoice-td text-right mono">{waterCfg.excess_unit_rate} {t('baht_label', lang)}</td>
                                         <td className="invoice-td text-right mono">{bill.water_excess_amount.toLocaleString()}</td>
                                     </tr>
                                 )}
@@ -172,13 +163,13 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                             /* แบบคิดตามจริง */
                             <tr className="invoice-row">
                                 <td className="invoice-td">
-                                    <div style={{ fontWeight: 500 }}>ค่าน้ำประปา</div>
+                                    <div style={{ fontWeight: 500 }}>{tBilingual('water', lang, isBilingual, secLang)}</div>
                                     <div className="invoice-detail">
-                                        เลขเดือนก่อน {bill.prev_water.toLocaleString()} → เดือนนี้ {bill.curr_water.toLocaleString()}
+                                        {t('prev_reading', lang)} {bill.prev_water.toLocaleString()} → {t('curr_reading', lang)} {bill.curr_water.toLocaleString()}
                                     </div>
                                 </td>
-                                <td className="invoice-td text-center mono">{bill.water_units} หน่วย</td>
-                                <td className="invoice-td text-right mono">{waterCfg.unit_rate} บาท</td>
+                                <td className="invoice-td text-center mono">{bill.water_units} {t('unit_label', lang)}</td>
+                                <td className="invoice-td text-right mono">{waterCfg.unit_rate} {t('baht_label', lang)}</td>
                                 <td className="invoice-td text-right mono">{bill.water_bill.toLocaleString()}</td>
                             </tr>
                         )}
@@ -187,7 +178,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                         {bill.common_fee > 0 && (
                             <tr className="invoice-row">
                                 <td className="invoice-td">
-                                    <div style={{ fontWeight: 500 }}>ค่าส่วนกลาง</div>
+                                    <div style={{ fontWeight: 500 }}>{tBilingual('common_fee', lang, isBilingual, secLang)}</div>
                                     {bill.applied_common_fees && bill.applied_common_fees.length > 0 && (
                                         <div className="invoice-detail">
                                             {bill.applied_common_fees.map(f => f.name).join(', ')}
@@ -205,7 +196,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 {/* Summary Box */}
                 <div className="invoice-summary-box">
                     <div className="invoice-summary-row total">
-                        <span>รวมทั้งสิ้น</span>
+                        <span>{tBilingual('total_amount', lang, isBilingual, secLang)}</span>
                         <span className="value">{formatCurrency(bill.total_bill)}</span>
                     </div>
                 </div>
@@ -215,14 +206,14 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                     {/* QR Code */}
                     {billCustomization?.promptpay_number && (
                         <div className="invoice-qr-section">
-                            <div className="invoice-qr-label">สแกนจ่ายผ่าน PromptPay</div>
+                            <div className="invoice-qr-label">{tBilingual('scan_promptpay', lang, isBilingual, secLang)}</div>
                             <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', display: 'inline-block' }}>
                                 <QRCodeSVG 
                                     value={generatePayload(billCustomization.promptpay_number, { amount: bill.total_bill })}
                                     size={140}
                                     level="H"
                                     imageSettings={{
-                                        src: "https://commons.wikimedia.org/wiki/Special:FilePath/PromptPay-logo.png",
+                                        src: PROMPTPAY_LOGO_DATA_URI,
                                         height: 20,
                                         width: 50,
                                         excavate: true,

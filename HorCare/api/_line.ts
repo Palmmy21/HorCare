@@ -78,8 +78,13 @@ export function thaiMonthLabel(month: string): string {
     return `${THAI_MONTHS[parseInt(mon)]} ${parseInt(year) + 543}`;
 }
 
+import { BillLanguage, t, tBilingual, formatMonthLabel } from './_translations.js';
+
 interface BillFlexOptions {
     portalUrl?: string;
+    lang?: BillLanguage;
+    bilingual?: boolean;
+    secLang?: BillLanguage;
 }
 
 export function buildBillFlex(
@@ -89,24 +94,35 @@ export function buildBillFlex(
     month: string,
     opts: BillFlexOptions = {}
 ): object {
-    const [year, mon] = month.split('-');
-    const m = parseInt(mon);
-    const y = parseInt(year);
-    const monthThai = `${THAI_MONTHS[m]} ${y + 543}`;
-    const dueDate   = `${dueDay} ${THAI_MONTHS[m]} ${y + 543}`;
+    const lang: BillLanguage = opts.lang || 'th';
+    const isBilingual = !!opts.bilingual;
+    const secLang: BillLanguage = opts.secLang || 'en';
+
+    const monthFormatted = formatMonthLabel(month, lang);
+    const dueDate   = `${dueDay} ${monthFormatted}`;
     const total     = bill.total_bill as number;
 
     const footerContents: object[] = opts.portalUrl ? [
         {
             type: 'button',
-            action: { type: 'uri', label: '🔗 เปิดพอร์ทัล / ดูบิล', uri: opts.portalUrl },
+            action: { type: 'uri', label: tBilingual('flex_open_portal', lang, isBilingual, secLang), uri: opts.portalUrl },
             style: 'primary', color: '#2563EB', height: 'sm',
         },
     ] : [];
 
+    const serviceTitle = tBilingual('flex_service_bill', lang, isBilingual, secLang);
+    const roomLabel = tBilingual('room', lang, isBilingual, secLang);
+    const monthLabel = tBilingual('month', lang, isBilingual, secLang);
+    const elecLabel = `⚡ ${tBilingual('electricity', lang, isBilingual, secLang)} (${bill.elec_units} ${t('unit_label', lang)})`;
+    const waterLabel = `💧 ${tBilingual('water', lang, isBilingual, secLang)} (${bill.water_units} ${t('unit_label', lang)})`;
+    const rentLabel = `🏠 ${tBilingual('room_rent', lang, isBilingual, secLang)}`;
+    const commonLabel = `🏢 ${tBilingual('common_fee', lang, isBilingual, secLang)}`;
+    const totalLabel = tBilingual('total_amount', lang, isBilingual, secLang);
+    const dueDateLabel = tBilingual('due_date', lang, isBilingual, secLang);
+
     return {
         type: 'flex',
-        altText: `📋 บิลค่าน้ำ-ไฟ ห้อง ${bill.room_number} เดือน ${monthThai} ยอด ฿${total.toLocaleString()}`,
+        altText: `${serviceTitle} ห้อง ${bill.room_number} (${monthFormatted}) ฿${total.toLocaleString()}`,
         contents: {
             type: 'bubble',
             size: 'kilo',
@@ -114,7 +130,7 @@ export function buildBillFlex(
                 type: 'box', layout: 'vertical', paddingAll: '16px',
                 backgroundColor: '#2563EB',
                 contents: [
-                    { type: 'text', text: '📋 ใบแจ้งค่าบริการ', color: '#ffffff', size: 'sm', weight: 'bold' },
+                    { type: 'text', text: serviceTitle, color: '#ffffff', size: 'sm', weight: 'bold' },
                     { type: 'text', text: dormName || '-', color: '#ffffffcc', size: 'xs' },
                 ],
             },
@@ -122,39 +138,39 @@ export function buildBillFlex(
                 type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px',
                 contents: [
                     { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'ห้อง',    color: '#888888', size: 'sm', flex: 2 },
+                        { type: 'text', text: roomLabel, color: '#888888', size: 'sm', flex: 2 },
                         { type: 'text', text: bill.room_number, size: 'sm', weight: 'bold', flex: 3, align: 'end' },
                     ] },
                     { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'รอบเดือน', color: '#888888', size: 'sm', flex: 2 },
-                        { type: 'text', text: monthThai, size: 'sm', flex: 3, align: 'end' },
+                        { type: 'text', text: monthLabel, color: '#888888', size: 'sm', flex: 2 },
+                        { type: 'text', text: monthFormatted, size: 'sm', flex: 3, align: 'end' },
                     ] },
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
-                        { type: 'text', text: `⚡ ค่าไฟ (${bill.elec_units} หน่วย)`, color: '#555555', size: 'sm', flex: 3 },
+                        { type: 'text', text: elecLabel, color: '#555555', size: 'sm', flex: 3 },
                         { type: 'text', text: `฿${(bill.elec_bill as number).toLocaleString()}`, size: 'sm', align: 'end', flex: 2 },
                     ] },
                     { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: `💧 ค่าน้ำ (${bill.water_units} หน่วย)`, color: '#555555', size: 'sm', flex: 3 },
+                        { type: 'text', text: waterLabel, color: '#555555', size: 'sm', flex: 3 },
                         { type: 'text', text: `฿${(bill.water_bill as number).toLocaleString()}`, size: 'sm', align: 'end', flex: 2 },
                     ] },
                     { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: '🏠 ค่าเช่าห้อง', color: '#555555', size: 'sm', flex: 3 },
+                        { type: 'text', text: rentLabel, color: '#555555', size: 'sm', flex: 3 },
                         { type: 'text', text: `฿${(bill.room_rent as number).toLocaleString()}`, size: 'sm', align: 'end', flex: 2 },
                     ] },
                     ...(bill.common_fee ? [{
                         type: 'box', layout: 'horizontal', contents: [
-                            { type: 'text', text: '🏢 ค่าส่วนกลาง', color: '#555555', size: 'sm', flex: 3 },
+                            { type: 'text', text: commonLabel, color: '#555555', size: 'sm', flex: 3 },
                             { type: 'text', text: `฿${(bill.common_fee as number).toLocaleString()}`, size: 'sm', align: 'end', flex: 2 },
                         ]
                     }] : []),
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
-                        { type: 'text', text: 'ยอดรวม', size: 'md', weight: 'bold', flex: 2 },
+                        { type: 'text', text: totalLabel, size: 'md', weight: 'bold', flex: 2 },
                         { type: 'text', text: `฿${total.toLocaleString()}`, size: 'md', weight: 'bold', color: '#2563EB', align: 'end', flex: 3 },
                     ] },
                     { type: 'box', layout: 'horizontal', margin: 'sm', contents: [
-                        { type: 'text', text: 'กำหนดชำระ', color: '#888888', size: 'xs', flex: 2 },
+                        { type: 'text', text: dueDateLabel, color: '#888888', size: 'xs', flex: 2 },
                         { type: 'text', text: dueDate, color: '#DC2626', size: 'xs', align: 'end', flex: 3 },
                     ] },
                 ],
@@ -200,8 +216,10 @@ export function buildPromptpayMessages(
     promptpayNumber: string,
     promptpayName: string,
     total: number,
+    lang: BillLanguage = 'th',
 ): object[] {
     const qrUrl = buildPromptpayQrImageUrl(promptpayNumber, total);
+    const slipNotice = t('flex_send_slip', lang);
     return [
         {
             type: 'image',
@@ -210,7 +228,7 @@ export function buildPromptpayMessages(
         },
         {
             type: 'text',
-            text: `💳 PromptPay${promptpayName ? `: ${promptpayName}` : ''}\n📞 ${promptpayNumber}\n💰 ฿${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })}\n\n📎 กรุณาส่งสลิปยืนยันการโอนเงินมาในแชทนี้ด้วยนะคะ 🙏`,
+            text: `💳 PromptPay${promptpayName ? `: ${promptpayName}` : ''}\n📞 ${promptpayNumber}\n💰 ฿${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })}\n\n${slipNotice}`,
         },
     ];
 }
@@ -223,21 +241,40 @@ export function buildReceiptFlex(
     bill: any,
     dormName: string,
     paidAt: Date,
+    opts: { lang?: BillLanguage; bilingual?: boolean; secLang?: BillLanguage } = {},
 ): object {
-    const monthThai = thaiMonthLabel(bill.month as string);
+    const lang: BillLanguage = opts.lang || 'th';
+    const isBilingual = !!opts.bilingual;
+    const secLang: BillLanguage = opts.secLang || 'en';
+
+    const monthFormatted = formatMonthLabel(bill.month as string, lang);
     // วันที่ชำระตามเวลาไทย
     const ict = new Date(paidAt.getTime() + 7 * 3600_000);
-    const paidDate = `${ict.getUTCDate()} ${THAI_MONTHS[ict.getUTCMonth() + 1]} ${ict.getUTCFullYear() + 543}`;
-    const row = (label: string, value: string, opts: object = {}) => ({
+    const paidDate = lang === 'th'
+        ? `${ict.getUTCDate()} ${THAI_MONTHS[ict.getUTCMonth() + 1]} ${ict.getUTCFullYear() + 543}`
+        : `${ict.getUTCDate()} ${formatMonthLabel(`${ict.getUTCFullYear()}-${String(ict.getUTCMonth() + 1).padStart(2, '0')}`, lang)}`;
+
+    const row = (label: string, value: string, optsObj: object = {}) => ({
         type: 'box', layout: 'horizontal', contents: [
             { type: 'text', text: label, color: '#555555', size: 'sm', flex: 3 },
             { type: 'text', text: value, size: 'sm', align: 'end', flex: 2 },
-        ], ...opts,
+        ], ...optsObj,
     });
+
+    const receiptTitle = `✅ ${tBilingual('receipt_title', lang, isBilingual, secLang)}`;
+    const roomLabel = tBilingual('room', lang, isBilingual, secLang);
+    const monthLabel = tBilingual('month', lang, isBilingual, secLang);
+    const elecLabel = `⚡ ${tBilingual('electricity', lang, isBilingual, secLang)} (${bill.elec_units ?? 0} ${t('unit_label', lang)})`;
+    const waterLabel = `💧 ${tBilingual('water', lang, isBilingual, secLang)} (${bill.water_units ?? 0} ${t('unit_label', lang)})`;
+    const rentLabel = `🏠 ${tBilingual('room_rent', lang, isBilingual, secLang)}`;
+    const commonLabel = `🏢 ${tBilingual('common_fee', lang, isBilingual, secLang)}`;
+    const paidAmountLabel = isBilingual ? 'ยอดที่ชำระ / Paid' : (lang === 'en' ? 'Paid Amount' : (lang === 'zh' ? '已付金额' : 'ยอดที่ชำระ'));
+    const paidAtLabel = isBilingual ? 'ชำระเมื่อ / Paid Date' : (lang === 'en' ? 'Paid Date' : (lang === 'zh' ? '支付时间' : 'ชำระเมื่อ'));
+    const thankLabel = isBilingual ? 'ขอบคุณที่ชำระค่ะ / Thank you!' : (lang === 'en' ? 'Thank you for your payment! 🙏' : (lang === 'zh' ? '感谢您的付款！🙏' : (lang === 'my' ? 'ငွေပေးချေမှုအတွက် ကျေးဇူးတင်ပါသည် 🙏' : 'ขอบคุณที่ชำระค่ะ 🙏')));
 
     return {
         type: 'flex',
-        altText: `✅ ใบเสร็จรับเงิน ห้อง ${bill.room_number} เดือน ${monthThai} ขอบคุณค่ะ`,
+        altText: `${receiptTitle} ห้อง ${bill.room_number} เดือน ${monthFormatted} ขอบคุณค่ะ`,
         contents: {
             type: 'bubble',
             size: 'kilo',
@@ -245,7 +282,7 @@ export function buildReceiptFlex(
                 type: 'box', layout: 'vertical', paddingAll: '16px',
                 backgroundColor: '#059669',
                 contents: [
-                    { type: 'text', text: '✅ ใบเสร็จรับเงิน', color: '#ffffff', size: 'sm', weight: 'bold' },
+                    { type: 'text', text: receiptTitle, color: '#ffffff', size: 'sm', weight: 'bold' },
                     { type: 'text', text: dormName || '-', color: '#ffffffcc', size: 'xs' },
                 ],
             },
@@ -253,28 +290,28 @@ export function buildReceiptFlex(
                 type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px',
                 contents: [
                     { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'ห้อง', color: '#888888', size: 'sm', flex: 2 },
+                        { type: 'text', text: roomLabel, color: '#888888', size: 'sm', flex: 2 },
                         { type: 'text', text: String(bill.room_number ?? '-'), size: 'sm', weight: 'bold', flex: 3, align: 'end' },
                     ] },
                     { type: 'box', layout: 'horizontal', contents: [
-                        { type: 'text', text: 'รอบเดือน', color: '#888888', size: 'sm', flex: 2 },
-                        { type: 'text', text: monthThai, size: 'sm', flex: 3, align: 'end' },
+                        { type: 'text', text: monthLabel, color: '#888888', size: 'sm', flex: 2 },
+                        { type: 'text', text: monthFormatted, size: 'sm', flex: 3, align: 'end' },
                     ] },
                     { type: 'separator', margin: 'md' },
-                    row(`⚡ ค่าไฟ (${bill.elec_units ?? 0} หน่วย)`, `฿${Number(bill.elec_bill ?? 0).toLocaleString()}`, { margin: 'md' }),
-                    row(`💧 ค่าน้ำ (${bill.water_units ?? 0} หน่วย)`, `฿${Number(bill.water_bill ?? 0).toLocaleString()}`),
-                    row('🏠 ค่าเช่าห้อง', `฿${Number(bill.room_rent ?? 0).toLocaleString()}`),
-                    ...(bill.common_fee ? [row('🏢 ค่าส่วนกลาง', `฿${Number(bill.common_fee).toLocaleString()}`)] : []),
+                    row(elecLabel, `฿${Number(bill.elec_bill ?? 0).toLocaleString()}`, { margin: 'md' }),
+                    row(waterLabel, `฿${Number(bill.water_bill ?? 0).toLocaleString()}`),
+                    row(rentLabel, `฿${Number(bill.room_rent ?? 0).toLocaleString()}`),
+                    ...(bill.common_fee ? [row(commonLabel, `฿${Number(bill.common_fee).toLocaleString()}`)] : []),
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
-                        { type: 'text', text: 'ยอดที่ชำระ', size: 'md', weight: 'bold', flex: 2 },
+                        { type: 'text', text: paidAmountLabel, size: 'md', weight: 'bold', flex: 2 },
                         { type: 'text', text: `฿${Number(bill.total_bill ?? 0).toLocaleString()}`, size: 'md', weight: 'bold', color: '#059669', align: 'end', flex: 3 },
                     ] },
                     { type: 'box', layout: 'horizontal', margin: 'sm', contents: [
-                        { type: 'text', text: 'ชำระเมื่อ', color: '#888888', size: 'xs', flex: 2 },
+                        { type: 'text', text: paidAtLabel, color: '#888888', size: 'xs', flex: 2 },
                         { type: 'text', text: paidDate, color: '#059669', size: 'xs', align: 'end', flex: 3 },
                     ] },
-                    { type: 'text', text: 'ขอบคุณที่ชำระค่ะ 🙏', size: 'xs', color: '#888888', align: 'center', margin: 'md' },
+                    { type: 'text', text: thankLabel, size: 'xs', color: '#888888', align: 'center', margin: 'md' },
                 ],
             },
         },

@@ -58,7 +58,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // ใช้เวลาที่เจ้าของกดยืนยัน (paid_at) ถ้ามี — ไม่งั้นใช้เวลาปัจจุบัน
         const paidAt = bill.paid_at ? new Date(bill.paid_at as string) : new Date();
-        await linePush(lineUserId, [buildReceiptFlex(bill, dormName, paidAt)]);
+        const roomLang = roomSnap.data()?.language || cfgSnap.data()?.bill_customization?.default_language || 'th';
+        const bilingual = !!cfgSnap.data()?.bill_customization?.bilingual_mode;
+        const secLang = cfgSnap.data()?.bill_customization?.secondary_language || 'en';
+        await linePush(lineUserId, [buildReceiptFlex(bill, dormName, paidAt, { lang: roomLang, bilingual, secLang })]);
         res.status(200).json({ data: { notified: true } });
 
     } catch (error: any) {

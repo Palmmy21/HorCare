@@ -154,11 +154,14 @@ const CSS = `
   letter-spacing: -0.04em; font-family: var(--font-mono);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
+  color: #FF7A00;
+  background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%);
+  filter: drop-shadow(0 2px 10px rgba(249, 115, 22, 0.25));
   will-change: contents;
 }
-.price-number.small  { background-image: linear-gradient(135deg,#3B82F6,#6366F1); }
-.price-number.medium { background-image: linear-gradient(135deg,#8B5CF6,#EC4899); }
-.price-number.large  { background-image: linear-gradient(135deg,#0EA5E9,#10B981); }
+.price-number.small  { background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%); }
+.price-number.medium { background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%); }
+.price-number.large  { background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%); }
 
 /* -- Price pop on key change -- */
 .price-pop { animation: p-pop 0.32s cubic-bezier(0.16,1,0.3,1) both; }
@@ -416,9 +419,9 @@ const PlanCard = memo(function PlanCard({
                 <div key={priceKey} className="price-pop" style={{
                     display: 'flex', alignItems: 'flex-end', gap: '0.2rem',
                 }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', paddingBottom: '0.6rem' }}>฿</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#FF7A00', paddingBottom: '0.45rem', marginRight: '0.15rem' }}>฿</span>
                     <span className={`price-number ${plan.id}`}>{price.toLocaleString()}</span>
-                    <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', paddingBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)', paddingBottom: '0.5rem', marginLeft: '0.15rem' }}>
                         {cycle === 'monthly' ? '/เดือน' : '/ปี'}
                     </span>
                 </div>
@@ -434,8 +437,8 @@ const PlanCard = memo(function PlanCard({
                         }}>ประหยัด {savings}%</span>
                     </div>
                 ) : (
-                    <div style={{ fontSize: '0.76rem', color: 'rgba(255,255,255,0.6)', marginTop: '0.35rem' }}>
-                        หรือ ฿{plan.yearlyPrice.toLocaleString()}/ปี (ประหยัดกว่า)
+                    <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.35rem' }}>
+                        หรือ <span style={{ color: '#FB923C', fontWeight: 700 }}>฿{plan.yearlyPrice.toLocaleString()}</span>/ปี (ประหยัดกว่า)
                     </div>
                 )}
             </div>
@@ -541,11 +544,11 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
                         {plan.name} ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'})
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '0.25rem', marginTop: '0.5rem' }}>
-                        <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.4)', paddingBottom: '0.5rem' }}>฿</span>
+                        <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#FF7A00', paddingBottom: '0.4rem', marginRight: '0.1rem' }}>฿</span>
                         <span className={`price-number ${plan.id}`} style={{ fontSize: '2.5rem' }}>
                             {price.toLocaleString()}
                         </span>
-                        <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)', paddingBottom: '0.4rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', paddingBottom: '0.4rem' }}>
                             {cycle === 'monthly' ? '/เดือน' : '/ปี'}
                         </span>
                     </div>
