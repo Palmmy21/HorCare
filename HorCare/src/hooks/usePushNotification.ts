@@ -43,7 +43,8 @@ export function usePushNotification() {
                 // Ensure Service Worker is registered for mobile push notifications (Samsung/Android)
                 if ('serviceWorker' in navigator) {
                     try {
-                        const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+                        const reg = (await navigator.serviceWorker.getRegistration()) || 
+                            await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/firebase-cloud-messaging-push-scope' });
                         // Fire a confirmation welcome notification
                         setTimeout(async () => {
                             try {
@@ -115,7 +116,7 @@ export function usePushNotification() {
                     reg = await navigator.serviceWorker.getRegistration();
                 }
                 if (!reg) {
-                    reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+                    reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/firebase-cloud-messaging-push-scope' });
                 }
                 if (reg) {
                     await reg.showNotification(title, notifOptions);

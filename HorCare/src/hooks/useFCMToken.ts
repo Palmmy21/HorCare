@@ -10,8 +10,8 @@ const SW_PATH = '/firebase-messaging-sw.js';
 async function registerFCMServiceWorker(): Promise<ServiceWorkerRegistration | null> {
     if (!('serviceWorker' in navigator)) return null;
     try {
-        // Use the dedicated FCM SW (separate from the PWA SW so they don't conflict)
-        const reg = await navigator.serviceWorker.register(SW_PATH, { scope: '/' });
+        // Use dedicated scope so it does not overwrite the root PWA Service Worker (VitePWA /sw.js)
+        const reg = await navigator.serviceWorker.register(SW_PATH, { scope: '/firebase-cloud-messaging-push-scope' });
         // Pass Firebase config to SW so it can init without bundler
         if (reg.active) {
             reg.active.postMessage({ type: 'FIREBASE_CONFIG', config: firebaseConfig });
