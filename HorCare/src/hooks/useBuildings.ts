@@ -4,7 +4,7 @@ import {
     onSnapshot, query, orderBy, getDocs, getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { Building } from '../types';
+import type { Building, DormConfig } from '../types';
 
 export function useBuildings(userId: string | null) {
     const [buildings, setBuildings] = useState<Building[]>([]);
@@ -63,7 +63,7 @@ export function useBuildings(userId: string | null) {
         return () => unsub();
     }, [userId]);
 
-    const addBuilding = useCallback(async (name: string): Promise<Building | undefined> => {
+    const addBuilding = useCallback(async (name: string, initialConfig?: Partial<DormConfig>): Promise<Building | undefined> => {
         if (!userId) return;
         const id = `building_${Date.now()}`;
         const newBuilding: Building = {
@@ -73,6 +73,28 @@ export function useBuildings(userId: string | null) {
             order: buildings.length,
         };
         await setDoc(doc(db, `users/${userId}/buildings`, id), newBuilding);
+
+        // Initialize default configuration for the new building
+        const configData: DormConfig = {
+            building_type: initialConfig?.building_type || 'dormitory',
+            electricity_rate: initialConfig?.electricity_rate ?? 8,
+            water_config: initialConfig?.water_config || { type: 'normal', unit_rate: 18 },
+            room_rent: initialConfig?.room_rent ?? 3500,
+            bill_customization: {
+                dorm_name: name.trim(),
+                dorm_address: '',
+                dorm_phone: '',
+                promptpay_number: '',
+                promptpay_name: '',
+                footer_text: 'กรุณาชำระภายในวันที่กำหนด ขอบคุณครับ',
+                due_day: initialConfig?.bill_customization?.due_day ?? 5,
+                default_language: initialConfig?.bill_customization?.default_language || 'th',
+                bilingual_mode: false,
+                secondary_language: 'en',
+            },
+        };
+        await setDoc(doc(db, `users/${userId}/buildings/${id}/data/config`), configData);
+
         return newBuilding;
     }, [userId, buildings.length]);
 

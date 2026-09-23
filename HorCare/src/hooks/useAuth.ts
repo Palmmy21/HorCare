@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import type { UserProfile } from '../types';
+import type { UserProfile, Building, DormConfig, InitialBuildingConfig } from '../types';
 
 
 export function useAuth() {
@@ -83,7 +83,12 @@ export function useAuth() {
     }, []);
 
     // Register
-    const register = useCallback(async (email: string, password: string, displayName: string) => {
+    const register = useCallback(async (
+        email: string,
+        password: string,
+        displayName: string,
+        initialBuilding?: InitialBuildingConfig
+    ) => {
         setError(null);
         try {
             await setPersistence(auth, browserLocalPersistence);
@@ -109,11 +114,44 @@ export function useAuth() {
                 display_name: displayName,
                 license: 'free',
                 access_until: 0, // 0 = no expiry (Firestore rules treat this as permanent)
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                ...(initialBuilding?.phone ? { phone: initialBuilding.phone } : {}),
+                ...(initialBuilding?.referral_sources ? { referral_sources: initialBuilding.referral_sources } : {}),
             };
 
             await setDoc(doc(db, 'users', cred.user.uid), userProfile);
             setProfile(userProfile);
+
+            // Initialize the user's first building with their configured initial values
+            const buildingId = `building_${Date.now()}`;
+            const dormName = initialBuilding?.dorm_name?.trim() || 'หอพักหลัก';
+            const newBuilding: Building = {
+                id: buildingId,
+                name: dormName,
+                created_at: new Date().toISOString(),
+                order: 0,
+            };
+            await setDoc(doc(db, `users/${cred.user.uid}/buildings`, buildingId), newBuilding);
+
+            const configData: DormConfig = {
+                building_type: initialBuilding?.building_type || 'dormitory',
+                electricity_rate: Number(initialBuilding?.electricity_rate) || 8,
+                water_config: initialBuilding?.water_config || { type: 'normal', unit_rate: 18 },
+                room_rent: Number(initialBuilding?.room_rent) || 3500,
+                bill_customization: {
+                    dorm_name: dormName,
+                    dorm_address: '',
+                    dorm_phone: initialBuilding?.phone || '',
+                    promptpay_number: '',
+                    promptpay_name: '',
+                    footer_text: 'กรุณาชำระภายในวันที่กำหนด ขอบคุณครับ',
+                    due_day: Number(initialBuilding?.due_day) || 5,
+                    default_language: 'th',
+                    bilingual_mode: false,
+                    secondary_language: 'en',
+                },
+            };
+            await setDoc(doc(db, `users/${cred.user.uid}/buildings/${buildingId}/data/config`), configData);
 
             return cred.user;
         } catch (err: unknown) {

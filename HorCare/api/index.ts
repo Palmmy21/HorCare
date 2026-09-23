@@ -11,6 +11,7 @@ import sendLineBillsHandler from './_send-line-bills.js';
 import sendLineFineHandler from './_send-line-fine.js';
 import sendVerifyEmailHandler from './_send-verify-email.js';
 import uploadSlipHandler from './_upload-slip.js';
+import notifyPushHandler from './_notify-push.js';
 
 // Apply the maximum duration config globally to this API gateway
 export const config = { maxDuration: 60 };
@@ -25,6 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);
         case 'notify-payment': return notifyPaymentHandler(req, res);
+        case 'notify-push': return notifyPushHandler(req, res);
         case 'prune-slips': return pruneSlipsHandler(req, res);
         case 'read-meter': return readMeterHandler(req, res);
         case 'remind-bills': return remindBillsHandler(req, res);

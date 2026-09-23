@@ -12,77 +12,56 @@ import type { UserProfile, PlanName, BillingCycle } from '../../types';
    GPU-composited CSS transitions (no JS hover).
 ------------------------------------------ */
 const CSS = `
-/* -- Animations (GPU-only: transform + opacity) -- */
-@keyframes p-float {
-  0%,100% { transform: translateY(0); }
-  50%      { transform: translateY(-20px); }
-}
+/* -- Animations -- */
 @keyframes p-slide-up {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes p-scale-in {
-  from { opacity: 0; transform: translate(-50%,-50%) scale(0.9); }
+  from { opacity: 0; transform: translate(-50%,-50%) scale(0.95); }
   to   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
 }
 @keyframes p-spin {
   to { transform: rotate(360deg); }
 }
 @keyframes p-pop {
-  0%  { opacity: 0; transform: scale(0.82); }
-  65% { transform: scale(1.06); }
-  100%{ opacity: 1; transform: scale(1); }
-}
-@keyframes p-shimmer {
-  0%   { background-position: -300% center; }
-  100% { background-position:  300% center; }
+  0%   { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 @keyframes p-check {
-  0%  { transform: scale(0) rotate(-45deg); opacity: 0; }
-  70% { transform: scale(1.12) rotate(0); }
-  100%{ transform: scale(1) rotate(0); opacity: 1; }
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
-/* -- Pricing page wrapper -- */
+/* -- Page Wrapper -- */
 .pricing-page {
   min-height: 100vh;
   margin: 0;
-  padding: 2.5rem 2rem 4rem;
-  background: linear-gradient(160deg, #0d0820 0%, #0a0a18 50%, #060414 100%);
+  padding: 3rem 1.5rem 5rem;
+  background-color: #090D16;
+  background-image: radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.12) 0%, rgba(9, 13, 22, 0) 65%);
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  color: #F8FAFC;
+  font-family: var(--font-sans);
 }
 
-/* -- Grid bg -- */
-.pricing-grid-bg {
-  position: absolute; inset: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
-  background-size: 52px 52px;
-}
-
-/* -- Ambient orb -- */
-.pricing-orb {
-  position: absolute; border-radius: 50%; pointer-events: none;
-  will-change: transform;
-}
-
-/* -- Content inner -- */
 .pricing-inner {
-  max-width: 1120px; margin: 0 auto; position: relative; z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
-/* -- Slide-up stagger for sections -- */
-.p-anim-0 { animation: p-slide-up 0.45s ease both; }
-.p-anim-1 { animation: p-slide-up 0.45s ease 0.09s both; }
-.p-anim-2 { animation: p-slide-up 0.45s ease 0.18s both; }
-.p-anim-3 { animation: p-slide-up 0.45s ease 0.48s both; }
+/* -- Slide-up animation -- */
+.p-anim-0 { animation: p-slide-up 0.35s ease both; }
+.p-anim-1 { animation: p-slide-up 0.35s ease 0.08s both; }
+.p-anim-2 { animation: p-slide-up 0.35s ease 0.16s both; }
+.p-anim-3 { animation: p-slide-up 0.35s ease 0.24s both; }
 
-/* -- Static section: wrapper for cards — no animation to prevent re-flash on cycle toggle -- */
 .pricing-section { opacity: 1; }
 
-/* -- Card grid, equal height -- */
 .pricing-grid {
   display: flex;
   justify-content: center;
@@ -90,208 +69,254 @@ const CSS = `
   align-items: stretch;
 }
 
-/* -- Plan card -- */
+/* -- Minimalist Plan Card -- */
 .plan-card {
   position: relative;
-  border-radius: 24px;
-  padding: 2rem 1.75rem;
-  display: flex; flex-direction: column;
-  border: 1px solid rgba(255,255,255,0.09);
-  background: rgba(255,255,255,0.032);
-  /* Only composite properties transition */
-  transition: transform 0.28s cubic-bezier(0.16,1,0.3,1),
-              box-shadow 0.28s ease,
-              border-color 0.28s ease;
+  width: 100%;
+  max-width: 460px;
+  border-radius: 20px;
+  padding: 2.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   will-change: transform;
   overflow: hidden;
 }
 .plan-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
+  border-color: rgba(14, 165, 233, 0.32);
+  box-shadow: 0 20px 44px -10px rgba(14, 165, 233, 0.12), 0 12px 28px -6px rgba(0, 0, 0, 0.5);
 }
 .plan-card.popular {
-  background: linear-gradient(160deg, #091325 0%, #061821 100%);
+  border-color: rgba(14, 165, 233, 0.25);
 }
-
-/* Glow ring for popular */
 .plan-card.popular::before {
   content: '';
-  position: absolute; inset: -2px; border-radius: 26px; z-index: -1;
-  background: linear-gradient(135deg, #0EA5E9, #10B981);
-  animation: p-float 3s ease-in-out infinite alternate;
-  will-change: transform;
-  opacity: 0.75;
+  position: absolute;
+  top: 0; left: 15%; right: 15%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #38BDF8, transparent);
 }
 
-/* -- CTA button inside card, CSS hover only -- */
+/* -- Popular micro-badge -- */
+.popular-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  color: #38BDF8;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* -- Minimal CTA button -- */
 .plan-cta {
-  width: 100%; padding: 1rem; border-radius: 14px; border: none;
-  font-weight: 700; font-size: 0.95rem; cursor: pointer; letter-spacing: -0.01em;
-  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-  color: #fff;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.13);
-  transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.15s ease;
-  will-change: transform;
+  width: 100%;
+  padding: 0.95rem;
+  border-radius: 12px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  text-decoration: none;
 }
-.plan-cta:hover { transform: translateY(-1px); }
-.plan-cta:active { transform: translateY(0); }
-.plan-cta.small  { --glow: rgba(99,102,241,0.45); }
-.plan-cta.medium { --glow: rgba(139,92,246,0.45); }
-.plan-cta.large  { --glow: rgba(16,185,129,0.45); }
+.plan-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+  opacity: 0.96;
+}
+.plan-cta:active {
+  transform: translateY(0);
+}
 
-.plan-card:hover .plan-cta.small  { background: linear-gradient(135deg,#3B82F6,#6366F1); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
-.plan-card:hover .plan-cta.medium { background: linear-gradient(135deg,#8B5CF6,#EC4899); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
-.plan-card:hover .plan-cta.large  { background: linear-gradient(135deg,#0EA5E9,#10B981); border-color: transparent; box-shadow: 0 6px 20px var(--glow); }
-
-/* -- Card hover shadows -- */
-.plan-card.small:hover  { box-shadow: 0 24px 60px rgba(99,102,241,0.3),  0 4px 16px rgba(0,0,0,0.4); border-color: rgba(99,102,241,0.45); }
-.plan-card.medium:hover { box-shadow: 0 24px 60px rgba(139,92,246,0.35), 0 4px 16px rgba(0,0,0,0.4); border-color: rgba(236,72,153,0.5); }
-.plan-card.large:hover  { box-shadow: 0 24px 60px rgba(16,185,129,0.3),  0 4px 16px rgba(0,0,0,0.4); border-color: rgba(16,185,129,0.45); }
-
-/* -- Price text -- */
+/* -- Price typography -- */
 .price-number {
-  font-size: 3.25rem; font-weight: 900; line-height: 1;
-  letter-spacing: -0.04em; font-family: var(--font-mono);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: #FF7A00;
-  background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%);
-  filter: drop-shadow(0 2px 10px rgba(249, 115, 22, 0.25));
-  will-change: contents;
+  font-size: 3.25rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #FFFFFF;
+  font-family: var(--font-sans);
 }
-.price-number.small  { background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%); }
-.price-number.medium { background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%); }
-.price-number.large  { background-image: linear-gradient(135deg, #FF6B00 0%, #FBA919 100%); }
-
-/* -- Price pop on key change -- */
-.price-pop { animation: p-pop 0.32s cubic-bezier(0.16,1,0.3,1) both; }
+.price-pop {
+  animation: p-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 /* -- Feature check icon -- */
 .feat-check {
-  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 0.06rem;
-  display: flex; align-items: center; justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0.08rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.24);
+  color: #38BDF8;
 }
-.feat-check.small  { background: linear-gradient(135deg,#3B82F6,#6366F1); box-shadow: 0 2px 8px rgba(99,102,241,0.35); }
-.feat-check.medium { background: linear-gradient(135deg,#8B5CF6,#EC4899); box-shadow: 0 2px 8px rgba(139,92,246,0.35); }
-.feat-check.large  { background: linear-gradient(135deg,#0EA5E9,#10B981); box-shadow: 0 2px 8px rgba(16,185,129,0.35); }
-
-/* -- Popular shimmer badge -- */
-.popular-badge {
-  position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
-  color: #fff; border-radius: 0 0 14px 14px; padding: 0.35rem 1.25rem;
-  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em;
-  text-transform: uppercase; white-space: nowrap;
-  display: flex; align-items: center; gap: 0.35rem;
-  background: linear-gradient(90deg,#8B5CF6 0%,#EC4899 25%,#fff 50%,#EC4899 75%,#8B5CF6 100%);
-  background-size: 300% auto;
-  animation: p-shimmer 3s linear infinite;
-  box-shadow: 0 4px 16px rgba(139,92,246,0.5);
-  will-change: background-position;
+.feat-check.unavailable {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #64748B;
 }
 
-/* -- Billing toggle -- */
+/* -- Minimal Billing Toggle -- */
 .billing-toggle {
   display: inline-flex;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 16px; padding: 4px; gap: 4px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
 }
 .billing-btn {
-  padding: 0.625rem 1.5rem; border-radius: 12px; border: none;
-  font-weight: 700; font-size: 0.9375rem; cursor: pointer;
-  color: rgba(255,255,255,0.4); background: transparent;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 1.25rem;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: #94A3B8;
+  background: transparent;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.billing-btn:hover {
+  color: #F8FAFC;
 }
 .billing-btn.active {
-  background: linear-gradient(135deg,#8B5CF6,#6366F1);
-  color: #fff; box-shadow: 0 4px 16px rgba(139,92,246,0.35);
+  background: #0284C7;
+  color: #FFFFFF;
+  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
 }
 
 /* -- Back button -- */
 .pricing-back {
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
-  border-radius: 10px; color: rgba(255,255,255,0.5);
-  cursor: pointer; display: inline-flex; align-items: center; gap: 0.375rem;
-  font-size: 0.875rem; padding: 0.5rem 1rem; margin-bottom: 2rem;
-  transition: color 0.18s ease, background 0.18s ease;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #94A3B8;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  margin-bottom: 2.25rem;
+  transition: all 0.18s ease;
 }
-.pricing-back:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.pricing-back:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
 
-/* -- Modal -- */
+/* -- Minimal Modal -- */
 .pricing-modal-backdrop {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
-  z-index: 300; backdrop-filter: blur(6px);
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 300;
+  backdrop-filter: blur(8px);
 }
 .pricing-modal {
   position: fixed; top: 50%; left: 50%; z-index: 301;
-  background: linear-gradient(160deg,#1a1040 0%,#0c0a1e 100%);
-  border-radius: 24px; padding: 2rem; width: min(420px,92vw);
-  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
-  animation: p-scale-in 0.22s cubic-bezier(0.16,1,0.3,1) both;
+  background: #0F172A;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  padding: 2rem;
+  width: min(420px, 92vw);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  animation: p-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  color: #F8FAFC;
 }
 .modal-close {
   position: absolute; top: 1rem; right: 1rem;
-  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px; padding: 0.375rem; cursor: pointer; display: flex; color: rgba(255,255,255,0.5);
-  transition: color 0.15s, background 0.15s;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px; padding: 0.375rem; cursor: pointer;
+  display: flex; color: #94A3B8;
+  transition: all 0.15s;
 }
-.modal-close:hover { color: #fff; background: rgba(255,255,255,0.1); }
+.modal-close:hover { color: #FFFFFF; background: rgba(255, 255, 255, 0.12); }
 .modal-cancel {
   flex: 1; padding: 0.8rem; border-radius: 12px; cursor: pointer;
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.55); font-weight: 600; font-size: 0.9rem;
-  transition: background 0.18s, color 0.18s;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94A3B8; font-weight: 600; font-size: 0.9rem;
+  transition: all 0.15s;
 }
-.modal-cancel:hover { background: rgba(255,255,255,0.09); color: #fff; }
+.modal-cancel:hover { background: rgba(255, 255, 255, 0.09); color: #FFFFFF; }
 .modal-confirm {
   flex: 2; padding: 0.8rem; border-radius: 12px; border: none;
-  color: #fff; font-weight: 700; font-size: 0.9rem; cursor: pointer;
+  background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+  color: #FFFFFF; font-weight: 600; font-size: 0.9rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-  transition: opacity 0.18s, transform 0.18s;
-  will-change: transform;
+  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+  transition: all 0.15s;
 }
-.modal-confirm:hover { opacity: 0.88; transform: translateY(-1px); }
+.modal-confirm:hover { opacity: 0.92; transform: translateY(-1px); }
 
 /* -- Processing spinner -- */
 .pricing-spinner {
-  width: 48px; height: 48px;
-  border: 3px solid rgba(139,92,246,0.2);
-  border-top-color: #8B5CF6; border-radius: 50%;
+  width: 44px; height: 44px;
+  border: 3px solid rgba(14, 165, 233, 0.2);
+  border-top-color: #0EA5E9;
+  border-radius: 50%;
   animation: p-spin 0.7s linear infinite;
-  will-change: transform;
 }
 
 /* -- Success check -- */
 .success-check {
-  width: 96px; height: 96px; border-radius: 50%;
-  background: linear-gradient(135deg,#10B981,#059669);
+  width: 80px; height: 80px; border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34D399;
   display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 1.75rem;
-  box-shadow: 0 12px 40px rgba(16,185,129,0.45);
-  animation: p-check 0.55s cubic-bezier(0.16,1,0.3,1) both;
-  will-change: transform;
+  margin: 0 auto 1.5rem;
+  animation: p-check 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* -- Responsive: tighter internal padding on smaller screens
-      (full-bleed handled by .main-content:has(.pricing-page) in index.css) -- */
 @media (max-width: 768px) {
-  .pricing-page { padding: 1.75rem 1rem 3rem; }
-}
-@media (max-width: 359px) {
-  .pricing-page { padding: 1.5rem 0.75rem 2.5rem; }
+  .pricing-page { padding: 2rem 1rem 3.5rem; }
+  .plan-card { padding: 1.75rem 1.25rem; }
 }
 `;
 
 /* ----------- Inject CSS once ----------- */
-let cssInjected = false;
 function injectCSS() {
-    if (cssInjected || typeof document === 'undefined') return;
-    const el = document.createElement('style');
-    el.id = 'horcare-pricing-css';
+    if (typeof document === 'undefined') return;
+    let el = document.getElementById('horcare-pricing-css') as HTMLStyleElement | null;
+    if (!el) {
+        el = document.createElement('style');
+        el.id = 'horcare-pricing-css';
+        document.head.appendChild(el);
+    }
     el.textContent = CSS;
-    document.head.appendChild(el);
-    cssInjected = true;
 }
 
 /* ----------- Plan definitions (stable ref) ----------- */
@@ -313,8 +338,8 @@ const PLANS: Plan[] = [
     {
         id: 'small', name: 'Start', icon: Home, roomRange: 'สูงสุด 50 ห้อง · 1 หอ',
         monthlyPrice: 149, yearlyPrice: 950, originalYearlyPrice: 1788,
-        gradient: 'linear-gradient(135deg,#3B82F6,#6366F1)',
-        glowColor: 'rgba(99,102,241,0.45)',
+        gradient: 'linear-gradient(135deg,#0EA5E9,#0284C7)',
+        glowColor: 'rgba(14,165,233,0.3)',
         features: [
             'ห้องสูงสุด 50 ห้อง · 1 หอพัก',
             'จดมิเตอร์ไฟ / น้ำ + ออกบิลอัตโนมัติ',
@@ -331,8 +356,8 @@ const PLANS: Plan[] = [
     {
         id: 'medium', name: 'Plus', icon: Building, roomRange: 'สูงสุด 150 ห้อง · 5 หอ',
         monthlyPrice: 259, yearlyPrice: 1590, originalYearlyPrice: 3108,
-        gradient: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
-        glowColor: 'rgba(139,92,246,0.45)',
+        gradient: 'linear-gradient(135deg,#0EA5E9,#0284C7)',
+        glowColor: 'rgba(14,165,233,0.3)',
         features: [
             'ห้องสูงสุด 150 ห้อง · 5 หอพัก',
             'ทุกอย่างของ Start',
@@ -348,8 +373,8 @@ const PLANS: Plan[] = [
     {
         id: 'large', name: 'HorCare', icon: Building2, roomRange: 'ไม่จำกัดห้อง · 10 หอ',
         monthlyPrice: 399, yearlyPrice: 2990, originalYearlyPrice: 4788,
-        gradient: 'linear-gradient(135deg,#0EA5E9,#10B981)',
-        glowColor: 'rgba(16,185,129,0.45)',
+        gradient: 'linear-gradient(135deg,#0EA5E9,#0284C7)',
+        glowColor: 'rgba(14,165,233,0.3)',
         popular: true,
         features: [
             'ห้องไม่จำกัด · สูงสุด 10 หอพัก',
@@ -368,7 +393,7 @@ const PLANS: Plan[] = [
     },
 ];
 
-/* ----------- PlanCard (memo = skip re-render unless props change) ----------- */
+/* ----------- PlanCard ----------- */
 const PlanCard = memo(function PlanCard({
     plan, cycle, currentPlanId,
 }: { plan: Plan; cycle: BillingCycle; currentPlanId?: string; onSelect?: (p: Plan) => void }) {
@@ -378,67 +403,70 @@ const PlanCard = memo(function PlanCard({
         ? Math.round((1 - plan.yearlyPrice / plan.originalYearlyPrice) * 100)
         : 0;
 
-    useEffect(() => { setPriceKey(k => k + 1); }, [cycle]); // eslint-disable-line react-hooks/set-state-in-effect
+    useEffect(() => { setPriceKey(k => k + 1); }, [cycle]);
 
     return (
         <div className={`plan-card ${plan.id}${plan.popular ? ' popular' : ''}`}>
-            {plan.popular && (
-                <div className="popular-badge">
-                    <Sparkles size={10} fill="currentColor" />
-                    ยอดนิยม
-                </div>
-            )}
-
-            {/* Icon + name */}
-            <div style={{ marginBottom: '1rem', marginTop: plan.popular ? '0.75rem' : 0 }}>
+            {/* Header: Icon + Badge */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                 <div style={{
-                    width: 52, height: 52, borderRadius: '16px',
-                    background: 'rgba(255,255,255,0.07)',
-                    border: '1px solid rgba(255,255,255,0.11)',
+                    width: 44, height: 44, borderRadius: '12px',
+                    background: 'rgba(14, 165, 233, 0.1)',
+                    border: '1px solid rgba(14, 165, 233, 0.22)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginBottom: '1rem',
+                    color: '#38BDF8',
                 }}>
-                    <plan.icon size={26} color="rgba(255,255,255,0.85)" />
+                    <plan.icon size={22} />
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: '#fff', letterSpacing: '-0.02em' }}>
+                {plan.popular && (
+                    <div className="popular-badge">
+                        <Sparkles size={11} fill="currentColor" />
+                        ยอดนิยม
+                    </div>
+                )}
+            </div>
+
+            {/* Plan Name & Scope */}
+            <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ fontWeight: 800, fontSize: '1.4rem', color: '#FFFFFF', letterSpacing: '-0.02em', marginBottom: '0.35rem' }}>
                     {plan.name}
                 </div>
                 <div style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                    marginTop: '0.35rem', background: 'rgba(255,255,255,0.07)',
-                    border: '1px solid rgba(255,255,255,0.09)',
-                    borderRadius: '999px', padding: '0.2rem 0.7rem',
-                    fontSize: '0.76rem', color: 'rgba(255,255,255,0.85)',
+                    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                    color: '#94A3B8', fontSize: '0.8125rem',
                 }}>
-                    <Package size={11} /> {plan.roomRange}
+                    <Package size={13} color="#38BDF8" /> {plan.roomRange}
                 </div>
             </div>
 
             {/* Price */}
             <div style={{ marginBottom: '1.5rem' }}>
                 <div key={priceKey} className="price-pop" style={{
-                    display: 'flex', alignItems: 'flex-end', gap: '0.2rem',
+                    display: 'flex', alignItems: 'baseline', gap: '0.3rem',
                 }}>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#FF7A00', paddingBottom: '0.45rem', marginRight: '0.15rem' }}>฿</span>
-                    <span className={`price-number ${plan.id}`}>{price.toLocaleString()}</span>
-                    <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.7)', paddingBottom: '0.5rem', marginLeft: '0.15rem' }}>
-                        {cycle === 'monthly' ? '/เดือน' : '/ปี'}
+                    <span style={{ fontSize: '1.35rem', fontWeight: 700, color: '#38BDF8' }}>฿</span>
+                    <span className="price-number">{price.toLocaleString()}</span>
+                    <span style={{ fontSize: '0.9rem', color: '#94A3B8', marginLeft: '0.2rem' }}>
+                        {cycle === 'monthly' ? '/ เดือน' : '/ ปี'}
                     </span>
                 </div>
                 {cycle === 'yearly' ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
-                        <span style={{ textDecoration: 'line-through', color: 'rgba(255,255,255,0.5)', fontSize: '0.875rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ textDecoration: 'line-through', color: '#64748B', fontSize: '0.85rem' }}>
                             ฿{plan.originalYearlyPrice.toLocaleString()}
                         </span>
                         <span style={{
-                            background: 'rgba(16,185,129,0.18)', border: '1px solid rgba(16,185,129,0.32)',
-                            color: '#34D399', borderRadius: '999px', padding: '0.15rem 0.6rem',
-                            fontSize: '0.72rem', fontWeight: 800,
+                            background: 'rgba(16,185,129,0.14)', border: '1px solid rgba(16,185,129,0.28)',
+                            color: '#34D399', borderRadius: '999px', padding: '0.12rem 0.55rem',
+                            fontSize: '0.72rem', fontWeight: 700,
                         }}>ประหยัด {savings}%</span>
+                        <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
+                            (เฉลี่ยเพียง ฿{Math.round(plan.yearlyPrice / 12).toLocaleString()} / ด.)
+                        </span>
                     </div>
                 ) : (
-                    <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.35rem' }}>
-                        หรือ <span style={{ color: '#FB923C', fontWeight: 700 }}>฿{plan.yearlyPrice.toLocaleString()}</span>/ปี (ประหยัดกว่า)
+                    <div style={{ fontSize: '0.8125rem', color: '#94A3B8', marginTop: '0.45rem' }}>
+                        หรือจ่ายรายปี <span style={{ color: '#38BDF8', fontWeight: 600 }}>฿{plan.yearlyPrice.toLocaleString()}</span> / ปี (ประหยัดกว่า 49%)
                     </div>
                 )}
             </div>
@@ -446,14 +474,14 @@ const PlanCard = memo(function PlanCard({
             {/* Divider */}
             <div style={{
                 height: 1,
-                background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent)',
-                marginBottom: '1.25rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                marginBottom: '1.5rem',
             }} />
 
-            {/* Features, flex:1 makes all cards same height */}
+            {/* Features */}
             <ul style={{
-                listStyle: 'none', padding: 0, margin: '0 0 1.75rem',
-                flex: 1, display: 'flex', flexDirection: 'column', gap: '0.6rem',
+                listStyle: 'none', padding: 0, margin: '0 0 2rem',
+                flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem',
             }}>
                 {plan.features.map(f => {
                     const coming = f.startsWith('[soon]');
@@ -461,42 +489,37 @@ const PlanCard = memo(function PlanCard({
                     const label = coming ? f.slice(7) : (f.startsWith('[no]') ? f.slice(5) : (f.startsWith('❌') ? f.slice(2) : f));
                     return (
                         <li key={f} style={{
-                            display: 'flex', alignItems: 'flex-start',
-                            gap: '0.6rem', fontSize: '0.88rem', fontWeight: 500,
-                            color: (unavailable || coming) ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                            display: 'flex', alignItems: 'center',
+                            gap: '0.75rem', fontSize: '0.875rem', fontWeight: 450,
+                            color: (unavailable || coming) ? '#64748B' : '#E2E8F0',
                         }}>
                             {coming ? (
                                 <div style={{
                                     background: 'rgba(245,158,11,0.12)',
                                     border: '1px solid rgba(245,158,11,0.25)',
-                                    borderRadius: '50%', width: 18, height: 18,
+                                    borderRadius: '50%', width: 20, height: 20,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                                 }}>
-                                    <Clock size={9} color="rgba(245,158,11,0.7)" strokeWidth={2.5} />
+                                    <Clock size={10} color="#FBBF24" strokeWidth={2.5} />
                                 </div>
                             ) : unavailable ? (
-                                <div className="feat-check unavailable" style={{
-                                    background: 'rgba(255,255,255,0.08)',
-                                    borderRadius: '50%', width: 18, height: 18,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                                }}>
-                                    <X size={10} color="rgba(255,255,255,0.4)" strokeWidth={3} />
+                                <div className="feat-check unavailable">
+                                    <X size={10} strokeWidth={2.5} />
                                 </div>
                             ) : (
-                                <div className={`feat-check ${plan.id}`}>
-                                    <Check size={10} color="#fff" strokeWidth={3} />
+                                <div className="feat-check">
+                                    <Check size={11} strokeWidth={2.5} />
                                 </div>
                             )}
-                            <span>
+                            <span style={{ flex: 1, lineHeight: 1.4 }}>
                                 {label}
                                 {coming && (
                                     <span style={{
-                                        marginLeft: '0.35rem', fontSize: '0.62rem', fontWeight: 800,
-                                        background: 'rgba(245,158,11,0.13)',
-                                        border: '1px solid rgba(245,158,11,0.28)',
-                                        color: 'rgba(245,158,11,0.75)', borderRadius: '999px',
-                                        padding: '0.06rem 0.4rem', verticalAlign: 'middle',
-                                        letterSpacing: '0.02em',
+                                        marginLeft: '0.4rem', fontSize: '0.65rem', fontWeight: 700,
+                                        background: 'rgba(245,158,11,0.12)',
+                                        border: '1px solid rgba(245,158,11,0.25)',
+                                        color: '#FBBF24', borderRadius: '999px',
+                                        padding: '0.1rem 0.45rem', verticalAlign: 'middle',
                                     }}>เร็วๆ นี้</span>
                                 )}
                             </span>
@@ -508,17 +531,13 @@ const PlanCard = memo(function PlanCard({
             {/* CTA — direct to LINE Support */}
             <a
                 id={`pricing-btn-${plan.id}`}
-                className={`plan-cta ${plan.id}`}
+                className="plan-cta"
                 href={`https://line.me/R/oaMessage/${encodeURIComponent('@127qwwfi')}/?${encodeURIComponent('สนใจสมัครแพ็กเกจ HorCare')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ textDecoration: 'none' }}
             >
-                {currentPlanId === plan.id 
-                    ? 'ต่ออายุแพ็กเกจ' 
-                    : 'สมัครผ่าน LINE'
-                }
-                <Zap size={15} />
+                <span>{currentPlanId === plan.id ? 'ต่ออายุแพ็กเกจ' : 'สมัครใช้งานผ่าน LINE'}</span>
+                <Zap size={16} />
             </a>
         </div>
     );
@@ -533,49 +552,50 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
     return (
         <>
             <div className="pricing-modal-backdrop" onClick={onClose} />
-            <div className="pricing-modal" style={{ border: `1px solid ${plan.glowColor}` }}>
+            <div className="pricing-modal">
                 <button className="modal-close" onClick={onClose}><X size={16} /></button>
 
-                <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.75rem', display: 'flex', justifyContent: 'center' }}>
-                        <plan.icon size={40} color="rgba(255,255,255,0.8)" />
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: '14px',
+                        background: 'rgba(14, 165, 233, 0.1)',
+                        border: '1px solid rgba(14, 165, 233, 0.25)',
+                        color: '#38BDF8', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', margin: '0 auto 1rem',
+                    }}>
+                        <plan.icon size={26} />
                     </div>
-                    <h2 style={{ fontWeight: 800, fontSize: '1.3rem', color: '#fff', marginBottom: '0.375rem', letterSpacing: '-0.025em' }}>
+                    <h2 style={{ fontWeight: 800, fontSize: '1.25rem', color: '#FFFFFF', marginBottom: '0.25rem', letterSpacing: '-0.02em' }}>
                         {plan.name} ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'})
                     </h2>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '0.25rem', marginTop: '0.5rem' }}>
-                        <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#FF7A00', paddingBottom: '0.4rem', marginRight: '0.1rem' }}>฿</span>
-                        <span className={`price-number ${plan.id}`} style={{ fontSize: '2.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.25rem', marginTop: '0.5rem' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38BDF8' }}>฿</span>
+                        <span className="price-number" style={{ fontSize: '2.5rem' }}>
                             {price.toLocaleString()}
                         </span>
-                        <span style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.6)', paddingBottom: '0.4rem' }}>
-                            {cycle === 'monthly' ? '/เดือน' : '/ปี'}
+                        <span style={{ fontSize: '0.875rem', color: '#94A3B8' }}>
+                            {cycle === 'monthly' ? '/ เดือน' : '/ ปี'}
                         </span>
                     </div>
                 </div>
 
                 <div style={{
-                    background: 'rgba(139,92,246,0.09)', border: '1px solid rgba(139,92,246,0.22)',
-                    borderRadius: '14px', padding: '1rem', marginBottom: '1.25rem',
+                    background: 'rgba(14, 165, 233, 0.06)', border: '1px solid rgba(14, 165, 233, 0.18)',
+                    borderRadius: '12px', padding: '0.875rem 1rem', marginBottom: '1.5rem',
                     display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                 }}>
-                    <QrCode size={16} color="#A78BFA" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                    <QrCode size={16} color="#38BDF8" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
                     <div>
-                        <div style={{ fontWeight: 700, color: '#C4B5FD', fontSize: '0.8rem', marginBottom: '0.2rem' }}>ชำระด้วย QR PromptPay</div>
-                        <div style={{ fontSize: '0.775rem', color: 'rgba(196,181,253,0.7)', lineHeight: 1.55 }}>
-                            กด "ยืนยัน" เพื่อไปหน้าชำระเงินของ Stripe<br />
-                            ใส่โค้ดส่วนลด หรือสแกน QR ด้วยแอปธนาคารได้เลย
+                        <div style={{ fontWeight: 600, color: '#F8FAFC', fontSize: '0.825rem', marginBottom: '0.2rem' }}>ชำระผ่าน QR PromptPay หรือ บัตรเครดิต</div>
+                        <div style={{ fontSize: '0.775rem', color: '#94A3B8', lineHeight: 1.5 }}>
+                            กด "ไปหน้าชำระเงิน" เพื่อดำเนินการผ่านระบบที่ปลอดภัยของ Stripe
                         </div>
                     </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                     <button className="modal-cancel" onClick={onClose}>ยกเลิก</button>
-                    <button
-                        className="modal-confirm"
-                        onClick={onConfirm}
-                        style={{ background: plan.gradient, boxShadow: `0 6px 24px ${plan.glowColor}` }}
-                    >
+                    <button className="modal-confirm" onClick={onConfirm}>
                         <Shield size={15} /> ไปหน้าชำระเงิน
                     </button>
                 </div>
@@ -584,42 +604,33 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
     );
 });
 
-
-
 /* ----------- Success Screen ----------- */
 function SuccessScreen({ plan, cycle, onBack }: { plan: Plan; cycle: BillingCycle; onBack?: () => void }) {
     return (
         <div className="p-anim-0" style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', minHeight: '65vh', textAlign: 'center', padding: '2rem',
+            justifyContent: 'center', minHeight: '60vh', textAlign: 'center', padding: '2rem',
         }}>
             <div className="success-check">
-                <Check size={44} color="#fff" strokeWidth={2.5} />
+                <Check size={40} strokeWidth={2.5} />
             </div>
             <h2 style={{
-                fontWeight: 900, fontSize: '2rem', letterSpacing: '-0.03em',
-                color: '#34D399',
-                marginBottom: '0.625rem',
+                fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em',
+                color: '#34D399', marginBottom: '0.5rem',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             }}>
-                <PartyPopper size={28} color="#10B981" />
+                <PartyPopper size={24} color="#10B981" />
                 ชำระเงินสำเร็จ!
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.55)', maxWidth: 340, lineHeight: 1.7, marginBottom: '0.375rem' }}>
-                อัปเกรดเป็นแผน <strong style={{ color: '#fff' }}>{plan.name}</strong>{' '}
+            <p style={{ color: '#94A3B8', maxWidth: 360, lineHeight: 1.6, marginBottom: '0.5rem', fontSize: '0.925rem' }}>
+                อัปเกรดเป็นแผน <strong style={{ color: '#FFFFFF' }}>{plan.name}</strong>{' '}
                 ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'}) เรียบร้อยแล้ว
             </p>
-            <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: '0.8rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
-                ขอบคุณที่อุดหนุน HorCare <Heart size={13} color="#EC4899" fill="#EC4899" />
+            <p style={{ color: '#64748B', fontSize: '0.8rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                ขอบคุณที่ไว้วางใจ HorCare <Heart size={13} color="#0EA5E9" fill="#0EA5E9" />
             </p>
-            <button onClick={onBack} style={{
-                background: 'linear-gradient(135deg,#10B981,#059669)',
-                color: '#fff', border: 'none', borderRadius: '14px',
-                padding: '0.9rem 2.25rem', fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
-                letterSpacing: '-0.01em', boxShadow: '0 8px 28px rgba(16,185,129,0.4)',
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-            }}>
-                <Zap size={17} fill="currentColor" /> เริ่มใช้งานเลย
+            <button onClick={onBack} className="plan-cta" style={{ maxWidth: 220 }}>
+                <Zap size={16} /> เริ่มใช้งานเลย
             </button>
         </div>
     );
@@ -639,7 +650,7 @@ interface PricingPageProps {
 }
 
 export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, initialPlanId, initialCycle }: Omit<PricingPageProps, 'onSubscribed'> & { onSubscribed?: () => void }) {
-    injectCSS(); // idempotent
+    injectCSS();
 
     const [cycle, setCycle] = useState<BillingCycle>(initialCycle ?? 'monthly');
     const [selectedPlan, setSelectedPlan] = useState<Plan | null>(() =>
@@ -648,7 +659,6 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
     const [processing, setProcessing] = useState(false);
     const [successPlan] = useState<Plan | null>(null);
 
-    // เมื่อ guest เลือกแผน → ข้าม modal ไปเรียก onNeedAuth ทันที
     const handlePlanSelect = (plan: Plan) => {
         if (isGuest) {
             onNeedAuth?.(plan.id, cycle);
@@ -703,28 +713,10 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
     return (
         <div className="pricing-page">
-            {/* Static background layers (no JS, no state) */}
-            <div className="pricing-grid-bg" />
-            <div className="pricing-orb" style={{
-                width: 560, height: 560, top: -180, left: -80,
-                background: 'radial-gradient(circle,rgba(139,92,246,0.13) 0%,transparent 65%)',
-                animation: 'p-float 11s ease-in-out infinite',
-            }} />
-            <div className="pricing-orb" style={{
-                width: 460, height: 460, top: '32%', right: -100,
-                background: 'radial-gradient(circle,rgba(236,72,153,0.10) 0%,transparent 65%)',
-                animation: 'p-float 9s ease-in-out 2s infinite',
-            }} />
-            <div className="pricing-orb" style={{
-                width: 380, height: 380, bottom: -60, left: '42%',
-                background: 'radial-gradient(circle,rgba(59,130,246,0.09) 0%,transparent 65%)',
-                animation: 'p-float 13s ease-in-out 5s infinite',
-            }} />
-
             <div className="pricing-inner">
                 {onBack && (
                     <button className="pricing-back" onClick={onBack}>
-                        <ChevronLeft size={16} /> กลับ
+                        <ChevronLeft size={16} /> ย้อนกลับ
                     </button>
                 )}
 
@@ -733,46 +725,46 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                 ) : (
                     <>
                         {/* Header */}
-                        <div className="p-anim-0" style={{ textAlign: 'center', marginBottom: '3rem' }}>
+                        <div className="p-anim-0" style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
                             <div style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                                background: 'rgba(139,92,246,0.13)', border: '1px solid rgba(139,92,246,0.28)',
-                                borderRadius: '999px', padding: '0.4rem 1.1rem', marginBottom: '1.25rem',
+                                display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                                background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.22)',
+                                borderRadius: '999px', padding: '0.35rem 0.95rem', marginBottom: '1rem',
                             }}>
-                                <Sparkles size={13} color="#A78BFA" />
-                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#A78BFA', letterSpacing: '0.04em' }}>
-                                    {currentPlanId ? 'ต่ออายุหรือเปลี่ยนแพ็กเกจ' : 'เลือกแผนที่ใช่สำหรับคุณ'}
+                                <Sparkles size={12} color="#38BDF8" />
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#38BDF8', letterSpacing: '0.02em' }}>
+                                    {currentPlanId ? 'ต่ออายุหรือเปลี่ยนแพ็กเกจ' : 'เลือกแผนที่เหมาะสำหรับคุณ'}
                                 </span>
                             </div>
 
                             <h1 style={{
-                                fontSize: 'clamp(2rem, 6vw, 3.25rem)', fontWeight: 900,
-                                color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.1, marginBottom: '1rem',
+                                fontSize: 'clamp(2rem, 5vw, 2.75rem)', fontWeight: 800,
+                                color: '#FFFFFF', letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: '0.75rem',
                             }}>
                                 {currentPlanId ? 'จัดการแพ็กเกจ ' : 'แพ็กเกจ '}
                                 <span style={{
-                                    background: 'linear-gradient(135deg,#A78BFA 0%,#EC4899 50%,#F59E0B 100%)',
-                                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+                                    background: 'linear-gradient(135deg, #FFFFFF 40%, #38BDF8 100%)',
+                                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                                 }}>HorCare</span>
                             </h1>
-                            <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '1.0625rem', maxWidth: 480, margin: '0 auto', lineHeight: 1.65 }}>
-                                {currentPlanId ? 'ต่ออายุแพ็กเกจปัจจุบันของคุณ หรืออัปเกรดเพื่อรับฟีเจอร์ที่มากขึ้น' : 'เริ่มต้นฟรี — อัปเกรดรับ LINE ส่งบิลอัตโนมัติและฟีเจอร์ครบครัน'}
+                            <p style={{ color: '#94A3B8', fontSize: '1rem', maxWidth: 460, margin: '0 auto', lineHeight: 1.6 }}>
+                                {currentPlanId ? 'ต่ออายุแพ็กเกจปัจจุบัน หรืออัปเกรดเพื่อรับฟีเจอร์ที่มากขึ้น' : 'ยกระดับการบริหารหอพักด้วยระบบอัตโนมัติ AI และ LINE แจ้งเตือนครบวงจร'}
                             </p>
                             {currentPlanId && currentPlan && (
                                 <div style={{
                                     marginTop: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                                    background: 'rgba(16,185,129,0.11)', border: '1px solid rgba(16,185,129,0.24)',
-                                    borderRadius: '999px', padding: '0.375rem 1rem',
+                                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)',
+                                    borderRadius: '999px', padding: '0.3rem 0.85rem',
                                     fontSize: '0.8rem', color: '#34D399', fontWeight: 600,
                                 }}>
                                     <InfinityIcon size={13} />
-                                    แผนปัจจุบัน: {currentPlan.name}
+                                    แผนปัจจุบันของคุณ: {currentPlan.name}
                                 </div>
                             )}
                         </div>
 
                         {/* Billing toggle */}
-                        <div className="p-anim-1" style={{ display: 'flex', justifyContent: 'center', marginBottom: '3rem' }}>
+                        <div className="p-anim-1" style={{ display: 'flex', justifyContent: 'center', marginBottom: '2.5rem' }}>
                             <div className="billing-toggle">
                                 {(['monthly', 'yearly'] as BillingCycle[]).map(c => (
                                     <button
@@ -784,9 +776,9 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                         {c === 'monthly' ? 'รายเดือน' : 'รายปี'}
                                         {c === 'yearly' && (
                                             <span style={{
-                                                background: 'rgba(16,185,129,0.18)', border: '1px solid rgba(16,185,129,0.3)',
+                                                background: 'rgba(16,185,129,0.18)', border: '1px solid rgba(16,185,129,0.32)',
                                                 color: '#34D399', borderRadius: '999px',
-                                                padding: '0.1rem 0.55rem', fontSize: '0.68rem', fontWeight: 800,
+                                                padding: '0.1rem 0.5rem', fontSize: '0.68rem', fontWeight: 700,
                                             }}>ประหยัด 49%</span>
                                         )}
                                     </button>
@@ -796,11 +788,11 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
                         {currentPlanId && currentPlan ? (
                             <>
-                                <div className="pricing-section" style={{ marginBottom: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <h3 style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem', marginBottom: '1.25rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+                                <div className="pricing-section" style={{ marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <h3 style={{ color: '#CBD5E1', fontSize: '1rem', marginBottom: '1.25rem', fontWeight: 600 }}>
                                         แพ็กเกจปัจจุบันของคุณ
                                     </h3>
-                                    <div style={{ maxWidth: '400px', width: '100%' }}>
+                                    <div style={{ maxWidth: '460px', width: '100%' }}>
                                         <PlanCard
                                             key={currentPlan.id}
                                             plan={currentPlan}
@@ -813,10 +805,10 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
                                 {currentPlanId !== 'large' && (
                                     <div className="pricing-section" style={{ marginBottom: '2rem' }}>
-                                        <h3 style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1rem', marginBottom: '1.25rem', fontWeight: 600, textAlign: 'center' }}>
+                                        <h3 style={{ color: '#94A3B8', fontSize: '0.95rem', marginBottom: '1.25rem', fontWeight: 500, textAlign: 'center' }}>
                                             อัปเกรดเป็นแพ็กเกจ HorCare เพื่อฟีเจอร์ที่ครบกว่า
                                         </h3>
-                                        <div className="pricing-grid" style={{ maxWidth: 440, margin: '0 auto' }}>
+                                        <div className="pricing-grid" style={{ maxWidth: 460, margin: '0 auto' }}>
                                             <PlanCard
                                                 plan={PLANS.find(p => p.id === 'large')!}
                                                 cycle={cycle}
@@ -828,7 +820,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                 )}
                             </>
                         ) : (
-                            <div className="pricing-grid pricing-section" style={{ maxWidth: 560, margin: '0 auto' }}>
+                            <div className="pricing-grid pricing-section" style={{ maxWidth: 460, margin: '0 auto' }}>
                                 <PlanCard
                                     plan={PLANS.find(p => p.id === 'large')!}
                                     cycle={cycle}
@@ -839,20 +831,20 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
                         {/* Trust signals */}
                         <div className="p-anim-3" style={{
-                            display: 'flex', justifyContent: 'center', gap: '2.5rem',
-                            marginTop: '3rem', flexWrap: 'wrap',
+                            display: 'flex', justifyContent: 'center', gap: '2rem',
+                            marginTop: '2.5rem', flexWrap: 'wrap',
                         }}>
                             {[
-                                { icon: Shield, text: 'ปลอดภัย 100%' },
-                                { icon: Clock, text: 'ยกเลิกได้ทุกเมื่อ' },
-                                { icon: CreditCard, text: 'ชำระผ่าน Stripe' },
+                                { icon: Shield, text: 'ระบบปลอดภัย ได้มาตรฐาน' },
+                                { icon: Clock, text: 'เริ่มใช้งานได้ทันทีหลังยืนยัน' },
+                                { icon: CreditCard, text: 'ปรึกษาทีมงานผ่าน LINE ตลอดเวลา' },
                             ].map(item => (
                                 <div key={item.text} style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                    color: 'rgba(255,255,255,0.22)', fontSize: '0.875rem',
+                                    display: 'flex', alignItems: 'center', gap: '0.45rem',
+                                    color: '#64748B', fontSize: '0.8125rem', fontWeight: 500,
                                 }}>
-                                    <item.icon size={14} />
-                                    {item.text}
+                                    <item.icon size={14} color="#38BDF8" />
+                                    <span>{item.text}</span>
                                 </div>
                             ))}
                         </div>
@@ -873,13 +865,13 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
             {/* Processing */}
             {processing && (
                 <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
                     zIndex: 400, display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center', gap: '1rem',
-                    backdropFilter: 'blur(4px)',
+                    backdropFilter: 'blur(6px)',
                 }}>
                     <div className="pricing-spinner" />
-                    <p style={{ color: 'rgba(255,255,255,0.65)', fontWeight: 600, fontSize: '1rem' }}>
+                    <p style={{ color: '#CBD5E1', fontWeight: 500, fontSize: '0.95rem' }}>
                         กำลังดำเนินการ...
                     </p>
                 </div>

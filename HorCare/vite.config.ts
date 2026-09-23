@@ -62,13 +62,13 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         runtimeCaching: [
-          // App icons & logos — cache after first request, long TTL
+          // App icons & logos — revalidate in background, cacheName v2 to clear old stale logos
           {
             urlPattern: /\.(?:png|jpg|jpeg|webp|gif)$/i,
-            handler: 'CacheFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'images-cache',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheName: 'images-cache-v2',
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

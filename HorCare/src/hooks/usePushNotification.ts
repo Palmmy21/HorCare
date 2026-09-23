@@ -17,7 +17,8 @@ export function usePushNotification() {
         const perm = Notification.permission as NotifPermission;
         setPermission(perm);
         const stored = localStorage.getItem(STORAGE_KEY);
-        setEnabled(perm === 'granted' && stored === 'true');
+        // Default to enabled if permission granted and not explicitly disabled
+        setEnabled(perm === 'granted' && stored !== 'false');
     }, []);
 
     const requestPermission = useCallback(async (): Promise<NotifPermission> => {
@@ -48,8 +49,8 @@ export function usePushNotification() {
                             try {
                                 await reg.showNotification('HorCare ยินดีต้อนรับ 🎉', {
                                     body: 'คุณเปิดรับการแจ้งเตือนสำเร็จแล้ว!',
-                                    icon: '/logo-icon.png',
-                                    badge: '/logo-icon.png',
+                                    icon: '/logo-icon.png?v=2',
+                                    badge: '/logo-icon.png?v=2',
                                     // @ts-expect-error vibrate
                                     vibrate: [200, 100, 200],
                                 });
@@ -76,12 +77,23 @@ export function usePushNotification() {
     const notify = useCallback(async (title: string, options?: NotificationOptions) => {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
+        // Trigger mobile device vibration if in foreground
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            try {
+                navigator.vibrate([200, 100, 200]);
+            } catch {
+                // ignore
+            }
+        }
+
         const notifOptions: NotificationOptions = {
-            icon: '/logo-icon.png',
-            badge: '/logo-icon.png',
+            icon: '/logo-icon.png?v=2',
+            badge: '/logo-icon.png?v=2',
             lang: 'th',
             // @ts-expect-error vibrate is supported in mobile browsers
             vibrate: [200, 100, 200],
+            renotify: true,
+            requireInteraction: false,
             ...options,
         };
 
@@ -89,7 +101,19 @@ export function usePushNotification() {
         // We MUST use ServiceWorkerRegistration.showNotification().
         if ('serviceWorker' in navigator) {
             try {
-                let reg = await navigator.serviceWorker.getRegistration();
+                let reg: ServiceWorkerRegistration | null | undefined = null;
+                try {
+                    reg = await Promise.race([
+                        navigator.serviceWorker.ready,
+                        new Promise<null>((r) => setTimeout(() => r(null), 1000)),
+                    ]);
+                } catch {
+                    reg = null;
+                }
+
+                if (!reg) {
+                    reg = await navigator.serviceWorker.getRegistration();
+                }
                 if (!reg) {
                     reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
                 }
@@ -111,8 +135,30 @@ export function usePushNotification() {
     }, []);
 
     const testNotification = useCallback(async () => {
+        // Play notification sound
+        try {
+            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const ctx = new AudioContextClass();
+            const now = ctx.currentTime;
+            [880, 1100].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, now + i * 0.18);
+                gain.gain.linearRampToValueAtTime(0.28, now + i * 0.18 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.35);
+                osc.start(now + i * 0.18);
+                osc.stop(now + i * 0.18 + 0.35);
+            });
+        } catch {
+            // silent fallback
+        }
+
         await notify('HorCare ทดสอบการแจ้งเตือน 🎉', {
-            body: 'ระบบแจ้งเตือนของเบราว์เซอร์ทำงานได้สมบูรณ์แล้ว!',
+            body: 'ระบบแจ้งเตือนทำงานได้สมบูรณ์แล้ว!',
             tag: 'horcare-test-' + Date.now(),
         });
     }, [notify]);

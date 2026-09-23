@@ -31,6 +31,19 @@ export interface UserProfile {
   billing_cycle?: BillingCycle;
   stripe_customer_id?: string;
   line_support_user_id?: string; // LINE User ID from the Support OA
+  phone?: string;
+  referral_sources?: string[];
+}
+
+export interface InitialBuildingConfig {
+  dorm_name?: string;
+  building_type?: DormConfig['building_type'];
+  electricity_rate?: number;
+  water_config?: WaterConfig;
+  room_rent?: number;
+  due_day?: number;
+  phone?: string;
+  referral_sources?: string[];
 }
 
 export interface Dorm {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Globe, Upload } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Globe, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeCanvas } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
@@ -9,6 +9,7 @@ import { generateDormCode } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import type { ThemeMode } from '../../hooks/useTheme';
 import { toast } from 'react-hot-toast';
+import horcareLogo from '../../assets/horcare_logo.png';
 
 async function compressLogoToBase64(file: File, maxPx = 400, quality = 0.85): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -155,7 +156,6 @@ export default function Settings(props: SettingsProps) {
         comm_water_flat_limit: config.commercial_water_config?.flat_limit_unit || 10,
         comm_water_excess_rate: config.commercial_water_config?.excess_unit_rate || 25
     });
-    const [saved, setSaved] = useState(false);
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -168,8 +168,9 @@ export default function Settings(props: SettingsProps) {
     const [portalPin, setPortalPin] = useState(config.portal_pin || '');
 
     // Push Notifications
-    const { permission, enabled, loading: notifLoading, requestPermission, toggleEnabled } = usePushNotification();
+    const { permission, enabled, loading: notifLoading, requestPermission, toggleEnabled, testNotification } = usePushNotification();
     const [notifRequesting, setNotifRequesting] = useState(false);
+    const [testNotifSending, setTestNotifSending] = useState(false);
 
     // Email verification + cooldown
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'checking'>('idle');
@@ -269,6 +270,7 @@ export default function Settings(props: SettingsProps) {
     const [dormLogo, setDormLogo] = useState<string | undefined>(config.bill_customization?.dorm_logo);
     const [logoLoading, setLogoLoading] = useState(false);
     const logoInputRef = useRef<HTMLInputElement>(null);
+    const [showBuildingTypes, setShowBuildingTypes] = useState(false);
 
     const [prevConfig, setPrevConfig] = useState(config);
 
@@ -308,7 +310,6 @@ export default function Settings(props: SettingsProps) {
 
     const handleChange = (field: string, value: string | number) => {
         setFormData(prev => ({ ...prev, [field]: value }));
-        setSaved(false);
     };
 
     const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -318,7 +319,6 @@ export default function Settings(props: SettingsProps) {
         try {
             const b64 = await compressLogoToBase64(file);
             setDormLogo(b64);
-            setSaved(false);
         } catch {
             alert('ไม่สามารถโหลดรูปได้ กรุณาลองใหม่');
         } finally {
@@ -370,13 +370,27 @@ export default function Settings(props: SettingsProps) {
         };
 
         onSaveConfig(newConfig);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+        toast.success('บันทึกเรียบร้อยแล้ว!', {
+            id: 'settings-saved',
+            duration: 3000,
+            style: {
+                background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                color: '#ffffff',
+                fontWeight: 600,
+                borderRadius: '14px',
+                padding: '0.85rem 1.4rem',
+                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.35)',
+                fontSize: '0.95rem',
+            },
+            iconTheme: {
+                primary: '#ffffff',
+                secondary: '#059669',
+            },
+        });
     };
 
     const handleBillFormChange = (field: string, value: string | number | boolean) => {
         setBillForm(prev => ({ ...prev, [field]: value }));
-        setSaved(false);
     };
 
 
@@ -769,7 +783,7 @@ export default function Settings(props: SettingsProps) {
                                 {dormLogo && (
                                     <button
                                         type="button"
-                                        onClick={() => { setDormLogo(undefined); setSaved(false); }}
+                                        onClick={() => setDormLogo(undefined)}
                                         className="btn btn-outline btn-sm"
                                         style={{
                                             display: 'flex',
@@ -853,58 +867,105 @@ export default function Settings(props: SettingsProps) {
                     </div>
                 </div>
 
-                {/* Supported Building Types (Static Display) */}
+                {/* Supported Building Types (Collapsible) */}
                 <div className="settings-section">
-                <h3 className="settings-title">
-                    <Building2 size={20} color="#0EA5E9" />
-                    ประเภทอาคารที่รองรับ
-                </h3>
-                <p className="form-hint" style={{ marginBottom: '1rem' }}>
-                    ระบบ HorCare รองรับอาคารหลายประเภท — ตั้งค่าประเภทห้องได้ในหน้าจัดการห้อง
-                </p>
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                    gap: '0.75rem',
-                }}>
-                    {BUILDING_TYPES.map(bt => {
-                        const Icon = bt.icon;
-                        return (
-                            <div
-                                key={bt.key}
-                                style={{
-                                    padding: '1rem',
-                                    border: '1px solid var(--color-gray-200)',
-                                    borderRadius: '12px',
-                                    backgroundColor: 'var(--color-gray-50)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    textAlign: 'center',
-                                }}
-                            >
-                                <div style={{
-                                    background: bt.iconBg,
-                                    padding: '0.65rem',
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}>
-                                    <Icon size={22} color={bt.iconColor} />
-                                </div>
-                                <div>
-                                    <div style={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3, color: 'var(--color-gray-800)' }}>{bt.title}</div>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', lineHeight: 1.3 }}>{bt.subtitle}</div>
-                                </div>
-                                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-gray-400)', lineHeight: 1.4 }}>
-                                    {bt.desc}
-                                </p>
-                            </div>
-                        );
-                    })}
-                </div>
+                    <div 
+                        onClick={() => setShowBuildingTypes(prev => !prev)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                        }}
+                    >
+                        <div>
+                            <h3 className="settings-title" style={{ marginBottom: showBuildingTypes ? '0.25rem' : 0 }}>
+                                <Building2 size={20} color="#0EA5E9" />
+                                ประเภทอาคารที่รองรับ
+                            </h3>
+                            <p className="form-hint" style={{ margin: 0 }}>
+                                ระบบ HorCare รองรับอาคารหลายประเภท — ตั้งค่าประเภทห้องได้ในหน้าจัดการห้อง
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.4rem 0.75rem',
+                                borderRadius: '8px',
+                                fontSize: '0.8125rem',
+                                flexShrink: 0,
+                                marginLeft: '1rem',
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowBuildingTypes(prev => !prev);
+                            }}
+                        >
+                            {showBuildingTypes ? (
+                                <>
+                                    <span>ซ่อน</span>
+                                    <ChevronUp size={16} />
+                                </>
+                            ) : (
+                                <>
+                                    <span>ดูประเภทที่รองรับ</span>
+                                    <ChevronDown size={16} />
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {showBuildingTypes && (
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                            gap: '0.75rem',
+                            marginTop: '1rem',
+                        }}>
+                            {BUILDING_TYPES.map(bt => {
+                                const Icon = bt.icon;
+                                return (
+                                    <div
+                                        key={bt.key}
+                                        style={{
+                                            padding: '1rem',
+                                            border: '1px solid var(--color-gray-200)',
+                                            borderRadius: '12px',
+                                            backgroundColor: 'var(--color-gray-50)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        <div style={{
+                                            background: bt.iconBg,
+                                            padding: '0.65rem',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}>
+                                            <Icon size={22} color={bt.iconColor} />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3, color: 'var(--color-gray-800)' }}>{bt.title}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', lineHeight: 1.3 }}>{bt.subtitle}</div>
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-gray-400)', lineHeight: 1.4 }}>
+                                            {bt.desc}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
                 </>
             )}
@@ -1027,7 +1088,7 @@ export default function Settings(props: SettingsProps) {
                             {dormLogo && (
                                 <button
                                     type="button"
-                                    onClick={() => { setDormLogo(undefined); setSaved(false); }}
+                                    onClick={() => setDormLogo(undefined)}
                                     style={{
                                         padding: '0.35rem 0.75rem', borderRadius: 8, cursor: 'pointer',
                                         border: '1px solid #FCA5A5', background: 'transparent',
@@ -1440,7 +1501,7 @@ export default function Settings(props: SettingsProps) {
                                                         level="H" 
                                                         marginSize={2} 
                                                         imageSettings={{
-                                                            src: "/logo-icon.png",
+                                                            src: horcareLogo,
                                                             height: 32,
                                                             width: 32,
                                                             excavate: true,
@@ -1467,7 +1528,7 @@ export default function Settings(props: SettingsProps) {
                                                                     value={inviteLink!} 
                                                                     size={360} 
                                                                     level="H" 
-                                                                    imageSettings={{ src: "/logo-icon.png", height: 60, width: 60, excavate: true }}
+                                                                    imageSettings={{ src: horcareLogo, height: 60, width: 60, excavate: true }}
                                                                 />
                                                             </div>
                                                             <div style={{ fontSize: '1.25rem', color: '#555', marginTop: '0.5rem' }}>
@@ -1477,7 +1538,7 @@ export default function Settings(props: SettingsProps) {
                                                             <div style={{ display: 'flex', gap: '3rem', justifyContent: 'center', alignItems: 'center', marginTop: '2rem' }}>
                                                                 <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" style={{ height: 65 }} alt="LINE" />
                                                                 <div style={{ width: '2px', height: '50px', background: '#ddd' }}></div>
-                                                                <img src="/logo.png" style={{ height: 60 }} alt="HorCare" />
+                                                                <img src={horcareLogo} style={{ height: 60 }} alt="HorCare" />
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1600,7 +1661,6 @@ export default function Settings(props: SettingsProps) {
                         onChange={e => {
                             const v = e.target.value.replace(/\D/g, '').slice(0, 4);
                             setPortalPin(v);
-                            setSaved(false);
                         }}
                     />
                     {portalPin && portalPin.length !== 4 && (
@@ -1776,7 +1836,8 @@ export default function Settings(props: SettingsProps) {
                         </div>
                     </div>
                 ) : permission === 'granted' ? (
-                    <div style={{
+                    <div>
+                        <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         gap: '1rem', flexWrap: 'wrap',
                         padding: '1rem 1.25rem', borderRadius: '14px',
@@ -1841,6 +1902,36 @@ export default function Settings(props: SettingsProps) {
                             }} />
                         </button>
                     </div>
+
+                    {/* Test notification button */}
+                    <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                            type="button"
+                            disabled={testNotifSending}
+                            onClick={async () => {
+                                setTestNotifSending(true);
+                                try {
+                                    await testNotification();
+                                    toast.success('ส่งการแจ้งเตือนทดสอบแล้ว! ตรวจสอบข้อความแจ้งเตือนที่แถบด้านบนหรือหน้าจอมือถือ');
+                                } catch {
+                                    toast.error('ไม่สามารถส่งการแจ้งเตือนทดสอบได้');
+                                } finally {
+                                    setTestNotifSending(false);
+                                }
+                            }}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                                padding: '0.5rem 1rem', borderRadius: '10px',
+                                border: '1px solid #e2e8f0', background: '#f8fafc',
+                                color: '#475569', fontSize: '0.8125rem', fontWeight: 600,
+                                cursor: 'pointer', transition: 'all 0.15s ease',
+                            }}
+                        >
+                            <Bell size={14} color="#8B5CF6" />
+                            {testNotifSending ? 'กำลังส่งแจ้งเตือน...' : 'ทดสอบส่งการแจ้งเตือน'}
+                        </button>
+                    </div>
+                </div>
                 ) : (
                     /* permission === 'default' — not asked yet */
                     <div style={{
@@ -1901,11 +1992,6 @@ export default function Settings(props: SettingsProps) {
                     <Save size={22} />
                     บันทึกการตั้งค่า
                 </button>
-                {saved && (
-                    <div className="text-success font-bold" style={{ marginTop: 'var(--space-3)', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <Check size={16} /> บันทึกเรียบร้อยแล้ว!
-                    </div>
-                )}
             </div>
             )}
 

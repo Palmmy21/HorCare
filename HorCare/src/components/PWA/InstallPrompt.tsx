@@ -19,7 +19,9 @@ export function isPWAStandalone(): boolean {
 }
 
 export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(() => {
+    return (window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent | null }).__pwaInstallPrompt || null;
+  });
   const [showBanner, setShowBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
@@ -50,30 +52,58 @@ export default function InstallPrompt() {
       return;
     }
 
-    const handler = (e: Event) => {
+    // Check if prompt was already captured before this component mounted
+    const existingPrompt = (window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent | null }).__pwaInstallPrompt;
+    if (existingPrompt) {
+      setDeferredPrompt(existingPrompt);
+      if (checkShouldShow()) {
+        setShowBanner(true);
+      }
+    }
+
+    const onPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const customEvt = e as CustomEvent<BeforeInstallPromptEvent>;
+      const prompt = customEvt.detail || (e as BeforeInstallPromptEvent);
+      (window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent }).__pwaInstallPrompt = prompt;
+      setDeferredPrompt(prompt);
       if (checkShouldShow()) {
         setShowBanner(true);
       }
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('pwa-prompt-available', onPrompt);
 
-    // Allow manual trigger from sidebar/settings
-    const manualOpenHandler = () => {
-      setShowBanner(true);
+    // Allow manual trigger from sidebar/settings: immediately trigger install if prompt is ready
+    const manualOpenHandler = async () => {
       if (ios) {
         setShowIOSGuide(true);
+        return;
       }
+      const prompt = (window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent | null }).__pwaInstallPrompt || deferredPrompt;
+      if (prompt) {
+        try {
+          await prompt.prompt();
+          const { outcome } = await prompt.userChoice;
+          if (outcome === 'accepted') {
+            setShowBanner(false);
+            return;
+          }
+        } catch (err) {
+          console.error('[PWA] Prompt error:', err);
+        }
+      }
+      setShowBanner(true);
     };
     window.addEventListener('open-pwa-install', manualOpenHandler);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('pwa-prompt-available', onPrompt);
       window.removeEventListener('open-pwa-install', manualOpenHandler);
     };
-  }, [checkShouldShow]);
+  }, [checkShouldShow, deferredPrompt]);
 
   const handleInstall = async () => {
     if (isIOS) {
@@ -81,23 +111,26 @@ export default function InstallPrompt() {
       return;
     }
 
-    if (!deferredPrompt) {
-      // Fallback for browsers that don't support beforeinstallprompt
-      alert('คุณสามารถติดตั้งได้โดยกดที่เมนูของเบราว์เซอร์ (⋮) แล้วเลือก "ติดตั้งแอป" หรือ "เพิ่มลงในหน้าจอหลัก"');
+    const prompt = deferredPrompt || (window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent | null }).__pwaInstallPrompt;
+
+    if (prompt) {
+      setInstalling(true);
+      try {
+        await prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+        if (outcome === 'accepted') {
+          setShowBanner(false);
+        }
+      } catch (err) {
+        console.error('[PWA] Install error:', err);
+      } finally {
+        setInstalling(false);
+      }
       return;
     }
 
-    setInstalling(true);
-    try {
-      await deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setShowBanner(false);
-      }
-    } finally {
-      setInstalling(false);
-      setDeferredPrompt(null);
-    }
+    // If install prompt is not available, close banner smoothly without showing alert()
+    setShowBanner(false);
   };
 
   const handleDismiss = () => {

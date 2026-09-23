@@ -1387,7 +1387,7 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
 
       // Notification to admin
       try {
-        await fetch('/api/notify-push', {
+        await fetch('/api/notify-push?route=notify-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1756,7 +1756,7 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
 
       // Notification to admin
       try {
-        await fetch('/api/notify-push', {
+        await fetch('/api/notify-push?route=notify-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

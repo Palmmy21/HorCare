@@ -3,12 +3,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useFirestore } from '../../hooks/useFirestore';
 import type { UserProfile, LicenseType } from '../../types';
 import {
-    Search, Loader2, CheckCircle, Clock, Shield, AlertTriangle,
-    Users, UserCheck, Timer, XCircle, Key, Infinity as InfinityIcon,
-    X, Mail, CalendarDays, Hash, BadgeCheck, ShieldAlert, Copy,
-    Ban, RotateCcw, ShieldOff, Crown, Package, ChevronDown, MailCheck,
-    RefreshCw, ShieldCheck, ShieldX, LogIn, CalendarPlus, TrendingUp,
-    Filter, ArrowUpDown,
+    Search, Loader2, Clock, Shield, AlertTriangle,
+    Users, Timer, XCircle, Key, Infinity as InfinityIcon,
+    X, Copy, Ban, Crown, Package, ChevronDown,
+    RefreshCw, CalendarPlus, Filter, ArrowUpDown,
+    Download, Eye, Coins, Sparkles, Activity, Check, CheckCircle2,
 } from 'lucide-react';
 
 type AdminUserRow = UserProfile & {
@@ -17,12 +16,8 @@ type AdminUserRow = UserProfile & {
     has_firestore_profile?: boolean;
 };
 
-type FilterKey = 'all' | 'free' | 'small' | 'medium' | 'large' | 'active' | 'expired' | 'banned';
-type SortKey = 'created_desc' | 'expiry_asc' | 'name_asc';
-
-// ──────────────────────────────────────────────
-// License display helpers
-// ──────────────────────────────────────────────
+type FilterKey = 'all' | 'paid' | 'free' | 'small' | 'medium' | 'large' | 'active' | 'expiring_soon' | 'expired' | 'banned';
+type SortKey = 'created_desc' | 'created_asc' | 'expiry_asc' | 'name_asc';
 
 interface LicenseStyle {
     label: string;
@@ -33,25 +28,27 @@ interface LicenseStyle {
 }
 
 const LICENSE_STYLES: Record<string, LicenseStyle> = {
-    free:           { label: 'Free Plan',         shortLabel: 'Free',       color: '#FCD34D', bg: 'rgba(245,158,11,0.15)',  border: 'rgba(245,158,11,0.3)' },
-    monthly_small:  { label: 'Start รายเดือน',    shortLabel: 'Start/เดือน',color: '#A5B4FC', bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.3)' },
-    monthly_medium: { label: 'Plus รายเดือน',     shortLabel: 'Plus/เดือน', color: '#67E8F9', bg: 'rgba(6,182,212,0.15)',  border: 'rgba(6,182,212,0.3)' },
-    monthly_large:  { label: 'Pro รายเดือน',      shortLabel: 'Pro/เดือน',  color: '#C4B5FD', bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.3)' },
-    yearly_small:   { label: 'Start รายปี',       shortLabel: 'Start/ปี',   color: '#A5B4FC', bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.3)' },
-    yearly_medium:  { label: 'Plus รายปี',        shortLabel: 'Plus/ปี',    color: '#67E8F9', bg: 'rgba(6,182,212,0.15)',  border: 'rgba(6,182,212,0.3)' },
-    yearly_large:   { label: 'Pro รายปี',         shortLabel: 'Pro/ปี',     color: '#C4B5FD', bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.3)' },
-    active:         { label: 'ตลอดชีพ',           shortLabel: 'ตลอดชีพ',   color: '#6EE7B7', bg: 'rgba(16,185,129,0.15)', border: 'rgba(16,185,129,0.3)' },
+    free:           { label: 'Free Plan',         shortLabel: 'Free',         color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.25)' },
+    monthly_small:  { label: 'Start (รายเดือน)',   shortLabel: 'Start/ด.',    color: '#38BDF8', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.28)' },
+    monthly_medium: { label: 'Plus (รายเดือน)',    shortLabel: 'Plus/ด.',     color: '#818CF8', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.28)' },
+    monthly_large:  { label: 'HorCare (รายเดือน)', shortLabel: 'HorCare/ด.',  color: '#C084FC', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.28)' },
+    yearly_small:   { label: 'Start (รายปี)',      shortLabel: 'Start/ปี',    color: '#38BDF8', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.28)' },
+    yearly_medium:  { label: 'Plus (รายปี)',       shortLabel: 'Plus/ปี',     color: '#818CF8', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.28)' },
+    yearly_large:   { label: 'HorCare (รายปี)',    shortLabel: 'HorCare/ปี',   color: '#C084FC', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.28)' },
+    active:         { label: 'ตลอดชีพ (VIP)',      shortLabel: 'ตลอดชีพ',     color: '#34D399', bg: 'rgba(16,185,129,0.14)',  border: 'rgba(16,185,129,0.32)' },
 };
 
 const LICENSE_OPTIONS: LicenseType[] = [
-    'free', 'monthly_small', 'monthly_medium', 'monthly_large',
-    'yearly_small', 'yearly_medium', 'yearly_large', 'active',
+    'free', 'monthly_small', 'yearly_small',
+    'monthly_medium', 'yearly_medium',
+    'monthly_large', 'yearly_large', 'active',
 ];
 
-function getLicenseStyle(license: LicenseType): LicenseStyle {
+function getLicenseStyle(license?: LicenseType): LicenseStyle {
+    if (!license) return LICENSE_STYLES.free;
     return LICENSE_STYLES[license] ?? {
         label: license, shortLabel: license,
-        color: '#9CA3AF', bg: 'rgba(107,114,128,0.15)', border: 'rgba(107,114,128,0.3)',
+        color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.25)',
     };
 }
 
@@ -64,51 +61,42 @@ function isExpiredUser(u: AdminUserRow): boolean {
     return u.current_period_end ? new Date(u.current_period_end) < new Date() : false;
 }
 
-// ──────────────────────────────────────────────
-// Sub-components
-// ──────────────────────────────────────────────
+function isExpiringSoon(u: AdminUserRow): boolean {
+    if (!u.license?.startsWith('monthly_') && !u.license?.startsWith('yearly_')) return false;
+    if (!u.current_period_end) return false;
+    const days = getDaysLeft(u.current_period_end);
+    return days > 0 && days <= 7;
+}
 
-function UserAvatar({ name, email, size = 40 }: { name?: string; email?: string; size?: number }) {
+/* User Avatar with Initials */
+function UserAvatar({ name, email, size = 38 }: { name?: string; email?: string; size?: number }) {
     const initials = (name || email || '?').slice(0, 2).toUpperCase();
     return (
         <div style={{
-            width: size, height: size, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+            width: size, height: size, borderRadius: '12px',
+            background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 700, fontSize: size > 48 ? '1.25rem' : '0.875rem',
-            flexShrink: 0, letterSpacing: '0.05em',
+            color: '#FFFFFF', fontWeight: 700, fontSize: size > 48 ? '1.25rem' : '0.8rem',
+            flexShrink: 0, letterSpacing: '0.04em',
+            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
         }}>
             {initials}
         </div>
     );
 }
 
-function InfoRow({ icon, label, value, mono }: { icon: React.ReactNode; label: string; value: React.ReactNode; mono?: boolean }) {
-    return (
-        <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
-            padding: '0.75rem 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}>
-            <div style={{ color: 'rgba(255,255,255,0.4)', paddingTop: '0.1rem', flexShrink: 0 }}>{icon}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
-                <div style={{ fontSize: '0.875rem', color: '#fff', fontWeight: 500, fontFamily: mono ? 'var(--font-mono)' : undefined, wordBreak: 'break-all' }}>{value}</div>
-            </div>
-        </div>
-    );
-}
-
+/* License Pill Badge */
 function LicenseBadge({ license, expired = false, size = 'md' }: { license: LicenseType; expired?: boolean; size?: 'sm' | 'md' }) {
     const style = getLicenseStyle(license);
     const isSm = size === 'sm';
     return (
         <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: isSm ? '0.25rem' : '0.375rem',
-            background: expired ? 'rgba(220,38,38,0.15)' : style.bg,
-            color: expired ? '#FCA5A5' : style.color,
-            border: `1px solid ${expired ? 'rgba(220,38,38,0.3)' : style.border}`,
+            display: 'inline-flex', alignItems: 'center', gap: isSm ? '0.25rem' : '0.35rem',
+            background: expired ? 'rgba(239, 68, 68, 0.14)' : style.bg,
+            color: expired ? '#F87171' : style.color,
+            border: `1px solid ${expired ? 'rgba(239, 68, 68, 0.3)' : style.border}`,
             borderRadius: '999px',
-            padding: isSm ? '0.2rem 0.5rem' : '0.3rem 0.75rem',
+            padding: isSm ? '0.15rem 0.55rem' : '0.25rem 0.75rem',
             fontSize: isSm ? '0.7rem' : '0.75rem',
             fontWeight: 600, whiteSpace: 'nowrap',
         }}>
@@ -120,15 +108,12 @@ function LicenseBadge({ license, expired = false, size = 'md' }: { license: Lice
                         ? <Clock size={isSm ? 11 : 12} />
                         : <Package size={isSm ? 11 : 12} />
             }
-            {expired ? 'หมดอายุ' : isSm ? style.shortLabel : style.label}
+            {expired ? 'หมดอายุแล้ว' : isSm ? style.shortLabel : style.label}
         </span>
     );
 }
 
-// ──────────────────────────────────────────────
-// Detail Panel
-// ──────────────────────────────────────────────
-
+/* User Detail Slide-over Panel */
 function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, onExtendDays, onVerifyEmail, isProcessing }: {
     u: AdminUserRow;
     onClose: () => void;
@@ -142,12 +127,10 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
 }) {
     const [licenseMenuOpen, setLicenseMenuOpen] = useState(false);
     const [verifyingEmail, setVerifyingEmail] = useState(false);
-    const [emailVerifyDone, setEmailVerifyDone] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const isBanned = u.status === 'banned';
     const expired = isExpiredUser(u);
-    const ls = getLicenseStyle(u.license);
     const daysLeft = u.current_period_end ? getDaysLeft(u.current_period_end) : null;
 
     const copyUID = () => {
@@ -156,117 +139,144 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
         setTimeout(() => setCopied(false), 1500);
     };
 
+    const handleVerify = async () => {
+        setVerifyingEmail(true);
+        try {
+            await onVerifyEmail(u.uid);
+        } finally {
+            setVerifyingEmail(false);
+        }
+    };
+
     return (
         <>
             <div
                 onClick={onClose}
                 style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
-                    zIndex: 200, backdropFilter: 'blur(2px)',
-                    animation: 'fadeIn 0.15s ease',
+                    position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.75)',
+                    zIndex: 200, backdropFilter: 'blur(6px)',
                 }}
             />
             <div style={{
                 position: 'fixed', top: 0, right: 0, height: '100vh',
-                width: 'min(420px, 92vw)',
-                background: '#1a1040', zIndex: 201, display: 'flex', flexDirection: 'column',
-                boxShadow: '-8px 0 32px rgba(0,0,0,0.6)',
-                animation: 'slideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+                width: 'min(460px, 94vw)',
+                background: '#0F172A', zIndex: 201, display: 'flex', flexDirection: 'column',
+                borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+                boxShadow: '-12px 0 40px rgba(0, 0, 0, 0.8)',
+                color: '#F8FAFC',
             }}>
                 {/* Header */}
                 <div style={{
-                    background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
-                    padding: '1.5rem', display: 'flex', alignItems: 'flex-start', gap: '1rem',
-                    flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)',
+                    padding: '1.5rem', background: 'rgba(15, 23, 42, 0.95)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex', alignItems: 'flex-start', gap: '1rem',
                 }}>
-                    <UserAvatar name={u.display_name} email={u.email} size={60} />
+                    <UserAvatar name={u.display_name} email={u.email} size={54} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: '#fff', fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.3, marginBottom: '0.25rem' }}>
+                        <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '1.15rem', marginBottom: '0.2rem' }}>
                             {u.display_name || 'ไม่ระบุชื่อ'}
                         </div>
-                        <div style={{ color: 'rgba(165,180,252,0.9)', fontSize: '0.8125rem', wordBreak: 'break-all', marginBottom: '0.625rem' }}>{u.email}</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                        <div style={{ color: '#94A3B8', fontSize: '0.825rem', wordBreak: 'break-all', marginBottom: '0.5rem' }}>
+                            {u.email}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                             {isBanned && (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(220,38,38,0.15)', color: '#FCA5A5', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '999px', padding: '0.2rem 0.625rem', fontSize: '0.75rem', fontWeight: 700 }}>
-                                    <Ban size={11} /> ถูกแบน
+                                <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                    background: 'rgba(239,68,68,0.18)', color: '#F87171',
+                                    border: '1px solid rgba(239,68,68,0.35)', borderRadius: '999px',
+                                    padding: '0.15rem 0.6rem', fontSize: '0.72rem', fontWeight: 700,
+                                }}>
+                                    <Ban size={11} /> ถูกแบน (Banned)
                                 </span>
                             )}
                             <LicenseBadge license={u.license} expired={expired} />
                         </div>
                     </div>
-                    <button onClick={onClose} style={{
-                        background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '8px',
-                        color: '#A5B4FC', cursor: 'pointer', padding: '0.375rem',
-                        display: 'flex', alignItems: 'center', flexShrink: 0,
-                    }}>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px', color: '#94A3B8', cursor: 'pointer', padding: '0.4rem',
+                            display: 'flex', alignItems: 'center',
+                        }}
+                    >
                         <X size={18} />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
-
-                    {/* Subscription info */}
+                {/* Content */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    
+                    {/* Status & Expiry Box */}
                     {u.license !== 'free' && u.license !== 'active' && (
-                        <div style={{ marginBottom: '1rem', padding: '1rem', background: expired ? 'rgba(220,38,38,0.07)' : 'rgba(99,102,241,0.07)', border: `1px solid ${expired ? 'rgba(220,38,38,0.2)' : ls.border}`, borderRadius: '12px' }}>
+                        <div style={{
+                            padding: '1.1rem', borderRadius: '14px',
+                            background: expired ? 'rgba(239, 68, 68, 0.08)' : 'rgba(14, 165, 233, 0.08)',
+                            border: `1px solid ${expired ? 'rgba(239, 68, 68, 0.25)' : 'rgba(14, 165, 233, 0.25)'}`,
+                        }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: expired ? '#FCA5A5' : ls.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    สถานะการสมัครสมาชิก
-                                </div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: expired ? '#F87171' : '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    สถานะแพ็กเกจ
+                                </span>
                                 <LicenseBadge license={u.license} expired={expired} size="sm" />
                             </div>
-                            {u.current_period_end && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
-                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>วันหมดอายุ</span>
-                                    <span style={{ color: expired ? '#FCA5A5' : '#fff', fontWeight: 600 }}>
-                                        {new Date(u.current_period_end).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                        {daysLeft !== null && (
-                                            <span style={{ marginLeft: '0.5rem', color: daysLeft <= 0 ? '#FCA5A5' : daysLeft <= 7 ? '#FCD34D' : '#6EE7B7', fontSize: '0.75rem' }}>
-                                                ({daysLeft <= 0 ? 'หมดแล้ว' : `${daysLeft} วัน`})
-                                            </span>
-                                        )}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Quick extend days */}
-                    {u.license !== 'free' && u.license !== 'active' && (
-                        <div style={{ marginBottom: '1rem', padding: '1rem', background: 'rgba(245,158,11,0.08)', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                                <CalendarPlus size={13} /> ต่ออายุ
-                            </div>
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                {[30, 90, 180, 365].map(days => (
-                                    <button
-                                        key={days}
-                                        onClick={() => onExtendDays(u.uid, days)}
-                                        disabled={isProcessing}
-                                        style={{
-                                            flex: 1, background: 'rgba(245,158,11,0.1)', color: '#FCD34D',
-                                            border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px',
-                                            padding: '0.5rem 0', fontSize: '0.8rem', fontWeight: 600,
-                                            cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                            opacity: isProcessing ? 0.5 : 1,
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem',
-                                        }}
-                                    >
-                                        {isProcessing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-                                        +{days}วัน
-                                    </button>
-                                ))}
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: 'rgba(245,158,11,0.6)', marginTop: '0.5rem' }}>
-                                ต่อจากวันหมดอายุปัจจุบัน (หรือจากวันนี้ถ้าหมดแล้ว)
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                                <span style={{ color: '#94A3B8' }}>วันหมดอายุ</span>
+                                <span style={{ fontWeight: 600, color: expired ? '#F87171' : '#FFFFFF' }}>
+                                    {u.current_period_end ? new Date(u.current_period_end).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                                    {daysLeft !== null && (
+                                        <span style={{ marginLeft: '0.5rem', color: daysLeft <= 0 ? '#F87171' : daysLeft <= 7 ? '#FBBF24' : '#34D399', fontSize: '0.75rem' }}>
+                                            ({daysLeft <= 0 ? 'หมดอายุแล้ว' : `เหลือ ${daysLeft} วัน`})
+                                        </span>
+                                    )}
+                                </span>
                             </div>
                         </div>
                     )}
 
-                    {/* Change plan */}
-                    <div style={{ marginBottom: '1rem', padding: '1rem', background: 'rgba(139,92,246,0.08)', borderRadius: '12px', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <Package size={13} /> เปลี่ยนแพ็กเกจ
+                    {/* Quick Extend Access */}
+                    <div style={{
+                        padding: '1.1rem', borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <CalendarPlus size={14} /> ต่ออายุการใช้งานทันที
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                            {[
+                                { days: 30, label: '+30 วัน' },
+                                { days: 90, label: '+90 วัน' },
+                                { days: 180, label: '+6 เดือน' },
+                                { days: 365, label: '+1 ปี' },
+                            ].map(item => (
+                                <button
+                                    key={item.days}
+                                    onClick={() => onExtendDays(u.uid, item.days)}
+                                    disabled={isProcessing}
+                                    style={{
+                                        background: 'rgba(14, 165, 233, 0.12)', color: '#38BDF8',
+                                        border: '1px solid rgba(14, 165, 233, 0.28)', borderRadius: '8px',
+                                        padding: '0.55rem 0', fontSize: '0.8rem', fontWeight: 600,
+                                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                        transition: 'all 0.15s ease',
+                                    }}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Change Plan Tier */}
+                    <div style={{
+                        padding: '1.1rem', borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Package size={14} /> เปลี่ยนระดับแพ็กเกจ (Tier)
                         </div>
                         <div style={{ position: 'relative' }}>
                             <button
@@ -274,45 +284,45 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                 disabled={isProcessing}
                                 style={{
                                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '8px',
-                                    padding: '0.5rem 0.75rem', cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                    fontSize: '0.8125rem', fontWeight: 600, color: '#C4B5FD',
-                                    opacity: isProcessing ? 0.5 : 1,
+                                    background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    borderRadius: '10px', padding: '0.65rem 0.85rem', cursor: 'pointer',
+                                    color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 600,
                                 }}
                             >
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                    <Package size={13} />
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Package size={14} color="#38BDF8" />
                                     {getLicenseStyle(u.license).label}
                                 </span>
-                                <ChevronDown size={14} style={{ transition: 'transform 0.2s', transform: licenseMenuOpen ? 'rotate(180deg)' : 'none', opacity: 0.6 }} />
+                                <ChevronDown size={15} style={{ transform: licenseMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: '#94A3B8' }} />
                             </button>
+
                             {licenseMenuOpen && (
                                 <div style={{
                                     position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                                    background: '#1a1040', border: '1px solid rgba(139,92,246,0.3)',
-                                    borderRadius: '10px', overflow: 'hidden',
-                                    zIndex: 50, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                                    background: '#1E293B', border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    borderRadius: '12px', overflow: 'hidden', zIndex: 60,
+                                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6)',
                                 }}>
                                     {LICENSE_OPTIONS.map(opt => {
                                         const s = getLicenseStyle(opt);
+                                        const isSelected = u.license === opt;
                                         return (
                                             <button
                                                 key={opt}
-                                                onClick={() => { onSetLicense(u.uid, opt); setLicenseMenuOpen(false); }}
-                                                style={{
-                                                    width: '100%', textAlign: 'left',
-                                                    background: u.license === opt ? s.bg : 'transparent',
-                                                    border: 'none', borderBottom: '1px solid rgba(255,255,255,0.06)',
-                                                    padding: '0.5rem 0.75rem', cursor: 'pointer',
-                                                    fontSize: '0.8125rem', fontWeight: u.license === opt ? 700 : 400,
-                                                    color: u.license === opt ? s.color : 'rgba(255,255,255,0.7)',
-                                                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                                onClick={() => {
+                                                    setLicenseMenuOpen(false);
+                                                    onSetLicense(u.uid, opt);
                                                 }}
-                                                onMouseEnter={e => { if (u.license !== opt) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                                                onMouseLeave={e => { if (u.license !== opt) e.currentTarget.style.background = 'transparent'; }}
+                                                style={{
+                                                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                    padding: '0.65rem 0.85rem', background: isSelected ? 'rgba(14, 165, 233, 0.15)' : 'transparent',
+                                                    border: 'none', borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                                    color: isSelected ? '#38BDF8' : '#F8FAFC', cursor: 'pointer',
+                                                    fontSize: '0.825rem', fontWeight: isSelected ? 700 : 500, textAlign: 'left',
+                                                }}
                                             >
-                                                {u.license === opt && <CheckCircle size={13} />}
-                                                {s.label}
+                                                <span>{s.label}</span>
+                                                {isSelected && <Check size={14} color="#38BDF8" />}
                                             </button>
                                         );
                                     })}
@@ -321,197 +331,132 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         </div>
                     </div>
 
-                    {/* User info */}
-                    <InfoRow icon={<Mail size={15} />} label="อีเมล" value={u.email} />
-                    <InfoRow
-                        icon={u.email_verified ? <ShieldCheck size={15} /> : <ShieldX size={15} />}
-                        label="ยืนยันอีเมล"
-                        value={
-                            u.email_verified === true
-                                ? <span style={{ color: '#6EE7B7', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={13} /> ยืนยันแล้ว</span>
-                                : u.email_verified === false
-                                    ? <span style={{ color: '#FCA5A5', display: 'flex', alignItems: 'center', gap: 4 }}><XCircle size={13} /> ยังไม่ยืนยัน</span>
-                                    : '—'
-                        }
-                    />
-                    {u.last_sign_in && (
-                        <InfoRow icon={<LogIn size={15} />} label="เข้าสู่ระบบล่าสุด" value={
-                            new Date(u.last_sign_in).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        } />
-                    )}
-                    <InfoRow icon={<CalendarDays size={15} />} label="สมัครเมื่อ" value={
-                        u.created_at ? new Date(u.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
-                    } />
-                    <InfoRow icon={<BadgeCheck size={15} />} label="ประเภทสิทธิ์" value={getLicenseStyle(u.license).label} />
-                    {u.role && (
-                        <InfoRow icon={<ShieldAlert size={15} />} label="บทบาท" value={
-                            u.role === 'admin'
-                                ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#B45309' }}><Crown size={13} /> Admin</span>
-                                : 'User'
-                        } />
-                    )}
-                    <InfoRow
-                        icon={<Hash size={15} />}
-                        label="UID"
-                        value={
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{u.uid}</span>
-                                <button onClick={copyUID} title="คัดลอก UID" style={{
-                                    background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)',
-                                    border: '1px solid ' + (copied ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)'),
-                                    borderRadius: '6px', cursor: 'pointer', padding: '0.2rem',
-                                    color: copied ? '#6EE7B7' : 'rgba(255,255,255,0.5)',
-                                    display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                                    transition: 'all 0.15s',
-                                }}>
-                                    {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
-                                </button>
+                    {/* Metadata & Actions */}
+                    <div style={{
+                        padding: '1.1rem', borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        display: 'flex', flexDirection: 'column', gap: '0.75rem',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                            <span style={{ color: '#94A3B8' }}>User ID (UID)</span>
+                            <button
+                                onClick={copyUID}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.06)', border: 'none', color: copied ? '#34D399' : '#38BDF8',
+                                    borderRadius: '6px', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.75rem',
+                                    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                }}
+                            >
+                                {copied ? <Check size={12} /> : <Copy size={12} />}
+                                {copied ? 'คัดลอกแล้ว!' : 'คัดลอก UID'}
+                            </button>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                            {u.uid}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                            <span style={{ color: '#94A3B8' }}>ยืนยันอีเมล</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ color: u.email_verified ? '#34D399' : '#FBBF24', fontWeight: 600, fontSize: '0.78rem' }}>
+                                    {u.email_verified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}
+                                </span>
+                                {!u.email_verified && (
+                                    <button
+                                        onClick={handleVerify}
+                                        disabled={verifyingEmail}
+                                        style={{
+                                            background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                                            color: '#34D399', borderRadius: '6px', padding: '0.15rem 0.45rem', fontSize: '0.7rem',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        {verifyingEmail ? '...' : 'บังคับยืนยัน'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
+                            <span style={{ color: '#94A3B8' }}>วันที่สมัครสมาชิก</span>
+                            <span style={{ color: '#FFFFFF', fontWeight: 500 }}>
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                             </span>
-                        }
-                    />
-                    {u.has_firestore_profile === false && (
-                        <div style={{ margin: '0.5rem 0', padding: '0.5rem 0.75rem', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, fontSize: '0.75rem', color: '#FCD34D', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <AlertTriangle size={12} /> ไม่มี Firestore profile (สมัครไม่สมบูรณ์)
                         </div>
-                    )}
+                    </div>
 
-                    {/* Verify email */}
-                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(6,182,212,0.08)', borderRadius: '12px', border: '1px solid rgba(6,182,212,0.2)' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#67E8F9', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <MailCheck size={13} /> ยืนยันอีเมล
-                        </div>
+                    {/* Dangerous Actions: Ban / Revoke */}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+                        {isBanned ? (
+                            <button
+                                onClick={() => onUnban(u.uid)}
+                                disabled={isProcessing}
+                                style={{
+                                    flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none',
+                                    background: 'rgba(16, 185, 129, 0.15)', color: '#34D399',
+                                    cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                                }}
+                            >
+                                ปลดแบนผู้ใช้
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => onBan(u.uid)}
+                                disabled={isProcessing}
+                                style={{
+                                    flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.15)', color: '#F87171',
+                                    cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                                }}
+                            >
+                                <Ban size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.3rem' }} />
+                                แบนผู้ใช้งาน
+                            </button>
+                        )}
                         <button
-                            onClick={async () => {
-                                setVerifyingEmail(true);
-                                try { await onVerifyEmail(u.uid); setEmailVerifyDone(true); }
-                                finally { setVerifyingEmail(false); }
-                            }}
-                            disabled={isProcessing || verifyingEmail || emailVerifyDone}
+                            onClick={() => onRevoke(u.uid)}
+                            disabled={isProcessing}
                             style={{
-                                width: '100%',
-                                background: emailVerifyDone ? 'rgba(16,185,129,0.1)' : 'rgba(6,182,212,0.1)',
-                                color: emailVerifyDone ? '#6EE7B7' : '#67E8F9',
-                                border: `1px solid ${emailVerifyDone ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.3)'}`,
-                                borderRadius: '8px', padding: '0.5rem 0.875rem',
-                                fontSize: '0.8125rem', fontWeight: 600,
-                                cursor: (isProcessing || verifyingEmail || emailVerifyDone) ? 'not-allowed' : 'pointer',
-                                opacity: (isProcessing || verifyingEmail) ? 0.5 : 1,
-                                display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left',
+                                flex: 1, padding: '0.75rem', borderRadius: '10px',
+                                background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.15)',
+                                color: '#94A3B8', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
                             }}
                         >
-                            {verifyingEmail ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : emailVerifyDone ? <CheckCircle size={13} /> : <MailCheck size={13} />}
-                            <span>
-                                <span style={{ display: 'block' }}>{emailVerifyDone ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>ยืนยันอีเมลแล้ว <CheckCircle size={12} /></span> : 'ยืนยันอีเมลแทนผู้ใช้'}</span>
-                                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>force-verify ผ่าน Firebase Admin SDK</span>
-                            </span>
+                            รีเซ็ตเป็น Free
                         </button>
                     </div>
 
-                    {/* Danger zone */}
-                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(220,38,38,0.08)', borderRadius: '12px', border: '1px solid rgba(220,38,38,0.2)' }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCA5A5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                            <Ban size={13} /> Danger Zone
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            <button
-                                onClick={() => onRevoke(u.uid)}
-                                disabled={isProcessing || u.license === 'free'}
-                                style={{
-                                    background: u.license === 'free' ? 'rgba(255,255,255,0.02)' : 'rgba(245,158,11,0.1)',
-                                    color: u.license === 'free' ? 'rgba(255,255,255,0.3)' : '#FCD34D',
-                                    border: '1px solid ' + (u.license === 'free' ? 'rgba(255,255,255,0.05)' : 'rgba(245,158,11,0.3)'),
-                                    borderRadius: '8px', padding: '0.5rem 0.875rem', fontSize: '0.8125rem', fontWeight: 600,
-                                    cursor: (isProcessing || u.license === 'free') ? 'not-allowed' : 'pointer',
-                                    opacity: isProcessing ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left',
-                                }}
-                            >
-                                <RotateCcw size={13} />
-                                <span>
-                                    <span style={{ display: 'block' }}>เพิกถอนสิทธิ์ (Revoke)</span>
-                                    <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>reset license กลับเป็น Free plan</span>
-                                </span>
-                            </button>
-                            {isBanned ? (
-                                <button
-                                    onClick={() => onUnban(u.uid)}
-                                    disabled={isProcessing}
-                                    style={{
-                                        background: 'rgba(16,185,129,0.1)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.3)',
-                                        borderRadius: '8px', padding: '0.5rem 0.875rem', fontSize: '0.8125rem', fontWeight: 600,
-                                        cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.5 : 1,
-                                        display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                    }}
-                                >
-                                    <ShieldOff size={13} />
-                                    <span>
-                                        <span style={{ display: 'block' }}>ยกเลิกแบน (Unban)</span>
-                                        <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>คืนค่าสถานะปกติให้ผู้ใช้งาน</span>
-                                    </span>
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => onBan(u.uid)}
-                                    disabled={isProcessing}
-                                    style={{
-                                        background: 'rgba(220,38,38,0.1)', color: '#FCA5A5', border: '1px solid rgba(220,38,38,0.3)',
-                                        borderRadius: '8px', padding: '0.5rem 0.875rem', fontSize: '0.8125rem', fontWeight: 600,
-                                        cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.5 : 1,
-                                        display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                    }}
-                                >
-                                    <Ban size={13} />
-                                    <span>
-                                        <span style={{ display: 'block' }}>แบนผู้ใช้งาน (Ban)</span>
-                                        <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>บล็อคการเข้าถึงระบบทันที</span>
-                                    </span>
-                                </button>
-                            )}
-                        </div>
-                    </div>
                 </div>
 
-                {/* Footer */}
-                <div style={{
-                    padding: '1rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex', gap: '0.625rem', flexShrink: 0,
-                }}>
+                {/* Footer Action */}
+                <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     {u.license !== 'active' ? (
                         <button
                             onClick={() => onSetLicense(u.uid, 'active')}
                             disabled={isProcessing}
                             style={{
-                                flex: 1, background: 'linear-gradient(135deg, #16A34A 0%, #059669 100%)',
-                                color: '#fff', border: 'none', borderRadius: '10px',
-                                padding: '0.75rem', fontSize: '0.875rem', fontWeight: 600,
-                                cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.5 : 1,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
-                                boxShadow: '0 2px 8px rgba(22,163,74,0.3)',
+                                width: '100%', padding: '0.85rem', borderRadius: '12px', border: 'none',
+                                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                color: '#FFFFFF', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
                             }}
                         >
-                            {isProcessing ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Key size={14} />}
-                            ปลดล็อกถาวร (ตลอดชีพ)
+                            <Key size={16} /> ปลดล็อกถาวรตลอดชีพ (Lifetime Access)
                         </button>
                     ) : (
-                        <div style={{ flex: 1, textAlign: 'center', color: '#34D399', fontSize: '0.875rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem' }}>
-                            <CheckCircle size={16} /> ใช้งานตลอดชีพแล้ว
+                        <div style={{ textAlign: 'center', color: '#34D399', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                            <CheckCircle2 size={18} /> ผู้ใช้นี้มีสิทธิ์ใช้งานตลอดชีพแล้ว
                         </div>
                     )}
                 </div>
             </div>
-
-            <style>{`
-                @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-                @keyframes slideInRight { from { transform: translateX(100%) } to { transform: translateX(0) } }
-                @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-            `}</style>
         </>
     );
 }
 
-// ──────────────────────────────────────────────
-// Main component
-// ──────────────────────────────────────────────
-
+/* ──────────────────────────────────────────────
+   Main Admin Dashboard Component
+────────────────────────────────────────────── */
 export default function AdminDashboard() {
     const { user, profile } = useAuth();
     const { updateUserLicense } = useFirestore(user?.uid ?? null, null);
@@ -526,6 +471,7 @@ export default function AdminDashboard() {
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
     const [backfilling, setBackfilling] = useState(false);
+    const [lastSyncTime, setLastSyncTime] = useState<string>('');
 
     const loadUsers = useCallback(async (showRefresh = false) => {
         if (!user) return;
@@ -539,8 +485,9 @@ export default function AdminDashboard() {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json() as { users: AdminUserRow[] };
             setUsers(data.users);
+            setLastSyncTime(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         } catch (err: unknown) {
-            setError((err as Error).message || 'ไม่สามารถโหลดข้อมูลได้');
+            setError((err as Error).message || 'ไม่สามารถโหลดข้อมูลผู้ใช้งานได้');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -549,82 +496,132 @@ export default function AdminDashboard() {
 
     useEffect(() => { loadUsers(); }, [loadUsers]);
 
-    // Sync selected user after any refresh
+    // Keep selectedUser in sync
     useEffect(() => {
         if (!selectedUser) return;
         const updated = users.find(u => u.uid === selectedUser.uid);
         if (updated) setSelectedUser(updated);
-    }, [users]); // eslint-disable-line react-hooks/exhaustive-deps -- selectedUser intentionally omitted to avoid loop
+    }, [users]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Stats ──
+    // Statistics Calculation
     const stats = useMemo(() => {
-        const total    = users.length;
-        const free     = users.filter(u => u.license === 'free').length;
-        const small    = users.filter(u => u.license?.includes('small')).length;
-        const medium   = users.filter(u => u.license?.includes('medium')).length;
-        const large    = users.filter(u => u.license?.includes('large')).length;
+        const total = users.length;
+        const free = users.filter(u => u.license === 'free').length;
+        const small = users.filter(u => u.license?.includes('small')).length;
+        const medium = users.filter(u => u.license?.includes('medium')).length;
+        const large = users.filter(u => u.license?.includes('large')).length;
         const lifetime = users.filter(u => u.license === 'active').length;
-        const expired  = users.filter(isExpiredUser).length;
-        const banned   = users.filter(u => u.status === 'banned').length;
-        const paid     = small + medium + large + lifetime;
-        return { total, free, small, medium, large, lifetime, expired, banned, paid };
+        const expired = users.filter(isExpiredUser).length;
+        const expiringSoon = users.filter(isExpiringSoon).length;
+        const banned = users.filter(u => u.status === 'banned').length;
+        const paid = small + medium + large + lifetime;
+
+        // Estimated MRR calculation
+        const mrr = users.reduce((sum, u) => {
+            if (u.status === 'banned') return sum;
+            if (isExpiredUser(u)) return sum;
+            if (u.license === 'monthly_small') return sum + 149;
+            if (u.license === 'yearly_small') return sum + Math.round(950 / 12);
+            if (u.license === 'monthly_medium') return sum + 259;
+            if (u.license === 'yearly_medium') return sum + Math.round(1590 / 12);
+            if (u.license === 'monthly_large') return sum + 399;
+            if (u.license === 'yearly_large') return sum + Math.round(2990 / 12);
+            return sum;
+        }, 0);
+
+        return { total, free, small, medium, large, lifetime, expired, expiringSoon, banned, paid, mrr };
     }, [users]);
 
-    // ── Filter + sort ──
+    // Filter + Sort
     const displayedUsers = useMemo(() => {
         let list = users.filter(u => {
             const q = searchTerm.toLowerCase();
-            if (q && !u.email?.toLowerCase().includes(q) && !u.display_name?.toLowerCase().includes(q)) return false;
-            if (filterKey === 'all')     return true;
-            if (filterKey === 'free')    return u.license === 'free';
-            if (filterKey === 'small')   return u.license?.includes('small');
-            if (filterKey === 'medium')  return u.license?.includes('medium');
-            if (filterKey === 'large')   return u.license?.includes('large');
-            if (filterKey === 'active')  return u.license === 'active';
+            if (q) {
+                const matchName = u.display_name?.toLowerCase().includes(q);
+                const matchEmail = u.email?.toLowerCase().includes(q);
+                const matchUid = u.uid.toLowerCase().includes(q);
+                if (!matchName && !matchEmail && !matchUid) return false;
+            }
+            if (filterKey === 'all') return true;
+            if (filterKey === 'paid') return u.license !== 'free';
+            if (filterKey === 'free') return u.license === 'free';
+            if (filterKey === 'small') return u.license?.includes('small');
+            if (filterKey === 'medium') return u.license?.includes('medium');
+            if (filterKey === 'large') return u.license?.includes('large');
+            if (filterKey === 'active') return u.license === 'active';
+            if (filterKey === 'expiring_soon') return isExpiringSoon(u);
             if (filterKey === 'expired') return isExpiredUser(u);
-            if (filterKey === 'banned')  return u.status === 'banned';
+            if (filterKey === 'banned') return u.status === 'banned';
             return true;
         });
+
         list = [...list].sort((a, b) => {
-            if (sortKey === 'created_desc') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            if (sortKey === 'created_desc') {
+                return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            }
+            if (sortKey === 'created_asc') {
+                return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+            }
             if (sortKey === 'expiry_asc') {
                 const aExp = a.current_period_end ? new Date(a.current_period_end).getTime() : Infinity;
                 const bExp = b.current_period_end ? new Date(b.current_period_end).getTime() : Infinity;
                 return aExp - bExp;
             }
-            if (sortKey === 'name_asc') return (a.display_name || '').localeCompare(b.display_name || '', 'th');
+            if (sortKey === 'name_asc') {
+                return (a.display_name || '').localeCompare(b.display_name || '', 'th');
+            }
             return 0;
         });
         return list;
     }, [users, searchTerm, filterKey, sortKey]);
 
-    // ── Handlers ──
+    // Handlers
     const handleBan = async (uid: string) => {
-        if (!confirm('ยืนยันแบนผู้ใช้นี้?')) return;
+        if (!confirm('ยืนยันแบนผู้ใช้นี้? บัญชีนี้จะไม่สามารถเข้าสู่ระบบได้ทันที')) return;
         setProcessingId(uid);
-        try { await updateUserLicense(uid, { status: 'banned' }); }
-        catch (err) { console.error(err); }
-        finally { setProcessingId(null); await loadUsers(true); }
+        try {
+            await updateUserLicense(uid, { status: 'banned' });
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+            await loadUsers(true);
+        }
     };
 
     const handleUnban = async (uid: string) => {
         setProcessingId(uid);
-        try { await updateUserLicense(uid, { status: 'active' }); }
-        catch (err) { console.error(err); }
-        finally { setProcessingId(null); await loadUsers(true); }
+        try {
+            await updateUserLicense(uid, { status: 'active' });
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+            await loadUsers(true);
+        }
     };
 
     const handleRevoke = async (uid: string) => {
-        if (!confirm('ยืนยันเพิกถอนสิทธิ์? license จะถูก reset กลับเป็น Free plan')) return;
+        if (!confirm('ยืนยันเพิกถอนสิทธิ์? ระบบจะรีเซ็ตแพ็กเกจของผู้ใช้นี้กลับเป็น Free plan')) return;
         setProcessingId(uid);
-        try { await updateUserLicense(uid, { license: 'free', access_until: 0, subscription_status: undefined, current_period_end: undefined }); }
-        catch (err) { console.error(err); }
-        finally { setProcessingId(null); await loadUsers(true); }
+        try {
+            await updateUserLicense(uid, {
+                license: 'free',
+                access_until: 0,
+                subscription_status: undefined,
+                current_period_end: undefined,
+            });
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+            await loadUsers(true);
+        }
     };
 
     const handleSetLicense = async (uid: string, license: LicenseType) => {
         const label = getLicenseStyle(license).label;
-        if (!confirm(`เปลี่ยนแพ็กเกจเป็น "${label}" ให้กับผู้ใช้นี้?`)) return;
+        if (!confirm(`ยืนยันการเปลี่ยนแพ็กเกจเป็น "${label}"?`)) return;
         setProcessingId(uid);
         try {
             const updates: Partial<UserProfile> = { license };
@@ -647,8 +644,12 @@ export default function AdminDashboard() {
                 updates.access_until = undefined;
             }
             await updateUserLicense(uid, updates);
-        } catch (err) { console.error(err); }
-        finally { setProcessingId(null); await loadUsers(true); }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+            await loadUsers(true);
+        }
     };
 
     const handleExtendDays = async (uid: string, days: number) => {
@@ -657,7 +658,6 @@ export default function AdminDashboard() {
         setProcessingId(uid);
         try {
             const now = Date.now();
-            // Extend from current expiry if still valid, otherwise from today
             const baseMs = u.current_period_end
                 ? Math.max(new Date(u.current_period_end).getTime(), now)
                 : now;
@@ -667,8 +667,12 @@ export default function AdminDashboard() {
                 current_period_end: newExpiry.toISOString(),
                 subscription_status: 'active',
             });
-        } catch (err) { console.error(err); }
-        finally { setProcessingId(null); await loadUsers(true); }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setProcessingId(null);
+            await loadUsers(true);
+        }
     };
 
     const handleVerifyEmail = async (targetUid: string) => {
@@ -687,7 +691,7 @@ export default function AdminDashboard() {
 
     const missingProfileCount = users.filter(u => !u.has_firestore_profile).length;
     const handleBackfill = async () => {
-        if (!confirm(`สร้าง Firestore profile ให้ ${missingProfileCount} user ที่ยังไม่มี?`)) return;
+        if (!confirm(`สร้าง Firestore profile ให้กับ ${missingProfileCount} บัญชีที่ยังไม่มี?`)) return;
         setBackfilling(true);
         try {
             const idToken = await user!.getIdToken();
@@ -695,203 +699,396 @@ export default function AdminDashboard() {
                 method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` },
             });
             const data = await res.json() as { created: number };
-            alert(`[สำเร็จ] สร้างแล้ว ${data.created} profiles`);
+            alert(`[สำเร็จ] สร้างโปรไฟล์สำเร็จแล้ว ${data.created} บัญชี`);
             await loadUsers(true);
-        } catch (err) { alert('Error: ' + (err as Error).message); }
-        finally { setBackfilling(false); }
+        } catch (err) {
+            alert('เกิดข้อผิดพลาด: ' + (err as Error).message);
+        } finally {
+            setBackfilling(false);
+        }
+    };
+
+    // Export to CSV
+    const handleExportCSV = () => {
+        const headers = ['UID', 'ชื่อ', 'อีเมล', 'แพ็กเกจ', 'สถานะ', 'วันหมดอายุ', 'วันที่สมัคร'];
+        const rows = displayedUsers.map(u => [
+            u.uid,
+            `"${(u.display_name || '').replace(/"/g, '""')}"`,
+            u.email || '',
+            u.license || 'free',
+            u.status === 'banned' ? 'banned' : isExpiredUser(u) ? 'expired' : 'active',
+            u.current_period_end ? new Date(u.current_period_end).toLocaleDateString('th-TH') : '—',
+            u.created_at ? new Date(u.created_at).toLocaleDateString('th-TH') : '—',
+        ]);
+        const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `horcare_users_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
     if (!isAdmin) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '16px', padding: '2rem 3rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', background: '#090D16', color: '#F8FAFC' }}>
+                <div style={{ background: '#1E293B', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px', padding: '2.5rem 3.5rem', textAlign: 'center' }}>
                     <AlertTriangle size={48} color="#EF4444" style={{ margin: '0 auto 1rem' }} />
-                    <h2 style={{ color: '#DC2626', fontWeight: 700 }}>Access Denied</h2>
-                    <p style={{ color: '#6B7280' }}>คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p>
+                    <h2 style={{ color: '#F87171', fontWeight: 800 }}>Access Denied</h2>
+                    <p style={{ color: '#94A3B8' }}>คุณไม่มีสิทธิ์เข้าถึงส่วนควบคุมผู้ดูแลระบบ</p>
                 </div>
             </div>
         );
     }
 
-    // Filter chip definitions
     const filterChips: { key: FilterKey; label: string; count: number; color: string }[] = [
-        { key: 'all',     label: 'ทั้งหมด',  count: stats.total,    color: '#818CF8' },
-        { key: 'free',    label: 'Free',     count: stats.free,     color: '#FCD34D' },
-        { key: 'small',   label: 'Small',    count: stats.small,    color: '#A5B4FC' },
-        { key: 'medium',  label: 'Medium',   count: stats.medium,   color: '#67E8F9' },
-        { key: 'large',   label: 'Large',    count: stats.large,    color: '#C4B5FD' },
-        { key: 'active',  label: 'ตลอดชีพ', count: stats.lifetime, color: '#6EE7B7' },
-        { key: 'expired', label: 'หมดอายุ', count: stats.expired,  color: '#FCA5A5' },
-        { key: 'banned',  label: 'แบน',      count: stats.banned,   color: '#F87171' },
+        { key: 'all',           label: 'ทั้งหมด',        count: stats.total,        color: '#38BDF8' },
+        { key: 'paid',          label: 'ผู้ใช้จ่ายเงิน',   count: stats.paid,         color: '#34D399' },
+        { key: 'free',          label: 'Free Plan',      count: stats.free,         color: '#94A3B8' },
+        { key: 'small',         label: 'Start',          count: stats.small,        color: '#38BDF8' },
+        { key: 'medium',        label: 'Plus',           count: stats.medium,       color: '#818CF8' },
+        { key: 'large',         label: 'HorCare Pro',    count: stats.large,        color: '#C084FC' },
+        { key: 'active',        label: 'ตลอดชีพ (VIP)',  count: stats.lifetime,     color: '#34D399' },
+        { key: 'expiring_soon', label: 'ใกล้หมดอายุ',   count: stats.expiringSoon, color: '#FBBF24' },
+        { key: 'expired',       label: 'หมดอายุแล้ว',    count: stats.expired,      color: '#F87171' },
+        { key: 'banned',        label: 'ถูกแบน',        count: stats.banned,       color: '#EF4444' },
     ];
 
     return (
-        <div style={{
-            background: 'linear-gradient(160deg, #0d0820 0%, #0a0a18 50%, #060414 100%)',
-            borderRadius: '20px', padding: '1.5rem', margin: '-1rem', colorScheme: 'dark',
+        <div className="admin-dashboard-page" style={{
+            minHeight: '100vh',
+            width: '100%',
+            background: '#090D16',
+            backgroundImage: 'radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.08) 0%, rgba(9, 13, 22, 0) 60%)',
+            color: '#F8FAFC',
+            padding: '2rem 2.5rem 5rem',
+            boxSizing: 'border-box',
+            fontFamily: 'var(--font-sans)',
         }}>
-            {/* Header */}
+            {/* Header Command Bar */}
             <div style={{
-                background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #1E1B4B 100%)',
-                borderRadius: '16px', padding: '1.75rem 2rem', marginBottom: '1.5rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem',
+                background: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                padding: '1.25rem 1.75rem',
+                marginBottom: '1.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.4)',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.12)', padding: '0.75rem', borderRadius: '12px', display: 'flex' }}>
-                        <Shield size={28} color="#A5B4FC" />
+                    <div style={{
+                        width: 44, height: 44, borderRadius: '12px',
+                        background: 'rgba(14, 165, 233, 0.12)',
+                        border: '1px solid rgba(14, 165, 233, 0.25)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#38BDF8',
+                    }}>
+                        <Shield size={22} />
                     </div>
                     <div>
-                        <h1 style={{ color: '#fff', fontWeight: 800, fontSize: '1.375rem', margin: 0, letterSpacing: '-0.025em' }}>แผงควบคุมผู้ดูแลระบบ</h1>
-                        <p style={{ color: 'rgba(165,180,252,0.8)', fontSize: '0.875rem', margin: 0 }}>จัดการสิทธิ์และข้อมูลผู้ใช้งาน HorCare</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <h1 style={{ color: '#FFFFFF', fontWeight: 800, fontSize: '1.35rem', margin: 0, letterSpacing: '-0.02em' }}>
+                                แผงควบคุมผู้ดูแลระบบ (Admin Mission Control)
+                            </h1>
+                            <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)',
+                                color: '#34D399', borderRadius: '999px', padding: '0.1rem 0.5rem',
+                                fontSize: '0.7rem', fontWeight: 700,
+                            }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34D399' }} /> Live System
+                            </span>
+                        </div>
+                        <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: '0.15rem 0 0' }}>
+                            จัดการสิทธิ์ สมาชิกภาพ และข้อมูลผู้ใช้งานระบบ HorCare ทั่วประเทศ
+                            {lastSyncTime && <span style={{ marginLeft: '0.5rem', color: '#64748B' }}>· ซิงค์ล่าสุด {lastSyncTime}</span>}
+                        </p>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
+
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     {missingProfileCount > 0 && (
-                        <button onClick={handleBackfill} disabled={backfilling} style={{
-                            background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)',
-                            borderRadius: '10px', color: '#FCD34D', padding: '0.625rem 1.25rem',
-                            cursor: backfilling ? 'not-allowed' : 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 600,
-                        }}>
-                            {backfilling ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <AlertTriangle size={15} />}
-                            สร้าง {missingProfileCount} profile ที่หาย
+                        <button
+                            onClick={handleBackfill}
+                            disabled={backfilling}
+                            style={{
+                                background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)',
+                                borderRadius: '10px', color: '#FBBF24', padding: '0.55rem 1rem',
+                                cursor: backfilling ? 'not-allowed' : 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', fontWeight: 600,
+                            }}
+                        >
+                            {backfilling ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <AlertTriangle size={14} />}
+                            ซ่อมแซม {missingProfileCount} โปรไฟล์ที่หาย
                         </button>
                     )}
-                    <button onClick={() => loadUsers(true)} disabled={refreshing} style={{
-                        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: '10px', color: '#C7D2FE', padding: '0.625rem 1.25rem',
-                        cursor: refreshing ? 'not-allowed' : 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', fontWeight: 500,
-                    }}>
-                        <RefreshCw size={15} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-                        รีเฟรช
+                    <button
+                        onClick={handleExportCSV}
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '10px', color: '#CBD5E1', padding: '0.55rem 1rem',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                            fontSize: '0.825rem', fontWeight: 600, transition: 'all 0.15s ease',
+                        }}
+                    >
+                        <Download size={14} /> ส่งออก CSV
+                    </button>
+                    <button
+                        onClick={() => loadUsers(true)}
+                        disabled={refreshing}
+                        style={{
+                            background: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
+                            border: 'none', borderRadius: '10px', color: '#FFFFFF',
+                            padding: '0.55rem 1.15rem', cursor: refreshing ? 'not-allowed' : 'pointer',
+                            display: 'flex', alignItems: 'center', gap: '0.45rem',
+                            fontSize: '0.825rem', fontWeight: 600, boxShadow: '0 2px 8px rgba(2, 132, 199, 0.3)',
+                        }}
+                    >
+                        <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+                        รีเฟรชข้อมูล
                     </button>
                 </div>
             </div>
 
-            {/* Stats cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.875rem', marginBottom: '1.25rem' }}>
+            {/* 8 Metric KPI Cards Grid */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                gap: '1rem',
+                marginBottom: '1.5rem',
+            }}>
                 {[
-                    { label: 'ผู้ใช้ทั้งหมด', value: stats.total,    color: '#818CF8', bg: 'rgba(99,102,241,0.15)',   icon: Users },
-                    { label: 'Free Plan',     value: stats.free,     color: '#FCD34D', bg: 'rgba(245,158,11,0.15)',  icon: Timer },
-                    { label: 'Small',         value: stats.small,    color: '#A5B4FC', bg: 'rgba(99,102,241,0.15)', icon: Package },
-                    { label: 'Medium',        value: stats.medium,   color: '#67E8F9', bg: 'rgba(6,182,212,0.15)',  icon: Package },
-                    { label: 'Large',         value: stats.large,    color: '#C4B5FD', bg: 'rgba(139,92,246,0.15)', icon: Package },
-                    { label: 'ตลอดชีพ',      value: stats.lifetime, color: '#6EE7B7', bg: 'rgba(16,185,129,0.15)', icon: UserCheck },
-                    { label: 'Paid ทั้งหมด', value: stats.paid,     color: '#A78BFA', bg: 'rgba(124,58,237,0.15)', icon: TrendingUp },
-                    { label: 'หมดอายุ',      value: stats.expired,  color: '#FCA5A5', bg: 'rgba(220,38,38,0.15)',  icon: XCircle },
+                    { label: 'ผู้ใช้งานทั้งหมด', value: stats.total, sub: `${stats.paid} ผู้ใช้ชำระเงิน`, color: '#38BDF8', bg: 'rgba(14,165,233,0.12)', icon: Users },
+                    { label: 'ประมาณการ MRR', value: `฿${stats.mrr.toLocaleString()}`, sub: 'รายได้เฉลี่ย/เดือน', color: '#34D399', bg: 'rgba(16,185,129,0.12)', icon: Coins },
+                    { label: 'ตลอดชีพ (VIP)', value: stats.lifetime, sub: 'สิทธิ์ไม่จำกัด', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', icon: Crown },
+                    { label: 'Start Plan', value: stats.small, sub: 'สูงสุด 50 ห้อง', color: '#38BDF8', bg: 'rgba(14,165,233,0.12)', icon: Package },
+                    { label: 'Plus Plan', value: stats.medium, sub: 'สูงสุด 150 ห้อง', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', icon: Package },
+                    { label: 'HorCare Pro', value: stats.large, sub: 'ไม่จำกัดห้อง', color: '#C084FC', bg: 'rgba(168,85,247,0.12)', icon: Sparkles },
+                    { label: 'ใกล้หมดอายุ (<7 วัน)', value: stats.expiringSoon, sub: 'ต้องติดตาม', color: '#FBBF24', bg: 'rgba(245,158,11,0.12)', icon: Timer },
+                    { label: 'หมดอายุ / แบน', value: `${stats.expired} / ${stats.banned}`, sub: 'หมดสัญญา / ระงับ', color: '#F87171', bg: 'rgba(239,68,68,0.12)', icon: XCircle },
                 ].map(s => {
                     const Icon = s.icon;
                     return (
                         <div key={s.label} style={{
-                            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: '14px', padding: '1.125rem', display: 'flex', flexDirection: 'column', gap: '0.625rem',
+                            background: 'rgba(15, 23, 42, 0.7)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '16px',
+                            padding: '1.15rem 1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem',
+                            backdropFilter: 'blur(12px)',
+                            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
                         }}>
-                            <div style={{ width: 36, height: 36, borderRadius: '9px', background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Icon size={18} color={s.color} />
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: 500 }}>{s.label}</span>
+                                <div style={{ width: 32, height: 32, borderRadius: '8px', background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Icon size={16} color={s.color} />
+                                </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '1.625rem', fontWeight: 700, color: '#fff', lineHeight: 1, fontFamily: 'var(--font-mono)' }}>
-                                    {loading ? '—' : s.value}
+                                <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.02em' }}>
+                                    {loading ? '…' : s.value}
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: '0.25rem' }}>{s.label}</div>
+                                <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '0.35rem' }}>{s.sub}</div>
                             </div>
                         </div>
                     );
                 })}
             </div>
 
-            {/* User table */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                {/* Toolbar */}
-                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {/* Search + sort */}
+            {/* Plan Tier Distribution Progress Bar */}
+            {stats.total > 0 && (
+                <div style={{
+                    background: 'rgba(15, 23, 42, 0.7)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '16px',
+                    padding: '1rem 1.5rem',
+                    marginBottom: '1.5rem',
+                    backdropFilter: 'blur(12px)',
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', fontSize: '0.8rem', color: '#94A3B8' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: '#CBD5E1' }}>
+                            <Activity size={14} color="#38BDF8" /> สัดส่วนผู้ใช้งานตามแพ็กเกจ (Subscription Distribution)
+                        </span>
+                        <span>ชำระเงิน {stats.paid} คน ({Math.round((stats.paid / stats.total) * 100)}%)</span>
+                    </div>
+                    {/* Visual Bar */}
+                    <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', display: 'flex', overflow: 'hidden', gap: '2px' }}>
+                        <div style={{ width: `${(stats.free / stats.total) * 100}%`, background: '#64748B' }} title={`Free: ${stats.free}`} />
+                        <div style={{ width: `${(stats.small / stats.total) * 100}%`, background: '#38BDF8' }} title={`Start: ${stats.small}`} />
+                        <div style={{ width: `${(stats.medium / stats.total) * 100}%`, background: '#818CF8' }} title={`Plus: ${stats.medium}`} />
+                        <div style={{ width: `${(stats.large / stats.total) * 100}%`, background: '#C084FC' }} title={`HorCare: ${stats.large}`} />
+                        <div style={{ width: `${(stats.lifetime / stats.total) * 100}%`, background: '#34D399' }} title={`Lifetime: ${stats.lifetime}`} />
+                    </div>
+                    {/* Legend */}
+                    <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.6rem', fontSize: '0.72rem', color: '#94A3B8', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#64748B' }} /> Free ({stats.free})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38BDF8' }} /> Start ({stats.small})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#818CF8' }} /> Plus ({stats.medium})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#C084FC' }} /> HorCare Pro ({stats.large})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399' }} /> ตลอดชีพ ({stats.lifetime})</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Main Interactive Table Card */}
+            <div style={{
+                background: 'rgba(15, 23, 42, 0.75)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                overflow: 'hidden',
+                backdropFilter: 'blur(16px)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+            }}>
+                {/* Search & Filter Toolbar */}
+                <div style={{
+                    padding: '1.25rem',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
-                            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
+                        {/* Search Input */}
+                        <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
+                            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
                             <input
                                 type="text"
-                                placeholder="ค้นหาชื่อ หรือ อีเมล..."
-                                className="form-input"
-                                style={{ paddingLeft: '2.25rem', paddingTop: '0.625rem', paddingBottom: '0.625rem', fontSize: '0.875rem', width: '100%', background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                placeholder="ค้นหาชื่อ, อีเมล หรือ UID ของผู้ใช้..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '0.65rem 1rem 0.65rem 2.5rem',
+                                    borderRadius: '10px',
+                                    background: 'rgba(255, 255, 255, 0.04)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    color: '#FFFFFF',
+                                    fontSize: '0.875rem',
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                }}
                             />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    style={{
+                                        position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                                        background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer',
+                                    }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
                         </div>
-                        {/* Sort */}
+
+                        {/* Sort Selector */}
                         <div style={{ position: 'relative' }}>
                             <select
                                 value={sortKey}
                                 onChange={e => setSortKey(e.target.value as SortKey)}
                                 style={{
-                                    appearance: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-                                    borderRadius: '8px', color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem', fontWeight: 500,
-                                    padding: '0.5rem 2rem 0.5rem 0.75rem', cursor: 'pointer',
+                                    appearance: 'none',
+                                    background: 'rgba(255, 255, 255, 0.04)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    borderRadius: '10px',
+                                    color: '#CBD5E1',
+                                    fontSize: '0.825rem',
+                                    fontWeight: 500,
+                                    padding: '0.65rem 2.25rem 0.65rem 1rem',
+                                    cursor: 'pointer',
+                                    outline: 'none',
                                 }}
                             >
-                                <option value="created_desc">สมัครล่าสุด</option>
-                                <option value="expiry_asc">หมดอายุใกล้สุด</option>
-                                <option value="name_asc">ชื่อ A-Z</option>
+                                <option value="created_desc" style={{ background: '#0F172A', color: '#fff' }}>สมัครล่าสุด (ใหม่ไปเก่า)</option>
+                                <option value="created_asc" style={{ background: '#0F172A', color: '#fff' }}>สมัครก่อนหน้า (เก่าไปใหม่)</option>
+                                <option value="expiry_asc" style={{ background: '#0F172A', color: '#fff' }}>หมดอายุใกล้สุด</option>
+                                <option value="name_asc" style={{ background: '#0F172A', color: '#fff' }}>ชื่อ A-Z</option>
                             </select>
-                            <ArrowUpDown size={13} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none' }} />
+                            <ArrowUpDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }} />
                         </div>
+
                         {error && (
-                            <div style={{ color: '#FCA5A5', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                            <div style={{ color: '#F87171', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                 <AlertTriangle size={14} /> {error}
                             </div>
                         )}
-                        <div style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.4)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                            {displayedUsers.length} / {stats.total} คน
+
+                        <div style={{ fontSize: '0.825rem', color: '#64748B', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                            แสดง <strong style={{ color: '#F8FAFC' }}>{displayedUsers.length}</strong> จาก {stats.total} รายการ
                         </div>
                     </div>
 
-                    {/* Filter chips */}
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Filter size={14} style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }} />
-                        {filterChips.map(chip => (
-                            <button
-                                key={chip.key}
-                                onClick={() => setFilterKey(chip.key)}
-                                style={{
-                                    background: filterKey === chip.key ? `rgba(${chip.color === '#FCD34D' ? '245,158,11' : chip.color === '#818CF8' ? '99,102,241' : chip.color === '#A5B4FC' ? '99,102,241' : chip.color === '#67E8F9' ? '6,182,212' : chip.color === '#C4B5FD' ? '139,92,246' : chip.color === '#6EE7B7' ? '16,185,129' : '220,38,38'},0.2)` : 'rgba(255,255,255,0.04)',
-                                    border: `1px solid ${filterKey === chip.key ? chip.color + '55' : 'rgba(255,255,255,0.08)'}`,
-                                    borderRadius: '999px',
-                                    color: filterKey === chip.key ? chip.color : 'rgba(255,255,255,0.5)',
-                                    padding: '0.25rem 0.75rem', fontSize: '0.75rem', fontWeight: 600,
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem',
-                                    transition: 'all 0.15s',
-                                }}
-                            >
-                                {chip.label}
-                                <span style={{
-                                    background: filterKey === chip.key ? chip.color + '33' : 'rgba(255,255,255,0.08)',
-                                    color: filterKey === chip.key ? chip.color : 'rgba(255,255,255,0.4)',
-                                    borderRadius: '999px', padding: '0.05rem 0.4rem', fontSize: '0.7rem', fontWeight: 700,
-                                }}>
-                                    {loading ? '…' : chip.count}
-                                </span>
-                            </button>
-                        ))}
+                    {/* Filter Tabs Chips */}
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Filter size={13} style={{ color: '#64748B', flexShrink: 0, marginRight: '0.2rem' }} />
+                        {filterChips.map(chip => {
+                            const isSelected = filterKey === chip.key;
+                            return (
+                                <button
+                                    key={chip.key}
+                                    onClick={() => setFilterKey(chip.key)}
+                                    style={{
+                                        background: isSelected ? 'rgba(14, 165, 233, 0.16)' : 'rgba(255, 255, 255, 0.04)',
+                                        border: `1px solid ${isSelected ? 'rgba(14, 165, 233, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                                        borderRadius: '999px',
+                                        color: isSelected ? '#38BDF8' : '#94A3B8',
+                                        padding: '0.3rem 0.75rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: isSelected ? 700 : 500,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        transition: 'all 0.15s ease',
+                                    }}
+                                >
+                                    <span>{chip.label}</span>
+                                    <span style={{
+                                        background: isSelected ? 'rgba(14, 165, 233, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                                        color: isSelected ? '#38BDF8' : '#64748B',
+                                        borderRadius: '999px', padding: '0.05rem 0.4rem', fontSize: '0.68rem', fontWeight: 700,
+                                    }}>
+                                        {loading ? '…' : chip.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                {/* Table */}
+                {/* Table View */}
                 {loading ? (
-                    <div style={{ padding: '4rem', textAlign: 'center' }}>
-                        <Loader2 size={32} color="#6366F1" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem' }} />
-                        <p style={{ color: '#9CA3AF', fontSize: '0.875rem' }}>กำลังโหลดข้อมูล...</p>
+                    <div style={{ padding: '5rem 2rem', textAlign: 'center' }}>
+                        <Loader2 size={36} color="#0EA5E9" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }} />
+                        <p style={{ color: '#94A3B8', fontSize: '0.9rem' }}>กำลังเชื่อมต่อและโหลดข้อมูลผู้ใช้...</p>
                     </div>
                 ) : displayedUsers.length === 0 ? (
-                    <div style={{ padding: '4rem', textAlign: 'center', color: '#9CA3AF' }}>ไม่พบผู้ใช้งาน</div>
+                    <div style={{ padding: '5rem 2rem', textAlign: 'center', color: '#64748B' }}>
+                        <Users size={36} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
+                        <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#94A3B8' }}>ไม่พบข้อมูลผู้ใช้งานที่ตรงกับเงื่อนไข</div>
+                        <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>ลองปรับเปลี่ยนคำค้นหาหรือเลือกฟิลเตอร์อื่น</div>
+                    </div>
                 ) : (
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
-                                <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                                    {['ผู้ใช้งาน', 'แพ็กเกจ', 'วันเหลือ', 'สมัครเมื่อ', 'จัดการ'].map(h => (
-                                        <th key={h} style={{ padding: '0.75rem 1rem', textAlign: h === 'ผู้ใช้งาน' ? 'left' : 'center', fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
-                                    ))}
+                                <tr style={{ background: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                                    <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ผู้ใช้งาน</th>
+                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>แพ็กเกจ</th>
+                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>อายุการใช้งาน</th>
+                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>วันที่สมัคร</th>
+                                    <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>การจัดการด่วน</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -900,107 +1097,145 @@ export default function AdminDashboard() {
                                     const daysLeft = u.current_period_end ? getDaysLeft(u.current_period_end) : null;
                                     const isProcessing = processingId === u.uid;
                                     const isSelected = selectedUser?.uid === u.uid;
-                                    let daysColor = '#6EE7B7'; let daysBg = 'rgba(16,185,129,0.12)';
-                                    if (daysLeft !== null) {
-                                        if (daysLeft <= 0)  { daysColor = '#FCA5A5'; daysBg = 'rgba(220,38,38,0.12)'; }
-                                        else if (daysLeft <= 7) { daysColor = '#FCD34D'; daysBg = 'rgba(245,158,11,0.12)'; }
-                                    }
+
                                     return (
                                         <tr
                                             key={u.uid}
                                             onClick={() => setSelectedUser(u)}
                                             style={{
-                                                borderBottom: i < displayedUsers.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                                                cursor: 'pointer', background: isSelected ? 'rgba(99,102,241,0.15)' : 'transparent',
-                                                transition: 'background 0.1s',
+                                                borderBottom: i < displayedUsers.length - 1 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
+                                                cursor: 'pointer',
+                                                background: isSelected ? 'rgba(14, 165, 233, 0.12)' : 'transparent',
+                                                transition: 'background 0.15s ease',
                                             }}
-                                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-                                            onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(99,102,241,0.15)' : 'transparent'; }}
+                                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.025)'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(14, 165, 233, 0.12)' : 'transparent'; }}
                                         >
-                                            {/* User */}
-                                            <td style={{ padding: '0.875rem 1rem' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                            {/* User Info */}
+                                            <td style={{ padding: '1rem 1.25rem' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                                                     <UserAvatar name={u.display_name} email={u.email} />
                                                     <div style={{ minWidth: 0 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                                                            {u.display_name || 'ไม่ระบุชื่อ'}
-                                                            {u.status === 'banned' && <Ban size={12} color="#FCA5A5" />}
-                                                            {u.role === 'admin' && <Crown size={12} color="#B45309" />}
+                                                        <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                            <span>{u.display_name || 'ไม่ระบุชื่อ'}</span>
+                                                            {u.role === 'admin' && (
+                                                                <span title="ผู้ดูแลระบบ (Admin)"><Crown size={13} color="#FBBF24" /></span>
+                                                            )}
+                                                            {u.status === 'banned' && (
+                                                                <span style={{ color: '#F87171', fontSize: '0.7rem', background: 'rgba(239,68,68,0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>แบน</span>
+                                                            )}
                                                         </div>
-                                                        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{u.email}</div>
+                                                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '0.15rem' }}>
+                                                            {u.email}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            {/* Plan */}
-                                            <td style={{ padding: '0.875rem 1rem', textAlign: 'center' }}>
+                                            {/* Plan Badge */}
+                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
                                                 {u.status === 'banned' ? (
-                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(220,38,38,0.15)', color: '#FCA5A5', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '999px', padding: '0.25rem 0.625rem', fontSize: '0.7rem', fontWeight: 600 }}>
-                                                        <Ban size={11} /> แบน
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'rgba(239,68,68,0.15)', color: '#F87171', borderRadius: '999px', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 600 }}>
+                                                        <Ban size={11} /> ถูกระงับ
                                                     </span>
                                                 ) : (
                                                     <LicenseBadge license={u.license} expired={expired} size="sm" />
                                                 )}
                                             </td>
 
-                                            {/* Days left */}
-                                            <td style={{ padding: '0.875rem 1rem', textAlign: 'center' }}>
+                                            {/* Days Left / Expiry */}
+                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
                                                 {u.license === 'active' ? (
-                                                    <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.875rem' }}>∞</span>
-                                                ) : daysLeft !== null ? (
-                                                    <span style={{ display: 'inline-block', background: daysBg, color: daysColor, borderRadius: '8px', padding: '0.2rem 0.5rem', fontSize: '0.8125rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                                                        {daysLeft <= 0 ? 'หมดแล้ว' : `${daysLeft} วัน`}
+                                                    <span style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                                        color: '#34D399', fontSize: '0.8rem', fontWeight: 700,
+                                                    }}>
+                                                        <InfinityIcon size={13} /> ตลอดชีพ
                                                     </span>
-                                                ) : <span style={{ color: 'rgba(255,255,255,0.25)' }}>—</span>}
+                                                ) : daysLeft !== null ? (
+                                                    <div>
+                                                        <span style={{
+                                                            display: 'inline-block',
+                                                            background: daysLeft <= 0 ? 'rgba(239,68,68,0.15)' : daysLeft <= 7 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+                                                            color: daysLeft <= 0 ? '#F87171' : daysLeft <= 7 ? '#FBBF24' : '#34D399',
+                                                            borderRadius: '8px', padding: '0.2rem 0.55rem', fontSize: '0.8rem', fontWeight: 700,
+                                                        }}>
+                                                            {daysLeft <= 0 ? 'หมดอายุแล้ว' : `${daysLeft} วัน`}
+                                                        </span>
+                                                        {u.current_period_end && (
+                                                            <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.25rem' }}>
+                                                                {new Date(u.current_period_end).toLocaleDateString('th-TH')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: '#64748B', fontSize: '0.8rem' }}>—</span>
+                                                )}
                                             </td>
 
-                                            {/* Created */}
-                                            <td style={{ padding: '0.875rem 1rem', textAlign: 'center' }}>
-                                                <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)' }}>
+                                            {/* Registration Date */}
+                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
                                                     {u.created_at ? new Date(u.created_at).toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' }) : '—'}
                                                 </span>
                                             </td>
 
-                                            {/* Actions */}
-                                            <td style={{ padding: '0.875rem 1rem' }} onClick={e => e.stopPropagation()}>
-                                                <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'center' }}>
-                                                    {/* Extend +30 days quick action for paid users */}
+                                            {/* Quick Actions */}
+                                            <td style={{ padding: '1rem 1.25rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                                                <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                                                    {/* +30 Days */}
                                                     {u.license !== 'free' && u.license !== 'active' && (
                                                         <button
                                                             onClick={() => handleExtendDays(u.uid, 30)}
                                                             disabled={isProcessing}
-                                                            title="+30 วัน"
+                                                            title="ต่ออายุ +30 วัน"
                                                             style={{
-                                                                background: 'rgba(245,158,11,0.1)', color: '#FCD34D',
-                                                                border: '1px solid rgba(245,158,11,0.3)', borderRadius: '7px',
-                                                                padding: '0.3rem 0.5rem', fontSize: '0.75rem', fontWeight: 600,
-                                                                cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.5 : 1,
-                                                                display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap',
+                                                                background: 'rgba(14, 165, 233, 0.12)', color: '#38BDF8',
+                                                                border: '1px solid rgba(14, 165, 233, 0.3)', borderRadius: '8px',
+                                                                padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
+                                                                cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                                                display: 'flex', alignItems: 'center', gap: '0.25rem',
+                                                                transition: 'all 0.15s ease',
                                                             }}
                                                         >
-                                                            {isProcessing ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <CalendarPlus size={11} />}
-                                                            +30
+                                                            {isProcessing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <CalendarPlus size={12} />}
+                                                            +30 วัน
                                                         </button>
                                                     )}
-                                                    {/* Unlock forever */}
+
+                                                    {/* Lifetime unlock */}
                                                     {u.license !== 'active' && (
                                                         <button
                                                             onClick={() => handleSetLicense(u.uid, 'active')}
                                                             disabled={isProcessing}
-                                                            title="ปลดล็อกถาวร"
+                                                            title="ปลดล็อกตลอดชีพ"
                                                             style={{
-                                                                background: 'rgba(16,185,129,0.1)', color: '#6EE7B7',
-                                                                border: '1px solid rgba(16,185,129,0.3)', borderRadius: '7px',
-                                                                padding: '0.3rem 0.5rem', fontSize: '0.75rem', fontWeight: 600,
-                                                                cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.5 : 1,
-                                                                display: 'flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap',
+                                                                background: 'rgba(16, 185, 129, 0.12)', color: '#34D399',
+                                                                border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px',
+                                                                padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
+                                                                cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                                                display: 'flex', alignItems: 'center', gap: '0.25rem',
+                                                                transition: 'all 0.15s ease',
                                                             }}
                                                         >
-                                                            {isProcessing ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Key size={11} />}
-                                                            ∞
+                                                            {isProcessing ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Key size={12} />}
+                                                            ตลอดชีพ
                                                         </button>
                                                     )}
-                                                    {u.license === 'active' && <CheckCircle size={16} color="#34D399" />}
+
+                                                    {/* View Detail Drawer */}
+                                                    <button
+                                                        onClick={() => setSelectedUser(u)}
+                                                        title="ดูข้อมูลละเอียด"
+                                                        style={{
+                                                            background: 'rgba(255, 255, 255, 0.05)', color: '#CBD5E1',
+                                                            border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px',
+                                                            padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 500,
+                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                                        }}
+                                                    >
+                                                        <Eye size={12} /> รายละเอียด
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1012,7 +1247,7 @@ export default function AdminDashboard() {
                 )}
             </div>
 
-            {/* Detail panel */}
+            {/* User Detail Slide Drawer */}
             {selectedUser && (
                 <UserDetailPanel
                     u={selectedUser}

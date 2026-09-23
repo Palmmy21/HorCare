@@ -122,6 +122,27 @@ service cloud.firestore {
             request.resource.data.description.size() <= 1000;
         }
 
+        // ── Cleaning requests (งานทำความสะอาด/แม่บ้าน) ────────────────────
+        // Tenants submit via public portal (no auth). Owner/maid can read/update/delete.
+        match /cleaning/{reqId} {
+          allow read: if true;
+          allow create: if true;
+          allow update: if true;
+          allow delete: if isOwner(userId) && isNotBanned();
+        }
+
+        // ── Cleaning photos ──────────────────────────────────────────────
+        match /cleaning_images/{reqId} {
+          allow read: if true;
+          allow write: if true;
+        }
+
+        // ── Housekeepers (แม่บ้าน) ───────────────────────────────────────
+        match /housekeepers/{maidId} {
+          allow read: if true;
+          allow write: if isOwner(userId) && isNotBanned();
+        }
+
         // ── Operations collections (owner only) ──────────────────────────
         match /vendors/{docId} {
           allow read, write: if isOwner(userId) && isNotBanned();
@@ -185,6 +206,12 @@ service cloud.firestore {
         || (isSignedIn() && isNotBanned()
             && request.resource.data.uid == request.auth.uid
             && (!exists(/databases/$(database)/documents/dorm_codes/$(code)) || get(/databases/$(database)/documents/dorm_codes/$(code)).data.uid == request.auth.uid));
+    }
+
+    // ── Housekeeper Auth table (lookup by phone for maid login) ─────────
+    match /housekeepers_auth/{phone} {
+      allow read: if true;
+      allow write: if isSignedIn() && isNotBanned();
     }
 
     // ── Deny all other paths ─────────────────────────────────────────────

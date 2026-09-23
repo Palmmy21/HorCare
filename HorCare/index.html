@@ -3,9 +3,9 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" href="/logo-icon.png" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="/logo-icon.png?v=2" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=2" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +25,7 @@
   <meta property="og:title" content="HorCare - ระบบจัดการหอพักอัจฉริยะ" />
   <meta property="og:description"
     content="ระบบจัดการหอพักที่ช่วยให้คุณทำงานง่ายขึ้น จดมิเตอร์ผ่านมือถือ คำนวณค่าไฟ-น้ำอัตโนมัติ พร้อมออกบิลได้ทันที" />
-  <meta property="og:image" content="/logo.png" />
+  <meta property="og:image" content="/logo.png?v=2" />
   <meta property="og:type" content="website" />
 
   <!-- Security: prevent clickjacking, XSS -->
@@ -33,6 +33,14 @@
   <meta http-equiv="X-Frame-Options" content="DENY" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
+  <script>
+    window.__pwaInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__pwaInstallPrompt = e;
+      window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
+    });
+  </script>
   <style>
     body { margin: 0; background-color: #0B0F19; font-family: 'Prompt', sans-serif; }
     .splash-screen {
@@ -75,7 +83,7 @@
   <div id="root">
     <div class="splash-screen">
       <div class="splash-logo-container">
-        <img src="/logo.png" alt="HorCare" />
+        <img src="/logo.png?v=2" alt="HorCare" />
       </div>
       <div class="splash-text">กำลังโหลด...</div>
     </div>

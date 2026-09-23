@@ -96,6 +96,15 @@
 
   /* Theme-controlled sidebar */
   --sidebar-bg: linear-gradient(180deg, #0284C7 0%, #0369A1 50%, #075985 100%);
+
+  /* Text & Border aliases */
+  --color-text: #1E293B;
+  --color-text-muted: #64748B;
+  --color-text-light: #94A3B8;
+  --color-border: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
 }
 
 /* ===== Dark Mode ===== */
@@ -114,6 +123,15 @@ html.dark {
   --color-gray-700: #E2E8F0;   /* body text */
   --color-gray-800: #F1F5F9;   /* heading */
   --color-gray-900: #FFFFFF;   /* max contrast */
+
+  /* Text & Border aliases for Dark Mode */
+  --color-text: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-text-light: #64748B;
+  --color-border: rgba(14, 165, 233, 0.18);
+  --text-primary: #FFFFFF;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
 
   /* Semantic tinted backgrounds (dark equivalents) */
   --color-primary-ultra-light: rgba(14, 165, 233, 0.12);
@@ -3011,6 +3029,11 @@ textarea,
   padding: var(--space-8);
   width: 100%;
   max-width: 400px;
+  transition: max-width var(--transition-normal);
+}
+
+.login-card.register-mode {
+  max-width: 520px;
 }
 
 .login-logo {
@@ -3235,15 +3258,19 @@ textarea,
   top: 36px;
 }
 
-/* Pricing page is a full-bleed dark hero: fill the whole content area so
+/* Pricing and Admin pages are full-bleed dark views: fill the whole content area so
    no light gutters show on wide screens (overrides the centered padding).
    Higher-specificity variant keeps the top offset to clear the trial banner. */
-.main-content:has(.pricing-page) {
+.main-content:has(.pricing-page),
+.main-content:has(.admin-dashboard-page) {
   padding: 0;
+  background-color: #090D16;
 }
 
-.app-container:has(.trial-banner) .main-content:has(.pricing-page) {
+.app-container:has(.trial-banner) .main-content:has(.pricing-page),
+.app-container:has(.trial-banner) .main-content:has(.admin-dashboard-page) {
   padding: 36px 0 0;
+  background-color: #090D16;
 }
 
 @media (max-width: 768px) {

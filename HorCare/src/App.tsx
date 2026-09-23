@@ -22,7 +22,9 @@ import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceReq
 import { useCleaningRequests } from './hooks/useCleaningRequests';
 import SlipNotificationToast from './components/SlipNotificationToast';
 import InstallPrompt, { isPWAStandalone } from './components/PWA/InstallPrompt';
-import type { HousekeeperSession } from './types';
+import AddBuildingModal from './components/Building/AddBuildingModal';
+import type { HousekeeperSession, DormConfig, InitialBuildingConfig } from './types';
+import toast from 'react-hot-toast';
 // Heavy pages — lazy loaded so their chunks (jsPDF, html2canvas, Stripe, etc.)
 // are downloaded only when the user first navigates to them
 const Summary         = lazy(() => import('./components/Summary/Summary'));
@@ -40,12 +42,25 @@ const FeatureLockedModal = lazy(() => import('./components/FeatureLockedModal'))
 const BranchSelector = lazy(() => import('./components/BranchSelector/BranchSelector'));
 
 import './index.css';
+import horcareLogo from './assets/horcare_logo.png';
 
-function PageLoader() {
+function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '0.75rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.875rem' }}>
-      <div className="loading-spinner" style={{ width: 24, height: 24 }} />
-      กำลังโหลด...
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: fullScreen ? '100dvh' : '60vh',
+      height: fullScreen ? '100dvh' : 'auto',
+      width: '100%',
+      gap: '0.875rem',
+      color: 'var(--text-secondary, #64748b)',
+      fontSize: '0.9375rem',
+      fontWeight: 500
+    }}>
+      <div className="loading-spinner" style={{ width: 36, height: 36, borderWidth: 3 }} />
+      <span>กำลังโหลด...</span>
     </div>
   );
 }
@@ -80,8 +95,7 @@ function App() {
   };
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonth());
   const [buildingMenuOpen, setBuildingMenuOpen] = useState(false);
-  const [addBuildingMode, setAddBuildingMode] = useState(false);
-  const [newBuildingName, setNewBuildingName] = useState('');
+  const [isAddBuildingModalOpen, setIsAddBuildingModalOpen] = useState(false);
   const [renamingBuildingId, setRenamingBuildingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState('');
   const buildingMenuRef = useRef<HTMLDivElement>(null);
@@ -188,7 +202,6 @@ function App() {
     function handleClick(e: MouseEvent) {
       if (buildingMenuRef.current && !buildingMenuRef.current.contains(e.target as Node)) {
         setBuildingMenuOpen(false);
-        setAddBuildingMode(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -201,13 +214,15 @@ function App() {
     setBuildingMenuOpen(false);
   };
 
-  const handleAddBuilding = async () => {
-    if (!newBuildingName.trim()) return;
-    const b = await addBuilding(newBuildingName);
-    if (b) handleSwitchBuilding(b.id);
-    setNewBuildingName('');
-    setAddBuildingMode(false);
+  const handleAddBuildingSubmit = async (name: string, initialConfig: Partial<DormConfig>) => {
+    const b = await addBuilding(name, initialConfig);
+    if (b) {
+      handleSwitchBuilding(b.id);
+      setHasSelectedBranch(true);
+      toast.success(`เพิ่มสาขา "${name}" เรียบร้อยแล้ว 🎉`);
+    }
     setBuildingMenuOpen(false);
+    setIsAddBuildingModalOpen(false);
   };
 
   const handleRenameBuilding = async (id: string) => {
@@ -340,11 +355,12 @@ function App() {
   }
 
   // Start+ features (any paid plan: Start / Plus / Pro)
-  const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'operations', 'payments', 'archives'];
+  const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'cleaning', 'operations', 'payments', 'archives'];
 
   const VIEW_LABELS: Record<string, string> = {
     tenants: 'ผู้เช่า',
     maintenance: 'แจ้งซ่อม',
+    cleaning: 'งานแม่บ้าน',
     operations: 'ระบบจัดการ',
     payments: 'การชำระเงิน',
     archives: 'คลังเอกสาร',
@@ -364,8 +380,8 @@ function App() {
     await login(email, password);
   };
 
-  const handleRegister = async (email: string, password: string, name: string) => {
-    await register(email, password, name);
+  const handleRegister = async (email: string, password: string, name: string, initialBuilding?: InitialBuildingConfig) => {
+    await register(email, password, name, initialBuilding);
   };
 
   const handleMonthChange = (newMonth: string) => {
@@ -396,7 +412,7 @@ function App() {
         gap: '1rem'
       }}>
         <div className="login-logo" style={{ marginBottom: 0 }}>
-          <img src="/logo.png" alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain' }} />
+          <img src={horcareLogo} alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain' }} />
         </div>
         <p style={{ color: 'var(--color-gray-400)', fontWeight: 500 }}>กำลังโหลด...</p>
       </div>
@@ -573,7 +589,7 @@ function App() {
 
   if (!maidSession && hasPaidSubscription && !hasSelectedBranch && buildings.length > 0) {
     return (
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<PageLoader fullScreen />}>
         <BranchSelector 
           buildings={buildings}
           onSelect={(id) => {
@@ -582,11 +598,14 @@ function App() {
           }}
           canAddBuilding={canAddBuilding}
           onAddBuilding={() => {
-            setAddBuildingMode(true);
-            setHasSelectedBranch(true);
-            setBuildingMenuOpen(true);
+            setIsAddBuildingModalOpen(true);
           }}
           userName={profile?.name || user?.email?.split('@')[0] || 'User'}
+        />
+        <AddBuildingModal
+          isOpen={isAddBuildingModalOpen}
+          onClose={() => setIsAddBuildingModalOpen(false)}
+          onAdd={handleAddBuildingSubmit}
         />
       </Suspense>
     );
@@ -596,11 +615,13 @@ function App() {
     <div className="app-container">
       <SlipNotificationToast
         bills={bills}
+        fines={fines}
         maintenanceRequests={_maintenanceReqs}
         cleaningRequests={cleaningRequests}
-        onGoToPayments={() => setCurrentView('payments')}
-        onGoToMaintenance={() => setCurrentView('maintenance')}
-        onGoToCleaning={() => setCurrentView('cleaning')}
+        buildingId={effectiveBuildingId}
+        onGoToPayments={() => handleNavClick('payments')}
+        onGoToMaintenance={() => handleNavClick('maintenance')}
+        onGoToCleaning={() => handleNavClick('cleaning')}
       />
       {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
       {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (
@@ -654,7 +675,7 @@ function App() {
           {!sidebarCollapsed ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
-                <img src="/logo-icon.png" alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
+                <img src={horcareLogo} alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
                 <span style={{ fontWeight: 700, letterSpacing: '-0.02em' }}>HorCare</span>
               </div>
               <button
@@ -716,7 +737,7 @@ function App() {
               aria-label="ขยายแถบเมนู"
               title="คลิกเพื่อขยายแถบเมนู"
             >
-              <img src="/logo-icon.png" alt="HorCare" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+              <img src={horcareLogo} alt="HorCare" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             </button>
           )}
         </div>
@@ -725,7 +746,7 @@ function App() {
         {!sidebarCollapsed && canAddBuilding && (
           <div ref={buildingMenuRef} className="sidebar-building-switcher" style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
             <button
-              onClick={() => { setBuildingMenuOpen(v => !v); setAddBuildingMode(false); }}
+              onClick={() => setBuildingMenuOpen(v => !v)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
                 background: 'rgba(255, 255, 255, 0.18)', border: '1px solid rgba(255, 255, 255, 0.35)',
@@ -749,93 +770,141 @@ function App() {
                 borderRadius: '12px', overflow: 'hidden', zIndex: 200,
                 boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
               }}>
-                {buildings.map(b => (
-                  <div key={b.id} style={{ display: 'flex', alignItems: 'center' }}>
-                    {renamingBuildingId === b.id ? (
-                      <form
-                        style={{ flex: 1, display: 'flex', gap: '0.25rem', padding: '0.375rem 0.5rem' }}
-                        onSubmit={e => { e.preventDefault(); handleRenameBuilding(b.id); }}
-                      >
-                        <input
-                          autoFocus
-                          value={renamingName}
-                          onChange={e => setRenamingName(e.target.value)}
-                          style={{
-                            flex: 1, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
-                            borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0.25rem 0.5rem',
-                          }}
-                        />
-                        <button type="submit" style={{ background: 'none', border: 'none', color: '#BAE6FD', cursor: 'pointer', padding: '0 0.25rem' }}>
-                          <Check size={14} />
-                        </button>
-                      </form>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleSwitchBuilding(b.id)}
-                          style={{
-                            flex: 1, textAlign: 'left', background: b.id === activeBuildingId ? 'rgba(255,255,255,0.18)' : 'none', border: 'none',
-                            color: '#FFFFFF',
-                            fontSize: '0.8125rem', fontWeight: b.id === activeBuildingId ? 800 : 500,
-                            padding: '0.5rem 0.75rem', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '0.5rem',
-                          }}
+                <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                  {buildings.map(b => (
+                    <div
+                      key={b.id}
+                      style={{
+                        display: 'flex', alignItems: 'center',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                        background: b.id === activeBuildingId ? 'rgba(255,255,255,0.18)' : 'transparent',
+                        transition: 'background 0.15s ease',
+                      }}
+                    >
+                      {renamingBuildingId === b.id ? (
+                        <form
+                          style={{ flex: 1, display: 'flex', gap: '0.375rem', padding: '0.5rem 0.625rem', alignItems: 'center' }}
+                          onSubmit={e => { e.preventDefault(); handleRenameBuilding(b.id); }}
                         >
-                          {b.id === activeBuildingId && <Check size={12} color="#38BDF8" />}
-                          <span style={{ marginLeft: b.id === activeBuildingId ? 0 : '1.25rem' }}>{b.name}</span>
-                        </button>
-                        <button
-                          onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }}
-                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', padding: '0 0.25rem' }}
-                          title="เปลี่ยนชื่อ"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        {buildings.length > 1 && (
+                          <input
+                            autoFocus
+                            value={renamingName}
+                            onChange={e => setRenamingName(e.target.value)}
+                            style={{
+                              flex: 1, background: 'rgba(255, 255, 255, 0.22)',
+                              border: '1.5px solid rgba(255, 255, 255, 0.65)',
+                              borderRadius: '8px', color: '#FFFFFF', fontWeight: 600,
+                              fontSize: '0.875rem', padding: '0.45rem 0.6rem',
+                              outline: 'none',
+                              boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.15)',
+                            }}
+                          />
                           <button
-                            onClick={() => setDeleteBuildingConfirm(b.id)}
-                            style={{ background: 'none', border: 'none', color: 'rgba(254,202,202,0.95)', cursor: 'pointer', padding: '0 0.25rem' }}
-                            title="ลบตึก"
+                            type="submit"
+                            title="บันทึก"
+                            style={{
+                              flexShrink: 0,
+                              background: '#10B981', border: 'none', color: '#FFFFFF',
+                              borderRadius: '8px', cursor: 'pointer', width: 32, height: 32,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#059669'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#10B981'; }}
                           >
-                            <TrashIcon size={12} />
+                            <Check size={16} strokeWidth={3} />
                           </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ))}
+                          <button
+                            type="button"
+                            onClick={() => setRenamingBuildingId(null)}
+                            title="ยกเลิก"
+                            style={{
+                              flexShrink: 0,
+                              background: '#EF4444', border: 'none', color: '#FFFFFF',
+                              borderRadius: '8px', cursor: 'pointer', width: 32, height: 32,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#DC2626'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#EF4444'; }}
+                          >
+                            <X size={16} strokeWidth={3} />
+                          </button>
+                        </form>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleSwitchBuilding(b.id)}
+                            style={{
+                              flex: 1, textAlign: 'left', background: 'none', border: 'none',
+                              color: '#FFFFFF',
+                              fontSize: '0.875rem', fontWeight: b.id === activeBuildingId ? 700 : 500,
+                              padding: '0.65rem 0.875rem', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '0.625rem', minHeight: '44px',
+                            }}
+                          >
+                            {b.id === activeBuildingId ? (
+                              <Check size={16} color="#38BDF8" style={{ flexShrink: 0 }} />
+                            ) : (
+                              <span style={{ width: 16, flexShrink: 0 }} />
+                            )}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {b.name}
+                            </span>
+                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', paddingRight: '0.5rem' }}>
+                            <button
+                              onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }}
+                              style={{
+                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)',
+                                cursor: 'pointer', width: 32, height: 32, borderRadius: 6,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}
+                              title="เปลี่ยนชื่อ"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            {buildings.length > 1 && (
+                              <button
+                                onClick={() => setDeleteBuildingConfirm(b.id)}
+                                style={{
+                                  background: 'none', border: 'none', color: 'rgba(254,202,202,0.95)',
+                                  cursor: 'pointer', width: 32, height: 32, borderRadius: 6,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}
+                                title="ลบตึก"
+                              >
+                                <TrashIcon size={15} />
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
 
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '0.375rem 0.5rem' }}>
-                  {addBuildingMode ? (
-                    <form style={{ display: 'flex', gap: '0.25rem' }} onSubmit={e => { e.preventDefault(); handleAddBuilding(); }}>
-                      <input
-                        autoFocus
-                        placeholder="ชื่อตึกใหม่"
-                        value={newBuildingName}
-                        onChange={e => setNewBuildingName(e.target.value)}
-                        style={{
-                          flex: 1, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
-                          borderRadius: '6px', color: '#fff', fontSize: '0.8rem', padding: '0.25rem 0.5rem',
-                        }}
-                      />
-                      <button type="submit" style={{ background: 'none', border: 'none', color: '#60A5FA', cursor: 'pointer', padding: '0 0.25rem' }}>
-                        <Check size={14} />
-                      </button>
-                    </form>
-                  ) : buildings.length >= maxBuildings ? (
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', padding: '0.25rem 0.25rem', display: 'block' }}>
-                      ครบ {maxBuildings} หอแล้ว
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', padding: '0.625rem 0.75rem', background: 'rgba(0,0,0,0.12)' }}>
+                  {buildings.length >= maxBuildings ? (
+                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', padding: '0.25rem', display: 'block', textAlign: 'center' }}>
+                      ครบ {maxBuildings} สาขาแล้วตามแพ็กเกจ
                     </span>
                   ) : (
                     <button
-                      onClick={() => setAddBuildingMode(true)}
+                      onClick={() => {
+                        setBuildingMenuOpen(false);
+                        setIsAddBuildingModalOpen(true);
+                      }}
                       style={{
-                        width: '100%', background: 'none', border: 'none',
-                        color: 'rgba(255,255,255,0.45)', fontSize: '0.8rem', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.25rem',
+                        width: '100%', background: 'rgba(255,255,255,0.12)', border: '1.5px dashed rgba(255,255,255,0.4)',
+                        borderRadius: '10px', color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 600,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        gap: '0.5rem', padding: '0.625rem 0.75rem', transition: 'all 0.15s ease',
                       }}
                     >
-                      <Plus size={13} /> เพิ่มตึก
+                      <Plus size={16} /> เพิ่มสาขาใหม่
                     </button>
                   )}
                 </div>
@@ -858,41 +927,50 @@ function App() {
                   onChange={e => setRenamingName(e.target.value)}
                   placeholder="ชื่อหอพัก"
                   style={{
-                    flex: 1, background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(139,92,246,0.5)',
-                    borderRadius: '8px', color: '#fff',
-                    fontSize: '0.8125rem', padding: '0.4rem 0.625rem',
+                    flex: 1, background: 'rgba(255, 255, 255, 0.22)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.65)',
+                    borderRadius: '8px', color: '#FFFFFF', fontWeight: 600,
+                    fontSize: '0.875rem', padding: '0.45rem 0.65rem',
                     outline: 'none', minWidth: 0,
+                    boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.15)',
                   }}
                 />
                 <button
                   type="submit"
+                  title="บันทึก"
                   style={{
                     flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 30, height: 30,
-                    background: 'rgba(96,165,250,0.18)',
-                    border: '1px solid rgba(96,165,250,0.4)',
-                    borderRadius: '8px', color: '#60A5FA',
-                    cursor: 'pointer', transition: 'all 0.15s',
+                    width: 32, height: 32,
+                    background: '#10B981',
+                    border: 'none',
+                    borderRadius: '8px', color: '#FFFFFF',
+                    cursor: 'pointer', transition: 'all 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#059669'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#10B981'; }}
                 >
-                  <Check size={14} />
+                  <Check size={16} strokeWidth={3} />
                 </button>
                 <button
                   type="button"
                   onClick={() => setRenamingBuildingId(null)}
+                  title="ยกเลิก"
                   style={{
                     flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 30, height: 30,
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: '8px', color: 'rgba(255,255,255,0.45)',
-                    cursor: 'pointer', transition: 'all 0.15s',
+                    width: 32, height: 32,
+                    background: '#EF4444',
+                    border: 'none',
+                    borderRadius: '8px', color: '#FFFFFF',
+                    cursor: 'pointer', transition: 'all 0.15s ease',
+                    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#DC2626'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#EF4444'; }}
                 >
-                  <X size={14} />
+                  <X size={16} strokeWidth={3} />
                 </button>
               </form>
             ) : (
@@ -925,12 +1003,12 @@ function App() {
           {visibleNavItems.map(item => {
             const isLocked = !maidSession && START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
             const showBadge = (
-              (item.id === 'cleaning' && pendingCleaningCount > 0) ||
-              (hasPaidSubscription && (
+              hasPaidSubscription && (
+                (item.id === 'cleaning' && pendingCleaningCount > 0) ||
                 (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
                 (item.id === 'operations' && lowStockCount > 0) ||
                 (item.id === 'payments' && pendingSlipCount > 0)
-              ))
+              )
             );
             const badgeCount = item.id === 'cleaning' ? pendingCleaningCount
               : item.id === 'maintenance' ? pendingMaintenanceCount
@@ -1239,6 +1317,8 @@ function App() {
             currentMonth={currentMonth}
             recentBills={monthBills}
             allBills={bills}
+            rooms={rooms}
+            onUpdateRoom={updateRoom}
             uid={user?.uid}
             buildingId={activeBuildingId ?? undefined}
             buildingName={activeBuilding?.name}
@@ -1292,7 +1372,7 @@ function App() {
               onLogout={handleMaidLogout}
             />
           ) : (
-            user && activeBuildingId && (
+            user && activeBuildingId && hasPaidSubscription && (
               <CleaningPage
                 uid={user.uid}
                 buildingId={activeBuildingId}
@@ -1535,6 +1615,13 @@ function App() {
           </div>
         );
       })()}
+
+      {/* Add Building / Branch Modal */}
+      <AddBuildingModal
+        isOpen={isAddBuildingModalOpen}
+        onClose={() => setIsAddBuildingModalOpen(false)}
+        onAdd={handleAddBuildingSubmit}
+      />
     </div>
 
   );

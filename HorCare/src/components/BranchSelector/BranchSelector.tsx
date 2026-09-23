@@ -1,4 +1,5 @@
 import { Building2, Plus } from 'lucide-react';
+import horcareLogo from '../../assets/horcare_logo.png';
 import './BranchSelector.css';
 
 interface Building {
@@ -20,13 +21,16 @@ export default function BranchSelector({
   onSelect,
   canAddBuilding,
   onAddBuilding,
-  userName
+  userName: _userName
 }: BranchSelectorProps) {
   return (
     <div className="branch-selector-overlay">
       <div className="branch-selector-container">
         <div className="branch-selector-header">
-          <h2>ยินดีต้อนรับ, {userName}</h2>
+          <div className="branch-selector-logo-wrapper">
+            <img src={horcareLogo} alt="HorCare Logo" className="branch-selector-logo" />
+          </div>
+          <h2>ยินดีต้อนรับเข้าสู่ HorCare</h2>
           <p>กรุณาเลือกสาขาที่ต้องการจัดการในเซสชันนี้</p>
         </div>
 

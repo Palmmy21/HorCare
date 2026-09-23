@@ -83,8 +83,8 @@ export function useFCMToken(uid: string | null) {
                             if (swReg) {
                                 await swReg.showNotification(title, {
                                     body,
-                                    icon: '/logo-icon.png',
-                                    badge: '/logo-icon.png',
+                                    icon: '/logo-icon.png?v=2',
+                                    badge: '/logo-icon.png?v=2',
                                     data: { url },
                                     // @ts-expect-error — vibrate is valid in mobile browsers
                                     vibrate: [200, 100, 200],
@@ -98,8 +98,8 @@ export function useFCMToken(uid: string | null) {
                         try {
                             const n = new Notification(title, {
                                 body,
-                                icon: '/logo-icon.png',
-                                badge: '/logo-icon.png',
+                                icon: '/logo-icon.png?v=2',
+                                badge: '/logo-icon.png?v=2',
                             });
                             n.onclick = () => { n.close(); window.focus(); window.location.href = url; };
                         } catch {

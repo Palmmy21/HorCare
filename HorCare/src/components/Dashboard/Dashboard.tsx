@@ -8,10 +8,11 @@ import {
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import type { DormConfig, MonthlyBill, PaymentStatus, Expense } from '../../types';
+import type { DormConfig, MonthlyBill, PaymentStatus, Expense, Room } from '../../types';
 import { formatCurrency, formatMonthThai, getPreviousMonth } from '../../utils/calculations';
 import { useDashboardPrefs, WIDGET_LABELS, type WidgetId } from '../../hooks/useDashboardPrefs';
 import NongCarePanel from '../NongCare/NongCarePanel';
+import RoomStatusDashboard from '../RoomManagement/RoomStatusDashboard';
 import { Bot } from 'lucide-react';
 
 interface DashboardProps {
@@ -26,6 +27,8 @@ interface DashboardProps {
     currentMonth: string;
     recentBills: MonthlyBill[];
     allBills?: MonthlyBill[];
+    rooms?: Room[];
+    onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
     uid?: string;
     buildingId?: string;
     buildingName?: string;
@@ -45,6 +48,7 @@ function expenseMonth(dateStr: string): string {
 
 export default function Dashboard({
     config, stats, currentMonth, recentBills, allBills = [],
+    rooms, onUpdateRoom,
     uid, buildingId, buildingName, onGoToPayments, license, onUpgrade
 }: DashboardProps) {
     const [showCustomize, setShowCustomize] = useState(false);
@@ -265,6 +269,11 @@ export default function Dashboard({
                 />
             ) : (
                 <>
+            {/* ── Room status overview ── */}
+            {isEnabled('room_status') && rooms && rooms.length > 0 && (
+                <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} />
+            )}
+
             {/* ── Collection overview ── */}
             {isEnabled('collection') && (
                 <div className="collection-panel card mb-6">
@@ -383,17 +392,17 @@ export default function Dashboard({
 
                     {/* 3-column summary */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: expenseByCategory.length > 0 ? '1rem' : 0 }}>
-                        <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '0.875rem', border: '1px solid #BBF7D0' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: '#059669', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
+                        <div style={{ background: 'var(--color-success-ultra-light)', borderRadius: '12px', padding: '0.875rem', border: '1px solid var(--color-success-light)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-success)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
                                 <ArrowUpRight size={14} /> รายได้จริง
                             </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-gray-800)' }}>{formatCurrency(collection_.collected)}</div>
+                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-success)' }}>{formatCurrency(collection_.collected)}</div>
                         </div>
                         <div style={{ background: 'var(--color-danger-ultra-light)', borderRadius: '12px', padding: '0.875rem', border: '1px solid var(--color-danger-light)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-danger)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
                                 <ArrowDownRight size={14} /> ค่าใช้จ่าย
                             </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-gray-800)' }}>{formatCurrency(totalExpense)}</div>
+                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-danger)' }}>{formatCurrency(totalExpense)}</div>
                         </div>
                         <div style={{
                             background: netProfit >= 0 ? 'var(--color-primary-ultra-light)' : 'var(--color-danger-ultra-light)',

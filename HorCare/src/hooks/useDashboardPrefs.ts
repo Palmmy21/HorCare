@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 
 export type WidgetId =
+    | 'room_status'
     | 'collection'
     | 'progress'
     | 'stats'
@@ -11,6 +12,7 @@ export type WidgetId =
     | 'recent_bills';
 
 export const WIDGET_LABELS: Record<WidgetId, string> = {
+    room_status:     'ภาพรวมสถานะห้องพัก (มีผู้เช่า / ว่าง / ติดจอง)',
     collection:      'การเก็บเงิน (คาดการณ์ / จริง / ค้าง)',
     progress:        'สถานะการจดมิเตอร์',
     stats:           'สถิติหลัก (ห้อง / รายได้ / ไฟ / น้ำ)',
@@ -22,11 +24,12 @@ export const WIDGET_LABELS: Record<WidgetId, string> = {
 };
 
 const ALL_WIDGETS: WidgetId[] = [
+    'room_status',
     'collection', 'progress', 'stats', 'expense_summary',
     'revenue_trend', 'revenue_chart', 'rate_config', 'recent_bills',
 ];
-// v3 — added expense_summary; bump so existing users see it
-const STORAGE_KEY = 'horcare_dashboard_prefs_v3';
+// v4 — added room_status; bump so existing users see it
+const STORAGE_KEY = 'horcare_dashboard_prefs_v4';
 
 function loadPrefs(key: string): WidgetId[] {
     try {
