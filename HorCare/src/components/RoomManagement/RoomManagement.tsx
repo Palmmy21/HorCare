@@ -1,8 +1,9 @@
 import { useState, useRef, Fragment } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles } from 'lucide-react';
 import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
+import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface RoomManagementProps {
@@ -34,6 +35,7 @@ export default function RoomManagement({
     buildingId,
     isPaid = false,
 }: RoomManagementProps) {
+    const terms = getWorkspaceTerms(config?.building_type);
     const [newRoomNumber, setNewRoomNumber] = useState('');
     const [editingRoom, setEditingRoom] = useState<string | null>(null);
     const [importResult, setImportResult] = useState<{ updated: number; created: number; skipped: string[] } | null>(null);
@@ -43,6 +45,9 @@ export default function RoomManagement({
     const [editRentType, setEditRentType] = useState<Room['rent_type']>('monthly');
     const [editRoomType, setEditRoomType] = useState<'dormitory' | 'commercial'>('dormitory');
     const [editTenantCount, setEditTenantCount] = useState<string>('1');
+    const [editZone, setEditZone] = useState('');
+    const [editStallSize, setEditStallSize] = useState('');
+    const [editBusinessType, setEditBusinessType] = useState('');
     const [editCustomElecRate, setEditCustomElecRate] = useState('');
     const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
     const [editCommonFeeOverrides, setEditCommonFeeOverrides] = useState<Record<string, { amount?: number; is_active?: boolean }>>({});
@@ -77,7 +82,7 @@ export default function RoomManagement({
 
         // Check for duplicate
         if (rooms.some(r => r.room_number === newRoomNumber.trim())) {
-            alert('ห้องนี้มีอยู่แล้ว!');
+            alert(`${terms.unitName}นี้มีอยู่แล้ว!`);
             return;
         }
 
@@ -98,6 +103,9 @@ export default function RoomManagement({
         setEditRentType(room.rent_type || 'monthly');
         setEditRoomType(room.room_type || 'dormitory');
         setEditTenantCount((room.tenant_count || 1).toString());
+        setEditZone(room.zone || '');
+        setEditStallSize(room.stall_size || '');
+        setEditBusinessType(room.business_type || '');
         setEditCustomElecRate(room.custom_electricity_rate?.toString() || '');
         setEditCustomWaterRate(
             room.custom_water_config
@@ -117,7 +125,10 @@ export default function RoomManagement({
             rent_amount: Number(editRentAmount) || 0,
             rent_type: editRentType,
             room_type: editRoomType,
-            tenant_count: Number(editTenantCount) || 1
+            tenant_count: Number(editTenantCount) || 1,
+            zone: editZone.trim() || undefined,
+            stall_size: editStallSize.trim() || undefined,
+            business_type: editBusinessType.trim() || undefined,
         };
         
         if (editCustomElecRate.trim() && !isNaN(Number(editCustomElecRate))) {
@@ -154,6 +165,9 @@ export default function RoomManagement({
         setEditRentType('monthly');
         setEditRoomType('dormitory');
         setEditTenantCount('1');
+        setEditZone('');
+        setEditStallSize('');
+        setEditBusinessType('');
         setEditCustomElecRate('');
         setEditCustomWaterRate('');
         setEditLanguage('');
@@ -284,10 +298,30 @@ export default function RoomManagement({
         <div>
             <div className="page-header">
                 <div>
-                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Home size={28} /> จัดการห้องพัก</h1>
-                    <p className="page-subtitle">เพิ่ม แก้ไข หรือลบห้องพักในระบบ</p>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {terms.isMarket ? <Store size={28} color="#D97706" /> : <Home size={28} />} {terms.manageUnitsLabel}
+                    </h1>
+                    <p className="page-subtitle">จัดการข้อมูล{terms.unitNamePlural} · อัตราค่าเช่า · มิเตอร์และค่าบริการ</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
+                    {terms.isMarket && rooms.length === 0 && (
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={async () => {
+                                const demo = [
+                                    'A01', 'A02', 'A03', 'A04', 'A05',
+                                    'B01', 'B02', 'B03', 'B04', 'B05'
+                                ];
+                                for (const num of demo) {
+                                    await onAddRoom(num);
+                                }
+                            }}
+                            title="สร้างแผงตัวอย่างสำหรับเดโม่"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', borderColor: '#D97706', color: '#B45309', background: '#FEF3C7', fontWeight: 700 }}
+                        >
+                            <Sparkles size={15} /> สร้าง 10 แผงตัวอย่าง
+                        </button>
+                    )}
                     <button
                         className="btn btn-outline btn-sm"
                         onClick={exportTemplate}
@@ -299,7 +333,7 @@ export default function RoomManagement({
                     <button
                         className="btn btn-outline btn-sm"
                         onClick={() => fileInputRef.current?.click()}
-                        title="นำเข้าข้อมูลห้องจาก CSV"
+                        title={`นำเข้าข้อมูล${terms.unitName}จาก CSV`}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
                     >
                         <Upload size={15} /> นำเข้า CSV
@@ -328,9 +362,9 @@ export default function RoomManagement({
                 }}>
                     <Check size={15} color="#059669" />
                     <span style={{ flex: 1 }}>
-                        {importResult.updated > 0 && `อัปเดต ${importResult.updated} ห้อง`}
+                        {importResult.updated > 0 && `อัปเดต ${importResult.updated} ${terms.unitName}`}
                         {importResult.updated > 0 && importResult.created > 0 && ' · '}
-                        {importResult.created > 0 && `สร้างใหม่ ${importResult.created} ห้อง`}
+                        {importResult.created > 0 && `สร้างใหม่ ${importResult.created} ${terms.unitName}`}
                         {importResult.updated === 0 && importResult.created === 0 && 'ไม่พบข้อมูลที่นำเข้าได้'}
                         {importResult.skipped.length > 0 && ` · ข้ามไป (ถึงลิมิต): ${importResult.skipped.join(', ')}`}
                     </span>
@@ -354,8 +388,8 @@ export default function RoomManagement({
                         <Lock size={14} color={atRoomLimit ? '#F87171' : '#A78BFA'} />
                         <span style={{ fontSize: '0.8125rem', color: atRoomLimit ? '#FCA5A5' : '#C4B5FD', fontWeight: 600 }}>
                             {atRoomLimit
-                                ? `ถึงลิมิตทดลองใช้แล้ว (${rooms.length}/${maxRooms} ห้อง)`
-                                : `ทดลองใช้: ${rooms.length}/${maxRooms} ห้อง`
+                                ? `ถึงลิมิตทดลองใช้แล้ว (${rooms.length}/${maxRooms} ${terms.unitName})`
+                                : `ทดลองใช้: ${rooms.length}/${maxRooms} ${terms.unitName}`
                             }
                         </span>
                     </div>
@@ -370,7 +404,7 @@ export default function RoomManagement({
                                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
                             }}
                         >
-                            <Zap size={12} fill="currentColor" /> อัปเกรดเพื่อเพิ่มห้องได้มากขึ้น
+                            <Zap size={12} fill="currentColor" /> อัปเกรดเพื่อเพิ่ม{terms.unitName}ได้มากขึ้น
                         </button>
                     )}
                 </div>
@@ -379,7 +413,7 @@ export default function RoomManagement({
             {/* Add Room Form */}
             <div className="card mb-6">
                 <div className="card-header">
-                    <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Plus size={16} /> เพิ่มห้องใหม่</span>
+                    <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Plus size={16} /> {terms.addUnitLabel}ใหม่</span>
                 </div>
                 {atRoomLimit ? (
                     <div style={{
@@ -390,7 +424,7 @@ export default function RoomManagement({
                     }}>
                         <Lock size={16} color="#F87171" />
                         <span style={{ fontSize: '0.875rem', color: '#FCA5A5' }}>
-                            ไม่สามารถเพิ่มห้องได้ — แผนทดลองใช้รองรับสูงสุด {maxRooms} ห้อง
+                            ไม่สามารถเพิ่ม{terms.unitName}ได้ — แผนทดลองใช้รองรับสูงสุด {maxRooms} {terms.unitName}
                         </span>
                         {onUpgrade && (
                             <button
@@ -411,8 +445,8 @@ export default function RoomManagement({
                         <input
                             type="text"
                             className="form-input mono"
-                            style={{ maxWidth: '200px' }}
-                            placeholder="เช่น A101, B202"
+                            style={{ maxWidth: '240px' }}
+                            placeholder={terms.unitPlaceholder}
                             value={newRoomNumber}
                             onChange={e => setNewRoomNumber(e.target.value)}
                             onKeyDown={handleKeyDown}
@@ -423,7 +457,7 @@ export default function RoomManagement({
                             disabled={!newRoomNumber.trim()}
                         >
                             <Plus size={18} />
-                            เพิ่มห้อง
+                            {terms.addUnitLabel}
                         </button>
                     </div>
                 )}
@@ -439,14 +473,14 @@ export default function RoomManagement({
                             type="text"
                             className="form-input"
                             style={{ paddingLeft: '2.1rem', width: '100%', height: '36px', fontSize: '0.875rem' }}
-                            placeholder="ค้นหมายเลขห้อง..."
+                            placeholder={`ค้นหา${terms.unitNumberLabel}...`}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                         />
                     </div>
                     {/* Type filter */}
                     <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#F3F4F6)', borderRadius: '8px', padding: '0.2rem' }}>
-                        {([['all', 'ทั้งหมด'], ['dormitory', 'หอพัก'], ['commercial', 'พาณิชย์']] as const).map(([val, label]) => (
+                        {([['all', 'ทั้งหมด'], ['dormitory', terms.isMarket ? 'แผงทั่วไป' : 'หอพัก'], ['commercial', terms.isMarket ? 'พาณิชย์/พิเศษ' : 'พาณิชย์']] as const).map(([val, label]) => (
                             <button key={val} onClick={() => setFilterType(val)}
                                 style={{
                                     padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: filterType === val ? 700 : 500, border: 'none',
@@ -482,7 +516,7 @@ export default function RoomManagement({
                     )}
                     <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginLeft: 'auto' }}>
                         <Filter size={12} style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} />
-                        {filteredRooms.length}/{rooms.length} ห้อง
+                        {filteredRooms.length}/{rooms.length} {terms.unitName}
                     </span>
                 </div>
             </div>
@@ -491,12 +525,12 @@ export default function RoomManagement({
             <div className="card">
                 <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <ClipboardList size={18} /> รายการห้องทั้งหมด ({rooms.length} ห้อง{isFiltering ? ` — แสดง ${filteredRooms.length}` : ''})
+                        <ClipboardList size={18} /> รายการ{terms.unitNamePlural}ทั้งหมด ({rooms.length} {terms.unitName}{isFiltering ? ` — แสดง ${filteredRooms.length}` : ''})
                     </span>
                     {selectedRooms.size > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
-                                เลือก {selectedRooms.size} ห้อง
+                                เลือก {selectedRooms.size} {terms.unitName}
                             </span>
                             <button
                                 className="btn btn-sm"
@@ -527,14 +561,14 @@ export default function RoomManagement({
 
                 {rooms.length === 0 ? (
                     <div className="empty-state">
-                        <Home size={48} />
-                        <h3>ยังไม่มีห้องพัก</h3>
-                        <p>เพิ่มห้องพักด้านบนเพื่อเริ่มต้นใช้งาน</p>
+                        {terms.isMarket ? <Store size={48} color="#D97706" /> : <Home size={48} />}
+                        <h3>ยังไม่มี{terms.unitNamePlural}</h3>
+                        <p>เพิ่ม{terms.unitNamePlural}ด้านบนเพื่อเริ่มต้นใช้งาน{terms.isMarket ? ' หรือกดปุ่ม "สร้าง 10 แผงตัวอย่าง" ด้านบนเพื่อเดโม่ได้ทันที' : ''}</p>
                     </div>
                 ) : filteredRooms.length === 0 ? (
                     <div className="empty-state">
                         <Search size={40} />
-                        <h3>ไม่พบห้องที่ตรงกับการค้นหา</h3>
+                        <h3>ไม่พบ{terms.unitName}ที่ตรงกับการค้นหา</h3>
                         <p>ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง</p>
                     </div>
                 ) : (
@@ -552,13 +586,13 @@ export default function RoomManagement({
                                         </button>
                                     </th>
                                     <th style={{ width: '50px' }}>#</th>
-                                    <th>หมายเลขห้อง</th>
-                                    <th className="text-center">ประเภทห้อง</th>
-                                    <th className="text-center">ผู้พักอาศัย</th>
-                                    <th className="text-right">ค่าเช่า</th>
+                                    <th>{terms.unitNumberLabel}</th>
+                                    <th className="text-center">{terms.isMarket ? 'โซน / แผงค้า' : 'ประเภทห้อง'}</th>
+                                    <th className="text-center">{terms.tenantLabel}</th>
+                                    <th className="text-right">{terms.rentLabel}</th>
                                     <th className="text-center">การชำระ</th>
-                                    <th className="text-right">มิเตอร์ไฟ</th>
-                                    <th className="text-right">มิเตอร์น้ำ</th>
+                                    <th className="text-right">{terms.isMarket ? 'ไฟแผง (หน่วย)' : 'มิเตอร์ไฟ'}</th>
+                                    <th className="text-right">{terms.isMarket ? 'น้ำ (หน่วย)' : 'มิเตอร์น้ำ'}</th>
                                     {hasAnyCommercial && <th className="text-center">ค่าน้ำ/ไฟ</th>}
                                     <th className="text-center" style={{ width: '180px' }}>จัดการ</th>
                                 </tr>
@@ -586,7 +620,7 @@ export default function RoomManagement({
                                                         value={editValue}
                                                         onChange={e => setEditValue(e.target.value)}
                                                         autoFocus
-                                                        placeholder="เลขห้อง"
+                                                        placeholder={terms.unitNumberLabel}
                                                     />
                                                 </div>
                                             ) : (
@@ -610,15 +644,60 @@ export default function RoomManagement({
                                         </td>
                                         <td className="text-center">
                                             {editingRoom === room.id ? (
-                                                <select
-                                                    className="form-input"
-                                                    style={{ width: '130px', fontSize: '0.8125rem' }}
-                                                    value={editRoomType}
-                                                    onChange={e => setEditRoomType(e.target.value as 'dormitory' | 'commercial')}
-                                                >
-                                                    <option value="dormitory">หอพัก</option>
-                                                    <option value="commercial">พาณิชย์</option>
-                                                </select>
+                                                terms.isMarket ? (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '140px' }}>
+                                                        <input
+                                                            type="text"
+                                                            className="form-input"
+                                                            style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem' }}
+                                                            placeholder="โซน เช่น โซน A"
+                                                            value={editZone}
+                                                            onChange={e => setEditZone(e.target.value)}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className="form-input"
+                                                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                                                            placeholder="ขนาด เช่น 2x2 ม."
+                                                            value={editStallSize}
+                                                            onChange={e => setEditStallSize(e.target.value)}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className="form-input"
+                                                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                                                            placeholder="ชื่อร้าน/สินค้า"
+                                                            value={editBusinessType}
+                                                            onChange={e => setEditBusinessType(e.target.value)}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <select
+                                                        className="form-input"
+                                                        style={{ width: '130px', fontSize: '0.8125rem' }}
+                                                        value={editRoomType}
+                                                        onChange={e => setEditRoomType(e.target.value as 'dormitory' | 'commercial')}
+                                                    >
+                                                        <option value="dormitory">หอพัก</option>
+                                                        <option value="commercial">พาณิชย์</option>
+                                                    </select>
+                                                )
+                                            ) : terms.isMarket ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                                    <span className="badge" style={{ fontSize: '0.75rem', background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' }}>
+                                                        <Store size={11} style={{ marginRight: 3 }} /> {room.zone || 'แผงทั่วไป'}
+                                                    </span>
+                                                    {room.business_type && (
+                                                        <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                                            {room.business_type}
+                                                        </span>
+                                                    )}
+                                                    {room.stall_size && (
+                                                        <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
+                                                            ขนาด {room.stall_size}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <span className={`badge ${(room.room_type || 'dormitory') === 'commercial' ? 'badge-info' : 'badge-success'}`} style={{ fontSize: '0.75rem' }}>
                                                     {(room.room_type || 'dormitory') === 'commercial' ? (
@@ -640,7 +719,7 @@ export default function RoomManagement({
                                                     onChange={e => setEditTenantCount(e.target.value)}
                                                 />
                                             ) : (
-                                                <span className="mono">{room.tenant_count || 1} คน</span>
+                                                <span className="mono">{room.tenant_count || 1} {terms.isMarket ? 'ร้าน' : 'คน'}</span>
                                             )}
                                         </td>
                                         <td className="text-right">
@@ -666,18 +745,21 @@ export default function RoomManagement({
                                                     onChange={e => setEditRentType(e.target.value as Room['rent_type'])}
                                                 >
                                                     <option value="monthly">รายเดือน</option>
+                                                    <option value="daily">รายวัน</option>
+                                                    <option value="weekly">รายสัปดาห์</option>
                                                     <option value="semester">รายเทอม</option>
                                                     <option value="yearly">รายปี</option>
-                                                    <option value="daily">รายวัน</option>
                                                 </select>
                                             ) : (
-                                                <span className={`badge ${room.rent_type === 'semester' || room.rent_type === 'yearly' ? 'badge-warning' : room.rent_type === 'daily' ? 'badge-info' : 'badge-success'}`}>
+                                                <span className={`badge ${room.rent_type === 'semester' || room.rent_type === 'yearly' ? 'badge-warning' : room.rent_type === 'daily' || room.rent_type === 'weekly' ? 'badge-info' : 'badge-success'}`}>
                                                     {room.rent_type === 'semester' ? (
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarDays size={12} /> รายเทอม</span>
                                                     ) : room.rent_type === 'yearly' ? (
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarDays size={12} /> รายปี</span>
                                                     ) : room.rent_type === 'daily' ? (
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายวัน</span>
+                                                    ) : room.rent_type === 'weekly' ? (
+                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายสัปดาห์</span>
                                                     ) : (
                                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายเดือน</span>
                                                     )}
@@ -990,6 +1072,7 @@ export default function RoomManagement({
                         isPaid={isPaid}
                         onUpgrade={onUpgrade}
                         onClose={() => setTenantRoomId(null)}
+                        config={config}
                     />
                 );
             })()}

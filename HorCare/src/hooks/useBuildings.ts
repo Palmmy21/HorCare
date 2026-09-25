@@ -71,6 +71,7 @@ export function useBuildings(userId: string | null) {
             name: name.trim(),
             created_at: new Date().toISOString(),
             order: buildings.length,
+            building_type: initialConfig?.building_type || 'dormitory',
         };
         await setDoc(doc(db, `users/${userId}/buildings`, id), newBuilding);
 

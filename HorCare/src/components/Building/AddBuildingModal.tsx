@@ -6,6 +6,8 @@ import {
 import type { DormConfig, WaterConfig, BillLanguage } from '../../types';
 import './AddBuildingModal.css';
 
+import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
+
 interface AddBuildingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,10 +22,11 @@ type BuildingTypeOption = {
 
 const BUILDING_TYPES: BuildingTypeOption[] = [
   { type: 'dormitory', label: 'หอพัก', icon: <Building2 size={20} /> },
+  { type: 'market', label: 'ตลาด / แผงค้า', icon: <Store size={20} /> },
+  { type: 'commercial', label: 'อาคารพาณิชย์', icon: <Building size={20} /> },
   { type: 'apartment', label: 'อพาร์ตเมนต์', icon: <Building size={20} /> },
   { type: 'condo', label: 'คอนโดมิเนียม', icon: <Building size={20} /> },
   { type: 'house', label: 'บ้านเช่า / ทาวน์โฮม', icon: <Home size={20} /> },
-  { type: 'commercial', label: 'อาคารพาณิชย์', icon: <Store size={20} /> },
   { type: 'resort', label: 'รีสอร์ท / โรงแรม', icon: <Hotel size={20} /> },
 ];
 
@@ -40,12 +43,14 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const terms = getWorkspaceTerms(buildingType);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('กรุณากรอกชื่อสาขา / ชื่อหอพัก');
+      setError(`กรุณากรอก${terms.facilityNameLabel}`);
       return;
     }
     setError('');
@@ -73,6 +78,15 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
           bilingual_mode: false,
           secondary_language: 'en',
         },
+        market_config: buildingType === 'market' ? {
+          default_rent_cycle: 'monthly',
+          default_stall_size: '2x2 ม.',
+          waste_fee_per_stall: 20,
+          waste_fee_cycle: 'daily',
+          electricity_flat_fee: 30,
+          table_rental_fee: 50,
+          zones: DEFAULT_MARKET_ZONES,
+        } : undefined,
       };
 
       await onAdd(name.trim(), initialConfig);
@@ -134,13 +148,13 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
                 <div className="ab-field">
                   <label className="ab-label">
-                    <span>ชื่อสาขา / ชื่อหอพัก <span className="req">*</span></span>
+                    <span>{terms.facilityNameLabel} <span className="req">*</span></span>
                   </label>
                   <input
                     type="text"
                     required
                     autoFocus
-                    placeholder="เช่น HorCare สุขุมวิท, Living LifeSV 2"
+                    placeholder={buildingType === 'market' ? 'เช่น ตลาดสดรวยทรัพย์, ตลาดไนท์บาร์ซาร์' : 'เช่น HorCare สุขุมวิท, Living LifeSV 2'}
                     className="ab-input"
                     value={name}
                     onChange={e => setName(e.target.value)}
@@ -270,7 +284,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
               <div className="ab-row-2">
                 <div className="ab-field">
                   <label className="ab-label">
-                    <span>ค่าเช่าห้องเฉลี่ย (บาท/เดือน)</span>
+                    <span>{terms.rentLabel}เฉลี่ย (บาท/เดือน)</span>
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input

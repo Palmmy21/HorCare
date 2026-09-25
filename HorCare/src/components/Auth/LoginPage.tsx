@@ -22,6 +22,7 @@ type PageMode = 'login' | 'register' | 'forgot' | 'pricing' | 'maid';
 
 const BUILDING_TYPES = [
     { type: 'dormitory', label: 'หอพัก', icon: <Building2 size={20} /> },
+    { type: 'market', label: 'ตลาด / แผงค้า', icon: <Store size={20} /> },
     { type: 'apartment', label: 'อพาร์ตเมนต์', icon: <Building size={20} /> },
     { type: 'condo', label: 'คอนโดมิเนียม', icon: <Building size={20} /> },
     { type: 'house', label: 'บ้านเช่า', icon: <Home size={20} /> },

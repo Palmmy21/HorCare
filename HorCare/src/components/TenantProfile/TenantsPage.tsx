@@ -2,10 +2,12 @@ import { useState } from 'react';
 import {
   Users, User, Phone, AlertTriangle, Search,
   LogIn, Banknote, ChevronRight, Home, MessageCircle,
-  UserCheck, UserX, Link2, CheckCheck,
+  UserCheck, UserX, Link2, CheckCheck, Store, Tag,
+  PenTool, ShieldCheck, Clock,
 } from 'lucide-react';
-import type { Room } from '../../types';
+import type { Room, DormConfig } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
+import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface TenantsPageProps {
@@ -15,6 +17,8 @@ interface TenantsPageProps {
   isPaid: boolean;
   onUpgrade?: () => void;
   onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
+  buildingType?: DormConfig['building_type'];
+  config?: DormConfig;
 }
 
 // ── Helper: วันที่เหลือ ──────────────────────────────────────────────────────
@@ -32,7 +36,7 @@ import RoomStatusDashboard from '../RoomManagement/RoomStatusDashboard';
 
 // ── Single room card (fetches its own profile) ───────────────────────────────
 function TenantCard({
-  room, uid, buildingId, onOpenProfile, filter, search,
+  room, uid, buildingId, onOpenProfile, filter, search, buildingType,
 }: {
   room: Room;
   uid: string;
@@ -42,7 +46,9 @@ function TenantCard({
   onOpenProfile: (room: Room) => void;
   filter: FilterMode;
   search: string;
+  buildingType?: DormConfig['building_type'];
 }) {
+  const terms = getWorkspaceTerms(buildingType);
   const { profile, loading } = useTenantProfile(uid, buildingId, room.id);
   const [copied, setCopied] = useState(false);
 
@@ -69,12 +75,15 @@ function TenantCard({
   if (!loading) {
     if (filter === 'has_profile' && !hasProfile) return null;
     if (filter === 'no_profile'  &&  hasProfile) return null;
+    if (filter === 'signed'      && !profile?.signed_contract) return null;
     if (filter === 'risk'        && riskLevel === 'none') return null;
     if (search) {
       const q = search.toLowerCase();
       const hit = room.room_number.toLowerCase().includes(q)
         || (profile?.full_name ?? '').toLowerCase().includes(q)
-        || (profile?.phone ?? '').includes(q);
+        || (profile?.phone ?? '').includes(q)
+        || (room.business_type ?? '').toLowerCase().includes(q)
+        || (room.zone ?? '').toLowerCase().includes(q);
       if (!hit) return null;
     }
   }
@@ -106,7 +115,9 @@ function TenantCard({
       <div style={{
         width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
         background: hasProfile
-          ? 'linear-gradient(135deg, #8B5CF6, #EC4899)'
+          ? terms.isMarket
+            ? 'linear-gradient(135deg, #D97706, #F59E0B)'
+            : 'linear-gradient(135deg, #8B5CF6, #EC4899)'
           : 'var(--color-gray-100, #F3F4F6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '1.125rem', fontWeight: 800,
@@ -135,14 +146,35 @@ function TenantCard({
         </div>
 
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.875rem',
+          display: 'flex', alignItems: 'center', gap: '0.625rem',
           fontSize: '0.775rem', color: 'var(--color-text-muted, #6B7280)',
           flexWrap: 'wrap',
         }}>
-          {/* Room badge */}
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
-            <Home size={12} /> {room.room_number}
+          {/* Room / Stall badge */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700,
+            color: terms.isMarket ? '#92400E' : 'inherit'
+          }}>
+            {terms.isMarket ? <Store size={13} color="#D97706" /> : <Home size={12} />}
+            {terms.unitPrefix}{room.room_number}
           </span>
+
+          {/* Stall size / Business type */}
+          {room.business_type && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+              color: '#059669', background: 'rgba(16, 185, 129, 0.1)',
+              padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.72rem'
+            }}>
+              <Tag size={10} /> {room.business_type}
+            </span>
+          )}
+
+          {room.stall_size && (
+            <span style={{ color: 'var(--color-gray-500)', fontSize: '0.72rem' }}>
+              ({room.stall_size})
+            </span>
+          )}
 
           {/* Tenant Count badge */}
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#0284C7', fontWeight: 600 }}>
@@ -178,8 +210,37 @@ function TenantCard({
                 '#D97706',
             }}>
               <Banknote size={11} />
-              {profile.deposit_status === 'held' ? 'มัดจำ: ถือไว้' :
+              {profile.deposit_status === 'held' ? `${terms.depositLabel}: ถือไว้` :
                profile.deposit_status === 'returned' ? 'คืนมัดจำแล้ว' : 'หักมัดจำ'}
+            </span>
+          )}
+
+          {/* E-Signature status badge */}
+          {profile?.signed_contract ? (
+            profile.signed_contract.lessee_signature ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                padding: '0.1rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
+                background: 'rgba(5,150,105,0.1)', color: '#059669', border: '1px solid rgba(5,150,105,0.25)',
+              }} title={`สัญญาเลขที่: ${profile.signed_contract.contract_number} (ลงนามครบ 2 ฝ่าย)`}>
+                <ShieldCheck size={11} /> E-Sign: {profile.signed_contract.contract_number}
+              </span>
+            ) : (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                padding: '0.1rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
+                background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A',
+              }} title={`สัญญาเลขที่: ${profile.signed_contract.contract_number} (ส่งร่างแล้ว รอผู้เช่าเซ็น)`}>
+                <Clock size={11} /> รอเซ็น: {profile.signed_contract.contract_number}
+              </span>
+            )
+          ) : (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+              padding: '0.1rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
+              background: 'rgba(107,114,128,0.08)', color: 'var(--color-text-muted, #6B7280)', border: '1px solid rgba(107,114,128,0.15)',
+            }}>
+              <PenTool size={10} /> ยังไม่เซ็นสัญญา
             </span>
           )}
         </div>
@@ -207,7 +268,7 @@ function TenantCard({
           {/* Copy tenant portal link */}
           <button
             onClick={copyTenantLink}
-            title="คัดลอกลิงก์หน้าผู้เช่า"
+            title={`คัดลอกลิงก์หน้า${terms.tenantLabel}`}
             style={{
               background: copied ? 'rgba(5,150,105,0.1)' : 'rgba(139,92,246,0.08)',
               border: `1px solid ${copied ? 'rgba(5,150,105,0.25)' : 'rgba(139,92,246,0.2)'}`,
@@ -229,11 +290,12 @@ function TenantCard({
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
-type FilterMode = 'all' | 'has_profile' | 'no_profile' | 'risk';
+type FilterMode = 'all' | 'has_profile' | 'signed' | 'no_profile' | 'risk';
 
 export default function TenantsPage({
-  rooms, uid, buildingId, isPaid, onUpgrade, onUpdateRoom,
+  rooms, uid, buildingId, isPaid, onUpgrade, onUpdateRoom, buildingType, config,
 }: TenantsPageProps) {
+  const terms = getWorkspaceTerms(buildingType);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -245,15 +307,15 @@ export default function TenantsPage({
       {/* Page Header */}
       <div className="page-header">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Users size={28} /> ข้อมูลผู้เช่า
+          {terms.isMarket ? <Store size={28} color="#D97706" /> : <Users size={28} />} ข้อมูล{terms.tenantPlural}
         </h1>
         <p className="page-subtitle">
-          จัดการและดูข้อมูลผู้เช่าทั้งหมด {activeRooms.length} ห้อง
+          จัดการและดูข้อมูล{terms.tenantLabel}ทั้งหมด {activeRooms.length} {terms.unitName}
         </p>
       </div>
 
       {/* ── Room Status Dashboard ── */}
-      <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} />
+      <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} buildingType={buildingType} />
 
       {/* Search + Filter Bar */}
       <div className="card mb-6" style={{ padding: '0.75rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
@@ -267,7 +329,7 @@ export default function TenantsPage({
           <Search size={15} color="var(--color-text-muted, #9CA3AF)" />
           <input
             type="text"
-            placeholder="ค้นหาชื่อ, เบอร์โทร หรือเลขห้อง..."
+            placeholder={`ค้นหาชื่อ, เบอร์โทร หรือ${terms.unitNumberLabel}...`}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{
@@ -289,13 +351,15 @@ export default function TenantsPage({
           borderRadius: '10px', padding: '3px', gap: '2px',
         }}>
           {([
-            { id: 'all',         label: 'ทั้งหมด',   icon: <Users size={13} /> },
-            { id: 'has_profile', label: 'มีข้อมูล',  icon: <UserCheck size={13} /> },
-            { id: 'no_profile',  label: 'ไม่มีข้อมูล', icon: <UserX size={13} /> },
-            { id: 'risk',        label: 'เสี่ยงย้ายออก', icon: <AlertTriangle size={13} /> },
+            { id: 'all',         label: 'ทั้งหมด',     icon: <Users size={13} /> },
+            { id: 'has_profile', label: 'มีข้อมูล',    icon: <UserCheck size={13} /> },
+            { id: 'signed',      label: 'สัญญา E-Sign', icon: <PenTool size={13} /> },
+            { id: 'no_profile',  label: 'ไม่มีข้อมูล',   icon: <UserX size={13} /> },
+            { id: 'risk',        label: 'เสี่ยงย้ายออก',  icon: <AlertTriangle size={13} /> },
           ] as { id: FilterMode; label: string; icon: React.ReactNode }[]).map(f => {
             const active = filter === f.id;
             const isRisk = f.id === 'risk';
+            const isSigned = f.id === 'signed';
             return (
               <button
                 key={f.id}
@@ -306,10 +370,10 @@ export default function TenantsPage({
                   border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.78rem',
                   fontWeight: active ? 700 : 500, transition: 'all 0.15s',
                   background: active
-                    ? (isRisk ? 'rgba(220,38,38,0.12)' : '#fff')
+                    ? (isRisk ? 'rgba(220,38,38,0.12)' : isSigned ? 'rgba(5,150,105,0.12)' : '#fff')
                     : 'transparent',
                   color: active
-                    ? (isRisk ? '#DC2626' : 'var(--color-primary, #8B5CF6)')
+                    ? (isRisk ? '#DC2626' : isSigned ? '#059669' : 'var(--color-primary, #8B5CF6)')
                     : 'var(--color-text-muted, #6B7280)',
                   boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                 }}
@@ -333,6 +397,7 @@ export default function TenantsPage({
         search={search}
         filter={filter}
         onOpenProfile={setSelectedRoom}
+        buildingType={buildingType}
       />
 
       {/* Profile Modal */}
@@ -344,6 +409,7 @@ export default function TenantsPage({
           isPaid={isPaid}
           onUpgrade={onUpgrade}
           onClose={() => setSelectedRoom(null)}
+          config={config}
         />
       )}
     </div>
@@ -352,7 +418,7 @@ export default function TenantsPage({
 
 // ── Tenant Grid (separated to avoid hook-in-loop issues) ────────────────────
 function TenantGrid({
-  rooms, uid, buildingId, isPaid, onUpgrade, search, filter, onOpenProfile,
+  rooms, uid, buildingId, isPaid, onUpgrade, search, filter, onOpenProfile, buildingType,
 }: {
   rooms: Room[];
   uid: string;
@@ -362,12 +428,9 @@ function TenantGrid({
   search: string;
   filter: FilterMode;
   onOpenProfile: (room: Room) => void;
+  buildingType?: DormConfig['building_type'];
 }) {
-  // NOTE: We render TenantCard per room — each card fetches its own profile.
-  // Filtering by search/profile happens inside each card but since we need
-  // to filter at grid level, we do a two-pass: render all, but hide via CSS.
-  // For correctness we render all and let TenantCard manage its own data.
-
+  const terms = getWorkspaceTerms(buildingType);
   return (
     <div style={{
       display: 'grid',
@@ -376,9 +439,9 @@ function TenantGrid({
     }}>
       {rooms.length === 0 ? (
         <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-          <Users size={48} />
-          <h3>ยังไม่มีห้องพัก</h3>
-          <p>เพิ่มห้องพักใน "จัดการห้อง" ก่อน</p>
+          {terms.isMarket ? <Store size={48} color="#D97706" /> : <Users size={48} />}
+          <h3>ยังไม่มี{terms.unitNamePlural}</h3>
+          <p>เพิ่ม{terms.unitNamePlural}ใน "{terms.manageUnitsLabel}" ก่อน</p>
         </div>
       ) : (
         rooms.map(room => (
@@ -392,6 +455,7 @@ function TenantGrid({
             onOpenProfile={onOpenProfile}
             filter={filter}
             search={search}
+            buildingType={buildingType}
           />
         ))
       )}

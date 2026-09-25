@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import { LayoutGrid, ChevronDown, ChevronUp } from 'lucide-react';
-import type { Room } from '../../types';
+import { LayoutGrid, ChevronDown, ChevronUp, Store } from 'lucide-react';
+import type { Room, DormConfig } from '../../types';
+import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 
 export type RoomStatus = 'occupied' | 'vacant' | 'reserved';
 
@@ -32,15 +33,18 @@ export interface RoomStatusDashboardProps {
   rooms: Room[];
   onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
   defaultCollapsed?: boolean;
+  buildingType?: DormConfig['building_type'];
 }
 
 export default function RoomStatusDashboard({
   rooms,
   onUpdateRoom,
   defaultCollapsed = false,
+  buildingType,
 }: RoomStatusDashboardProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const terms = getWorkspaceTerms(buildingType);
 
   const activeRooms = rooms.filter(r => r.is_active);
 
@@ -95,12 +99,16 @@ export default function RoomStatusDashboard({
         onClick={() => setCollapsed(c => !c)}
         role="button"
         aria-expanded={!collapsed}
-        aria-label="ภาพรวมสถานะห้องพัก"
+        aria-label={`ผังสถานะ${terms.unitNamePlural}`}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <LayoutGrid size={17} color="var(--color-primary, #3B82F6)" />
+          {terms.isMarket ? (
+            <Store size={17} color="#D97706" />
+          ) : (
+            <LayoutGrid size={17} color="var(--color-primary, #3B82F6)" />
+          )}
           <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-text, #F1F5F9)' }}>
-            ภาพรวมสถานะห้องพัก
+            {terms.isMarket ? `ผังสถานะ${terms.unitNamePlural}` : `ภาพรวมสถานะ${terms.unitNamePlural}`}
           </span>
           {/* Summary badges */}
           <div style={{ display: 'flex', gap: '0.375rem', marginLeft: '0.25rem' }}>
@@ -142,23 +150,28 @@ export default function RoomStatusDashboard({
             display: 'flex', gap: '1rem', marginBottom: '0.75rem',
             flexWrap: 'wrap',
           }}>
-            {(['occupied', 'vacant', 'reserved'] as RoomStatus[]).map(s => (
-              <span
-                key={s}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.3rem',
-                  fontSize: '0.72rem', color: 'var(--color-text-muted, #94A3B8)',
-                }}
-              >
+            {(['occupied', 'vacant', 'reserved'] as RoomStatus[]).map(s => {
+              const label = s === 'occupied' ? terms.occupiedUnitLabel
+                : s === 'vacant' ? terms.vacantUnitLabel
+                : terms.reservedUnitLabel;
+              return (
                 <span
+                  key={s}
                   style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: STATUS_CONFIG[s].dot,
+                    display: 'flex', alignItems: 'center', gap: '0.3rem',
+                    fontSize: '0.72rem', color: 'var(--color-text-muted, #94A3B8)',
                   }}
-                />
-                {STATUS_CONFIG[s].label}
-              </span>
-            ))}
+                >
+                  <span
+                    style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: STATUS_CONFIG[s].dot,
+                    }}
+                  />
+                  {label}
+                </span>
+              );
+            })}
             {onUpdateRoom && (
               <span style={{
                 fontSize: '0.68rem',
@@ -166,7 +179,7 @@ export default function RoomStatusDashboard({
                 marginLeft: 'auto',
                 alignSelf: 'center',
               }}>
-                แตะห้องเพื่อเปลี่ยนสถานะ
+                แตะ{terms.unitName}เพื่อเปลี่ยนสถานะ
               </span>
             )}
           </div>

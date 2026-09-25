@@ -14,9 +14,14 @@ import {
   Plus, Trash2, Edit2, Check, X, CheckCircle2,
   Clock, LogIn, LogOut, RefreshCw, FileText, Lock, Zap,
   Heart, GraduationCap, ClipboardList, AlertTriangle, Users,
+  PenTool, ShieldCheck, Copy, CheckCheck, Send,
 } from 'lucide-react';
-import type { Room, TenantProfile, TenantEvent } from '../../types';
+import toast from 'react-hot-toast';
+import type { Room, TenantProfile, TenantEvent, DormConfig, SignedContractData } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
+import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
+import ContractSignModal from '../ESignature/ContractSignModal';
+import ShareContractModal from '../ESignature/ShareContractModal';
 
 interface TenantProfilePageProps {
   room: Room;
@@ -25,6 +30,7 @@ interface TenantProfilePageProps {
   isPaid: boolean;          // paid plan = access extended fields
   onUpgrade?: () => void;
   onClose: () => void;
+  config?: DormConfig;
 }
 
 type TabId = 'info' | 'contract' | 'history';
@@ -64,16 +70,40 @@ function emptyForm(): Omit<TenantProfile, 'id' | 'room_id' | 'building_id' | 'cr
 }
 
 export default function TenantProfilePage({
-  room, uid, buildingId, isPaid, onUpgrade, onClose,
+  room, uid, buildingId, isPaid, onUpgrade, onClose, config,
 }: TenantProfilePageProps) {
   const { profile, events, loading, saveProfile, addEvent, deleteEvent } =
     useTenantProfile(uid, buildingId, room.id);
 
   const isMobile = useMobile();
+  const terms = getWorkspaceTerms(config?.building_type || (room.room_type === 'commercial' ? 'market' : 'dormitory'));
+
+  const effectiveConfig: DormConfig = config || {
+    building_type: terms.isMarket ? 'market' : 'dormitory',
+    electricity_rate: 8,
+    water_config: { type: 'normal', unit_rate: 18 },
+    room_rent: room.rent_amount || 3000,
+    bill_customization: {
+      dorm_name: terms.isMarket ? 'ตลาดกลางพาณิชย์' : 'หอพัก',
+      dorm_address: '',
+      dorm_phone: '',
+      promptpay_number: '',
+      promptpay_name: '',
+      footer_text: '',
+      due_day: 5,
+    },
+  };
+
   const [activeTab, setActiveTab] = useState<TabId>('info');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm());
+
+  // E-Signature modal states
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [showShareContractModal, setShowShareContractModal] = useState(false);
+  const [contractInitialStep, setContractInitialStep] = useState<'details' | 'signing' | 'preview'>('details');
+  const [copiedContractNum, setCopiedContractNum] = useState(false);
 
   // ── New event form ──
   const [showEventForm, setShowEventForm] = useState(false);
@@ -113,14 +143,82 @@ export default function TenantProfilePage({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveProfile({ ...form, room_id: room.id, building_id: buildingId });
+      await saveProfile({
+        ...form,
+        room_id: room.id,
+        building_id: buildingId,
+        signed_contract: profile?.signed_contract,
+      });
       setIsEditing(false);
-    } catch (e) {
+      toast.success('บันทึกข้อมูลเรียบร้อยแล้ว');
+    } catch (e: any) {
       console.error(e);
-      alert('บันทึกไม่สำเร็จ กรุณาลองใหม่');
+      toast.error('บันทึกไม่สำเร็จ: ' + (e?.message || 'กรุณาลองใหม่'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveContract = async (signedContract: SignedContractData) => {
+    try {
+      setSaving(true);
+      const updatedData = {
+        ...form,
+        room_id: room.id,
+        building_id: buildingId,
+        full_name: signedContract.lessee_name || form.full_name,
+        phone: signedContract.lessee_phone || form.phone,
+        move_in_date: signedContract.start_date || form.move_in_date,
+        contract_end_date: signedContract.end_date || form.contract_end_date,
+        deposit_amount: signedContract.deposit_amount ?? form.deposit_amount,
+        id_card_number: signedContract.lessee_id_card || form.id_card_number,
+        signed_contract: signedContract,
+      };
+
+      await saveProfile(updatedData);
+
+      // Audit log event
+      await addEvent({
+        type: 'contract_renewed',
+        date: new Date().toISOString().slice(0, 10),
+        note: `ลงนามสัญญาดิจิทัล (เลขที่: ${signedContract.contract_number}) โดย ${signedContract.lessor_name} และ ${signedContract.lessee_name}`,
+      });
+
+      setForm(prev => ({
+        ...prev,
+        full_name: updatedData.full_name,
+        phone: updatedData.phone,
+        move_in_date: updatedData.move_in_date,
+        contract_end_date: updatedData.contract_end_date,
+        deposit_amount: updatedData.deposit_amount,
+        id_card_number: updatedData.id_card_number,
+      }));
+
+      toast.success(`บันทึกสัญญาดิจิทัล ${signedContract.contract_number} เรียบร้อยแล้ว!`);
+      setShowContractModal(false);
+    } catch (err: any) {
+      console.error('Error saving signed contract:', err);
+      toast.error('ไม่สามารถบันทึกสัญญาได้: ' + (err.message || ''));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateContractStatus = async (newStatus: 'pending_lessee') => {
+    if (!profile?.signed_contract) return;
+    const updated = {
+      ...profile.signed_contract,
+      status: newStatus,
+    };
+    await handleSaveContract(updated);
+  };
+
+  const copyContractNumber = (num: string) => {
+    navigator.clipboard.writeText(num).then(() => {
+      setCopiedContractNum(true);
+      setTimeout(() => setCopiedContractNum(false), 2000);
+      toast.success('คัดลอกเลขที่สัญญาแล้ว');
+    });
   };
 
   const handleAddEvent = async () => {
@@ -140,8 +238,9 @@ export default function TenantProfilePage({
   ];
 
   return (
-    <div
-      className="tenant-profile-overlay"
+    <>
+      <div
+        className="tenant-profile-overlay"
       style={{
         position: 'fixed', inset: 0, zIndex: 800,
         background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
@@ -157,7 +256,7 @@ export default function TenantProfilePage({
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: isMobile ? '100%' : '640px',
+          maxWidth: isMobile ? '100%' : '760px',
           maxHeight: isMobile ? '92vh' : '90vh',
           display: 'flex', flexDirection: 'column',
           background: 'var(--color-surface, #fff)',
@@ -397,7 +496,494 @@ export default function TenantProfilePage({
 
               {/* ══ TAB: สัญญา / มัดจำ ══ */}
               {activeTab === 'contract' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Digital Contract (E-Signature) Banner/Card */}
+                  <div style={{
+                    borderRadius: '16px',
+                    border: profile?.signed_contract ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(139, 92, 246, 0.25)',
+                    background: profile?.signed_contract
+                      ? 'linear-gradient(135deg, rgba(240, 253, 244, 0.8) 0%, rgba(255, 255, 255, 0.95) 100%)'
+                      : 'linear-gradient(135deg, rgba(245, 243, 255, 0.8) 0%, rgba(255, 255, 255, 0.95) 100%)',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+                    overflow: 'hidden',
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      padding: '1rem 1.25rem',
+                      borderBottom: profile?.signed_contract ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(139, 92, 246, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{
+                          width: 42, height: 42, borderRadius: '12px',
+                          background: profile?.signed_contract ? '#10B981' : 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
+                        }}>
+                          {profile?.signed_contract ? <ShieldCheck size={24} /> : <PenTool size={22} />}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--color-text, #111827)' }}>
+                              สัญญาเช่าดิจิทัล (E-Signature)
+                            </h3>
+                            {profile?.signed_contract ? (
+                              profile.signed_contract.lessee_signature ? (
+                                <span style={{
+                                  fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '999px',
+                                  background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0',
+                                  display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                                }}>
+                                  <CheckCircle2 size={12} /> ลงนามสมบูรณ์ 2 ฝ่าย
+                                </span>
+                              ) : (
+                                <span style={{
+                                  fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '999px',
+                                  background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A',
+                                  display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                                }}>
+                                  <Clock size={12} /> ส่งร่างแล้ว (รอผู้เช่าเซ็น)
+                                </span>
+                              )
+                            ) : (
+                              <span style={{
+                                fontSize: '0.72rem', fontWeight: 700, padding: '0.2rem 0.6rem', borderRadius: '999px',
+                                background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE'
+                              }}>
+                                ระบบลงนามลายมือชื่อออนไลน์
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted, #6B7280)', marginTop: '0.15rem' }}>
+                            {profile?.signed_contract
+                              ? `เลขที่สัญญา: ${profile.signed_contract.contract_number} • มีผลผูกพันทางกฎหมาย`
+                              : `สร้างสัญญาเช่ามาตรฐานสำหรับ${terms.unitName} ${room.room_number} พร้อมเซ็นชื่อดิจิทัลทันที`}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Top Action Badge */}
+                      {profile?.signed_contract && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowShareContractModal(true)}
+                            style={{
+                              padding: '0.4rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700,
+                              background: 'linear-gradient(135deg, #0284C7, #0369A1)', color: '#FFFFFF', border: 'none',
+                              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)'
+                            }}
+                            title="ส่งร่างสัญญาให้ผู้เช่าเซ็นผ่าน LINE หรือ ลิงก์ตรง"
+                          >
+                            <Send size={13} /> {profile.signed_contract.lessee_signature ? 'แชร์สัญญา' : 'ส่งร่างสัญญา'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => copyContractNumber(profile.signed_contract!.contract_number)}
+                            title="คลิกเพื่อคัดลอกเลขที่สัญญา"
+                            style={{
+                              padding: '0.4rem 0.65rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600,
+                              background: '#fff', border: '1px solid var(--color-border, #E5E7EB)',
+                              color: 'var(--color-text, #374151)', cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: '0.35rem'
+                            }}
+                          >
+                            {copiedContractNum ? <CheckCheck size={13} color="#059669" /> : <Copy size={13} />}
+                            {copiedContractNum ? 'คัดลอกแล้ว' : profile.signed_contract.contract_number}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Body */}
+                    <div style={{ padding: '1.25rem' }}>
+                      {profile?.signed_contract ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {/* Contract Overview Grid */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: '0.75rem',
+                            background: '#fff',
+                            padding: '1rem',
+                            borderRadius: '12px',
+                            border: '1px solid var(--color-border, #E5E7EB)',
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6B7280)', fontWeight: 600 }}>ชื่อประเภทสัญญา</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text, #111827)' }}>
+                                {profile.signed_contract.title}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6B7280)', fontWeight: 600 }}>ค่าเช่า</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#2563EB' }}>
+                                ฿{profile.signed_contract.rent_amount.toLocaleString()} / {profile.signed_contract.rent_cycle === 'daily' ? 'วัน' : profile.signed_contract.rent_cycle === 'weekly' ? 'สัปดาห์' : profile.signed_contract.rent_cycle === 'yearly' ? 'ปี' : 'เดือน'}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6B7280)', fontWeight: 600 }}>เงินประกันสัญญา</div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#D97706' }}>
+                                ฿{profile.signed_contract.deposit_amount.toLocaleString()}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6B7280)', fontWeight: 600 }}>ระยะเวลาสัญญา</div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #111827)' }}>
+                                {formatDate(profile.signed_contract.start_date)} - {formatDate(profile.signed_contract.end_date) || 'ไม่ระบุ'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dual Signatures Preview */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                            gap: '1rem',
+                          }}>
+                            {/* Lessor */}
+                            <div style={{
+                              background: '#fff',
+                              border: '1px solid var(--color-border, #E5E7EB)',
+                              borderRadius: '12px',
+                              padding: '1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563EB' }}>
+                                  ฝ่ายผู้ให้เช่า (Lessor)
+                                </span>
+                                {profile.signed_contract.lessor_signed_at && (
+                                  <span style={{ fontSize: '0.7rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
+                                    <CheckCircle2 size={11} /> เซ็นแล้ว
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text, #111827)' }}>
+                                {profile.signed_contract.lessor_name}
+                              </div>
+                              <div style={{
+                                height: 80,
+                                background: '#F8FAFC',
+                                border: '1px dashed #CBD5E1',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                              }}>
+                                {profile.signed_contract.lessor_signature ? (
+                                  <img
+                                    src={profile.signed_contract.lessor_signature}
+                                    alt="Lessor Signature"
+                                    style={{ maxHeight: '70px', maxWidth: '90%', objectFit: 'contain' }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>ยังไม่มีลายเซ็น</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted, #6B7280)', textAlign: 'center' }}>
+                                วันที่ลงนาม: {formatDate(profile.signed_contract.lessor_signed_at)}
+                              </div>
+                            </div>
+
+                            {/* Lessee */}
+                            <div style={{
+                              background: '#fff',
+                              border: '1px solid var(--color-border, #E5E7EB)',
+                              borderRadius: '12px',
+                              padding: '1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.5rem',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#7C3AED' }}>
+                                  ฝ่ายผู้เช่า / ผู้ค้า (Lessee)
+                                </span>
+                                {profile.signed_contract.lessee_signed_at && (
+                                  <span style={{ fontSize: '0.7rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
+                                    <CheckCircle2 size={11} /> เซ็นแล้ว
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text, #111827)' }}>
+                                {profile.signed_contract.lessee_name}
+                                {profile.signed_contract.lessee_business_type && (
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#D97706', marginLeft: '0.5rem' }}>
+                                    ({profile.signed_contract.lessee_business_type})
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{
+                                height: 80,
+                                background: '#F8FAFC',
+                                border: '1px dashed #CBD5E1',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                              }}>
+                                {profile.signed_contract.lessee_signature ? (
+                                  <img
+                                    src={profile.signed_contract.lessee_signature}
+                                    alt="Lessee Signature"
+                                    style={{ maxHeight: '70px', maxWidth: '90%', objectFit: 'contain' }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>ยังไม่มีลายเซ็น</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted, #6B7280)', textAlign: 'center' }}>
+                                วันที่ลงนาม: {formatDate(profile.signed_contract.lessee_signed_at)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Verification Audit Hash Stamp */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.65rem 0.85rem',
+                            borderRadius: '8px',
+                            background: '#F0FDF4',
+                            border: '1px solid #BBF7D0',
+                            fontSize: '0.75rem',
+                            color: '#166534',
+                          }}>
+                            <ShieldCheck size={16} color="#15803D" style={{ flexShrink: 0 }} />
+                            <span>
+                              รหัสตรวจสอบเอกสาร (Security Audit Hash): <strong>{profile.signed_contract.verification_code || profile.signed_contract.id}</strong> • รับรองตามมาตรฐานธุรกรรมทางอิเล็กทรอนิกส์
+                            </span>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowShareContractModal(true)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                padding: '0.65rem 1.25rem',
+                                borderRadius: '10px',
+                                fontWeight: 700,
+                                fontSize: '0.875rem',
+                                flex: '1 1 180px',
+                                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                              }}
+                            >
+                              <Send size={15} /> {profile.signed_contract.lessee_signature ? 'แชร์สัญญาให้ผู้เช่า' : 'ส่งร่างสัญญาให้ผู้เช่าเซ็น'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContractInitialStep('preview');
+                                setShowContractModal(true);
+                              }}
+                              className="btn btn-primary"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                padding: '0.65rem 1.25rem',
+                                borderRadius: '10px',
+                                fontWeight: 700,
+                                fontSize: '0.875rem',
+                                flex: '1 1 180px',
+                              }}
+                            >
+                              <FileText size={16} /> ดูเอกสารสัญญาฉบับเต็ม / พิมพ์ PDF
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContractInitialStep('details');
+                                setShowContractModal(true);
+                              }}
+                              className="btn btn-secondary"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                padding: '0.65rem 1.25rem',
+                                borderRadius: '10px',
+                                fontWeight: 600,
+                                fontSize: '0.875rem',
+                                flex: '1 1 160px',
+                              }}
+                            >
+                              <RefreshCw size={15} /> แก้ไขเงื่อนไข / ต่อสัญญาใหม่
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Empty / Not signed yet banner */
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '1rem',
+                        }}>
+                          <div>
+                            <div style={{
+                              fontSize: '1rem',
+                              fontWeight: 800,
+                              color: 'var(--color-text, #111827)',
+                              marginBottom: '0.4rem',
+                            }}>
+                              ยังไม่ได้ทำสัญญาเช่าดิจิทัลที่มีลายเซ็นอิเล็กทรอนิกส์
+                            </div>
+                            <p style={{
+                              fontSize: '0.85rem',
+                              color: 'var(--color-text-muted, #6B7280)',
+                              lineHeight: 1.6,
+                              margin: 0,
+                            }}>
+                              ระบบ HorCare รองรับการสร้างสัญญาเช่าดิจิทัลมาตรฐาน (สัญญาเช่าแผงค้า, พื้นที่พาณิชย์ หรือห้องพัก) พร้อมระบบลงลายมือชื่อ E-Signature Pad ในตัว คู่สัญญาสามารถลงนามผ่านหน้าจอ คอมพิวเตอร์ หรือมือถือ/แท็บเล็ตได้ทันที พร้อมออกเอกสารและดาวน์โหลดเป็น PDF
+                            </p>
+                          </div>
+
+                          {/* Feature Highlights Grid */}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                            gap: '0.625rem',
+                          }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.6rem 0.75rem',
+                              borderRadius: '10px',
+                              background: '#fff',
+                              border: '1px solid rgba(139, 92, 246, 0.2)',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              color: '#374151',
+                            }}>
+                              <PenTool size={15} color="#7C3AED" style={{ flexShrink: 0 }} />
+                              <span>เซ็นสดบนหน้าจอ / มือถือ</span>
+                            </div>
+
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.6rem 0.75rem',
+                              borderRadius: '10px',
+                              background: '#fff',
+                              border: '1px solid rgba(139, 92, 246, 0.2)',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              color: '#374151',
+                            }}>
+                              <FileText size={15} color="#2563EB" style={{ flexShrink: 0 }} />
+                              <span>ออกเอกสาร PDF A4 ทันที</span>
+                            </div>
+
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.6rem 0.75rem',
+                              borderRadius: '10px',
+                              background: '#fff',
+                              border: '1px solid rgba(139, 92, 246, 0.2)',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              color: '#374151',
+                            }}>
+                              <ShieldCheck size={16} color="#059669" style={{ flexShrink: 0 }} />
+                              <span>มี QR & Audit Hash รับรอง</span>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            paddingTop: '0.35rem',
+                          }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContractInitialStep('details');
+                                setShowContractModal(true);
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)',
+                                border: 'none',
+                                padding: '0.75rem 1.4rem',
+                                borderRadius: '12px',
+                                color: '#fff',
+                                fontWeight: 700,
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <PenTool size={17} />
+                              <span>สร้างและเซ็นสัญญาดิจิทัล</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContractInitialStep('details');
+                                setShowContractModal(true);
+                              }}
+                              style={{
+                                background: '#FFFFFF',
+                                border: '1.5px solid #BAE6FD',
+                                padding: '0.75rem 1.4rem',
+                                borderRadius: '12px',
+                                color: '#0284C7',
+                                fontWeight: 700,
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.12)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <Send size={16} />
+                              <span>ส่งร่างสัญญาให้ผู้เช่าเซ็น</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <SectionCard title="วันที่สัญญา" icon={<Calendar size={15} />}>
                     <FormGrid>
                       <Field label="วันที่เข้าอยู่">
@@ -609,7 +1195,36 @@ export default function TenantProfilePage({
         </div>
       </div>
     </div>
-  );
+
+    {/* ── Digital Contract E-Signature Modal ── */}
+    {showContractModal && (
+      <ContractSignModal
+        room={room}
+        config={effectiveConfig}
+        profile={profile}
+        onSaveContract={handleSaveContract}
+        onClose={() => setShowContractModal(false)}
+        uid={uid}
+        buildingId={buildingId}
+        initialStep={contractInitialStep}
+      />
+    )}
+
+    {/* ── Share Contract Draft Modal ── */}
+    {showShareContractModal && profile?.signed_contract && (
+      <ShareContractModal
+        isOpen={showShareContractModal}
+        onClose={() => setShowShareContractModal(false)}
+        contract={profile.signed_contract}
+        room={room}
+        uid={uid}
+        buildingId={buildingId}
+        dormName={effectiveConfig.bill_customization?.dorm_name || 'HorCare'}
+        onUpdateContractStatus={handleUpdateContractStatus}
+      />
+    )}
+  </>
+);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

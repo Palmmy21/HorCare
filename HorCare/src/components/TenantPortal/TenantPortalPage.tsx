@@ -18,13 +18,14 @@ import {
   Building2, CalendarDays, CreditCard, Receipt,
   Wrench, Plus, AlertTriangle, Plug, Wind, DoorOpen,
   Bath, Armchair, Send, Pencil, Camera, X as XIcon,
-  User, Save, Heart, Lock, Sparkles,
+  User, Save, Heart, Lock, Sparkles, FileText,
 } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
 import { QRCodeSVG } from 'qrcode.react';
 import generatePayload from 'promptpay-qr';
 import { PROMPTPAY_LOGO_DATA_URI } from '../../assets/promptpayLogo';
 import toast from 'react-hot-toast';
+import TenantContractSection from './TenantContractSection';
 
 // ── Image compression (canvas) ────────────────────────────────────────────────
 async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
@@ -1206,6 +1207,22 @@ export default function TenantPortalPage() {
 
         {/* ── Main Body Sections ── */}
         <div style={{ padding: '0.75rem 1.125rem 3rem', background: '#F8FAFC' }}>
+
+          {/* Digital Lease Contract (E-Signature) */}
+          {profile?.signed_contract && (
+            <section>
+              <SectionLabel icon={<FileText size={14} />} label="สัญญาเช่าดิจิทัล (Digital Lease Contract)" />
+              <TenantContractSection
+                profile={profile}
+                room={room}
+                config={config}
+                uid={uid}
+                buildingId={buildingId}
+                roomId={roomId}
+                lang={lang}
+              />
+            </section>
+          )}
 
           {/* Personal info */}
           <section>

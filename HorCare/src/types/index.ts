@@ -59,6 +59,7 @@ export interface Building {
   created_at: string;
   order: number;
   logo?: string;
+  building_type?: DormConfig['building_type'];
 }
 export interface WaterConfig {
   type: 'normal' | 'flat_rate_tier';
@@ -86,6 +87,16 @@ export interface BillCustomization {
   secondary_language?: BillLanguage; // ภาษาที่สองเมื่อเปิดโหมด 2 ภาษา (default: 'en')
 }
 
+export interface MarketConfig {
+  default_rent_cycle?: 'daily' | 'weekly' | 'monthly';
+  default_stall_size?: string;       // เช่น "2x2 ม.", "3x3 ม."
+  waste_fee_per_stall?: number;      // ค่าขยะ/ทำความสะอาดรายแผง (บาท)
+  waste_fee_cycle?: 'daily' | 'monthly';
+  electricity_flat_fee?: number;     // ค่าไฟเหมาต่อจุด/ดวง (บาท/วัน)
+  table_rental_fee?: number;         // ค่าเช่าโต๊ะ/ร่ม/เต็นท์ (บาท/วัน)
+  zones?: string[];                  // รายชื่อโซนตลาด e.g. ['โซน A (อาหาร)', 'โซน B (ของสด)']
+}
+
 export interface DormConfig {
   building_type: 'dormitory' | 'commercial' | 'resort' | 'hotel' | 'apartment' | 'condo' | 'house' | 'office' | 'market' | 'other';
   electricity_rate: number;
@@ -95,6 +106,8 @@ export interface DormConfig {
   bill_customization?: BillCustomization; // ตั้งค่าใบแจ้งหนี้
   dorm_code?: string; // รหัสสำหรับลงทะเบียนรับบิลผ่าน LINE
   portal_pin?: string; // PIN สำหรับเข้า tenant portal (4 หลัก)
+  market_config?: MarketConfig; // ตั้งค่าเฉพาะตลาด / แผงค้า
+  contract_templates?: ContractTemplate[]; // เทมเพลตสัญญาเช่าดิจิทัลที่เจ้าของสร้าง
 }
 
 export interface Room {
@@ -107,7 +120,11 @@ export interface Room {
   current_meter_water: number;
   is_active: boolean;
   rent_amount: number;
-  rent_type: 'monthly' | 'semester' | 'yearly' | 'daily';
+  rent_type: 'monthly' | 'semester' | 'yearly' | 'daily' | 'weekly';
+  // Market / Commercial extensions
+  zone?: string;               // โซนแผงค้า เช่น 'โซน A', 'โซน B' หรือชั้น 'ชั้น 1'
+  stall_size?: string;         // ขนาดแผง เช่น '2x2 ม.'
+  business_type?: string;      // ประเภทสินค้า/ร้าน เช่น 'ข้าวมันไก่', 'เสื้อผ้า'
   // Per-room rate overrides (used in commercial mode)
   custom_electricity_rate?: number | null;
   custom_water_config?: WaterConfig | null;
@@ -228,9 +245,70 @@ export interface TenantProfile {
   emergency_phone?: string;
   emergency_relation?: string;   // "พ่อ" | "แม่" | "พี่น้อง" | ฯลฯ
 
+  // ── Digital Contract & E-Signature ──
+  signed_contract?: SignedContractData;
+
   // ── Metadata ──
   created_at: string;
   updated_at: string;
+}
+
+export interface ContractTemplate {
+  id: string;                          // Template ID (e.g. "tpl-residential-std", "tpl-user-123")
+  name: string;                        // Display name (e.g. "สัญญาเช่าห้องพักมาตรฐาน", "สัญญาเช่าแผงรายวัน")
+  contract_type: 'market_stall' | 'residential' | 'commercial';
+  title: string;                       // e.g. "สัญญาเช่าแผงค้าและล็อกจำหน่ายสินค้า"
+  default_rent_cycle?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  electricity_rate_desc?: string;
+  water_rate_desc?: string;
+  waste_fee_desc?: string;
+  clauses: string[];                   // ข้อกำหนดและเงื่อนไขสัญญา
+  custom_terms?: string;               // เงื่อนไขเพิ่มเติมเริ่มต้น
+  is_default?: boolean;                // เป็นเทมเพลตมาตรฐาน
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SignedContractData {
+  id: string;                          // Contract document ID
+  contract_number: string;             // e.g. "HC-MK-202609-001" or "HC-DM-..."
+  contract_type: 'market_stall' | 'residential' | 'commercial';
+  title: string;                       // e.g. "สัญญาเช่าแผงค้าตลาด" / "สัญญาเช่าห้องพัก"
+  template_id?: string;                // ID ของ template ที่ใช้สร้าง
+  lessor_name: string;                 // ชื่อผู้ให้เช่า
+  lessor_phone?: string;
+  lessor_id_card?: string;
+  lessor_address?: string;
+  lessor_signature?: string;           // Base64 PNG signature
+  lessor_signed_at?: string;           // ISO timestamp
+
+  lessee_name: string;                 // ชื่อผู้เช่า / ผู้ค้า
+  lessee_phone?: string;
+  lessee_id_card?: string;
+  lessee_address?: string;
+  lessee_business_type?: string;       // e.g. ข้าวมันไก่ (กรณีตลาด)
+  lessee_signature?: string;           // Base64 PNG signature
+  lessee_signed_at?: string;           // ISO timestamp
+
+  unit_number: string;                 // e.g. "A01" หรือ "101"
+  zone_or_floor?: string;              // e.g. "โซน A (อาหาร)" หรือ "ชั้น 2"
+  stall_or_room_size?: string;         // e.g. "2x2 ม." หรือ "28 ตร.ม."
+  rent_amount: number;
+  rent_cycle: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  deposit_amount: number;
+  start_date: string;                  // ISO "YYYY-MM-DD"
+  end_date?: string;                   // ISO "YYYY-MM-DD"
+  
+  electricity_rate_desc?: string;
+  water_rate_desc?: string;
+  waste_fee_desc?: string;
+
+  clauses: string[];                   // ข้อตกลงและเงื่อนไขสัญญา
+  custom_terms?: string;               // ข้อตกลงเพิ่มเติมเฉพาะราย
+
+  created_at: string;                  // ISO timestamp
+  verification_code: string;           // e.g. "HC-SIGN-9F2B81" hash for integrity
+  status: 'draft' | 'pending_lessee' | 'signed' | 'expired' | 'terminated';
 }
 
 /**

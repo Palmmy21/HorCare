@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, Zap, Ban,
-  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles
+  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
@@ -11,6 +11,7 @@ import { useFCMToken } from './hooks/useFCMToken';
 import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
+import { getWorkspaceTerms } from './utils/workspaceTerminology';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
 import RoomManagement from './components/RoomManagement/RoomManagement';
@@ -324,14 +325,15 @@ function App() {
 
   const stats = getMonthStats(currentMonth);
   const monthBills = getBillsForMonth(currentMonth);
+  const terms = getWorkspaceTerms(config?.building_type);
 
   const navItems = [
     { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'rooms'       as ViewMode, icon: Home,            label: 'จัดการห้อง' },
-    { id: 'recording'   as ViewMode, icon: FileText,        label: 'จดมิเตอร์' },
-    { id: 'tenants'     as ViewMode, icon: Users,           label: 'ผู้เช่า' },
+    { id: 'rooms'       as ViewMode, icon: terms.isMarket ? Store : Home, label: terms.manageUnitsLabel || 'จัดการห้อง' },
+    { id: 'recording'   as ViewMode, icon: FileText,        label: terms.meterRecordingLabel || 'จดมิเตอร์' },
+    { id: 'tenants'     as ViewMode, icon: Users,           label: terms.tenantLabel || 'ผู้เช่า' },
     { id: 'maintenance' as ViewMode, icon: Wrench,          label: 'แจ้งซ่อม' },
-    { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: 'งานแม่บ้าน' },
+    { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
     { id: 'operations'  as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
@@ -343,8 +345,8 @@ function App() {
 
   const visibleNavItems = maidSession
     ? [
-        { id: 'cleaning' as ViewMode, icon: Sparkles, label: 'งานแม่บ้าน' },
-        { id: 'recording' as ViewMode, icon: FileText, label: 'จดมิเตอร์' },
+        { id: 'cleaning' as ViewMode, icon: Sparkles, label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
+        { id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' },
       ]
     : navItems;
 
@@ -358,9 +360,9 @@ function App() {
   const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'cleaning', 'operations', 'payments', 'archives'];
 
   const VIEW_LABELS: Record<string, string> = {
-    tenants: 'ผู้เช่า',
+    tenants: terms.tenantLabel || 'ผู้เช่า',
     maintenance: 'แจ้งซ่อม',
-    cleaning: 'งานแม่บ้าน',
+    cleaning: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน',
     operations: 'ระบบจัดการ',
     payments: 'การชำระเงิน',
     archives: 'คลังเอกสาร',
@@ -1353,6 +1355,8 @@ function App() {
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
             onUpdateRoom={updateRoom}
+            buildingType={config?.building_type}
+            config={config}
           />
         )}
 

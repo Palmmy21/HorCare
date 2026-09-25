@@ -4,13 +4,14 @@ import {
     TrendingUp, TrendingDown, CheckCircle, Clock,
     BarChart3, CheckSquare, FileText, LineChart, Settings, ClipboardList,
     SlidersHorizontal, X, Wallet, CircleDollarSign, AlertCircle, ChevronRight,
-    Receipt, ArrowUpRight, ArrowDownRight, Building2,
+    Receipt, ArrowUpRight, ArrowDownRight, Building2, Store,
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import type { DormConfig, MonthlyBill, PaymentStatus, Expense, Room } from '../../types';
 import { formatCurrency, formatMonthThai, getPreviousMonth } from '../../utils/calculations';
 import { useDashboardPrefs, WIDGET_LABELS, type WidgetId } from '../../hooks/useDashboardPrefs';
+import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import NongCarePanel from '../NongCare/NongCarePanel';
 import RoomStatusDashboard from '../RoomManagement/RoomStatusDashboard';
 import { Bot } from 'lucide-react';
@@ -55,6 +56,7 @@ export default function Dashboard({
     const [activeTab, setActiveTab] = useState<'overview' | 'ai'>('overview');
     const { allWidgets, toggle, isEnabled } = useDashboardPrefs(uid);
     const dormLogo = config?.bill_customization?.dorm_logo;
+    const terms = getWorkspaceTerms(config?.building_type);
 
     // ── Fetch expenses (last 6+ months) ──────────────────────────────────────
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -155,16 +157,16 @@ export default function Dashboard({
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.45rem',
-                            background: 'rgba(14, 165, 233, 0.08)',
-                            border: '1px solid rgba(14, 165, 233, 0.25)',
+                            background: terms.isMarket ? 'rgba(217, 119, 6, 0.1)' : 'rgba(14, 165, 233, 0.08)',
+                            border: terms.isMarket ? '1px solid rgba(217, 119, 6, 0.3)' : '1px solid rgba(14, 165, 233, 0.25)',
                             borderRadius: '9999px',
                             padding: '0.25rem 0.85rem',
                             marginBottom: '0.5rem',
                             fontSize: '0.8125rem',
                             fontWeight: 700,
-                            color: '#0284C7',
+                            color: terms.isMarket ? '#B45309' : '#0284C7',
                             letterSpacing: '0.02em',
-                            boxShadow: '0 2px 8px rgba(14, 165, 233, 0.12)',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
                             backdropFilter: 'blur(8px)',
                         }}>
                             <span style={{
@@ -177,17 +179,33 @@ export default function Dashboard({
                                     alt={buildingName}
                                     style={{ width: 16, height: 16, borderRadius: '4px', objectFit: 'contain', flexShrink: 0 }}
                                 />
+                            ) : terms.isMarket ? (
+                                <Store size={13} style={{ color: '#D97706', flexShrink: 0 }} />
                             ) : (
                                 <Building2 size={13} style={{ color: '#0EA5E9', flexShrink: 0 }} />
                             )}
                             <span>{buildingName}</span>
+                            {terms.isMarket && (
+                                <span style={{
+                                    fontSize: '0.65rem',
+                                    fontWeight: 800,
+                                    background: '#FEF3C7',
+                                    color: '#B45309',
+                                    padding: '0.1rem 0.45rem',
+                                    borderRadius: '6px',
+                                    marginLeft: '0.2rem',
+                                    border: '1px solid #FDE68A',
+                                }}>
+                                    ตลาด / แผงค้า
+                                </span>
+                            )}
                         </div>
                     )}
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <BarChart3 size={28} /> Dashboard
                     </h1>
                     <p className="page-subtitle">
-                        ภาพรวมหอพัก — รอบเดือน {formatMonthThai(currentMonth)}
+                        ภาพรวม{terms.facilityType} — รอบเดือน {formatMonthThai(currentMonth)}
                     </p>
                 </div>
 
@@ -206,7 +224,7 @@ export default function Dashboard({
                         }}>
                             <img
                                 src={dormLogo}
-                                alt={buildingName || 'โลโก้หอพัก'}
+                                alt={buildingName || 'โลโก้'}
                                 style={{
                                     width: 46,
                                     height: 46,
@@ -222,7 +240,7 @@ export default function Dashboard({
                                     สาขาปัจจุบัน
                                 </span>
                                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-gray-800)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {buildingName || config?.bill_customization?.dorm_name || 'หอพัก'}
+                                    {buildingName || config?.bill_customization?.dorm_name || terms.facilityType}
                                 </span>
                             </div>
                         </div>
@@ -245,7 +263,7 @@ export default function Dashboard({
                         transition: 'var(--transition-fast)'
                     }}
                 >
-                    ภาพรวมหอพัก
+                    ภาพรวม{terms.facilityType}
                 </button>
                 <button 
                     onClick={() => setActiveTab('ai')}
@@ -271,7 +289,7 @@ export default function Dashboard({
                 <>
             {/* ── Room status overview ── */}
             {isEnabled('room_status') && rooms && rooms.length > 0 && (
-                <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} />
+                <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} buildingType={config?.building_type} />
             )}
 
             {/* ── Collection overview ── */}
@@ -336,15 +354,15 @@ export default function Dashboard({
                             <span className="progress-label">
                                 {stats.isAllSaved ? (
                                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <CheckSquare size={16} color="#10B981" /> จดครบทุกห้องแล้ว!
+                                        <CheckSquare size={16} color="#10B981" /> จดครบทุก{terms.unitName}แล้ว!
                                     </span>
                                 ) : (
                                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <FileText size={16} /> สถานะการจดมิเตอร์
+                                        <FileText size={16} /> สถานะ{terms.meterRecordingLabel}
                                     </span>
                                 )}
                             </span>
-                            <span className="progress-value">{stats.savedCount}/{stats.totalRooms} ห้อง</span>
+                            <span className="progress-value">{stats.savedCount}/{stats.totalRooms} {terms.unitName}</span>
                         </div>
                         <div className="progress-bar">
                             <div className="progress-fill" style={{ transform: `scaleX(${stats.progress / 100})` }} />
@@ -357,8 +375,10 @@ export default function Dashboard({
             {isEnabled('stats') && (
                 <div className="stats-grid">
                     <div className="stat-card primary">
-                        <div className="stat-icon primary"><Home size={24} /></div>
-                        <div className="stat-label">จำนวนห้องทั้งหมด</div>
+                        <div className="stat-icon primary">
+                            {terms.isMarket ? <Store size={24} /> : <Home size={24} />}
+                        </div>
+                        <div className="stat-label">{terms.unitCountLabel}</div>
                         <div className="stat-value">{stats.totalRooms}</div>
                     </div>
                     <div className="stat-card success">
