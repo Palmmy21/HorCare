@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl } from './_slip.js';
+import { isInvitationToken, redeemInvitation } from './_invitations.js';
 
 export const config = {
     api: {
@@ -137,6 +138,12 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
         return;
     }
 
+    // ── 2e. Room invitation: HCI-XXXXXXXXXX (owner-issued, room is bound server-side) ──
+    if (isInvitationToken(text)) {
+        await handleInvitation(lineUserId, replyToken, text);
+        return;
+    }
+
     // ── 3. Invite Link: HC-XXXXXX pattern ─────────────────────────
     //    ลูกหอกดลิ้งก์ → LINE pre-fills รหัสหอ → กด Send
     if (DORM_CODE_RE.test(text.toUpperCase())) {
@@ -230,6 +237,28 @@ async function getOldestUnpaidFine(
     return unpaid[0] ?? null;
 }
 
+/** รับรหัสเชิญรายห้อง (HCI-...) — ห้องถูกกำหนดจากฝั่งเซิร์ฟเวอร์ ผู้เช่าเลือกเองไม่ได้ */
+async function handleInvitation(lineUserId: string, replyToken: string, token: string) {
+    const r = await redeemInvitation(lineUserId, token);
+    if (r.ok) {
+        await db.collection('line_pending').doc(lineUserId).delete();
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: `🎉 ลงทะเบียนสำเร็จ!\n\n🏠 หอพัก: ${r.dormName || '-'}\n🚪 ห้อง: ${r.roomNumber}\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`,
+        }]);
+        return;
+    }
+    const messages: Record<string, string> = {
+        not_found: '❌ ไม่พบรหัสเชิญนี้ กรุณาตรวจสอบรหัส หรือขอรหัสใหม่จากเจ้าของหอ',
+        expired: '⌛ รหัสเชิญนี้หมดอายุแล้ว กรุณาขอรหัสใหม่จากเจ้าของหอ',
+        used: '⚠️ รหัสเชิญนี้ถูกใช้ไปแล้ว กรุณาขอรหัสใหม่จากเจ้าของหอ',
+        revoked: '⚠️ รหัสเชิญนี้ถูกยกเลิกแล้ว กรุณาขอรหัสใหม่จากเจ้าของหอ',
+        room_unavailable: '⚠️ ห้องนี้ไม่พร้อมใช้งาน กรุณาติดต่อเจ้าของหอ',
+        room_taken: '⚠️ ห้องนี้มีผู้ลงทะเบียน LINE ไว้แล้ว กรุณาติดต่อเจ้าของหอ',
+    };
+    await lineReply(replyToken, [{ type: 'text', text: messages[r.reason] ?? messages.not_found }]);
+}
+
 /** รับรหัสหอ HC-XXXXXX แล้วย้ายไป step รอเลขห้อง */
 async function handleDormCode(lineUserId: string, replyToken: string, dormCode: string) {
     const codeSnap = await db.collection('dorm_codes').doc(dormCode).get();
@@ -241,6 +270,17 @@ async function handleDormCode(lineUserId: string, replyToken: string, dormCode: 
         return;
     }
     const { uid, building_id, dorm_name, due_day } = codeSnap.data()!;
+
+    // Typing a room number is not a safe way to claim a room (wrong/forged numbers).
+    // Unless the owner explicitly opted into the legacy flow, require an invitation.
+    const cfg = await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get();
+    if (cfg.data()?.claim_mode !== 'legacy') {
+        await lineReply(replyToken, [{
+            type: 'text',
+            text: `✅ พบหอพัก: ${dorm_name || dormCode}\n\nหอพักนี้ลงทะเบียนผ่านลิงก์เชิญเฉพาะห้องเท่านั้น\nกรุณาขอ "ลิงก์เชิญ" หรือรหัสเชิญ (HCI-...) จากเจ้าของหอ แล้วกดลิงก์หรือพิมพ์รหัสมาในแชทนี้ค่ะ`,
+        }]);
+        return;
+    }
     await db.collection('line_pending').doc(lineUserId).set({
         step: 'waiting_room_number',
         dorm_code: dormCode,

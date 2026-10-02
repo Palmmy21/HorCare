@@ -41,6 +41,22 @@ service cloud.firestore {
              || au > request.time.toMillis();
     }
 
+    // ── RBAC (members) ───────────────────────────────────────────────────
+    // Staff access is granted by the owner through the /api/members route
+    // (Admin SDK). Documents live at users/{ownerId}/members/{memberUid} and carry
+    // a denormalised `permissions` array written by the backend from the role map
+    // in src/shared/permissions.ts. Clients can never write them.
+    function activeMember(ownerId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function memberHasPerm(ownerId, perm) {
+      return activeMember(ownerId)
+        && perm in get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.permissions;
+    }
+
     // Fields only the backend (or admin) should write — never the user directly (updates only)
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
@@ -167,6 +183,29 @@ service cloud.firestore {
         }
       }
 
+      // ── Members (RBAC) — read-only for clients; managed via /api/members ──
+      match /members/{memberId} {
+        allow read: if isOwner(userId)
+                    || (isSignedIn() && request.auth.uid == memberId)
+                    || memberHasPerm(userId, 'member.read');
+        allow write: if false;
+      }
+
+      // ── Activity log — append-only. Nobody (owner included) can edit or delete. ──
+      match /audit_logs/{eventId} {
+        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'audit_log.read');
+        allow create: if isNotBanned()
+          && request.resource.data.event_id == eventId
+          && request.resource.data.organization_id == userId
+          && request.resource.data.user_id == request.auth.uid
+          && request.resource.data.action is string
+          && request.resource.data.resource_type is string
+          && ((isOwner(userId) && request.resource.data.role == 'owner')
+              || (activeMember(userId)
+                  && request.resource.data.role == get(/databases/$(database)/documents/users/$(userId)/members/$(request.auth.uid)).data.role));
+        allow update, delete: if false;
+      }
+
       // ── Legacy flat paths ──────────────────────────────────────────────
       match /rooms/{roomId} {
         allow read: if isOwner(userId) && isNotBanned();
@@ -180,9 +219,12 @@ service cloud.firestore {
         allow read: if isOwner(userId) && isNotBanned();
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
       }
+      // Excludes audit_logs/members: those have their own (stricter) rules above and
+      // a permissive wildcard here would let the owner rewrite history.
       match /{subCol}/{docId} {
-        allow read: if isOwner(userId) && isNotBanned();
-        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+        allow read: if isOwner(userId) && isNotBanned() && subCol != 'audit_logs' && subCol != 'members';
+        allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId)
+                     && subCol != 'audit_logs' && subCol != 'members';
       }
     }
 

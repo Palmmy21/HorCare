@@ -6,6 +6,9 @@ import {
     Download, Upload, X, Layers, Camera, Check, Search,
 } from 'lucide-react';
 import MeterPhotoReader, { type MeterReadResult } from './MeterPhotoReader';
+import MeterBatchModal, { type BatchSaveResult } from './MeterBatchModal';
+import { logActivity } from '../../utils/auditLog';
+import type { RoomMeterContext, RoomReadings } from '../../utils/meterBatch';
 import type { Room, DormConfig, MonthlyBill, CommonFee } from '../../types';
 import {
     calculateFullBill,
@@ -29,6 +32,8 @@ interface MeterRecordingProps {
     buildingId?: string;
     /** true = ผู้ใช้เป็น Plus หรือ Pro — เปิดใช้ฟีเจอร์อ่านมิเตอร์จากรูปถ่าย */
     canUseMeterPhoto?: boolean;
+    /** Signed-in owner uid. Needed for AI batch reading (server checks permission); omit for maid sessions. */
+    ownerUid?: string;
 }
 
 interface RoomRecordingState {
@@ -89,7 +94,9 @@ export default function MeterRecording({
     onMonthChange,
     buildingId,
     canUseMeterPhoto = false,
+    ownerUid,
 }: MeterRecordingProps) {
+    const [showBatch, setShowBatch] = useState(false);
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'saved' | 'unsaved'>('all');
@@ -341,6 +348,85 @@ export default function MeterRecording({
         }
 
         flushSync(() => setBulkProgress(prev => prev ? { ...prev, done: true, failed } : null));
+    };
+
+    // ── AI batch reading ───────────────────────────────────────────────────────
+    // What the batch review needs to judge a reading: last month's closing value, last
+    // month's usage (to spot jumps) and whether the month is already closed.
+    const getBatchContext = (roomId: string, type: 'electric' | 'water'): RoomMeterContext | undefined => {
+        const state = recordingState[roomId];
+        if (!state) return undefined;
+        const prev = getPreviousBill(roomId, currentMonth);
+        return {
+            previous: parseInt(type === 'electric' ? state.prevElec : state.prevWater) || 0,
+            lastUnits: type === 'electric' ? prev?.elec_units : prev?.water_units,
+            locked: state.isLocked,
+        };
+    };
+
+    // Called only with readings a person confirmed. A room needs both an electric and a
+    // water reading to become a bill; with only one, the value is kept as a draft in the
+    // normal recording form (same as typing it) so the other can be added later.
+    const saveBatchReadings = async (readings: RoomReadings[], meta: { overriddenCount: number }): Promise<BatchSaveResult> => {
+        const result: BatchSaveResult = { bills: 0, drafts: 0, failed: [] };
+        const savedRooms: string[] = [];
+
+        for (const r of readings) {
+            const room = rooms.find(x => x.id === r.roomId);
+            const state = recordingState[r.roomId];
+            if (!room || !state || state.isLocked) { result.failed.push(r.roomId); continue; }
+
+            const currElec = r.electric !== undefined ? String(r.electric) : state.currElec;
+            const currWater = r.water !== undefined ? String(r.water) : state.currWater;
+            const next: RoomRecordingState = { ...state, currElec, currWater, isSaved: false };
+            writeDraft(draftKey, r.roomId, { prevElec: next.prevElec, prevWater: next.prevWater, currElec, currWater });
+
+            const prevElec = parseInt(next.prevElec) || 0;
+            const prevWater = parseInt(next.prevWater) || 0;
+            const complete = currElec !== '' && currWater !== ''
+                && validateReading(prevElec, parseInt(currElec)).valid
+                && validateReading(prevWater, parseInt(currWater)).valid;
+
+            if (!complete) {
+                setRecordingState(prev => ({ ...prev, [r.roomId]: next }));
+                result.drafts++;
+                savedRooms.push(room.room_number);
+                continue;
+            }
+
+            const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+            const { electricityRate, waterConfig } = getEffectiveRates(room, config);
+            const calc = calculateFullBill(prevElec, parseInt(currElec), prevWater, parseInt(currWater), config, effectiveRent,
+                room.tenant_count, electricityRate, waterConfig, commonFees, room.common_fee_overrides, currentMonth);
+            const now = new Date().toISOString();
+            const bill: MonthlyBill = {
+                id: `bill_${room.id}_${currentMonth}`, room_id: room.id, room_number: room.room_number, month: currentMonth,
+                prev_elec: prevElec, curr_elec: parseInt(currElec), elec_units: calc.elec_units, elec_bill: calc.elec_bill,
+                prev_water: prevWater, curr_water: parseInt(currWater), water_units: calc.water_units, water_bill: calc.water_bill,
+                water_flat_amount: calc.water_flat_amount, water_excess_units: calc.water_excess_units,
+                water_excess_amount: calc.water_excess_amount, common_fee: calc.common_fee,
+                applied_common_fees: calc.applied_common_fees, room_rent: effectiveRent, total_bill: calc.total_bill,
+                is_saved: true, is_locked: false, is_notified: false, created_at: now, updated_at: now,
+            };
+            try {
+                await onSaveBill(bill);
+                removeDraft(draftKey, r.roomId);
+                setRecordingState(prev => ({ ...prev, [r.roomId]: { ...next, isSaved: true } }));
+                result.bills++;
+                savedRooms.push(room.room_number);
+            } catch {
+                result.failed.push(r.roomId);
+            }
+        }
+
+        if (savedRooms.length > 0) {
+            logActivity({
+                action: 'CREATE', resourceType: 'meter', resourceLabel: `AI batch · ${savedRooms.length} rooms · ${currentMonth}`,
+                after: { rooms: savedRooms, bills: result.bills, drafts: result.drafts },
+                note: `AI-assisted, human-confirmed; warnings overridden: ${meta.overriddenCount}`,
+            });
+        }
+        return result;
     };
 
     // ── CSV export template ────────────────────────────────────────────────────
@@ -841,6 +927,17 @@ export default function MeterRecording({
                 </div>
             </div>
         )}
+            {showBatch && ownerUid && buildingId && (
+                <MeterBatchModal
+                    ownerUid={ownerUid}
+                    buildingId={buildingId}
+                    rooms={rooms}
+                    monthLabel={formatMonthThai(currentMonth)}
+                    getContext={getBatchContext}
+                    onSave={saveBatchReadings}
+                    onClose={() => setShowBatch(false)}
+                />
+            )}
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
@@ -863,6 +960,16 @@ export default function MeterRecording({
                             </button>
                         ) : null;
                     })()}
+                    {canUseMeterPhoto && ownerUid && buildingId && (
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => setShowBatch(true)}
+                            title="อ่านมิเตอร์จากรูปหลายรูปพร้อมกันด้วย AI"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontWeight: 700 }}
+                        >
+                            <Camera size={15} /> AI อ่านเป็นชุด
+                        </button>
+                    )}
                     <button
                         className="btn btn-outline btn-sm"
                         onClick={exportTemplate}

@@ -1,6 +1,8 @@
 import { useState, useRef, Fragment } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles, Layers } from 'lucide-react';
 import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
+import BulkRoomModal from './BulkRoomModal';
+import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
 import { formatCurrency } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
@@ -11,6 +13,9 @@ interface RoomManagementProps {
     config: DormConfig;
     commonFees: CommonFee[];
     onAddRoom: (roomNumber: string) => void;
+    /** Create many rooms at once; rejects if any room number already exists. */
+    onBulkCreate?: (rooms: Partial<Room>[]) => Promise<{ created: number }>;
+    onSaveConfig?: (config: DormConfig) => Promise<void>;
     onUpdateRoom: (roomId: string, updates: Partial<Room>) => Promise<void>;
     onDeleteRoom: (roomId: string) => void;
     maxRooms?: number;
@@ -26,6 +31,8 @@ export default function RoomManagement({
     config,
     commonFees,
     onAddRoom,
+    onBulkCreate,
+    onSaveConfig,
     onUpdateRoom,
     onDeleteRoom,
     maxRooms = Infinity,
@@ -56,6 +63,8 @@ export default function RoomManagement({
     const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [tenantRoomId, setTenantRoomId] = useState<string | null>(null);
+    const [showBulk, setShowBulk] = useState(false);
+    const [editAmenities, setEditAmenities] = useState<string[]>([]);
 
     // ── Search & Filter state ───────────────────────────────────────────────────
     const [searchQuery, setSearchQuery] = useState('');
@@ -116,6 +125,7 @@ export default function RoomManagement({
         );
         setEditCommonFeeOverrides(room.common_fee_overrides || {});
         setEditLanguage(room.language || '');
+        setEditAmenities(room.amenities || []);
     };
 
     const saveEdit = async (roomId: string) => {
@@ -148,6 +158,7 @@ export default function RoomManagement({
 
         updates.common_fee_overrides = editCommonFeeOverrides;
         updates.language = editLanguage ? (editLanguage as BillLanguage) : undefined;
+        updates.amenities = editAmenities;
 
         try {
             await onUpdateRoom(roomId, updates);
@@ -296,6 +307,17 @@ export default function RoomManagement({
 
     return (
         <div>
+            {showBulk && onBulkCreate && onSaveConfig && (
+                <BulkRoomModal
+                    existingRooms={rooms}
+                    config={config}
+                    remainingSlots={Math.max(0, maxRooms - rooms.length)}
+                    unitName={terms.unitName}
+                    onCreate={onBulkCreate}
+                    onSaveConfig={onSaveConfig}
+                    onClose={() => setShowBulk(false)}
+                />
+            )}
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -320,6 +342,17 @@ export default function RoomManagement({
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', borderColor: '#D97706', color: '#B45309', background: '#FEF3C7', fontWeight: 700 }}
                         >
                             <Sparkles size={15} /> สร้าง 10 แผงตัวอย่าง
+                        </button>
+                    )}
+                    {onBulkCreate && onSaveConfig && (
+                        <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => setShowBulk(true)}
+                            disabled={atRoomLimit}
+                            title={`สร้าง${terms.unitName}หลายรายการพร้อมกัน เช่น 101–120`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                        >
+                            <Layers size={15} /> สร้างหลายรายการ
                         </button>
                     )}
                     <button
@@ -940,6 +973,35 @@ export default function RoomManagement({
                                                                 <span>{opt.nativeName}</span>
                                                             </button>
                                                         ))}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {editingRoom === room.id && (
+                                        <tr key={`${room.id}-amenities`} style={{ background: 'rgba(96,165,250,0.06)' }}>
+                                            <td colSpan={hasAnyCommercial ? 11 : 10} style={{ padding: '0.5rem 2rem', borderTop: 'none' }}>
+                                                <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.5rem' }}>สิ่งอำนวยความสะดวก</div>
+                                                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                                                        {[...BUILTIN_AMENITIES.map(a => a.id), ...(config.custom_amenities ?? []),
+                                                          ...editAmenities.filter(a => !BUILTIN_AMENITIES.some(b => b.id === a) && !(config.custom_amenities ?? []).includes(a))
+                                                        ].map(key => {
+                                                            const on = editAmenities.includes(key);
+                                                            return (
+                                                                <button
+                                                                    key={key} type="button" aria-pressed={on}
+                                                                    onClick={() => setEditAmenities(prev => on ? prev.filter(x => x !== key) : [...prev, key])}
+                                                                    className="btn btn-sm"
+                                                                    style={{
+                                                                        background: on ? '#2563EB' : 'var(--color-gray-100)',
+                                                                        color: on ? '#fff' : 'var(--color-gray-700)',
+                                                                        border: '1px solid var(--color-gray-300)', borderRadius: '6px',
+                                                                        fontSize: '0.75rem', padding: '0.2rem 0.5rem',
+                                                                    }}
+                                                                >{amenityLabel(key)}</button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </td>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, Zap, Ban,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -12,6 +12,7 @@ import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 import { getWorkspaceTerms } from './utils/workspaceTerminology';
+import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
 import RoomManagement from './components/RoomManagement/RoomManagement';
@@ -36,6 +37,7 @@ const MaintenancePage = lazy(() => import('./components/Maintenance/MaintenanceP
 const CleaningPage    = lazy(() => import('./components/Cleaning/CleaningPage'));
 const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'));
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
+const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
 
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
@@ -67,7 +69,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -112,7 +114,7 @@ function App() {
   // Auth
   const {
     user, profile, loading: authLoading, error: authError,
-    emailVerified, login, register, logout, resetPassword,
+    emailVerified, login, register, logout: signOutUser, resetPassword,
     sendVerifyEmailViaResend, refreshEmailVerified,
     isPaidExpired, licenseDaysLeft, isBanned, setError
   } = useAuth();
@@ -148,6 +150,44 @@ function App() {
 
   const effectiveUid = maidSession ? maidSession.owner_uid : (user?.uid ?? null);
   const effectiveBuildingId = maidSession ? maidSession.building_id : activeBuildingId;
+
+  // Activity log identity. Maid sessions have no Firebase user, so nothing is logged for them.
+  useEffect(() => {
+    if (!user || maidSession) {
+      setAuditContext(null);
+      return;
+    }
+    setAuditContext({
+      organizationId: user.uid,
+      userId: user.uid,
+      userName: user.displayName || user.email || user.uid,
+      role: 'owner',
+      propertyId: activeBuildingId,
+    });
+  }, [user, maidSession, activeBuildingId]);
+
+  // One LOGIN event per browser session (page reloads restore the session and are not logins).
+  useEffect(() => {
+    if (!user || maidSession) return;
+    const key = `horcare_login_logged_${user.uid}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch { /* storage blocked — log anyway */ }
+    logActivity({ action: 'LOGIN', resourceType: 'session', resourceId: user.uid, resourceLabel: user.email ?? undefined, propertyId: null });
+  }, [user, maidSession]);
+
+  const logout = async () => {
+    if (user && !maidSession) {
+      // Must be written before sign-out (rules need the auth token); don't hang if offline.
+      await Promise.race([
+        logActivityAsync({ action: 'LOGOUT', resourceType: 'session', resourceId: user.uid, resourceLabel: user.email ?? undefined, propertyId: null }),
+        new Promise(resolve => setTimeout(resolve, 1500)),
+      ]);
+      try { sessionStorage.removeItem(`horcare_login_logged_${user.uid}`); } catch { /* ignore */ }
+    }
+    await signOutUser();
+  };
 
   // Buildings (multi-building support — Large plan)
   const { buildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(effectiveUid);
@@ -255,6 +295,7 @@ function App() {
     loading: dataLoading,
     saveConfig,
     addRoom,
+    addRoomsBulk,
     updateRoom,
     deleteRoom,
     saveBill,
@@ -338,6 +379,7 @@ function App() {
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
+    { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
 
     { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
     { id: 'pricing'     as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
@@ -1336,6 +1378,8 @@ function App() {
             config={config}
             commonFees={commonFees}
             onAddRoom={addRoom}
+            onBulkCreate={addRoomsBulk}
+            onSaveConfig={saveConfig}
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
             maxRooms={maxRooms}
@@ -1414,6 +1458,7 @@ function App() {
             onMonthChange={handleMonthChange}
             buildingId={activeBuildingId ?? undefined}
             canUseMeterPhoto={isPlusOrAbove(profile?.license ?? 'free')}
+            ownerUid={maidSession ? undefined : user?.uid}
           />
         )}
 
@@ -1457,6 +1502,15 @@ function App() {
         )}
 
 
+
+        {currentView === 'security' && user && !maidSession && (
+          <SecurityPage
+            ownerUid={user.uid}
+            buildings={buildings}
+            config={config}
+            onSaveConfig={saveConfig}
+          />
+        )}
 
         {currentView === 'settings' && (
           <Settings

@@ -12,6 +12,9 @@ import sendLineFineHandler from './_send-line-fine.js';
 import sendVerifyEmailHandler from './_send-verify-email.js';
 import uploadSlipHandler from './_upload-slip.js';
 import notifyPushHandler from './_notify-push.js';
+import invitationsHandler from './_invitations.js';
+import membersHandler from './_members.js';
+import meterOcrHandler from './_meter-ocr.js';
 
 // Apply the maximum duration config globally to this API gateway
 export const config = { maxDuration: 60 };
@@ -23,6 +26,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (route) {
         case 'admin': return adminHandler(req, res);
         case 'create-checkout': return createCheckoutHandler(req, res);
+        case 'invitations': return invitationsHandler(req, res);
+        case 'members': return membersHandler(req, res);
+        case 'meter-ocr': return meterOcrHandler(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);
         case 'notify-payment': return notifyPaymentHandler(req, res);

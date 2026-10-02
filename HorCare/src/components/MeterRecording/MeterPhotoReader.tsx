@@ -6,6 +6,7 @@
 import { useRef, useState } from 'react';
 import { Camera, Upload, X, RotateCcw, CheckCircle, AlertTriangle, Zap, Droplets, HelpCircle, AlertCircle } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
+import { compressImage } from '../../utils/imageCompress';
 
 export interface MeterReadResult {
     reading: number;
@@ -21,41 +22,6 @@ interface MeterPhotoReaderProps {
     onConfirm: (result: MeterReadResult) => void;
     /** เรียกเมื่อปิด modal */
     onClose: () => void;
-}
-
-// ── Image compression ─────────────────────────────────────────────────────────
-/** ย่อรูปลง Canvas แล้วส่งออกเป็น base64 JPEG (<= 1MB) */
-async function compressImage(file: File): Promise<{ base64: string; mimeType: string }> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const MAX = 1200; // px
-            let { width, height } = img;
-            if (width > MAX || height > MAX) {
-                const ratio = Math.min(MAX / width, MAX / height);
-                width = Math.round(width * ratio);
-                height = Math.round(height * ratio);
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d')!;
-            ctx.drawImage(img, 0, 0, width, height);
-
-            // ลด quality ถ้ายังใหญ่เกิน
-            let quality = 0.82;
-            let dataUrl = canvas.toDataURL('image/jpeg', quality);
-            while (dataUrl.length > 5_500_000 && quality > 0.3) {
-                quality -= 0.1;
-                dataUrl = canvas.toDataURL('image/jpeg', quality);
-            }
-            // strip data URL header → base64 only
-            const base64 = dataUrl.split(',')[1];
-            resolve({ base64, mimeType: 'image/jpeg' });
-        };
-        img.onerror = reject;
-        img.src = URL.createObjectURL(file);
-    });
 }
 
 // ── API call ──────────────────────────────────────────────────────────────────

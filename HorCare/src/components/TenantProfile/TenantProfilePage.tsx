@@ -17,6 +17,7 @@ import {
   PenTool, ShieldCheck, Copy, CheckCheck, Send,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { logActivity } from '../../utils/auditLog';
 import type { Room, TenantProfile, TenantEvent, DormConfig, SignedContractData } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
@@ -74,6 +75,11 @@ export default function TenantProfilePage({
 }: TenantProfilePageProps) {
   const { profile, events, loading, saveProfile, addEvent, deleteEvent } =
     useTenantProfile(uid, buildingId, room.id);
+
+  // Tenant PII (ID card, birthdate, contract) lives here — record who opened it.
+  useEffect(() => {
+    logActivity({ action: 'VIEW', resourceType: 'tenant', resourceId: room.id, resourceLabel: `Room ${room.room_number}` });
+  }, [room.id, room.room_number]);
 
   const isMobile = useMobile();
   const terms = getWorkspaceTerms(config?.building_type || (room.room_type === 'commercial' ? 'market' : 'dormitory'));

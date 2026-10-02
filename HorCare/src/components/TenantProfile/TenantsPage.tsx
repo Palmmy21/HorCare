@@ -9,6 +9,7 @@ import type { Room, DormConfig } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
+import InvitationModal from './InvitationModal';
 
 interface TenantsPageProps {
   rooms: Room[];
@@ -36,7 +37,7 @@ import RoomStatusDashboard from '../RoomManagement/RoomStatusDashboard';
 
 // ── Single room card (fetches its own profile) ───────────────────────────────
 function TenantCard({
-  room, uid, buildingId, onOpenProfile, filter, search, buildingType,
+  room, uid, buildingId, onOpenProfile, onInvite, filter, search, buildingType,
 }: {
   room: Room;
   uid: string;
@@ -44,6 +45,7 @@ function TenantCard({
   isPaid?: boolean;
   onUpgrade?: () => void;
   onOpenProfile: (room: Room) => void;
+  onInvite: (room: Room, tenantName?: string) => void;
   filter: FilterMode;
   search: string;
   buildingType?: DormConfig['building_type'];
@@ -265,6 +267,20 @@ function TenantCard({
           </span>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          {/* Invite: owner-issued code that binds the tenant's LINE to exactly this room */}
+          <button
+            onClick={e => { e.stopPropagation(); onInvite(room, profile?.full_name); }}
+            title={`สร้างรหัสเชิญให้${terms.tenantLabel}ลงทะเบียนห้องนี้`}
+            style={{
+              background: 'rgba(6,199,85,0.08)', border: '1px solid rgba(6,199,85,0.25)',
+              borderRadius: '8px', padding: '0.3rem 0.5rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '0.25rem',
+              color: '#059669', fontSize: '0.7rem', fontWeight: 700,
+            }}
+          >
+            <MessageCircle size={13} />
+            <span className="tenant-link-label">เชิญ</span>
+          </button>
           {/* Copy tenant portal link */}
           <button
             onClick={copyTenantLink}
@@ -299,6 +315,7 @@ export default function TenantsPage({
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<{ room: Room; tenantName?: string } | null>(null);
 
   const activeRooms = rooms.filter(r => r.is_active);
 
@@ -397,8 +414,20 @@ export default function TenantsPage({
         search={search}
         filter={filter}
         onOpenProfile={setSelectedRoom}
+        onInvite={(room, tenantName) => setInviteTarget({ room, tenantName })}
         buildingType={buildingType}
       />
+
+      {inviteTarget && (
+        <InvitationModal
+          ownerUid={uid}
+          buildingId={buildingId}
+          room={inviteTarget.room}
+          tenantName={inviteTarget.tenantName}
+          unitName={terms.unitName}
+          onClose={() => setInviteTarget(null)}
+        />
+      )}
 
       {/* Profile Modal */}
       {selectedRoom && (
@@ -418,7 +447,7 @@ export default function TenantsPage({
 
 // ── Tenant Grid (separated to avoid hook-in-loop issues) ────────────────────
 function TenantGrid({
-  rooms, uid, buildingId, isPaid, onUpgrade, search, filter, onOpenProfile, buildingType,
+  rooms, uid, buildingId, isPaid, onUpgrade, search, filter, onOpenProfile, onInvite, buildingType,
 }: {
   rooms: Room[];
   uid: string;
@@ -428,6 +457,7 @@ function TenantGrid({
   search: string;
   filter: FilterMode;
   onOpenProfile: (room: Room) => void;
+  onInvite: (room: Room, tenantName?: string) => void;
   buildingType?: DormConfig['building_type'];
 }) {
   const terms = getWorkspaceTerms(buildingType);
@@ -453,6 +483,7 @@ function TenantGrid({
             isPaid={isPaid}
             onUpgrade={onUpgrade}
             onOpenProfile={onOpenProfile}
+            onInvite={onInvite}
             filter={filter}
             search={search}
             buildingType={buildingType}

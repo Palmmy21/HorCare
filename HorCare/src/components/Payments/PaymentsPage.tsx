@@ -4,7 +4,10 @@ import {
     Image as ImageIcon, Check, RotateCcw, Loader2, X, TrendingUp,
     CalendarDays, User, Banknote, Download, CheckSquare, Square, TriangleAlert, AlertTriangle,
 } from 'lucide-react';
-import type { MonthlyBill, Room, DormConfig, PaymentStatus, Fine } from '../../types';
+import type { MonthlyBill, Room, DormConfig, PaymentStatus, Fine, PaymentMethod } from '../../types';
+import PaymentMethodModal from './PaymentMethodModal';
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, VERIFICATION_LABELS, resolvePaymentMethod, type PaymentRecordFields } from '../../utils/paymentMethods';
+import { logActivity } from '../../utils/auditLog';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc, collection, query, onSnapshot, updateDoc } from 'firebase/firestore';
 import { storage, db, auth } from '../../firebase/config';
@@ -50,6 +53,12 @@ type PayableItem = {
   slip_image?: boolean;
   slip_path?: string;
   paid_at?: string;
+  payment_method?: PaymentMethod;
+  paid_amount?: number;
+  received_by?: string;
+  transaction_ref?: string;
+  verification_status?: MonthlyBill['verification_status'];
+  paid_method?: 'auto' | 'manual';
   title: string;
   originalBill?: MonthlyBill;
   originalFine?: Fine;
@@ -68,6 +77,9 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     }, [uid, buildingId]);
 
     const [filter, setFilter] = useState<FilterKey>('all');
+    const [methodFilter, setMethodFilter] = useState<'all' | PaymentMethod>('all');
+    // Items waiting for the user to choose how they were paid (one = single, many = bulk).
+    const [payModal, setPayModal] = useState<PayableItem[] | null>(null);
     const [search, setSearch] = useState('');
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [slipView, setSlipView] = useState<{ url?: string; loading: boolean; error?: string; item: PayableItem } | null>(null);
@@ -84,7 +96,9 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
             total_amount: b.total_bill, payment_status: b.payment_status || 'unpaid',
             slip_submitted_at: b.slip_submitted_at, slip_ref: b.slip_ref, slip_amount: b.slip_amount,
             slip_sender: b.slip_sender, verify_note: b.verify_note, slip_image: b.slip_image, slip_path: b.slip_path,
-            paid_at: b.paid_at, title: 'บิลค่าเช่า', originalBill: b
+            paid_at: b.paid_at, payment_method: b.payment_method, paid_amount: b.paid_amount, received_by: b.received_by,
+            transaction_ref: b.transaction_ref, verification_status: b.verification_status, paid_method: b.paid_method,
+            title: 'บิลค่าเช่า', originalBill: b
         }));
 
         const fineList = fines.filter(f => f.date.startsWith(currentMonth));
@@ -93,7 +107,9 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
             total_amount: f.amount, payment_status: f.status || 'unpaid',
             slip_submitted_at: f.slip_submitted_at, slip_ref: f.slip_ref, slip_amount: f.slip_amount,
             slip_sender: f.slip_sender, verify_note: f.verify_note, slip_image: f.slip_image,
-            paid_at: f.paid_at, title: 'ค่าปรับ: ' + f.reason, originalFine: f
+            paid_at: f.paid_at, payment_method: f.payment_method, paid_amount: f.paid_amount, received_by: f.received_by,
+            transaction_ref: f.transaction_ref, verification_status: f.verification_status, paid_method: f.paid_method,
+            title: 'ค่าปรับ: ' + f.reason, originalFine: f
         }));
 
         const orderOf = new Map(rooms.map((r, i) => [r.id, i]));
@@ -114,8 +130,24 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         return { paid, pending, unpaid, collected, outstanding, total: monthItems.length };
     }, [monthItems]);
 
+    // Collected money split by how it arrived. Total = cash + transfer + gateway + other.
+    const methodTotals = useMemo(() => {
+        const totals: Record<PaymentMethod, { amount: number; count: number }> = {
+            cash: { amount: 0, count: 0 }, bank_transfer: { amount: 0, count: 0 },
+            qr_gateway: { amount: 0, count: 0 }, other: { amount: 0, count: 0 },
+        };
+        for (const b of monthItems) {
+            if (b.payment_status !== 'paid') continue;
+            const m = resolvePaymentMethod(b);
+            totals[m].amount += b.paid_amount ?? b.total_amount;
+            totals[m].count++;
+        }
+        return totals;
+    }, [monthItems]);
+
     const filtered = monthItems.filter(b => {
         if (filter !== 'all' && b.payment_status !== filter) return false;
+        if (methodFilter !== 'all' && (b.payment_status !== 'paid' || resolvePaymentMethod(b) !== methodFilter)) return false;
         if (search && !b.room_number.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
     });
@@ -145,29 +177,45 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         });
     };
 
-    const bulkConfirmPaid = async () => {
-        if (selected.size === 0) return;
-        if (!confirm(`ยืนยันว่า ${selected.size} รายการที่เลือกชำระแล้วทั้งหมด?`)) return;
-        setBulkProcessing(true);
+    // Bulk confirm: pick one method for every selected item, then write them all.
+    const bulkConfirmPaid = () => {
+        const items = [...selected].map(id => filtered.find(x => x.id === id)).filter((x): x is PayableItem => !!x);
+        if (items.length > 0) setPayModal(items);
+    };
+
+    /** Persist a confirmed payment for every item, with the method details the user entered. */
+    const applyPayment = async (items: PayableItem[], fields: PaymentRecordFields) => {
+        const bulk = items.length > 1;
+        setBulkProcessing(bulk);
+        if (!bulk) setProcessingId(items[0].id);
         try {
-            const now = new Date().toISOString();
-            await Promise.all([...selected].map(id => {
-                const item = filtered.find(x => x.id === id);
-                if (!item) return Promise.resolve();
+            await Promise.all(items.map(async item => {
+                const record = { ...fields, paid_amount: fields.paid_amount ?? item.total_amount };
                 if (item.type === 'bill') {
-                    return onUpdatePayment(item.id, { payment_status: 'paid', paid_at: now, paid_method: 'manual' });
+                    await onUpdatePayment(item.id, { ...record, payment_status: 'paid' });
+                    void notifyTenantPaid(item.originalBill!);
                 } else {
-                    return updateDoc(doc(db, `users/${uid}/buildings/${buildingId}/fines/${item.id}`), { status: 'paid', paid_at: now, paid_method: 'manual' });
+                    await updateDoc(doc(db, `users/${uid}/buildings/${buildingId}/fines/${item.id}`), { ...record, status: 'paid' });
+                    logActivity({
+                        action: 'PAYMENT_MODIFY', resourceType: 'payment', resourceId: item.id,
+                        resourceLabel: `Room ${item.room_number} ${item.title}`,
+                        before: { status: item.payment_status },
+                        after: { status: 'paid', payment_method: record.payment_method, paid_amount: record.paid_amount },
+                    });
                 }
             }));
             setSelected(new Set());
-        } finally { setBulkProcessing(false); }
+            setPayModal(null);
+        } finally {
+            setBulkProcessing(false);
+            setProcessingId(null);
+        }
     };
 
     const exportCSV = () => {
         const THAI_STATUS: Record<PaymentStatus, string> = { paid: 'จ่ายแล้ว', pending: 'รอตรวจสอบ', unpaid: 'ยังไม่จ่าย' };
         const rows = [
-            ['เดือน', 'ห้อง', 'ประเภท', 'รายการ', 'ค่าไฟ (หน่วย)', 'ค่าไฟ (บาท)', 'ค่าน้ำ (หน่วย)', 'ค่าน้ำ (บาท)', 'ค่าเช่า (บาท)', 'ค่าส่วนกลาง (บาท)', 'รวม (บาท)', 'สถานะ', 'ยอดสลิป', 'วันที่ชำระ'],
+            ['เดือน', 'ห้อง', 'ประเภท', 'รายการ', 'ค่าไฟ (หน่วย)', 'ค่าไฟ (บาท)', 'ค่าน้ำ (หน่วย)', 'ค่าน้ำ (บาท)', 'ค่าเช่า (บาท)', 'ค่าส่วนกลาง (บาท)', 'รวม (บาท)', 'สถานะ', 'ยอดสลิป', 'วันที่ชำระ', 'วิธีชำระเงิน', 'ยอดที่รับ', 'ผู้รับเงิน', 'เลขอ้างอิง'],
             ...monthItems.map(b => [
                 monthLabel(b.month),
                 b.room_number,
@@ -183,6 +231,10 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                 THAI_STATUS[b.payment_status],
                 b.slip_amount ?? '',
                 b.paid_at ? new Date(b.paid_at).toLocaleDateString('th-TH') : '',
+                b.payment_status === 'paid' ? PAYMENT_METHOD_LABELS[resolvePaymentMethod(b)] : '',
+                b.payment_status === 'paid' ? (b.paid_amount ?? b.total_amount) : '',
+                b.received_by ?? '',
+                b.transaction_ref ?? b.slip_ref ?? '',
             ]),
         ];
         const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -191,6 +243,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         a.href = URL.createObjectURL(blob);
         a.download = `payments_${currentMonth}_${dormName}.csv`;
         a.click();
+        logActivity({ action: 'EXPORT', resourceType: 'payment', resourceLabel: `Payments ${currentMonth}`, note: `${monthItems.length} rows` });
     };
 
     const notifyTenantPaid = async (b: MonthlyBill) => {
@@ -208,18 +261,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         }
     };
 
-    const confirmPaid = async (item: PayableItem) => {
-        setProcessingId(item.id);
-        try {
-            const now = new Date().toISOString();
-            if (item.type === 'bill') {
-                await onUpdatePayment(item.id, { payment_status: 'paid', paid_at: now, paid_method: 'manual' });
-                void notifyTenantPaid(item.originalBill!);
-            } else {
-                await updateDoc(doc(db, `users/${uid}/buildings/${buildingId}/fines/${item.id}`), { status: 'paid', paid_at: now, paid_method: 'manual' });
-            }
-        } finally { setProcessingId(null); }
-    };
+    const confirmPaid = (item: PayableItem) => setPayModal([item]);
 
     const undoPaid = async (item: PayableItem) => {
         if (!confirm(`ยกเลิกสถานะจ่ายของห้อง ${item.room_number}?`)) return;
@@ -230,6 +272,11 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                 await onUpdatePayment(item.id, { payment_status: status, paid_at: '', paid_method: 'manual' });
             } else {
                 await updateDoc(doc(db, `users/${uid}/buildings/${buildingId}/fines/${item.id}`), { status, paid_at: '', paid_method: 'manual' });
+                logActivity({
+                    action: 'PAYMENT_MODIFY', resourceType: 'payment', resourceId: item.id,
+                    resourceLabel: `Room ${item.room_number} ${item.title}`,
+                    before: { status: 'paid', payment_method: item.payment_method }, after: { status }, note: 'undo paid',
+                });
             }
         } finally { setProcessingId(null); }
     };
@@ -341,6 +388,39 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                     </div>
                 ))}
             </div>
+
+            {stats.paid > 0 && (
+                <div className="card" style={{ padding: '0.875rem 1rem', marginBottom: '1.25rem' }}>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-gray-700)', marginBottom: '0.5rem' }}>
+                        รายรับแยกตามวิธีชำระ
+                        <span style={{ fontWeight: 500, color: 'var(--color-gray-500)' }}> · รวม ฿{stats.collected.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem' }}>
+                        {PAYMENT_METHODS.map(m => {
+                            const on = methodFilter === m;
+                            return (
+                                <button
+                                    key={m} type="button" aria-pressed={on}
+                                    onClick={() => { setMethodFilter(on ? 'all' : m); if (!on) setFilter('paid'); }}
+                                    style={{
+                                        textAlign: 'left', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: 10,
+                                        border: `1.5px solid ${on ? '#6366F1' : 'var(--color-gray-200)'}`,
+                                        background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                    }}
+                                >
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>{PAYMENT_METHOD_LABELS[m]} · {methodTotals[m].count} รายการ</div>
+                                    <div style={{ fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--color-gray-800)' }}>฿{methodTotals[m].amount.toLocaleString()}</div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {methodFilter !== 'all' && (
+                        <button className="btn btn-outline btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setMethodFilter('all')}>
+                            <X size={12} /> ล้างตัวกรองวิธีชำระ ({PAYMENT_METHOD_LABELS[methodFilter]})
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                 <div style={{ display: 'inline-flex', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-md)', padding: 3, gap: 3, flexWrap: 'wrap' }}>
@@ -463,6 +543,16 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, borderRadius: 999, padding: '0.25rem 0.7rem', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
                                     <meta.icon size={13} /> {meta.label}
                                 </span>
+                                {s === 'paid' && (
+                                    <span
+                                        title={[b.received_by && `ผู้รับ: ${b.received_by}`, b.transaction_ref && `อ้างอิง: ${b.transaction_ref}`,
+                                            b.verification_status && VERIFICATION_LABELS[b.verification_status]].filter(Boolean).join(' · ') || undefined}
+                                        style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-gray-600)', background: 'var(--color-gray-100)', borderRadius: 999, padding: '0.2rem 0.55rem', whiteSpace: 'nowrap' }}
+                                    >
+                                        {PAYMENT_METHOD_LABELS[resolvePaymentMethod(b)]}
+                                        {b.verification_status === 'verified' ? ' ✓' : ''}
+                                    </span>
+                                )}
                                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                     {(b.slip_image || b.slip_path) && (
                                         <button className="btn btn-outline btn-sm" onClick={() => openSlip(b)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -490,6 +580,18 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                         </div>
                     )}
                 </div>
+            )}
+
+            {payModal && (
+                <PaymentMethodModal
+                    labels={payModal.map(i => `ห้อง ${i.room_number} · ${i.title}`)}
+                    amount={payModal.length === 1 ? payModal[0].total_amount : undefined}
+                    defaultMethod={payModal.length === 1 && (payModal[0].slip_image || payModal[0].slip_path) ? 'bank_transfer' : 'cash'}
+                    defaultReference={payModal.length === 1 ? (payModal[0].slip_ref ?? '') : ''}
+                    receiverName={auth.currentUser?.displayName || auth.currentUser?.email || ''}
+                    onConfirm={fields => applyPayment(payModal, fields)}
+                    onClose={() => setPayModal(null)}
+                />
             )}
 
             {slipView && (

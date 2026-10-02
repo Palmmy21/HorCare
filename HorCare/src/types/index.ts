@@ -107,7 +107,11 @@ export interface DormConfig {
   dorm_code?: string; // รหัสสำหรับลงทะเบียนรับบิลผ่าน LINE
   portal_pin?: string; // PIN สำหรับเข้า tenant portal (4 หลัก)
   market_config?: MarketConfig; // ตั้งค่าเฉพาะตลาด / แผงค้า
-  contract_templates?: ContractTemplate[]; // เทมเพลตสัญญาเช่าดิจิทัลที่เจ้าของสร้าง
+  /** How tenants may claim a room over LINE. Undefined = 'invitation_only'. */
+  claim_mode?: 'invitation_only' | 'legacy';
+  /** Owner-defined amenities, offered next to the built-in list in bulk room creation. */
+  custom_amenities?: string[];
+  contract_templates?: ContractTemplate[]; //เทมเพลตสัญญาเช่าดิจิทัลที่เจ้าของสร้าง
 }
 
 export interface Room {
@@ -133,6 +137,11 @@ export interface Room {
   // Room occupancy status — set manually by owner
   // 'occupied' = มีผู้เช่า, 'vacant' = ว่าง, 'reserved' = ติดจอง
   room_status?: 'occupied' | 'vacant' | 'reserved';
+  // Bulk-creation / amenity data
+  building_name?: string;      // ตึก / อาคาร (free text, e.g. 'A')
+  floor?: string;              // ชั้น
+  deposit_amount?: number;     // เงินมัดจำมาตรฐานของห้อง
+  amenities?: string[];        // amenity ids (see src/utils/amenities.ts) or custom names
   // ภาษาเฉพาะห้องสำหรับบิลและการแจ้งเตือน (ถ้าไม่ระบุจะใช้ค่าเริ่มต้นของหอพัก)
   language?: BillLanguage;
 }
@@ -178,6 +187,15 @@ export interface MonthlyBill {
   paid_at?: string;            // ISO timestamp when the bill was marked paid
   paid_method?: 'auto' | 'manual'; // how the payment was confirmed
 
+  // ── Payment method (how the money actually arrived) ──
+  payment_method?: PaymentMethod;
+  paid_amount?: number;            // amount actually received (THB)
+  received_by?: string;            // who took the cash / confirmed it (display name)
+  bank_account?: string;           // receiving account, for bank transfers
+  transaction_ref?: string;        // bank / gateway reference
+  verification_status?: PaymentVerification; // transfers: has the money been seen in the account?
+  payment_note?: string;
+
   // ── Auto reminders (written by /api/remind-bills cron) ──
   last_reminded_at?: string;   // ISO timestamp of the latest LINE reminder
   reminder_count?: number;     // total reminders sent for this bill (spam cap)
@@ -188,6 +206,11 @@ export interface MonthlyBill {
 //             (auto-verify failed, quota exhausted, or amount mismatch)
 // 'paid'    — confirmed (auto by SlipOK, or manually by the owner)
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid';
+
+// Every confirmed payment carries a method. `qr_gateway` covers PromptPay QR / card gateways.
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_gateway' | 'other';
+// 'unverified' = recorded from a slip only; 'verified' = confirmed against the bank account.
+export type PaymentVerification = 'unverified' | 'verified' | 'rejected';
 
 export interface BillCalculation {
   elec_units: number;
@@ -438,6 +461,14 @@ export interface Fine {
   verify_note?: string;
   paid_at?: string;
   paid_method?: 'auto' | 'manual';
+
+  payment_method?: PaymentMethod;
+  paid_amount?: number;
+  received_by?: string;
+  bank_account?: string;
+  transaction_ref?: string;
+  verification_status?: PaymentVerification;
+  payment_note?: string;
 }
 
 // ─── Common Fees (ค่าบริการส่วนกลาง) ─────────────────────────────────────────

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, orderBy, serverTimestamp
+    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, orderBy, serverTimestamp, writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { logActivity, diffFields } from '../utils/auditLog';
+import { findDuplicates, MAX_BULK_ROOMS } from '../utils/bulkRooms';
 import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee } from '../types';
 import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth } from '../utils/calculations';
 
@@ -178,6 +180,17 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         if (!userPath || !userId || !buildingId) return;
         await setDoc(doc(db, userPath, 'data', 'config'), newConfig);
 
+        // Only the names of the changed settings are logged — values can be large
+        // (logo base64) or sensitive (portal PIN).
+        const changedKeys = (Object.keys(newConfig) as (keyof DormConfig)[])
+            .filter(k => JSON.stringify(newConfig[k]) !== JSON.stringify(config[k]));
+        if (changedKeys.length > 0) {
+            logActivity({
+                action: 'UPDATE', resourceType: 'config', resourceId: 'config',
+                resourceLabel: 'Property settings', note: `changed: ${changedKeys.join(', ')}`,
+            });
+        }
+
         // Sync dorm logo to building document
         try {
             const logo = newConfig.bill_customization?.dorm_logo;
@@ -250,7 +263,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 throw e; // re-throw ให้ UI แสดง error ได้
             }
         }
-    }, [userPath, userId, buildingId, bills, rooms, commonFees, anchorMonth]);
+    }, [userPath, userId, buildingId, bills, rooms, commonFees, anchorMonth, config]);
 
     // Room operations
     const addRoom = useCallback(async (roomNumber: string) => {
@@ -267,14 +280,82 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             rent_type: 'monthly'
         };
         await setDoc(doc(db, userPath, 'rooms', roomId), newRoom);
+        logActivity({
+            action: 'CREATE', resourceType: 'room', resourceId: roomId,
+            resourceLabel: `Room ${roomNumber}`, after: { room_number: roomNumber, rent_amount: newRoom.rent_amount },
+        });
         return newRoom;
     }, [userPath, config.room_rent, config.building_type]);
+
+    /**
+     * Create many rooms atomically per chunk. Rejects (creating nothing) if any room
+     * number already exists in this property or repeats inside the request.
+     */
+    const addRoomsBulk = useCallback(async (inputs: Partial<Room>[]): Promise<{ created: number }> => {
+        if (!userPath) throw new Error('no_property');
+        if (inputs.length === 0) return { created: 0 };
+        if (inputs.length > MAX_BULK_ROOMS) throw new Error('too_many');
+
+        const dupes = findDuplicates(
+            inputs.map(i => String(i.room_number ?? '')),
+            rooms.map(r => r.room_number),
+        );
+        if (dupes.length > 0) {
+            const err = new Error('duplicate_room_numbers') as Error & { duplicates?: string[] };
+            err.duplicates = dupes;
+            throw err;
+        }
+
+        const stamp = Date.now();
+        const docs: Room[] = inputs.map((input, i) => ({
+            room_type: config.building_type === 'commercial' ? 'commercial' : 'dormitory',
+            current_meter_elec: 0,
+            current_meter_water: 0,
+            is_active: true,
+            rent_amount: config.room_rent,
+            rent_type: 'monthly',
+            ...input,
+            room_number: String(input.room_number).trim(),
+            id: `room_${stamp}_${i}`,
+        }));
+
+        // Firestore batches are capped at 500 writes.
+        for (let i = 0; i < docs.length; i += 400) {
+            const batch = writeBatch(db);
+            for (const r of docs.slice(i, i + 400)) {
+                // Firestore rejects `undefined` field values.
+                const clean = JSON.parse(JSON.stringify(r)) as Room;
+                batch.set(doc(db, userPath, 'rooms', r.id), clean);
+            }
+            await batch.commit();
+        }
+
+        logActivity({
+            action: 'CREATE', resourceType: 'room', resourceId: null,
+            resourceLabel: `${docs.length} rooms (${docs[0].room_number} – ${docs[docs.length - 1].room_number})`,
+            after: { count: docs.length, first: docs[0].room_number, last: docs[docs.length - 1].room_number },
+            note: 'bulk create',
+        });
+        return { created: docs.length };
+    }, [userPath, rooms, config.building_type, config.room_rent]);
 
     const updateRoom = useCallback(async (roomId: string, updates: Partial<Room>) => {
         if (!userPath) return;
 
         // 1. Update the room
         await updateDoc(doc(db, userPath, 'rooms', roomId), updates);
+
+        const roomDiff = diffFields(rooms.find(r => r.id === roomId), updates);
+        if (roomDiff) {
+            logActivity({
+                action: 'UPDATE',
+                // Meter edits get their own resource type so they are easy to filter.
+                resourceType: 'current_meter_elec' in updates || 'current_meter_water' in updates ? 'meter' : 'room',
+                resourceId: roomId,
+                resourceLabel: `Room ${rooms.find(r => r.id === roomId)?.room_number ?? roomId}`,
+                before: roomDiff.before, after: roomDiff.after,
+            });
+        }
 
         // 2. Recalculate this room's bills for the months the owner can be working
         // in: the current calendar month AND the month selected in the UI. Meter
@@ -330,8 +411,14 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
     const deleteRoom = useCallback(async (roomId: string) => {
         if (!userPath) return;
+        const existing = rooms.find(r => r.id === roomId);
         await deleteDoc(doc(db, userPath, 'rooms', roomId));
-    }, [userPath]);
+        logActivity({
+            action: 'DELETE', resourceType: 'room', resourceId: roomId,
+            resourceLabel: `Room ${existing?.room_number ?? roomId}`,
+            before: existing ? { room_number: existing.room_number, rent_amount: existing.rent_amount } : null,
+        });
+    }, [userPath, rooms]);
 
     const deleteBill = useCallback(async (billId: string) => {
         if (!userPath) return;
@@ -342,12 +429,34 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
     const updateBillPayment = useCallback(async (billId: string, fields: Partial<MonthlyBill>) => {
         if (!userPath) return;
         await updateDoc(doc(db, userPath, 'bills', billId), fields);
-    }, [userPath]);
+
+        const bill = bills.find(b => b.id === billId);
+        const pick = (b: Partial<MonthlyBill> | undefined) => b && ({
+            payment_status: b.payment_status, payment_method: b.payment_method,
+            paid_amount: b.paid_amount, paid_at: b.paid_at,
+        });
+        logActivity({
+            action: 'PAYMENT_MODIFY', resourceType: 'payment', resourceId: billId,
+            resourceLabel: `Room ${bill?.room_number ?? ''} ${bill?.month ?? ''}`.trim(),
+            before: pick(bill), after: pick({ ...bill, ...fields }),
+        });
+    }, [userPath, bills]);
 
     // Bill operations
     const saveBill = useCallback(async (bill: MonthlyBill) => {
         if (!userPath) return bill;
+        const previous = bills.find(b => b.id === bill.id);
         await setDoc(doc(db, userPath, 'bills', bill.id), bill);
+
+        // Meter readings: log only when a reading actually changed (e.g. "Room 305 Meter 1,245 → 1,285").
+        if (!previous || previous.curr_elec !== bill.curr_elec || previous.curr_water !== bill.curr_water) {
+            logActivity({
+                action: previous ? 'UPDATE' : 'CREATE', resourceType: 'meter', resourceId: bill.id,
+                resourceLabel: `Room ${bill.room_number} ${bill.month}`,
+                before: previous ? { curr_elec: previous.curr_elec, curr_water: previous.curr_water } : null,
+                after: { curr_elec: bill.curr_elec, curr_water: bill.curr_water },
+            });
+        }
 
         // Also update room meters
         await updateDoc(doc(db, userPath, 'rooms', bill.room_id), {
@@ -537,6 +646,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         loading,
         saveConfig,
         addRoom,
+        addRoomsBulk,
         updateRoom,
         deleteRoom,
         saveBill,
