@@ -25,6 +25,12 @@ export interface MeterOcrResult {
     note: string;
 }
 
+/** An OCR failure with a short, safe code the UI can show to help diagnose it. */
+class OcrError extends Error {
+    code: string;
+    constructor(code: string, message: string) { super(message); this.code = code; }
+}
+
 const EMPTY: MeterOcrResult = { room_number: null, reading: null, meter_type: 'unknown', confidence: 0, note: '' };
 
 function isPlusOrAbove(license: string): boolean {
@@ -62,7 +68,7 @@ export function parseMeterOcr(raw: string): MeterOcrResult {
 
 async function callGemini(imageBase64: string, mimeType: string): Promise<MeterOcrResult> {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY not set');
+    if (!apiKey) throw new OcrError('missing_key', 'GEMINI_API_KEY not set');
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
 
     const prompt = `คุณคือผู้เชี่ยวชาญอ่านมิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา พนักงานถ่ายรูปมิเตอร์ของแต่ละห้อง
@@ -91,10 +97,16 @@ async function callGemini(imageBase64: string, mimeType: string): Promise<MeterO
             generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json' },
         }),
     });
-    if (!resp.ok) throw new Error(`Gemini API error ${resp.status}`);
+    if (!resp.ok) {
+        // Log the provider's message server-side; the client only gets the status code.
+        console.error('[meter-ocr] Gemini', resp.status, (await resp.text()).slice(0, 300));
+        throw new OcrError(`gemini_${resp.status}`, `Gemini API error ${resp.status}`);
+    }
     const data = await resp.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } };
-    if (data.error) throw new Error(`Gemini: ${data.error.message}`);
-    return parseMeterOcr(data.candidates?.[0]?.content?.parts?.[0]?.text ?? '');
+    if (data.error) throw new OcrError('gemini_error', `Gemini: ${data.error.message}`);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new OcrError('empty_response', 'Gemini returned no text');
+    return parseMeterOcr(text);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -129,6 +141,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json({ data: await callGemini(body.imageBase64, mime) });
     } catch (err) {
         console.error('[meter-ocr]', (err as Error).message);
-        res.status(502).json({ error: 'ocr_failed', message: 'AI อ่านรูปไม่สำเร็จ กรุณาลองใหม่' });
+        const code = err instanceof OcrError ? err.code : 'unexpected';
+        const hint = code === 'missing_key' ? 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY บนเซิร์ฟเวอร์'
+            : code === 'gemini_429' ? 'โควต้า AI เต็มชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่'
+            : code === 'gemini_403' || code === 'gemini_400' ? 'คีย์ AI ใช้ไม่ได้หรือไม่มีสิทธิ์ใช้โมเดลนี้'
+            : 'AI อ่านรูปไม่สำเร็จ กรุณาลองใหม่';
+        res.status(502).json({ error: 'ocr_failed', detail: code, message: `${hint} (${code})` });
     }
 }
