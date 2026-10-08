@@ -26,6 +26,7 @@ export function dbError(err: { code?: string; message?: string }): { status: num
         case '23505': return { status: 409, code: 'conflict' };           // unique violation (e.g. room already reserved)
         case '23514': return { status: 400, code: 'invalid_input' };      // check constraint
         case '23503': return { status: 409, code: 'in_use' };            // foreign key
+        case '23P01': return { status: 409, code: 'conflict' };          // exclusion violation (room already booked for those nights)
         case 'P0002': return { status: 404, code: err.message || 'not_found' };
         case 'P0001': return { status: 409, code: err.message || 'conflict' };
         default: return { status: 502, code: 'database_error' };

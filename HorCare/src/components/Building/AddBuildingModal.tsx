@@ -3,10 +3,10 @@ import {
   Building2, Building, Home, Hotel, Store,
   Zap, DollarSign, X, Plus
 } from 'lucide-react';
-import type { DormConfig, WaterConfig, BillLanguage } from '../../types';
+import type { DormConfig, WaterConfig, BillLanguage, CollectionStyle } from '../../types';
 import './AddBuildingModal.css';
 
-import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
+import { getWorkspaceTerms, defaultCollectionStyle, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
 import { errorInfo } from '../../shared/errorInfo';
 
 interface AddBuildingModalProps {
@@ -31,6 +31,12 @@ const BUILDING_TYPES: BuildingTypeOption[] = [
   { type: 'resort', label: 'รีสอร์ท / โรงแรม', icon: <Hotel size={20} /> },
 ];
 
+const COLLECTION_STYLES: { style: CollectionStyle; label: string; hint: string; unit: string; startRent: number }[] = [
+  { style: 'monthly', label: 'รายเดือน', hint: 'ออกบิลค่าเช่า + ค่าน้ำไฟทุกเดือน', unit: 'บาท/เดือน', startRent: 3500 },
+  { style: 'nightly', label: 'รายวัน (ต่อคืน)', hint: 'จองห้อง เช็คอิน/เช็คเอาต์ คิดเงินตามจำนวนคืน', unit: 'บาท/คืน', startRent: 800 },
+  { style: 'stall', label: 'แผงค้า รายสัปดาห์/วัน', hint: 'เก็บล่วงหน้ารายสัปดาห์ หรือรายวันตามที่ร้านมาจริง', unit: 'บาท/วัน', startRent: 100 },
+];
+
 export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuildingModalProps) {
   const [name, setName] = useState('');
   const [buildingType, setBuildingType] = useState<DormConfig['building_type']>('dormitory');
@@ -38,6 +44,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
   const [waterMode, setWaterMode] = useState<'normal' | 'flat'>('normal');
   const [waterUnitRate, setWaterUnitRate] = useState<number>(18);
   const [waterFlatRate, setWaterFlatRate] = useState<number>(100);
+  const [collectionStyle, setCollectionStyle] = useState<CollectionStyle>('monthly');
   const [roomRent, setRoomRent] = useState<number>(3500);
   const [dueDay, setDueDay] = useState<number>(5);
   const [defaultLang, setDefaultLang] = useState<BillLanguage>('th');
@@ -45,6 +52,17 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
   const [error, setError] = useState('');
 
   const terms = getWorkspaceTerms(buildingType);
+  const styleInfo = COLLECTION_STYLES.find(s => s.style === collectionStyle) ?? COLLECTION_STYLES[0];
+
+  const pickStyle = (style: CollectionStyle) => {
+    setCollectionStyle(style);
+    setRoomRent(COLLECTION_STYLES.find(s => s.style === style)?.startRent ?? 3500);
+  };
+  // Picking a building type switches the collection style (and its starting rate); the owner can still change it.
+  const pickType = (type: DormConfig['building_type']) => {
+    setBuildingType(type);
+    pickStyle(defaultCollectionStyle(type));
+  };
 
   if (!isOpen) return null;
 
@@ -64,6 +82,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
 
       const initialConfig: Partial<DormConfig> = {
         building_type: buildingType,
+        collection_style: collectionStyle,
         electricity_rate: Number(elecRate) || 8,
         water_config,
         room_rent: Number(roomRent) || 3500,
@@ -78,7 +97,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
           secondary_language: 'en',
         },
         market_config: buildingType === 'market' ? {
-          default_rent_cycle: 'monthly',
+          default_rent_cycle: collectionStyle === 'monthly' ? 'monthly' : 'weekly',
           default_stall_size: '2x2 ม.',
           waste_fee_per_stall: 20,
           waste_fee_cycle: 'daily',
@@ -169,13 +188,30 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                         key={item.type}
                         type="button"
                         className={`ab-type-card ${buildingType === item.type ? 'selected' : ''}`}
-                        onClick={() => setBuildingType(item.type)}
+                        onClick={() => pickType(item.type)}
                       >
                         <div className="icon-wrap">{item.icon}</div>
                         <span className="name">{item.label}</span>
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div className="ab-field">
+                  <label className="ab-label">รูปแบบการเก็บเงิน</label>
+                  <div className="ab-segmented">
+                    {COLLECTION_STYLES.map(s => (
+                      <button
+                        key={s.style}
+                        type="button"
+                        className={`ab-segmented-btn ${collectionStyle === s.style ? 'active' : ''}`}
+                        onClick={() => pickStyle(s.style)}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: 6 }}>{styleInfo.hint}</span>
                 </div>
               </div>
             </div>
@@ -284,7 +320,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
               <div className="ab-row-2">
                 <div className="ab-field">
                   <label className="ab-label">
-                    <span>{terms.rentLabel}เฉลี่ย (บาท/เดือน)</span>
+                    <span>{collectionStyle === 'nightly' ? 'ราคาห้องเฉลี่ย' : collectionStyle === 'stall' ? 'ค่าเช่าแผงเฉลี่ย' : `${terms.rentLabel}เฉลี่ย`} ({styleInfo.unit})</span>
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input
@@ -297,12 +333,12 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                       placeholder="3500"
                     />
                     <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#94a3b8' }}>
-                      ฿/เดือน
+                      ฿/{styleInfo.unit.split('/')[1]}
                     </span>
                   </div>
                 </div>
 
-                <div className="ab-field">
+                {collectionStyle === 'monthly' && <div className="ab-field">
                   <label className="ab-label">
                     <span>กำหนดชำระทุกวันที่</span>
                   </label>
@@ -320,7 +356,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                       ของเดือน
                     </span>
                   </div>
-                </div>
+                </div>}
               </div>
 
               <div style={{ marginTop: '0.75rem' }}>

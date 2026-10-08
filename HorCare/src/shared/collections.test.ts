@@ -206,6 +206,11 @@ describe('the collector round', () => {
     expect(run([], ['s2']).find(r => r.room_id === 's2')).toMatchObject({ status: 'closed', expected_satang: 0 });
     expect(run([charge({ dedupe_key: 'stall-week:s1:2026-10-05', status: 'void' })])[0].status).toBe('due');
   });
+  it('a daily-actual stall marked absent is not asked for money, but a weekly one cannot be marked absent away', () => {
+    const rows = buildRound({ date: '2026-10-08', plans, charges: [], closedToday: new Set(), absentToday: new Set(['s1', 's2']), rooms, dayRateOf: () => null, weekRateOf: () => null });
+    expect(rows.find(r => r.room_id === 's2')).toMatchObject({ status: 'absent', expected_satang: 0 });
+    expect(rows.find(r => r.room_id === 's1')).toMatchObject({ status: 'due', expected_satang: 20000 });
+  });
   it('totals count only stalls that trade', () => {
     const t = roundTotals(run([charge({ dedupe_key: 'stall-week:s1:2026-10-05', paid_satang: 20000, status: 'paid' })]));
     expect(t).toEqual({ stalls: 2, to_collect_satang: 5000, collected_satang: 20000, unpaid: 1 });

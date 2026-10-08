@@ -259,7 +259,7 @@ export function cleanPaymentInput(raw: Record<string, unknown>): PaymentInput | 
 
 // ── The collector's round ───────────────────────────────────────────────────
 
-export type RoundStatus = 'due' | 'partial' | 'paid' | 'closed' | 'not_trading';
+export type RoundStatus = 'due' | 'partial' | 'paid' | 'closed' | 'absent' | 'not_trading';
 
 export interface RoundRow {
   room_id: string; room_number: string; mode: CollectionMode | null;
@@ -277,6 +277,8 @@ export function buildRound(input: {
   plans: StallPlan[];
   charges: Charge[];
   closedToday: Set<string>;
+  /** Stalls the collector marked as not having turned up today (daily-actual stalls pay only when they trade). */
+  absentToday?: Set<string>;
   rooms: { id: string; room_number: string }[];
   dayRateOf: (roomId: string) => number | null;
   weekRateOf: (roomId: string) => number | null;
@@ -290,11 +292,14 @@ export function buildRound(input: {
     if (!plan || !planOpenOn(plan, date)) { rows.push({ ...base, expected_satang: 0, paid_satang: 0, status: 'not_trading', charge: null }); continue; }
     if (input.closedToday.has(room.id)) { rows.push({ ...base, expected_satang: 0, paid_satang: 0, status: 'closed', charge: null }); continue; }
 
+    const absent = input.absentToday ?? new Set<string>();
     const key = plan.mode === 'weekly_advance' ? `stall-week:${room.id}:${wk}` : `stall-day:${room.id}:${date}`;
     const charge = input.charges.find(c => c.dedupe_key === key && c.status !== 'void') ?? null;
     if (charge) {
       const out = outstanding(charge);
       rows.push({ ...base, expected_satang: out, paid_satang: charge.paid_satang, status: out === 0 ? 'paid' : charge.paid_satang > 0 ? 'partial' : 'due', charge });
+    } else if (plan.mode === 'daily_actual' && absent.has(room.id)) {
+      rows.push({ ...base, expected_satang: 0, paid_satang: 0, status: 'absent', charge: null });
     } else {
       // not generated yet: weekly plans get their charge from the weekly run, daily plans when the stall is marked
       const amount = plan.mode === 'daily_actual' ? (plan.rate_satang ?? input.dayRateOf(room.id) ?? 0) : stallWeekCharge(plan, wk, new Set(), input.dayRateOf(room.id), input.weekRateOf(room.id)).amount_satang;

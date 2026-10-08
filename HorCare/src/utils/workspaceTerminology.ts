@@ -51,6 +51,13 @@ export const DEFAULT_MARKET_ZONES = [
   'โซน E (เปิดท้าย ลานโปรโมชัน)',
 ];
 
+/** The collection style a building type starts with; the owner can still change it. */
+export function defaultCollectionStyle(type: string | undefined): 'monthly' | 'nightly' | 'stall' {
+  if (type === 'resort' || type === 'hotel') return 'nightly';
+  if (type === 'market') return 'stall';
+  return 'monthly';
+}
+
 export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): WorkspaceTerms {
   const type = buildingType || 'dormitory';
 
