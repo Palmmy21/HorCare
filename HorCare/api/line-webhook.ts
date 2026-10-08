@@ -5,6 +5,7 @@ import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } fro
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
+import { raiseBindingAlert } from './_security-alerts.js';
 import { latestAnnouncementsText } from './_announcements.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
@@ -388,6 +389,9 @@ async function handleRoomNumber(
         return;
     }
 
+    const prevLink = (await db.collection('line_rooms').doc(lineUserId).get()).data();
+    const alreadyBound = existingLineUserId === lineUserId && prevLink?.room_id === roomDoc.id;
+
     const batch = db.batch();
 
     // ── บันทึกการลงทะเบียนใหม่ ────────────────────────────────────
@@ -404,6 +408,14 @@ async function handleRoomNumber(
     batch.delete(db.collection('line_pending').doc(lineUserId));
 
     await batch.commit();
+
+    if (!alreadyBound) {
+        await raiseBindingAlert(uid, building_id, {
+            roomId: roomDoc.id, roomNumber: roomNumberInput, lineUserId, via: 'room_number',
+            replacedExisting: false,
+            movedFromRoomNumber: prevLink && prevLink.room_id !== roomDoc.id ? String(prevLink.room_number ?? '') || null : null,
+        });
+    }
 
     await lineReply(replyToken, [{
         type: 'text',

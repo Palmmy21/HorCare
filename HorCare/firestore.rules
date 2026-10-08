@@ -224,6 +224,10 @@ service cloud.firestore {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'visitor.read');
           allow write: if false;
         }
+        match /security_alerts/{alertId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'audit_log.read');
+          allow write: if false;
+        }
         match /faqs/{faqId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'chatbot.manage');
           allow write: if false;

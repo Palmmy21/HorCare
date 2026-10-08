@@ -3,6 +3,7 @@ import { createHash, randomInt } from 'node:crypto';
 import { admin, db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
+import { raiseBindingAlert } from './_security-alerts.js';
 
 export const config = { maxDuration: 15 };
 
@@ -32,7 +33,9 @@ function generateToken(): string {
 }
 
 export type RedeemResult =
-    | { ok: true; ownerUid: string; buildingId: string; roomId: string; roomNumber: string; dormName: string }
+    | { ok: true; ownerUid: string; buildingId: string; roomId: string; roomNumber: string; dormName: string;
+          /** What this binding changed — drives the admin's security alert. */
+          replacedExisting: boolean; movedFromRoomNumber: string | null; alreadyBound: boolean }
     | { ok: false; reason: 'not_found' | 'expired' | 'used' | 'revoked' | 'room_unavailable' | 'room_taken' };
 
 /**
@@ -106,10 +109,19 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
         return {
             ok: true, ownerUid: inv.owner_uid, buildingId: inv.building_id,
             roomId: inv.room_id, roomNumber: room.room_number, dormName,
+            replacedExisting: !!existingLine && existingLine !== lineUserId,
+            movedFromRoomNumber: prevLink && prevLink.room_id !== inv.room_id ? String(prevLink.room_number ?? '') || null : null,
+            alreadyBound: existingLine === lineUserId && prevLink?.room_id === inv.room_id,
         };
     });
 
     if (result.ok) {
+        if (!result.alreadyBound) {
+            await raiseBindingAlert(result.ownerUid, result.buildingId, {
+                roomId: result.roomId, roomNumber: result.roomNumber, lineUserId, via: 'invitation',
+                replacedExisting: result.replacedExisting, movedFromRoomNumber: result.movedFromRoomNumber,
+            });
+        }
         await writeAudit({
             ownerUid: result.ownerUid, propertyId: result.buildingId,
             userId: `line:${lineUserId}`, role: 'tenant', action: 'UPDATE',

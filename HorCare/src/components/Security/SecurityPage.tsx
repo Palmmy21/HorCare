@@ -14,6 +14,8 @@ import {
 } from '../../shared/permissions';
 import { apiPost, ApiError } from '../../utils/api';
 import { logActivity } from '../../utils/auditLog';
+import LineBindingsTab from './LineBindingsTab';
+import { useSecurityAlerts } from '../../hooks/useSecurityAlerts';
 
 interface SecurityPageProps {
     ownerUid: string;
@@ -22,7 +24,7 @@ interface SecurityPageProps {
     onSaveConfig: (config: DormConfig) => Promise<void>;
 }
 
-type Tab = 'log' | 'members';
+type Tab = 'log' | 'members' | 'line';
 const PAGE_SIZE = 300;
 
 function formatValue(v: unknown): string {
@@ -357,9 +359,11 @@ function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageP
 
 export default function SecurityPage(props: SecurityPageProps) {
     const [tab, setTab] = useState<Tab>('log');
+    const { openCount } = useSecurityAlerts(props.ownerUid, props.buildings.map(b => b.id));
     const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
         { id: 'log', label: 'ประวัติการใช้งาน', icon: ScrollText },
         { id: 'members', label: 'สมาชิกและสิทธิ์', icon: Users },
+        { id: 'line', label: openCount > 0 ? `การผูก LINE (${openCount})` : 'การผูก LINE', icon: Link2 },
     ];
     return (
         <div style={{ maxWidth: 980, margin: '0 auto' }}>
@@ -387,9 +391,9 @@ export default function SecurityPage(props: SecurityPageProps) {
                     </button>
                 ))}
             </div>
-            {tab === 'log'
-                ? <ActivityLogTab ownerUid={props.ownerUid} buildings={props.buildings} />
-                : <MembersTab {...props} />}
+            {tab === 'log' && <ActivityLogTab ownerUid={props.ownerUid} buildings={props.buildings} />}
+            {tab === 'members' && <MembersTab {...props} />}
+            {tab === 'line' && <LineBindingsTab ownerUid={props.ownerUid} buildings={props.buildings} />}
         </div>
     );
 }
