@@ -2,11 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import {
     Wallet, CheckCircle2, Clock, AlertCircle, Receipt, Search, Landmark,
     Image as ImageIcon, Check, RotateCcw, Loader2, X, TrendingUp,
-    CalendarDays, User, Banknote, Download, CheckSquare, Square, TriangleAlert, AlertTriangle,
+    CalendarDays, User, Banknote, Download, CheckSquare, Square, TriangleAlert, AlertTriangle, ShieldCheck,
 } from 'lucide-react';
 import type { MonthlyBill, Room, DormConfig, PaymentStatus, Fine, PaymentMethod } from '../../types';
 import PaymentMethodModal from './PaymentMethodModal';
 import BankAccountsModal from './BankAccountsModal';
+import ReconciliationModal from './ReconciliationModal';
+import { useBankTransactions } from '../../hooks/useBankTransactions';
 import BankLogo from './BankLogo';
 import SlipChecksPanel from './SlipChecksPanel';
 import { useBankAccounts } from '../../hooks/useBankAccounts';
@@ -99,7 +101,10 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [showAccounts, setShowAccounts] = useState(false);
+  const [showRecon, setShowRecon] = useState(false);
     const { accounts, activeAccounts, loading: accountsLoading } = useBankAccounts(uid ?? null, buildingId ?? null);
+  const { transactions: bankTxs, loading: bankTxsLoading } = useBankTransactions(uid ?? null, buildingId ?? null);
+  const reconPending = bankTxs.filter(t => t.status !== 'reconciled').length;
     const accountById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
     // Only the account owner (not staff) manages receiving accounts; the server enforces this too.
     const canManageAccounts = !!uid && auth.currentUser?.uid === uid;
@@ -377,6 +382,14 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                         title="จัดการบัญชีธนาคารที่รับเงินโอน"
                     >
                         <Landmark size={15} /> บัญชีรับเงิน{activeAccounts.length > 0 ? ` (${activeAccounts.length})` : ''}
+                    </button>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setShowRecon(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                        title="กระทบยอดกับรายการเงินเข้าบัญชีจริง"
+                    >
+                        <ShieldCheck size={15} /> กระทบยอด{reconPending > 0 ? ` (${reconPending})` : ''}
                     </button>
                     {monthItems.length > 0 && (
                         <button
@@ -669,6 +682,13 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                 <BankAccountsModal
                     ownerUid={uid} buildingId={buildingId} accounts={accounts} loading={accountsLoading}
                     canManage={canManageAccounts} onClose={() => setShowAccounts(false)}
+                />
+            )}
+
+            {showRecon && uid && buildingId && (
+                <ReconciliationModal
+                    ownerUid={uid} buildingId={buildingId} accounts={activeAccounts} transactions={bankTxs} loading={bankTxsLoading}
+                    onClose={() => setShowRecon(false)}
                 />
             )}
 

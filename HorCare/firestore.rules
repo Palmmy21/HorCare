@@ -231,6 +231,11 @@ service cloud.firestore {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'finance.read');
           allow write: if false;
         }
+        // Bank statement lines + their reconciliation state. Written only by /api/reconciliation.
+        match /bank_transactions/{txId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'finance.read');
+          allow write: if false;
+        }
         // In-app notification records produced by the central notification service.
         match /notifications/{notificationId} {
           allow read: if isOwner(userId) && isNotBanned();

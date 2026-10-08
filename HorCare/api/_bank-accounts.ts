@@ -17,7 +17,8 @@ import { bankByCode, digitsOnly, isValidAccountNumber, type BankAccount } from '
 export const config = { maxDuration: 15 };
 
 interface Body {
-    action?: 'create' | 'update' | 'set_default';
+    action?: 'create' | 'update' | 'set_default' | 'tenant_list';
+    room_id?: string;
     owner_uid?: string;
     building_id?: string;
     account_id?: string;
@@ -43,6 +44,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = (req.body ?? {}) as Body;
     const buildingId = body.building_id;
     if (!buildingId || typeof buildingId !== 'string') { res.status(400).json({ error: 'building_id is required' }); return; }
+    // Tenant portal: the active accounts a tenant can transfer to. No login (like parcels
+    // `tenant_list`), so it proves the room exists and returns only what a bill already shows.
+    if (body.action === 'tenant_list') {
+        const owner = body.owner_uid;
+        if (typeof owner !== 'string' || !owner || typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'invalid_input' }); return; }
+        const base = `users/${owner}/buildings/${buildingId}`;
+        if (!(await db.doc(`${base}/rooms/${body.room_id}`).get()).exists) { res.status(404).json({ error: 'not_found' }); return; }
+        const snap = await db.collection(`${base}/bank_accounts`).get();
+        const accounts = snap.docs.map(d => d.data() as BankAccount)
+            .filter(a => a.status === 'active')
+            .sort((a, b) => Number(b.is_default) - Number(a.is_default))
+            .map(a => ({ id: a.id, bank_code: a.bank_code, bank_short: a.bank_short, account_name: a.account_name, account_number: a.account_number, nickname: a.nickname ?? null, is_default: a.is_default }));
+        res.status(200).json({ accounts });
+        return;
+    }
     if (body.action !== 'create' && body.action !== 'update' && body.action !== 'set_default') {
         res.status(400).json({ error: 'unknown_action' });
         return;

@@ -39,3 +39,6 @@ describe('account numbers', () => {
         expect(bankAccountLabel({ bank_short: 'KBANK', account_number: '1234567890' })).toBe('KBANK ••••7890');
     });
 });
+
+import { formatAccountNumber as fmtAcc } from './banks';
+describe('formatAccountNumber', () => { it('groups 10 digits and leaves other lengths alone', () => { expect(fmtAcc('1234567890')).toBe('123-4-56789-0'); expect(fmtAcc('123-4-56789-0')).toBe('123-4-56789-0'); expect(fmtAcc('12345678901')).toBe('12345678901'); }); });

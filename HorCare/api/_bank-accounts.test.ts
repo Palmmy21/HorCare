@@ -152,3 +152,28 @@ describe('update and default', () => {
         expect(dump).not.toContain('1234567890');
     });
 });
+
+describe('tenant_list', () => {
+    beforeEach(() => { seed(`users/${OWNER}/buildings/${BLD}/rooms/r1`, { id: 'r1' }); });
+    const list = (over: Record<string, unknown> = {}) => call(undefined, { action: 'tenant_list', room_id: 'r1', ...over });
+
+    it('returns only active accounts, default first, without login', async () => {
+        await create(OWNER);
+        const b = await create(OWNER, { bank_code: '014', account_number: '9876543210' });
+        await create(OWNER, { bank_code: '002', account_number: '1111111111' });
+        const third = (await call(OWNER, { action: 'create', bank_code: '006', account_name: 'ab', account_number: '2222222222' })).body.account;
+        await call(OWNER, { action: 'update', account_id: third.id, status: 'inactive' });
+        await call(OWNER, { action: 'set_default', account_id: b.body.account.id });
+        const res = await list();
+        expect(res.statusCode).toBe(200);
+        expect(res.body.accounts[0].id).toBe(b.body.account.id);
+        expect(res.body.accounts.map((a: any) => a.bank_code)).not.toContain('006');
+        expect(Object.keys(res.body.accounts[0]).sort()).toEqual(['account_name', 'account_number', 'bank_code', 'bank_short', 'id', 'is_default', 'nickname']);
+    });
+
+    it('rejects unknown rooms and other properties', async () => {
+        expect((await list({ room_id: 'nope' })).statusCode).toBe(404);
+        expect((await list({ building_id: 'bld-B' })).statusCode).toBe(404);
+        expect((await list({ room_id: undefined })).statusCode).toBe(400);
+    });
+});
