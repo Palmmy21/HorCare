@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { readSlipAmount } from './_slip-ai.js';
+import { evaluateSlip } from './_slip-flow.js';
 import { decodeSlipQR, slipFingerprint } from './_slip.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -80,25 +80,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             created_at: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // AI Verification
-        let autoVerified = false;
-        let geminiAmount: number | null = null;
-        
         const userSnap = await db.collection('users').doc(uid).get();
         const license = userSnap.data()?.license || 'free';
         const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 
-        if (isPro && qr.payload) {
-            // AI only suggests the amount; auto-approval needs it to equal the bill exactly.
-            geminiAmount = await readSlipAmount(base64Data, mimeType);
-            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
-            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
-                autoVerified = true;
-            }
-        }
+        // Read the slip with AI and compare it with the bill and the property's receiving accounts
+        // (amount, receiver name / account, date-time). Auto-approval needs every check to hold, and
+        // the payment is then recorded as "slip only — not yet confirmed against the bank".
+        const evaluation = await evaluateSlip({
+            ownerUid: uid, buildingId, imageBase64: base64Data, mimeType, qrPayload: qr.payload,
+            expectedAmount: isFine ? targetData.amount : targetData.total_bill,
+            billCreatedAt: targetData.created_at as string | undefined,
+            isPro,
+        });
+        const autoVerified = evaluation.autoApprove;
 
         const now = new Date().toISOString();
-        const qrPassed = !!qr.payload;
 
         await targetDocRef.update({
             [statusField]: autoVerified ? 'paid' : 'pending',
@@ -106,12 +103,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...(autoVerified ? { paid_at: now, payment_date: now.split('T')[0] } : {}),
             slip_image: true,
             ...(fingerprint ? { slip_ref: fingerprint.slice(0, 12) } : {}),
-            ...(geminiAmount !== null ? { slip_amount: geminiAmount, slip_ai_amount: geminiAmount } : {}),
-            verify_note: autoVerified 
-                ? 'อนุมัติอัตโนมัติด้วย AI (ยอดเงินตรง)'
-                : qrPassed
-                    ? 'ตรวจ QR ผ่าน (ไม่ซ้ำ) — รอเจ้าของยืนยันยอด'
-                    : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา',
+            ...evaluation.fields,
+            verify_note: evaluation.verifyNote,
         });
 
         res.status(200).json({ success: true, autoVerified, status: autoVerified ? 'paid' : 'pending' });

@@ -23,6 +23,8 @@ export const PERMISSIONS = [
   'meter.read', 'meter.record',
   'finance.read',
   'payment.create', 'payment.update', 'payment.reconcile',
+  /** Add / edit / disable the bank accounts the property receives money into. */
+  'bank_account.manage',
   'contract.read', 'contract.create', 'contract.sign',
   'work_order.read', 'work_order.create', 'work_order.update',
   /** Verify, close or reopen a completed job — kept apart from `update` so the person who did the work can't sign it off. */

@@ -41,6 +41,7 @@ export interface PaymentRecordFields {
   paid_amount?: number;
   received_by?: string;
   bank_account?: string;
+  bank_account_id?: string;
   transaction_ref?: string;
   verification_status?: PaymentVerification;
   payment_note?: string;

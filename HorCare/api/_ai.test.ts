@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AiError, aiGenerate, aiModel, aiProvider, extractJson } from './_ai.js';
-import { parseSlipAmount, readSlipAmount } from './_slip-ai.js';
 import { parseMeterOcr } from './_meter-ocr.js';
 
 // _meter-ocr pulls in the Firebase helpers at import time; the pure parser doesn't need them.
@@ -166,29 +165,6 @@ describe('extractJson', () => {
     });
     it('returns null for anything that is not parseable', () => {
         for (const s of ['', 'no json here', '{broken', '}{']) expect(extractJson(s)).toBeNull();
-    });
-});
-
-describe('slip amount (AI suggestion only)', () => {
-    it('accepts numbers and clean numeric strings', () => {
-        expect(parseSlipAmount('{"amount":1500}')).toBe(1500);
-        expect(parseSlipAmount('{"amount":1500.5}')).toBe(1500.5);
-        expect(parseSlipAmount('```json\n{"amount":"1,500.00"}\n```')).toBe(1500);
-        expect(parseSlipAmount('{"amount":"3500"}')).toBe(3500);
-    });
-    it('rejects null, negatives, junk strings, wrong shapes and non-JSON', () => {
-        for (const raw of ['{"amount":null}', '{"amount":-5}', '{"amount":"abc"}', '{"amount":"1500 baht"}', '{"amount":"1,50"}',
-            '{"amount":[1]}', '[1500]', 'about 1500 baht', '', '{"other":1}']) {
-            expect(parseSlipAmount(raw)).toBeNull();
-        }
-    });
-    it('readSlipAmount returns null (never throws) when the AI is down or unconfigured', async () => {
-        expect(await readSlipAmount('AAAA', 'image/jpeg')).toBeNull(); // no key
-        process.env.OPENROUTER_API_KEY = 'o';
-        fetchMock.mockResolvedValue(fail(500));
-        expect(await readSlipAmount('AAAA', 'image/jpeg')).toBeNull();
-        fetchMock.mockResolvedValue(orReply('{"amount":1200}'));
-        expect(await readSlipAmount('AAAA', 'image/jpeg')).toBe(1200);
     });
 });
 

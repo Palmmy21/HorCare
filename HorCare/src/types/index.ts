@@ -192,6 +192,13 @@ export interface MonthlyBill {
   paid_amount?: number;            // amount actually received (THB)
   received_by?: string;            // who took the cash / confirmed it (display name)
   bank_account?: string;           // receiving account, for bank transfers
+  bank_account_id?: string;        // BankAccount.id the money went to
+  // What was read from the slip (AI) and how it compared with the bill / receiving accounts
+  slip_receiver_name?: string;
+  slip_receiver_account?: string;
+  slip_datetime?: string;          // ISO, Thailand time
+  slip_account_id?: string;        // receiving account the slip matched
+  slip_checks?: SlipChecks;
   transaction_ref?: string;        // bank / gateway reference
   verification_status?: PaymentVerification; // transfers: has the money been seen in the account?
   payment_note?: string;
@@ -211,6 +218,18 @@ export type PaymentStatus = 'unpaid' | 'pending' | 'paid';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'qr_gateway' | 'other';
 // 'unverified' = recorded from a slip only; 'verified' = confirmed against the bank account.
 export type PaymentVerification = 'unverified' | 'verified' | 'rejected';
+
+// Result of comparing a slip with the bill and the property's receiving accounts.
+// 'unknown' = the slip did not show that detail (or nothing to compare against).
+export type SlipCheck = 'pass' | 'fail' | 'unknown';
+export interface SlipChecks {
+  amount: SlipCheck;
+  receiver_name: SlipCheck;
+  receiver_account: SlipCheck;
+  datetime: SlipCheck;
+  duplicate: SlipCheck;
+  qr: SlipCheck;
+}
 
 export interface BillCalculation {
   elec_units: number;
@@ -466,9 +485,15 @@ export interface Fine {
   paid_amount?: number;
   received_by?: string;
   bank_account?: string;
+  bank_account_id?: string;
   transaction_ref?: string;
   verification_status?: PaymentVerification;
   payment_note?: string;
+  slip_receiver_name?: string;
+  slip_receiver_account?: string;
+  slip_datetime?: string;
+  slip_account_id?: string;
+  slip_checks?: SlipChecks;
 }
 
 // ─── Common Fees (ค่าบริการส่วนกลาง) ─────────────────────────────────────────

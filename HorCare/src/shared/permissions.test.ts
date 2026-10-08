@@ -28,7 +28,14 @@ describe('RBAC catalog', () => {
         expect(can('shop_owner', 'room.read')).toBe(false);
     });
 
-    it('finance can reconcile, front desk can invite tenants', () => {
+    it('only owner and property manager can manage bank accounts; finance can read finance data but not change accounts', () => {
+    for (const role of ROLES) {
+      expect(can(role, 'bank_account.manage')).toBe(role === 'owner' || role === 'property_manager');
+    }
+    expect(can('finance', 'finance.read')).toBe(true);
+  });
+
+  it('finance can reconcile, front desk can invite tenants', () => {
         expect(can('finance', 'payment.reconcile')).toBe(true);
         expect(can('front_desk', 'invitation.create')).toBe(true);
     });

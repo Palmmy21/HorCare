@@ -4,7 +4,7 @@ import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } fr
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { getTenantLink, recordInbound } from './_line-inbox.js';
-import { readSlipAmount } from './_slip-ai.js';
+import { evaluateSlip } from './_slip-flow.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 
 export const config = {
@@ -669,27 +669,27 @@ async function handleSlipImage(
     }
 
     // 7. Auto Slip Verification for Pro Users (Gemini OCR)
-    let autoVerified = false;
-    let geminiAmount: number | null = null;
-    
     const userSnap = await db.collection('users').doc(uid).get();
     const license = userSnap.data()?.license || 'free';
     // อนุญาตให้ทุกแพ็กเกจที่จ่ายเงิน (small, medium, large) หรือ active ได้ใช้งาน AI 
     const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 
-    if (isPro && dataUrl && !duplicate && qr.payload) {
-        const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-        if (match) {
-            // AI only suggests the amount; auto-approval needs it to equal the bill exactly.
-            geminiAmount = await readSlipAmount(match[2], match[1]);
-            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
-            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
-                autoVerified = true;
-            }
-        }
-    }
+    // Read the slip with AI and compare it with the bill and the property's receiving accounts
+    // (amount, receiver name / account, date-time). Auto-approval needs every check to hold, and the
+    // payment is then recorded as "slip only — not yet confirmed against the bank".
+    const slipMatch = dataUrl ? dataUrl.match(/^data:(image\/\w+);base64,(.+)$/) : null;
+    const evaluation = await evaluateSlip({
+        ownerUid: uid, buildingId: building_id,
+        imageBase64: slipMatch ? slipMatch[2] : null, mimeType: slipMatch ? slipMatch[1] : 'image/jpeg',
+        qrPayload: qr.payload,
+        expectedAmount: isFine ? targetData.amount : targetData.total_bill,
+        billCreatedAt: targetData.created_at as string | undefined,
+        isPro,
+    });
+    const autoVerified = evaluation.autoApprove;
+    const geminiAmount = evaluation.aiAmount;
 
-    // 8. ตั้งเป็น "รอตรวจสอบ" ให้เจ้าของยืนยันยอด หรือ "จ่ายแล้ว" (ถ้าออโต้ผ่าน)
+    // 8. Pending for the owner to confirm, or "paid" when the slip checks all passed
     const now = new Date().toISOString();
     const qrPassed = !!qr.payload;
     const statusField = isFine ? 'status' : 'payment_status';
@@ -700,14 +700,9 @@ async function handleSlipImage(
         ...(autoVerified ? { paid_at: now, payment_date: now.split('T')[0] } : {}),
         ...(dataUrl ? { slip_image: true } : {}),
         ...(fingerprint ? { slip_ref: fingerprint.slice(0, 12) } : {}),
-        ...(geminiAmount !== null ? { slip_amount: geminiAmount, slip_ai_amount: geminiAmount } : {}),
-        verify_note: autoVerified 
-            ? 'อนุมัติอัตโนมัติด้วย AI (ยอดเงินตรง)'
-            : qrPassed
-                ? 'ตรวจ QR ผ่าน (ไม่ซ้ำ) — รอเจ้าของยืนยันยอด'
-                : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา',
+        ...evaluation.fields,
+        verify_note: evaluation.verifyNote,
     });
-
     if (autoVerified) {
         await lineReply(replyToken, [{
             type: 'text',

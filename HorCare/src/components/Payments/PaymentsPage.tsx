@@ -1,11 +1,16 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
-    Wallet, CheckCircle2, Clock, AlertCircle, Receipt, Search,
+    Wallet, CheckCircle2, Clock, AlertCircle, Receipt, Search, Landmark,
     Image as ImageIcon, Check, RotateCcw, Loader2, X, TrendingUp,
     CalendarDays, User, Banknote, Download, CheckSquare, Square, TriangleAlert, AlertTriangle,
 } from 'lucide-react';
 import type { MonthlyBill, Room, DormConfig, PaymentStatus, Fine, PaymentMethod } from '../../types';
 import PaymentMethodModal from './PaymentMethodModal';
+import BankAccountsModal from './BankAccountsModal';
+import BankLogo from './BankLogo';
+import SlipChecksPanel from './SlipChecksPanel';
+import { useBankAccounts } from '../../hooks/useBankAccounts';
+import { maskAccountNumber } from '../../shared/banks';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, VERIFICATION_LABELS, resolvePaymentMethod, type PaymentRecordFields } from '../../utils/paymentMethods';
 import { logActivity } from '../../utils/auditLog';
 import { ref, getDownloadURL } from 'firebase/storage';
@@ -59,6 +64,14 @@ type PayableItem = {
   transaction_ref?: string;
   verification_status?: MonthlyBill['verification_status'];
   paid_method?: 'auto' | 'manual';
+  bank_account_id?: string;
+  bank_account?: string;
+  // what was read from the slip and how it compared (set by the slip check)
+  slip_receiver_name?: string;
+  slip_receiver_account?: string;
+  slip_datetime?: string;
+  slip_account_id?: string;
+  slip_checks?: MonthlyBill['slip_checks'];
   title: string;
   originalBill?: MonthlyBill;
   originalFine?: Fine;
@@ -85,6 +98,11 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     const [slipView, setSlipView] = useState<{ url?: string; loading: boolean; error?: string; item: PayableItem } | null>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [bulkProcessing, setBulkProcessing] = useState(false);
+    const [showAccounts, setShowAccounts] = useState(false);
+    const { accounts, activeAccounts, loading: accountsLoading } = useBankAccounts(uid ?? null, buildingId ?? null);
+    const accountById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
+    // Only the account owner (not staff) manages receiving accounts; the server enforces this too.
+    const canManageAccounts = !!uid && auth.currentUser?.uid === uid;
 
     const dormName = config.bill_customization?.dorm_name || 'หอพัก';
 
@@ -98,6 +116,9 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
             slip_sender: b.slip_sender, verify_note: b.verify_note, slip_image: b.slip_image, slip_path: b.slip_path,
             paid_at: b.paid_at, payment_method: b.payment_method, paid_amount: b.paid_amount, received_by: b.received_by,
             transaction_ref: b.transaction_ref, verification_status: b.verification_status, paid_method: b.paid_method,
+            bank_account_id: b.bank_account_id, bank_account: b.bank_account,
+            slip_receiver_name: b.slip_receiver_name, slip_receiver_account: b.slip_receiver_account, slip_datetime: b.slip_datetime,
+            slip_account_id: b.slip_account_id, slip_checks: b.slip_checks,
             title: 'บิลค่าเช่า', originalBill: b
         }));
 
@@ -109,6 +130,9 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
             slip_sender: f.slip_sender, verify_note: f.verify_note, slip_image: f.slip_image,
             paid_at: f.paid_at, payment_method: f.payment_method, paid_amount: f.paid_amount, received_by: f.received_by,
             transaction_ref: f.transaction_ref, verification_status: f.verification_status, paid_method: f.paid_method,
+            bank_account_id: f.bank_account_id, bank_account: f.bank_account,
+            slip_receiver_name: f.slip_receiver_name, slip_receiver_account: f.slip_receiver_account, slip_datetime: f.slip_datetime,
+            slip_account_id: f.slip_account_id, slip_checks: f.slip_checks,
             title: 'ค่าปรับ: ' + f.reason, originalFine: f
         }));
 
@@ -144,6 +168,25 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         }
         return totals;
     }, [monthItems]);
+
+    // Bank transfers split by the account the money went to (accounts without an id are grouped together).
+    const accountTotals = useMemo(() => {
+        const map = new Map<string, { key: string; short: string | null; label: string; amount: number; count: number }>();
+        for (const b of monthItems) {
+            if (b.payment_status !== 'paid' || resolvePaymentMethod(b) !== 'bank_transfer') continue;
+            const acc = b.bank_account_id ? accountById.get(b.bank_account_id) : undefined;
+            const key = acc?.id ?? (b.bank_account ? `text:${b.bank_account}` : 'unspecified');
+            const row = map.get(key) ?? {
+                key, short: acc?.bank_short ?? null,
+                label: acc ? `${acc.nickname || acc.bank_short} · ${maskAccountNumber(acc.account_number).slice(-4)}` : (b.bank_account || 'ไม่ระบุบัญชี'),
+                amount: 0, count: 0,
+            };
+            row.amount += b.paid_amount ?? b.total_amount;
+            row.count++;
+            map.set(key, row);
+        }
+        return [...map.values()].sort((a, b) => b.amount - a.amount);
+    }, [monthItems, accountById]);
 
     const filtered = monthItems.filter(b => {
         if (filter !== 'all' && b.payment_status !== filter) return false;
@@ -327,6 +370,14 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                     </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setShowAccounts(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                        title="จัดการบัญชีธนาคารที่รับเงินโอน"
+                    >
+                        <Landmark size={15} /> บัญชีรับเงิน{activeAccounts.length > 0 ? ` (${activeAccounts.length})` : ''}
+                    </button>
                     {monthItems.length > 0 && (
                         <button
                             className="btn btn-outline btn-sm"
@@ -414,6 +465,19 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                             );
                         })}
                     </div>
+                    {accountTotals.length > 0 && (
+                        <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-600)' }}>เงินโอนแยกตามบัญชี</div>
+                            {accountTotals.map(r => (
+                                <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8125rem' }}>
+                                    <BankLogo short={r.short} size={22} />
+                                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                                    <span style={{ color: 'var(--color-gray-500)' }}>{r.count} รายการ</span>
+                                    <b className="mono">฿{r.amount.toLocaleString()}</b>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     {methodFilter !== 'all' && (
                         <button className="btn btn-outline btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setMethodFilter('all')}>
                             <X size={12} /> ล้างตัวกรองวิธีชำระ ({PAYMENT_METHOD_LABELS[methodFilter]})
@@ -529,6 +593,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                                 {b.slip_sender && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><User size={11} />{b.slip_sender}</span>}
                                             </div>
                                         )}
+                                        {b.slip_checks && <div style={{ marginTop: 4 }}><SlipChecksPanel checks={b.slip_checks} compact /></div>}
                                         {s === 'pending' && b.verify_note && (() => {
                                             const good = b.verify_note.startsWith('ตรวจ QR ผ่าน');
                                             return (
@@ -549,6 +614,10 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                             b.verification_status && VERIFICATION_LABELS[b.verification_status]].filter(Boolean).join(' · ') || undefined}
                                         style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-gray-600)', background: 'var(--color-gray-100)', borderRadius: 999, padding: '0.2rem 0.55rem', whiteSpace: 'nowrap' }}
                                     >
+                                        {resolvePaymentMethod(b) === 'bank_transfer' && (() => {
+                                            const acc = b.bank_account_id ? accountById.get(b.bank_account_id) : undefined;
+                                            return acc ? <span style={{ marginRight: 5, verticalAlign: 'middle', display: 'inline-flex' }}><BankLogo short={acc.bank_short} size={16} /></span> : null;
+                                        })()}
                                         {PAYMENT_METHOD_LABELS[resolvePaymentMethod(b)]}
                                         {b.verification_status === 'verified' ? ' ✓' : ''}
                                     </span>
@@ -589,8 +658,17 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                     defaultMethod={payModal.length === 1 && (payModal[0].slip_image || payModal[0].slip_path) ? 'bank_transfer' : 'cash'}
                     defaultReference={payModal.length === 1 ? (payModal[0].slip_ref ?? '') : ''}
                     receiverName={auth.currentUser?.displayName || auth.currentUser?.email || ''}
+                    accounts={activeAccounts}
+                    defaultAccountId={payModal.length === 1 ? payModal[0].slip_account_id : undefined}
                     onConfirm={fields => applyPayment(payModal, fields)}
                     onClose={() => setPayModal(null)}
+                />
+            )}
+
+            {showAccounts && uid && buildingId && (
+                <BankAccountsModal
+                    ownerUid={uid} buildingId={buildingId} accounts={accounts} loading={accountsLoading}
+                    canManage={canManageAccounts} onClose={() => setShowAccounts(false)}
                 />
             )}
 
@@ -608,6 +686,19 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                             <div style={{ padding: '2rem', textAlign: 'center', color: '#DC2626', fontSize: '0.875rem' }}>{slipView.error}</div>
                         ) : (
                             <img src={slipView.url} alt="payment slip" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block' }} />
+                        )}
+                        {slipView.item.slip_checks && (
+                            <SlipChecksPanel
+                                checks={slipView.item.slip_checks}
+                                expectedAmount={slipView.item.total_amount}
+                                read={{
+                                    amount: slipView.item.slip_amount, sender: slipView.item.slip_sender, receiverName: slipView.item.slip_receiver_name,
+                                    receiverAccount: slipView.item.slip_receiver_account, datetime: slipView.item.slip_datetime,
+                                }}
+                            />
+                        )}
+                        {slipView.item.verify_note && (
+                            <p style={{ margin: '10px 0 0', fontSize: '0.78rem', color: 'var(--color-gray-600)' }}>{slipView.item.verify_note}</p>
                         )}
                     </div>
                 </>
