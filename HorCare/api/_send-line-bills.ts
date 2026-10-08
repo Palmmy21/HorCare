@@ -2,6 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildBillFlex, buildPromptpayMessages, linePush, runPooled } from './_line.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+import type { MonthlyBill } from '../src/types/index.js';
+
 async function fcmPushToOwner(uid: string, title: string, body: string) {
     try {
         const fcmDoc = await db.doc(`users/${uid}/data/fcm`).get();
@@ -111,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';
                 const bilingual = !!cfg.bill_customization?.bilingual_mode;
                 const secLang = cfg.bill_customization?.secondary_language || 'en';
-                const messages: object[] = [buildBillFlex(bill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })];
+                const messages: object[] = [buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })];
                 if (promptpayNumber) {
                     messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, bill.total_bill as number, roomLang));
                 }
@@ -119,7 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 await billDoc.ref.update({ is_notified: true });
                 sent++;
                 results.push(`✅ ห้อง ${bill.room_number}`);
-            } catch (err: any) {
+            } catch (errRaw) {
+                const err = errorInfo(errRaw);
                 results.push(`❌ ห้อง ${bill.room_number}: ${err.message}`);
             }
         });
@@ -136,8 +140,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         res.status(200).json({ data: { sent, skipped, results } });
 
-    } catch (error: any) {
-        console.error('Send bills error:', error);
+    } catch (errorRaw) {
+        console.error('Send bills error:', errorRaw);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }

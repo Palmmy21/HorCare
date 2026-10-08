@@ -151,3 +151,9 @@ alter table leases enable row level security;
 revoke all on leasing_leads, leasing_reservations, leases from anon, authenticated;
 revoke execute on function leasing_reserve(text, text, uuid, text, text, bigint, date, text) from public, anon, authenticated;
 revoke execute on function leasing_convert_reservation(text, text, uuid, text, text, date, date, bigint, bigint, text) from public, anon, authenticated;
+-- Revoking from PUBLIC also removes it from service_role (which inherits PUBLIC), so grant it back explicitly:
+-- the API calls these through rpc() with the service-role key.
+grant execute on function leasing_reserve(text, text, uuid, text, text, bigint, date, text) to service_role;
+grant execute on function leasing_convert_reservation(text, text, uuid, text, text, date, date, bigint, bigint, text) to service_role;
+-- and the tables: service_role needs them even though RLS has no policies (it bypasses RLS but not privileges).
+grant select, insert, update, delete on leasing_leads, leasing_reservations, leases to service_role;

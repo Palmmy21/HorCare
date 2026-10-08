@@ -10,10 +10,12 @@ export function useHousekeepers(
   buildingId: string | null,
 ) {
   const [housekeepers, setHousekeepers] = useState<Housekeeper[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  /** Loading only while there is something to load; with no property selected there is nothing to wait for. */
+  const loading = !!(uid && buildingId) && !loaded;
 
   useEffect(() => {
-    if (!uid || !buildingId) { setLoading(false); return; }
+    if (!uid || !buildingId) return;
 
     const col = collection(db, `users/${uid}/buildings/${buildingId}/housekeepers`);
     const unsub = onSnapshot(
@@ -22,11 +24,11 @@ export function useHousekeepers(
         const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Housekeeper));
         docs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         setHousekeepers(docs);
-        setLoading(false);
+        setLoaded(true);
       },
       err => {
         console.error('Housekeepers onSnapshot error:', err);
-        setLoading(false);
+        setLoaded(true);
       }
     );
 
@@ -88,7 +90,7 @@ export function useHousekeepers(
   ) => {
     if (!buildingPath || !uid || !buildingId) return;
     const now = new Date().toISOString();
-    const finalUpdates: Record<string, any> = {
+    const finalUpdates: Record<string, unknown> = {
       ...updates,
       updated_at: now,
     };

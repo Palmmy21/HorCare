@@ -5,7 +5,7 @@ import * as jsQRns from 'jsqr';
 
 // jsqr ships a CJS `module.exports = jsQR` with an ESM-style `export default`
 // in its .d.ts — normalize so it resolves to the callable under any bundler.
-const jsQR = ((jsQRns as any).default ?? jsQRns) as
+const jsQR = ((jsQRns as unknown as { default?: unknown }).default ?? jsQRns) as
     (data: Uint8ClampedArray, width: number, height: number) => { data: string } | null;
 
 /**

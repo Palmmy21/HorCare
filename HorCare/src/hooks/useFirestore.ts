@@ -407,7 +407,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
             await updateDoc(doc(db, userPath, 'bills', existingBill.id), updatedBill);
         }
-    }, [userPath, bills, rooms, config, anchorMonth]);
+    }, [userPath, bills, rooms, config, commonFees, anchorMonth]);
 
     const deleteRoom = useCallback(async (roomId: string) => {
         if (!userPath) return;
@@ -509,7 +509,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         }
 
         return bill;
-    }, [userPath, bills, rooms, config]);
+    }, [userPath, bills, rooms, config, commonFees]);
 
     const getBillForRoom = useCallback((roomId: string, month: string): MonthlyBill | undefined => {
         return bills.find(b => b.room_id === roomId && b.month === month);

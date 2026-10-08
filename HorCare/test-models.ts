@@ -6,7 +6,7 @@ const key = env.split('\n').find(line => line.startsWith('GEMINI_API_KEY='))?.sp
 fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`)
   .then(res => res.json())
   .then(data => {
-    const models = data.models.map((m: any) => m.name);
+    const models = data.models.map((m: { name: string }) => m.name);
     console.log(models);
   })
   .catch(console.error);

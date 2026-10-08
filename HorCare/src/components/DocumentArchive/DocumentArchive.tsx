@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Download, Printer, Archive, Lock } from 'lucide-react';
 import type { MonthlyBill, DormConfig, Room } from '../../types';
 import { formatCurrency, formatMonthThai, getCurrentMonth, getPreviousMonth, getEffectiveRates } from '../../utils/calculations';
@@ -16,17 +16,14 @@ interface DocumentArchiveProps {
 }
 
 export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrade }: DocumentArchiveProps) {
-    const [months, setMonths] = useState<string[]>([]);
-    
-    useEffect(() => {
-        const mList = [];
+    /** The last six months, newest first (computed once per mount). */
+    const months = useMemo(() => {
+        const list: string[] = [];
         let m = getCurrentMonth();
-        for (let i = 0; i < 6; i++) {
-            mList.push(m);
-            m = getPreviousMonth(m);
-        }
-        setMonths(mList);
+        for (let i = 0; i < 6; i++) { list.push(m); m = getPreviousMonth(m); }
+        return list;
     }, []);
+    
 
     const [isExporting, setIsExporting] = useState<string | null>(null);
     const hiddenReportRef = useRef<HTMLDivElement>(null);

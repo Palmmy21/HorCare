@@ -12,7 +12,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { authorize, buildingExists, type AuthContext } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { loadBuilding } from './_accounting.js';
+import { loadBuilding } from './_accounting-data.js';
 import {
     buildVouchers, sumCr, sumDr, thDate, toSatang, type PostingResult, type VoucherKind,
 } from '../src/shared/accounting.js';

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { db } from './_firebase.js';
+import { errorInfo } from '../src/shared/errorInfo.js';
 
 export const config = {
     api: {
@@ -42,7 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const rawBody = await getRawBody(req);
         event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    } catch (err: any) {
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
         const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('Webhook signature verification failed:', message);
         res.status(400).send(`Webhook Error: ${message}`);

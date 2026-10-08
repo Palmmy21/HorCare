@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { linePush, buildReceiptFlex } from './_line.js';
+import type { MonthlyBill } from '../src/types/index.js';
+
 
 // ส่งใบเสร็จรับเงินให้ลูกหอทาง LINE เมื่อเจ้าของกด "ยืนยันจ่าย" ในหน้า Payments.
 // เจ้าของยืนยันใน Firestore ฝั่ง client ไปแล้ว — endpoint นี้แค่ push ใบเสร็จ
@@ -61,11 +63,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const roomLang = roomSnap.data()?.language || cfgSnap.data()?.bill_customization?.default_language || 'th';
         const bilingual = !!cfgSnap.data()?.bill_customization?.bilingual_mode;
         const secLang = cfgSnap.data()?.bill_customization?.secondary_language || 'en';
-        await linePush(lineUserId, [buildReceiptFlex(bill, dormName, paidAt, { lang: roomLang, bilingual, secLang })]);
+        await linePush(lineUserId, [buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })]);
         res.status(200).json({ data: { notified: true } });
 
-    } catch (error: any) {
-        console.error('notify-payment error:', error);
+    } catch (errorRaw) {
+        console.error('notify-payment error:', errorRaw);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }

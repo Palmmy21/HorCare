@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { admin } from './_firebase.js';
 import { AiError, aiGenerate } from './_ai.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+
 // ── Plan helper ──
 function isPro(license: string): boolean {
     if (license === 'active') return true;
@@ -65,8 +67,9 @@ ${JSON.stringify(context, null, 2)}
 
         return res.status(200).json({ reply });
 
-    } catch (err: any) {
-        console.error('Nong Care Error:', err);
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
+        console.error('Nong Care Error:', errRaw);
         return res.status(500).json({ error: 'Internal server error', details: err.message });
     }
 }

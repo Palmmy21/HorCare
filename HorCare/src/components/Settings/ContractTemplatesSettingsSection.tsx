@@ -597,7 +597,7 @@ export default function ContractTemplatesSettingsSection({
                   <select
                     className="form-input"
                     value={formType}
-                    onChange={(e) => setFormType(e.target.value as any)}
+                    onChange={(e) => setFormType(e.target.value as typeof formType)}
                   >
                     <option value="residential">หอพัก / อพาร์ตเมนต์ (Residential)</option>
                     <option value="market_stall">แผงค้าและล็อกตลาด (Market Stall)</option>
@@ -623,7 +623,7 @@ export default function ContractTemplatesSettingsSection({
                   <select
                     className="form-input"
                     value={formCycle}
-                    onChange={(e) => setFormCycle(e.target.value as any)}
+                    onChange={(e) => setFormCycle(e.target.value as typeof formCycle)}
                   >
                     <option value="monthly">รายเดือน (Monthly)</option>
                     <option value="daily">รายวัน (Daily)</option>

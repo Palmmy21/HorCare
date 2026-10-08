@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, memo } from 'react';
 import {
     Check, Zap, Sparkles, Shield, Clock, CreditCard, X, Heart,
     ChevronLeft, Infinity as InfinityIcon,
@@ -397,13 +397,11 @@ const PLANS: Plan[] = [
 const PlanCard = memo(function PlanCard({
     plan, cycle, currentPlanId,
 }: { plan: Plan; cycle: BillingCycle; currentPlanId?: string; onSelect?: (p: Plan) => void }) {
-    const [priceKey, setPriceKey] = useState(0);
     const price = cycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
     const savings = cycle === 'yearly'
         ? Math.round((1 - plan.yearlyPrice / plan.originalYearlyPrice) * 100)
         : 0;
 
-    useEffect(() => { setPriceKey(k => k + 1); }, [cycle]);
 
     return (
         <div className={`plan-card ${plan.id}${plan.popular ? ' popular' : ''}`}>
@@ -441,7 +439,7 @@ const PlanCard = memo(function PlanCard({
 
             {/* Price */}
             <div style={{ marginBottom: '1.5rem' }}>
-                <div key={priceKey} className="price-pop" style={{
+                <div key={cycle} className="price-pop" style={{
                     display: 'flex', alignItems: 'baseline', gap: '0.3rem',
                 }}>
                     <span style={{ fontSize: '1.35rem', fontWeight: 700, color: '#38BDF8' }}>฿</span>

@@ -210,17 +210,14 @@ function App() {
   // Buildings (multi-building support — Large plan)
   const { buildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(effectiveUid);
 
-  useEffect(() => {
-    if (maidSession?.building_id) {
-      setActiveBuildingId(maidSession.building_id);
-    }
-  }, [maidSession]);
-
-  useEffect(() => {
-    if (maidSession && currentView !== 'cleaning' && currentView !== 'recording') {
-      setCurrentView('cleaning');
-    }
-  }, [maidSession, currentView]);
+  // A housekeeper session is locked to its own building and to two screens. These are derived from the
+  // session, so they are corrected while rendering (React re-renders at once) instead of in an effect.
+  if (maidSession?.building_id && activeBuildingId !== maidSession.building_id) {
+    setActiveBuildingId(maidSession.building_id);
+  }
+  if (maidSession && currentView !== 'cleaning' && currentView !== 'recording') {
+    setCurrentView('cleaning');
+  }
 
   // Sync activeBuildingId when buildings load
   useEffect(() => {

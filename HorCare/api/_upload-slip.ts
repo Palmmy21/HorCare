@@ -3,6 +3,8 @@ import { db, admin } from './_firebase.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { decodeSlipQR, slipFingerprint } from './_slip.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -59,11 +61,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     room_id: roomId,
                     created_at: admin.firestore.FieldValue.serverTimestamp(),
                 });
-            } catch (e: any) {
-                if (e?.code === 6 || e?.code === 'already-exists') {
+            } catch (eRaw) {
+                const e = errorInfo(eRaw);
+                if (e.code === '6' || e.code === 'already-exists') {
                     duplicate = true;
                 } else {
-                    throw e;
+                    throw eRaw;
                 }
             }
         }

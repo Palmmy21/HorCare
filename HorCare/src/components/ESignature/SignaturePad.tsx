@@ -117,6 +117,8 @@ export default function SignaturePad({
   // Set initial signature if provided
   useEffect(() => {
     if (initialDataUrl) {
+      // props → imperative canvas: the flag mirrors what is drawn, so it is set together with the drawing
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasSignature(true);
       redrawCanvas([], initialDataUrl);
     }

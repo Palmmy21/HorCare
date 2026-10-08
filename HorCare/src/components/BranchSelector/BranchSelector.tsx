@@ -15,8 +15,8 @@ export default function BranchSelector({
   buildings,
   onSelect,
   canAddBuilding,
-  onAddBuilding,
-  userName: _userName
+  onAddBuilding
+
 }: BranchSelectorProps) {
   return (
     <div className="branch-selector-overlay">

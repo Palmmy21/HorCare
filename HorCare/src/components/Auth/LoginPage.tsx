@@ -7,6 +7,7 @@ import {
 import { authenticateHousekeeper } from '../../hooks/useHousekeepers';
 import type { HousekeeperSession, DormConfig, WaterConfig, InitialBuildingConfig } from '../../types';
 import horcareLogo from '../../assets/horcare_logo.png';
+import { errorInfo } from '../../shared/errorInfo';
 const PricingPage = lazy(() => import('../Pricing/PricingPage'));
 
 interface LoginPageProps {
@@ -140,7 +141,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
             } else {
                 setMaidError('เบอร์โทรหรือรหัสผ่านไม่ถูกต้อง หรือบัญชีถูกปิดใช้งาน');
             }
-        } catch (err: any) {
+        } catch (errRaw) {
+            const err = errorInfo(errRaw);
             setMaidError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
         } finally {
             setIsLoading(false);

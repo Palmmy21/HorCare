@@ -3,6 +3,7 @@ import type { Fine, PaymentStatus, Room } from '../../types';
 import toast from 'react-hot-toast';
 import { AlertTriangle, Plus, Edit2, Trash2, Check, X, Filter, MessageCircle, Loader2 } from 'lucide-react';
 import { auth } from '../../firebase/config';
+import { errorInfo } from '../../shared/errorInfo';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
@@ -119,7 +120,8 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send LINE notification');
       toast.success('ส่งแจ้งเตือนผ่าน LINE เรียบร้อยแล้ว');
-    } catch (e: any) {
+    } catch (eRaw) {
+        const e = errorInfo(eRaw);
       toast.error(`ไม่สามารถส่ง LINE ได้: ${e.message}`);
     } finally {
       setSendingLineId(null);

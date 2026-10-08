@@ -2,6 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildFineFlex, buildPromptpayMessages, linePush } from './_line.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+import type { Fine } from '../src/types/index.js';
+
 export const config = { maxDuration: 60 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -78,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${fine.room_id}`
             : undefined;
 
-        const messages: object[] = [buildFineFlex(fine, dormName, { portalUrl })];
+        const messages: object[] = [buildFineFlex(fine as Fine, dormName, { portalUrl })];
         if (promptpayNumber && fine.amount > 0) {
             messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, fine.amount));
         }
@@ -90,8 +93,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         res.status(200).json({ success: true, message: 'Line notification sent' });
 
-    } catch (error: any) {
-        console.error('Send fine error:', error);
+    } catch (errorRaw) {
+        const error = errorInfo(errorRaw);
+        console.error('Send fine error:', errorRaw);
         res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }

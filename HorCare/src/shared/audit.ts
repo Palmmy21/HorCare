@@ -9,21 +9,22 @@ export const AUDIT_ACTIONS = [
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export const AUDIT_ACTION_LABELS_TH: Record<AuditAction, string> = {
-  LOGIN: 'เน€เธเนเธฒเธชเธนเนเธฃเธฐเธเธ',
-  LOGOUT: 'เธญเธญเธเธเธฒเธเธฃเธฐเธเธ',
-  VIEW: 'เน€เธเธดเธ”เธ”เธนเธเนเธญเธกเธนเธฅเธชเธณเธเธฑเธ',
-  CREATE: 'เธชเธฃเนเธฒเธ',
-  UPDATE: 'เนเธเนเนเธ',
-  DELETE: 'เธฅเธ',
-  EXPORT: 'เธชเนเธเธญเธญเธ',
-  DOWNLOAD: 'เธ”เธฒเธงเธเนเนเธซเธฅเธ”',
-  PAYMENT_MODIFY: 'เนเธเนเนเธเธเธฒเธฃเธเธณเธฃเธฐเน€เธเธดเธ',
-  PERMISSION_CHANGE: 'เน€เธเธฅเธตเนเธขเธเธชเธดเธ—เธเธดเน',
+  LOGIN: 'เข้าสู่ระบบ',
+  LOGOUT: 'ออกจากระบบ',
+  VIEW: 'เปิดดูข้อมูลสำคัญ',
+  CREATE: 'สร้าง',
+  UPDATE: 'แก้ไข',
+  DELETE: 'ลบ',
+  EXPORT: 'ส่งออก',
+  DOWNLOAD: 'ดาวน์โหลด',
+  PAYMENT_MODIFY: 'แก้ไขการชำระเงิน',
+  PERMISSION_CHANGE: 'เปลี่ยนสิทธิ์',
 };
 
 export type AuditResourceType =
   | 'session' | 'room' | 'tenant' | 'meter' | 'bill' | 'payment'
-  | 'contract' | 'invitation' | 'member' | 'property' | 'config' | 'parcel' | 'work_order' | 'staff' | 'message' | 'bank_account' | 'bank_transaction' | 'faq' | 'announcement' | 'shop_closure' | 'walkin' | 'security_alert' | 'line_link' | 'accounting_profile' | 'accounting_export' | 'ledger' | 'journal_entry' | 'lead' | 'lease';
+  | 'contract' | 'invitation' | 'member' | 'property' | 'config' | 'parcel' | 'work_order' | 'staff' | 'message' | 'bank_account' | 'faq' | 'announcement'
+  | 'bank_transaction' | 'shop_closure' | 'walkin' | 'security_alert' | 'line_link' | 'accounting_profile' | 'accounting_export' | 'ledger' | 'journal_entry' | 'lead' | 'lease';
 
 export interface AuditEntry {
   event_id: string;

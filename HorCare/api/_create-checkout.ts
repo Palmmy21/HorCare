@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import { db, admin } from './_firebase.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+
 function getStripe(): Stripe {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error('STRIPE_SECRET_KEY not set');
@@ -73,11 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (customerId) {
             try {
                 await stripe.customers.retrieve(customerId);
-            } catch (err: any) {
+            } catch (errRaw) {
+                const err = errorInfo(errRaw);
                 if (err?.statusCode === 404 || err?.code === 'resource_missing') {
                     customerId = '';
                 } else {
-                    throw err;
+                    throw errRaw;
                 }
             }
         }
@@ -140,8 +143,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         res.status(200).json({ data: { url: session.url } });
-    } catch (error: any) {
-        console.error('Create checkout error:', error);
+    } catch (errorRaw) {
+        console.error('Create checkout error:', errorRaw);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }

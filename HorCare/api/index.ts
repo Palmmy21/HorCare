@@ -24,9 +24,6 @@ import chatbotHandler from './_chatbot.js';
 import marketHandler from './_market.js';
 import securityAlertsHandler from './_security-alerts.js';
 import tenantLinkHandler from './_tenant-link.js';
-import accountingHandler from './_accounting.js';
-import ledgerHandler from './_ledger.js';
-import leasingHandler from './_leasing.js';
 import announcementsHandler from './_announcements.js';
 import remindParcelsHandler from './_remind-parcels.js';
 
@@ -52,9 +49,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'market': return marketHandler(req, res);
         case 'security-alerts': return securityAlertsHandler(req, res);
         case 'tenant-link': return tenantLinkHandler(req, res);
-        case 'accounting': return accountingHandler(req, res);
-        case 'ledger': return ledgerHandler(req, res);
-        case 'leasing': return leasingHandler(req, res);
+        // Heavy dependencies (XLSX writer, Supabase client) are loaded only when their route is called,
+        // so they never slow the cold start of every other API route.
+        case 'accounting': return (await import('./_accounting.js')).default(req, res);
+        case 'ledger': return (await import('./_ledger.js')).default(req, res);
+        case 'leasing': return (await import('./_leasing.js')).default(req, res);
         case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
         case 'nong-care': return nongCareHandler(req, res);

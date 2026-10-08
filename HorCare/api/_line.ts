@@ -1,3 +1,4 @@
+import type { Fine, MonthlyBill } from '../src/types/index.js';
 import * as crypto from 'crypto';
 
 export function verifyLineSignature(rawBody: Buffer | string, secret: string, signature: string): boolean {
@@ -93,7 +94,7 @@ interface BillFlexOptions {
 }
 
 export function buildBillFlex(
-    bill: any,
+    bill: MonthlyBill,
     dormName: string,
     dueDay: number,
     month: string,
@@ -243,7 +244,7 @@ export function buildPromptpayMessages(
  * โทนเขียว แยกจากบิล (น้ำเงิน) ให้รู้ทันทีว่าจ่ายสำเร็จแล้ว
  */
 export function buildReceiptFlex(
-    bill: any,
+    bill: MonthlyBill,
     dormName: string,
     paidAt: Date,
     opts: { lang?: BillLanguage; bilingual?: boolean; secLang?: BillLanguage } = {},
@@ -327,7 +328,7 @@ export function buildReceiptFlex(
  * แจ้งยอดค่าปรับ
  */
 export function buildFineFlex(
-    fine: any,
+    fine: Fine,
     dormName: string,
     opts: BillFlexOptions = {}
 ): object {
@@ -340,7 +341,7 @@ export function buildFineFlex(
             const [y, m, d] = fine.date.split('-');
             dateStr = `${parseInt(d)} ${THAI_MONTHS[parseInt(m)]} ${parseInt(y) + 543}`;
         }
-    } catch (e) {}
+    } catch { /* malformed date: keep the fallback text */ }
 
     const footerContents: object[] = opts.portalUrl ? [
         {

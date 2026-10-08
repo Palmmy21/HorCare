@@ -12,10 +12,12 @@ export function useCleaningRequests(
   maidId?: string,
 ) {
   const [requests, setRequests] = useState<CleaningRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  /** Loading only while there is something to load; with no property selected there is nothing to wait for. */
+  const loading = !!(uid && buildingId) && !loaded;
 
   useEffect(() => {
-    if (!uid || !buildingId) { setLoading(false); return; }
+    if (!uid || !buildingId) return;
 
     const col = collection(db, `users/${uid}/buildings/${buildingId}/cleaning`);
     let q = query(col);
@@ -41,11 +43,11 @@ export function useCleaningRequests(
         });
 
         setRequests(docs);
-        setLoading(false);
+        setLoaded(true);
       },
       err => {
         console.error('Cleaning onSnapshot error:', err);
-        setLoading(false);
+        setLoaded(true);
       }
     );
 
