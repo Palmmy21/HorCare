@@ -96,6 +96,10 @@ export interface MangoProfile {
     customer_code_all_lines: boolean;
     /** Fill "Voucher no." with HorCare's document number (otherwise left for Mango). */
     voucher_no_from_horcare: boolean;
+    /** How dates are written in the file — not confirmed by Mango yet, so the accountant picks. */
+    date_format: 'dd/mm/yyyy' | 'dd/mm/yyyy_be' | 'yyyy-mm-dd';
+    /** Repeat the header fields (voucher no., date, remarks…) on every line of a voucher, or only on its first line. */
+    header_on_every_line: boolean;
   };
   codes: {
     ar_account: string;
@@ -119,7 +123,7 @@ export interface MangoProfile {
 export function emptyProfile(id: string): MangoProfile {
   return {
     id, name: '', legal_entity_name: '', template_version: '', property_ids: [], property_codes: {}, status: 'draft',
-    options: { invoice_date_basis: 'issued_at', count_unverified_transfers: false, opening_cutoff_month: null, customer_code_all_lines: false, voucher_no_from_horcare: false },
+    options: { invoice_date_basis: 'issued_at', count_unverified_transfers: false, opening_cutoff_month: null, customer_code_all_lines: false, voucher_no_from_horcare: false, date_format: 'dd/mm/yyyy', header_on_every_line: true },
     codes: { ar_account: '', project: null, job: null, department: null, cost_code: null, book: null, pu_cost_yn: null, ac_type: null, data_type: null },
     remarks: { invoice: 'บันทึกตั้งลูกหนี้', receipt: 'บันทึกตัดลูกหนี้' },
     revenue_accounts: {}, channels: {}, customers: {},
