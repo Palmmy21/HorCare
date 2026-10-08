@@ -191,13 +191,15 @@ export default function MangoSettingsTab({ ownerUid, buildings, profiles }: Prop
                         </select></label>
                     <label style={lab}>รูปแบบวันที่ในไฟล์
                         <select style={input} value={d.options.date_format} onChange={e => opts({ date_format: e.target.value as MangoProfile['options']['date_format'] })}>
-                            <option value="dd/mm/yyyy">05/10/2026</option><option value="dd/mm/yyyy_be">05/10/2569 (พ.ศ.)</option><option value="yyyy-mm-dd">2026-10-05</option>
+                            <option value="template">ตามไฟล์ตัวอย่างของ Mango (แนะนำ)</option><option value="dd/mm/yyyy">05/10/2026</option><option value="yyyy-mm-dd">2026-10-05</option>
                         </select></label>
                     <label style={lab}>บิลก่อนเดือนนี้มีใน Mango แล้ว (ยกยอด)<input style={input} placeholder="YYYY-MM เช่น 2026-10" value={d.options.opening_cutoff_month ?? ''} onChange={e => opts({ opening_cutoff_month: e.target.value.trim() || null })} /></label>
                 </div>
                 {([
                     ['header_on_every_line', 'ใส่ข้อมูลหัวเอกสาร (เลขที่ วันที่ Remark) ซ้ำทุกบรรทัด'],
-                    ['customer_code_all_lines', 'ใส่ Customer Code ทุกบรรทัด (ไม่เลือก = เฉพาะบรรทัดลูกหนี้)'],
+                    ['customer_code_all_lines', 'ใส่ Customer Code ทุกบรรทัด เหมือนไฟล์ตัวอย่าง (ไม่เลือก = เฉพาะบรรทัดลูกหนี้)'],
+                    ['fill_reference_columns', 'ใส่เลขอ้างอิงเอกสาร (Ref No./Ref Date ทั้งหัวและรายบรรทัด) — ไฟล์ตัวอย่างเว้นว่าง'],
+                    ['fill_customer_block', 'ใส่ชื่อและเบอร์โทรลูกค้า (คอลัมน์ Customer Name / Tel No.) เหมือนไฟล์ตัวอย่าง'],
                     ['voucher_no_from_horcare', 'ใช้เลขเอกสารของ HorCare เป็น Voucher no. (ไม่เลือก = ให้ Mango ออกเลข)'],
                     ['count_unverified_transfers', 'นับเงินโอนที่ยังไม่ยืนยันกับบัญชีธนาคารเป็นเงินรับ (ไม่แนะนำ)'],
                 ] as const).map(([k, text]) => (

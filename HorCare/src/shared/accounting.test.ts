@@ -79,13 +79,15 @@ describe('invoices (AT-01, AT-02)', () => {
       ['AR-X', 350000, 0], ['REV-RENT', 0, 300000], ['REV-WATER', 0, 10000], ['REV-ELEC', 0, 40000],
     ]);
     expect(sumDr(r.vouchers)).toBe(sumCr(r.vouchers));
-    expect(v.lines[0].customer_code).toBe('C-001');
-    expect(v.lines[1].customer_code).toBeNull();
+    // like Mango's sample, the customer code is on every line by default
+    expect(v.lines.every(l => l.customer_code === 'C-001')).toBe(true);
   });
 
-  it('puts the customer code on every line when the profile says so', () => {
-    const p = profile(); p.options.customer_code_all_lines = true;
-    expect(run('invoice', { profile: p, exported: [] }).vouchers[0].lines.every(l => l.customer_code === 'C-001')).toBe(true);
+  it('limits the customer code to the receivable line when the profile says so', () => {
+    const p = profile(); p.options.customer_code_all_lines = false;
+    const lines = run('invoice', { profile: p, exported: [] }).vouchers[0].lines;
+    expect(lines[0].customer_code).toBe('C-001');
+    expect(lines.slice(1).every(l => l.customer_code === null)).toBe(true);
   });
 
   it('a 100 baht bill is one voucher of 100, not a copy of the sample rows (AT-01)', () => {
