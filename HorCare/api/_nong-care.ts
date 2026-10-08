@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { admin } from './_firebase.js';
+import { AiError, aiGenerate } from './_ai.js';
 
 // ── Plan helper ──
 function isPro(license: string): boolean {
@@ -41,13 +42,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'Prompt is required' });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) throw new Error('GEMINI_API_KEY not set');
-
-        // Use gemini-2.5-flash for general reasoning
-        const model = 'gemini-2.5-flash'; 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
         const systemPrompt = `คุณคือ "น้องแคร์" (Nong Care) ผู้ช่วยอัจฉริยะด้านการเงินและภาษีสำหรับเจ้าของหอพัก
 คุณได้รับข้อมูลสถิติของหอพัก (Context) ในรูปแบบ JSON ดังนี้:
 ${JSON.stringify(context, null, 2)}
@@ -59,33 +53,15 @@ ${JSON.stringify(context, null, 2)}
 - หากคำถามไม่อยู่ในข้อมูล ให้แนะนำตามหลักการจัดการหอพักทั่วไป
 - ใช้ Markdown ในการจัดรูปแบบ (เช่น ตัวหนา, bullet points) เพื่อให้อ่านง่าย`;
 
-        const body = {
-            contents: [
-                {
-                    role: 'user',
-                    parts: [{ text: systemPrompt + '\n\nคำถามจากเจ้าของหอพัก: ' + prompt }]
-                }
-            ],
-            generationConfig: {
-                temperature: 0.7,
-            },
-        };
-
-        const resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+        // Uses the configured text model (OpenRouter or Gemini — see _ai.ts). An empty answer
+        // falls back to an apology; any other failure is reported as before.
+        const answer = await aiGenerate({
+            kind: 'text', system: systemPrompt, prompt: 'คำถามจากเจ้าของหอพัก: ' + prompt, temperature: 0.7,
+        }).catch(err => {
+            if (err instanceof AiError && err.code === 'empty_response') return null;
+            throw err;
         });
-
-        if (!resp.ok) {
-            const errText = await resp.text();
-            throw new Error(`Gemini API error: ${errText}`);
-        }
-
-        const data = await resp.json() as any;
-        if (data.error) throw new Error(`Gemini: ${data.error.message}`);
-
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'ขออภัยค่ะ น้องแคร์ไม่สามารถประมวลผลคำถามนี้ได้ในขณะนี้';
+        const reply = answer ?? 'ขออภัยค่ะ น้องแคร์ไม่สามารถประมวลผลคำถามนี้ได้ในขณะนี้';
 
         return res.status(200).json({ reply });
 

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { readSlipAmount } from './_slip-ai.js';
 import { decodeSlipQR, slipFingerprint } from './_slip.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -88,47 +89,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 
         if (isPro && qr.payload) {
-            try {
-                const apiKey = process.env.GEMINI_API_KEY;
-                if (apiKey) {
-                    const model = 'gemini-2.5-flash-lite';
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                    
-                    const prompt = `ดึงตัวเลข "จำนวนเงินที่โอน" จากสลิปโอนเงินนี้ (ไม่ต้องรวมค่าธรรมเนียม)\nตอบเป็น JSON เท่านั้น:\n{\n  "amount": <ตัวเลขทศนิยม เช่น 1500.00 หรือ null ถ้าอ่านไม่ได้>\n}`;
-                    const body = {
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inline_data: { mime_type: mimeType, data: base64Data } },
-                            ],
-                        }],
-                        generationConfig: {
-                            temperature: 0,
-                            responseMimeType: 'application/json',
-                        },
-                    };
-
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body),
-                    });
-
-                    if (resp.ok) {
-                        const data = await resp.json() as any;
-                        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-                        try {
-                            const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                            const parsed = JSON.parse(cleanJson);
-                            geminiAmount = parsed.amount;
-                            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
-                            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
-                                autoVerified = true;
-                            }
-                        } catch (e) {}
-                    }
-                }
-            } catch (err) {}
+            // AI only suggests the amount; auto-approval needs it to equal the bill exactly.
+            geminiAmount = await readSlipAmount(base64Data, mimeType);
+            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
+            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
+                autoVerified = true;
+            }
         }
 
         const now = new Date().toISOString();

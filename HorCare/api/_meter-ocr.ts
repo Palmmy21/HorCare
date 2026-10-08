@@ -1,7 +1,7 @@
 /**
  * POST /api/meter-ocr
  *
- * Reads ONE meter photo with Gemini Vision and returns what it saw: the room
+ * Reads ONE meter photo with the configured AI vision model (see _ai.ts) and returns what it saw: the room
  * number written near the meter, the dial reading and the meter type.
  *
  * It only *reads*. It never touches meter records — the client shows the result
@@ -13,6 +13,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
+import { AiError, aiGenerate, extractJson } from './_ai.js';
 
 export const config = { maxDuration: 30 };
 
@@ -25,12 +26,6 @@ export interface MeterOcrResult {
     note: string;
 }
 
-/** An OCR failure with a short, safe code the UI can show to help diagnose it. */
-class OcrError extends Error {
-    code: string;
-    constructor(code: string, message: string) { super(message); this.code = code; }
-}
-
 const EMPTY: MeterOcrResult = { room_number: null, reading: null, meter_type: 'unknown', confidence: 0, note: '' };
 
 function isPlusOrAbove(license: string): boolean {
@@ -41,14 +36,10 @@ function isPlusOrAbove(license: string): boolean {
 
 /** Defensive parse: the model's output is untrusted input. Never throws. */
 export function parseMeterOcr(raw: string): MeterOcrResult {
-    let parsed: Record<string, unknown>;
-    try {
-        const obj = JSON.parse(raw.trim());
-        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ...EMPTY, note: 'อ่านผลจาก AI ไม่สำเร็จ' };
-        parsed = obj as Record<string, unknown>;
-    } catch {
-        return { ...EMPTY, note: 'อ่านผลจาก AI ไม่สำเร็จ' };
-    }
+    // extractJson also copes with ```json fences some models add around the object.
+    const obj = extractJson(raw);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ...EMPTY, note: 'อ่านผลจาก AI ไม่สำเร็จ' };
+    const parsed = obj as Record<string, unknown>;
 
     const room = typeof parsed.room_number === 'string' || typeof parsed.room_number === 'number'
         ? String(parsed.room_number).trim().slice(0, 20) : '';
@@ -66,11 +57,7 @@ export function parseMeterOcr(raw: string): MeterOcrResult {
     };
 }
 
-async function callGemini(imageBase64: string, mimeType: string): Promise<MeterOcrResult> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new OcrError('missing_key', 'GEMINI_API_KEY not set');
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
-
+async function readMeter(imageBase64: string, mimeType: string): Promise<MeterOcrResult> {
     const prompt = `คุณคือผู้เชี่ยวชาญอ่านมิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา พนักงานถ่ายรูปมิเตอร์ของแต่ละห้อง
 โดยมักมีเลขห้องเขียนหรือติดสติกเกอร์ไว้ใกล้มิเตอร์
 
@@ -89,23 +76,10 @@ async function callGemini(imageBase64: string, mimeType: string): Promise<MeterO
 - ถ้าไม่ใช่รูปมิเตอร์หรือมืด/เบลอมาก ให้ reading เป็น null และ confidence ต่ำกว่า 0.3
 - ห้ามอธิบายเพิ่มนอก JSON`;
 
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: imageBase64 } }] }],
-            generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json' },
-        }),
+    // Provider errors are logged server-side by _ai.ts; the client only gets a short code.
+    const text = await aiGenerate({
+        kind: 'vision', prompt, images: [{ base64: imageBase64, mimeType }], json: true, temperature: 0, maxTokens: 300,
     });
-    if (!resp.ok) {
-        // Log the provider's message server-side; the client only gets the status code.
-        console.error('[meter-ocr] Gemini', resp.status, (await resp.text()).slice(0, 300));
-        throw new OcrError(`gemini_${resp.status}`, `Gemini API error ${resp.status}`);
-    }
-    const data = await resp.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[]; error?: { message?: string } };
-    if (data.error) throw new OcrError('gemini_error', `Gemini: ${data.error.message}`);
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new OcrError('empty_response', 'Gemini returned no text');
     return parseMeterOcr(text);
 }
 
@@ -138,13 +112,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const mime = typeof body.mimeType === 'string' && /^image\/(jpeg|png|webp)$/.test(body.mimeType) ? body.mimeType : 'image/jpeg';
 
     try {
-        res.status(200).json({ data: await callGemini(body.imageBase64, mime) });
+        res.status(200).json({ data: await readMeter(body.imageBase64, mime) });
     } catch (err) {
         console.error('[meter-ocr]', (err as Error).message);
-        const code = err instanceof OcrError ? err.code : 'unexpected';
-        const hint = code === 'missing_key' ? 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY บนเซิร์ฟเวอร์'
-            : code === 'gemini_429' ? 'โควต้า AI เต็มชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่'
-            : code === 'gemini_403' || code === 'gemini_400' ? 'คีย์ AI ใช้ไม่ได้หรือไม่มีสิทธิ์ใช้โมเดลนี้'
+        const code = err instanceof AiError ? err.code : 'unexpected';
+        const hint = code === 'missing_key' ? 'ยังไม่ได้ตั้งค่า AI บนเซิร์ฟเวอร์ (OPENROUTER_API_KEY หรือ GEMINI_API_KEY)'
+            : code === 'provider_429' ? 'โควต้า AI เต็มชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่'
+            : code === 'provider_401' || code === 'provider_403' ? 'คีย์ AI ใช้ไม่ได้หรือไม่มีสิทธิ์'
+            : code === 'provider_402' ? 'เครดิต AI หมด กรุณาเติมเครดิต'
+            : code === 'provider_400' || code === 'provider_404' ? 'โมเดล AI ที่ตั้งไว้ใช้ไม่ได้ ตรวจสอบชื่อโมเดล'
+            : code === 'timeout' ? 'AI ตอบช้าเกินไป ลองใหม่อีกครั้ง'
             : 'AI อ่านรูปไม่สำเร็จ กรุณาลองใหม่';
         res.status(502).json({ error: 'ocr_failed', detail: code, message: `${hint} (${code})` });
     }

@@ -4,6 +4,7 @@ import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } fr
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { getTenantLink, recordInbound } from './_line-inbox.js';
+import { readSlipAmount } from './_slip-ai.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 
 export const config = {
@@ -676,59 +677,14 @@ async function handleSlipImage(
     const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 
     if (isPro && dataUrl && !duplicate && qr.payload) {
-        try {
-            const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-            if (match) {
-                const mimeType = match[1];
-                const base64 = match[2];
-                const apiKey = process.env.GEMINI_API_KEY;
-                if (apiKey) {
-                    const model = 'gemini-2.5-flash-lite';
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                    
-                    const prompt = `ดึงตัวเลข "จำนวนเงินที่โอน" จากสลิปโอนเงินนี้ (ไม่ต้องรวมค่าธรรมเนียม)
-ตอบเป็น JSON เท่านั้น:
-{
-  "amount": <ตัวเลขทศนิยม เช่น 1500.00 หรือ null ถ้าอ่านไม่ได้>
-}`;
-                    const body = {
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inline_data: { mime_type: mimeType, data: base64 } },
-                            ],
-                        }],
-                        generationConfig: {
-                            temperature: 0,
-                            responseMimeType: 'application/json',
-                        },
-                    };
-
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body),
-                    });
-
-                    if (resp.ok) {
-                        const data = await resp.json() as any;
-                        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-                        try {
-                            const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-                            const parsed = JSON.parse(cleanJson);
-                            geminiAmount = parsed.amount;
-                            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
-                            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
-                                autoVerified = true;
-                            }
-                        } catch (e) {
-                            console.error('Parse Gemini slip error:', e);
-                        }
-                    }
-                }
+        const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (match) {
+            // AI only suggests the amount; auto-approval needs it to equal the bill exactly.
+            geminiAmount = await readSlipAmount(match[2], match[1]);
+            const expectedAmount = isFine ? targetData.amount : targetData.total_bill;
+            if (typeof geminiAmount === 'number' && geminiAmount === expectedAmount) {
+                autoVerified = true;
             }
-        } catch (err) {
-            console.error('Slip auto-verification failed:', err);
         }
     }
 

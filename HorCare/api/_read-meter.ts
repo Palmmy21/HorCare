@@ -14,6 +14,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { aiGenerate, extractJson } from './_ai.js';
 
 // ── Plan helpers (inline — ไม่ import จาก src เพราะ API ไม่ bundle React) ──
 function isPlusOrAbove(license: string): boolean {
@@ -35,13 +36,6 @@ async function callGeminiVision(
     imageBase64: string,
     mimeType: string,
 ): Promise<GeminiResult> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY not set');
-
-    // ใช้ gemini-2.5-flash-lite
-    const model = 'gemini-2.5-flash-lite';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
     const prompt = `คุณคือผู้เชี่ยวชาญอ่านค่ามิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา
 
 ดูรูปและตอบ JSON ตามรูปแบบนี้เท่านั้น (ห้ามอธิบายเพิ่ม):
@@ -57,48 +51,13 @@ async function callGeminiVision(
 - ไม่นับตัวเลขสีแดงหรือตัวเลขทศนิยมหลังจุด (ถ้ามี)
 - ถ้ารูปมืด เบลอ หรือไม่ใช่รูปมิเตอร์ ให้ใส่ reading: null และ confidence: "low"`;
 
-    const body = {
-        contents: [{
-            parts: [
-                { text: prompt },
-                {
-                    inline_data: {
-                        mime_type: mimeType,
-                        data: imageBase64,
-                    },
-                },
-            ],
-        }],
-        generationConfig: {
-            temperature: 0,          // ต้องการผลที่แน่นอน ไม่ creative
-            maxOutputTokens: 150,    // ตอบสั้นๆ JSON เท่านั้น
-            responseMimeType: 'application/json',
-        },
-    };
-
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+    const rawText = await aiGenerate({
+        kind: 'vision', prompt, images: [{ base64: imageBase64, mimeType }], json: true, temperature: 0, maxTokens: 300,
     });
-
-    if (!resp.ok) {
-        const errText = await resp.text();
-        throw new Error(`Gemini API error ${resp.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const data = await resp.json() as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
-        error?: { message?: string };
-    };
-
-    if (data.error) throw new Error(`Gemini: ${data.error.message}`);
-
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     // Parse JSON response
     try {
-        const parsed = JSON.parse(rawText.trim()) as Partial<GeminiResult>;
+        const parsed = (extractJson(rawText) ?? {}) as Partial<GeminiResult>;
         return {
             reading: typeof parsed.reading === 'number' ? Math.round(parsed.reading) : null,
             meterType: (['electric', 'water', 'unknown'].includes(parsed.meterType ?? ''))
