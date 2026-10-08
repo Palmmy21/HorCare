@@ -8,6 +8,7 @@ import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
 import { useLineThreads } from './hooks/useLineThreads';
+import { useSecurityAlerts } from './hooks/useSecurityAlerts';
 import { groupNav, groupOfView, isGroupOpen, navGroupDefs, parseSavedState, type NavGroupState, type TransientClose } from './utils/navGroups';
 import { useFCMToken } from './hooks/useFCMToken';
 import { usePushNotification } from './hooks/usePushNotification';
@@ -365,6 +366,8 @@ function App() {
   // LINE inbox — live conversations (shared with the Messages page) and the unread badge
   const { threads: lineThreads, unreadTotal: unreadMessages, loading: threadsLoading, error: threadsError } =
     useLineThreads(maidSession ? null : (user?.uid ?? null), maidSession ? null : activeBuildingId);
+  // Open security alerts (new LINE bindings etc.) — badge on the Security menu item
+  const { openCount: openSecurityAlerts } = useSecurityAlerts(maidSession ? null : (user?.uid ?? null), buildings.map(b => b.id));
 
   // Stock badge — real-time count of items below minimum quantity
   const { items: _stockItems } = useStockItems(effectiveUid, effectiveBuildingId);
@@ -451,6 +454,7 @@ function App() {
       case 'operations': return lowStockCount;
       case 'payments': return pendingSlipCount;
       case 'messages': return unreadMessages;
+      case 'security': return openSecurityAlerts;
       default: return 0;
     }
   };
