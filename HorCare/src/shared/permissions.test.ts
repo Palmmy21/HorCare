@@ -49,6 +49,13 @@ describe('RBAC catalog', () => {
     }
   });
 
+  it('leasing: owner, manager and front desk manage; finance may read; staff roles have no access', () => {
+    for (const role of ROLES) {
+      expect(can(role, 'leasing.manage')).toBe(role === 'owner' || role === 'property_manager' || role === 'front_desk');
+      expect(can(role, 'leasing.read')).toBe(['owner', 'property_manager', 'front_desk', 'finance'].includes(role));
+    }
+  });
+
   it('finance can reconcile, front desk can invite tenants', () => {
         expect(can('finance', 'payment.reconcile')).toBe(true);
         expect(can('front_desk', 'invitation.create')).toBe(true);
