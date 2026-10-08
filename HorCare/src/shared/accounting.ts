@@ -170,6 +170,8 @@ export interface JournalLine {
   ref_date: string;
   customer_code: string | null;
   option_code: string | null;
+  /** Sub-ledger party (the stall/room the receivable belongs to); null on lines that are not receivables. */
+  party_id?: string | null;
 }
 
 export interface Voucher {
@@ -214,14 +216,19 @@ export const PROBLEM_LABELS_TH: Record<string, string> = {
   over_allocated: 'จัดสรรเกินยอดที่รับ',
   allocation_target_missing: 'ไม่พบบิล/ค่าปรับที่จัดสรรไว้',
   allocation_cancelled: 'จัดสรรไปยังเอกสารที่ถูกยกเลิก',
-  invoice_not_in_mango: 'บิลที่ชำระยังไม่เคยส่งออกตั้งลูกหนี้ — ส่งออกใบตั้งลูกหนี้ก่อน',
-  revised_after_export: 'บิลถูกแก้หลังส่งออกแล้ว — ต้องให้ฝ่ายบัญชีตัดสินวิธีแก้ไขใน Mango',
+  invoice_not_in_mango: 'บิลที่ชำระยังไม่เคยลงบัญชี/ส่งออกตั้งลูกหนี้ — ตั้งลูกหนี้ก่อน',
+  revised_after_export: 'บิลถูกแก้หลังลงบัญชี/ส่งออกแล้ว — ต้องกลับรายการเดิมหรือให้ฝ่ายบัญชีตัดสินวิธีแก้ไข',
   multi_customer_payment: 'การรับเงินครั้งเดียวจัดสรรให้หลายลูกค้า (ยังไม่รองรับ)',
   voucher_unbalanced: 'เดบิตไม่เท่าเครดิต',
 };
 
+/** What the posting rules need from a profile — a Mango export profile or a ledger's posting settings. */
+export type PostingProfile = Pick<MangoProfile, 'id' | 'options' | 'codes' | 'remarks' | 'revenue_accounts' | 'channels' | 'customers' | 'property_codes'>;
+
 export interface PostingInput {
-  profile: MangoProfile;
+  profile: PostingProfile;
+  /** An external system needs a customer code on every document; the internal ledger does not. Default true. */
+  requireCustomerCode?: boolean;
   kind: VoucherKind;
   /** Inclusive Thai dates. Invoices are filtered by voucher date, receipts by payment date. */
   from: string;
@@ -249,7 +256,8 @@ const merge = (lines: JournalLine[]): JournalLine[] => {
   const out: JournalLine[] = [];
   for (const l of lines) {
     const hit = out.find(o => o.account === l.account && o.description === l.description && o.ref_no === l.ref_no
-      && (o.dr_satang > 0) === (l.dr_satang > 0) && o.option_code === l.option_code && o.customer_code === l.customer_code);
+      && (o.dr_satang > 0) === (l.dr_satang > 0) && o.option_code === l.option_code && o.customer_code === l.customer_code
+      && (o.party_id ?? null) === (l.party_id ?? null));
     if (hit) { hit.dr_satang += l.dr_satang; hit.cr_satang += l.cr_satang; } else out.push({ ...l });
   }
   return out;
@@ -273,6 +281,7 @@ export function buildVouchers(input: PostingInput): PostingResult {
   const docById = new Map(docs.map(d => [`${d.kind}:${d.id}`, d]));
   const cutoff = profile.options.opening_cutoff_month;
   const customerOf = (roomId: string) => profile.customers[roomId]?.code?.trim() || '';
+  const needCode = input.requireCustomerCode !== false;
 
   if (kind === 'invoice') {
     for (const d of docs) {
@@ -294,7 +303,7 @@ export function buildVouchers(input: PostingInput): PostingResult {
         own.push({ code: 'total_mismatch', message: PROBLEM_LABELS_TH.total_mismatch, source: src });
       }
       const code = customerOf(d.room_id);
-      if (!code) own.push({ code: 'no_customer_code', message: `${PROBLEM_LABELS_TH.no_customer_code} (${d.room_number})`, source: src });
+      if (!code && needCode) own.push({ code: 'no_customer_code', message: `${PROBLEM_LABELS_TH.no_customer_code} (${d.room_number})`, source: src });
       for (const cat of new Set(d.lines.map(l => l.category))) {
         if (!profile.revenue_accounts[cat]?.trim()) own.push({ code: 'no_revenue_account', message: `${PROBLEM_LABELS_TH.no_revenue_account}: ${REVENUE_CATEGORY_LABELS_TH[cat]}`, source: src });
       }
@@ -303,11 +312,11 @@ export function buildVouchers(input: PostingInput): PostingResult {
       const ref = docRef(d);
       const common = { ref_no: ref, ref_date: date };
       const lines = merge([
-        { account: profile.codes.ar_account, dr_satang: d.total_satang, cr_satang: 0, description: `REF : ${ref}`, customer_code: code, option_code: null, ...common },
+        { account: profile.codes.ar_account, dr_satang: d.total_satang, cr_satang: 0, description: `REF : ${ref}`, customer_code: code || null, option_code: null, party_id: d.room_id, ...common },
         ...d.lines.map(l => ({
           account: profile.revenue_accounts[l.category]!, dr_satang: 0, cr_satang: l.amount_satang,
           description: `${REVENUE_CATEGORY_LABELS_TH[l.category]} ${d.room_number} ${d.period}`,
-          customer_code: profile.options.customer_code_all_lines ? code : null, option_code: null, ...common,
+          customer_code: profile.options.customer_code_all_lines && code ? code : null, option_code: null, party_id: null, ...common,
         })),
       ]);
       const v = finish({
@@ -356,16 +365,16 @@ export function buildVouchers(input: PostingInput): PostingResult {
     }
     const codes = new Set(targets.map(t => customerOf(t.room_id)));
     if (targets.length && codes.size > 1) own.push({ code: 'multi_customer_payment', message: PROBLEM_LABELS_TH.multi_customer_payment, source: src });
-    else if (targets.length && ![...codes][0]) own.push({ code: 'no_customer_code', message: `${PROBLEM_LABELS_TH.no_customer_code} (${targets[0].room_number})`, source: src });
+    else if (targets.length && needCode && ![...codes][0]) own.push({ code: 'no_customer_code', message: `${PROBLEM_LABELS_TH.no_customer_code} (${targets[0].room_number})`, source: src });
     if (own.length) { problems.push(...own); continue; }
 
     const code = [...codes][0];
     const ref = receiptRef(p.id);
     const lines = merge([
-      { account: channel!.account, dr_satang: p.gross_satang, cr_satang: 0, description: `REF : ${ref}`, ref_no: ref, ref_date: date, customer_code: profile.options.customer_code_all_lines ? code : null, option_code: channel!.option_code },
+      { account: channel!.account, dr_satang: p.gross_satang, cr_satang: 0, description: `REF : ${ref}`, ref_no: ref, ref_date: date, customer_code: profile.options.customer_code_all_lines && code ? code : null, option_code: channel!.option_code, party_id: null },
       ...p.allocations.map((a, i) => {
         const d = targets[i];
-        return { account: profile.codes.ar_account, dr_satang: 0, cr_satang: a.amount_satang, description: `REF : ${docRef(d)}`, ref_no: docRef(d), ref_date: invoiceDate(d, profile.options.invoice_date_basis), customer_code: code, option_code: null };
+        return { account: profile.codes.ar_account, dr_satang: 0, cr_satang: a.amount_satang, description: `REF : ${docRef(d)}`, ref_no: docRef(d), ref_date: invoiceDate(d, profile.options.invoice_date_basis), customer_code: code || null, option_code: null, party_id: d.room_id };
       }),
     ]);
     const v = finish({

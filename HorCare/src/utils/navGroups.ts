@@ -13,7 +13,7 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
     { id: 'overview', label: 'ภาพรวม', items: ['dashboard'] },
     { id: 'property', label: isMarket ? 'แผงค้า' : 'ห้องพัก', items: ['rooms', 'recording'] },
     { id: 'people', label: isMarket ? 'ผู้เช่า/ร้านค้า' : 'ผู้เช่า', items: ['tenants', 'parcels', 'market'] },
-    { id: 'money', label: 'การเงิน', items: ['payments', 'accounting', 'summary', 'archives'] },
+    { id: 'money', label: 'การเงิน', items: ['payments', 'ledger', 'accounting', 'summary', 'archives'] },
     { id: 'service', label: 'งานบริการ', items: ['maintenance', 'cleaning', 'workorders', 'operations'] },
     { id: 'comms', label: 'สื่อสาร', items: ['messages', 'announcements'] },
     { id: 'system', label: 'ระบบ', items: ['security', 'settings', 'pricing', 'admin'] },

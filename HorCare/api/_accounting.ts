@@ -108,7 +108,7 @@ export function legacyPayment(kind: 'bill' | 'fine', item: PaidItem): PaymentRec
     };
 }
 
-async function loadBuilding(owner: string, bld: string, code?: string) {
+export async function loadBuilding(owner: string, bld: string, code?: string) {
     const base = bldBase(owner, bld);
     const [bills, fines, pays, tenants] = await Promise.all([
         db.collection(`${base}/bills`).get(), db.collection(`${base}/fines`).get(), db.collection(`${base}/payments`).get(), db.collection(`${base}/tenants`).get(),

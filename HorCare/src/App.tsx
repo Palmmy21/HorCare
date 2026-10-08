@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -45,6 +45,7 @@ const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
 const AnnouncementsPage = lazy(() => import('./components/Announcements/AnnouncementsPage'));
 const MarketPage = lazy(() => import('./components/Market/MarketPage'));
 const AccountingPage = lazy(() => import('./components/Accounting/AccountingPage'));
+const LedgerPage = lazy(() => import('./components/Ledger/LedgerPage'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
 
@@ -78,7 +79,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -398,6 +399,7 @@ function App() {
     { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
     { id: 'operations'  as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
+    { id: 'ledger' as ViewMode, icon: BookOpen, label: 'สมุดบัญชี' },
     { id: 'accounting' as ViewMode, icon: BookOpenCheck, label: 'บัญชี · Export Mango' },
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
@@ -1614,6 +1616,10 @@ function App() {
         )}
 
 
+
+        {currentView === 'ledger' && user && !maidSession && (
+          <LedgerPage ownerUid={user.uid} buildings={buildings} />
+        )}
 
         {currentView === 'accounting' && user && !maidSession && (
           <AccountingPage ownerUid={user.uid} buildings={buildings} />
