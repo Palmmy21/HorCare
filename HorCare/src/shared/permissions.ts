@@ -42,6 +42,12 @@ export const PERMISSIONS = [
   'accounting.manage',
   /** Accounting export: preview, create, download and confirm the import of export files. */
   'accounting.export',
+  /** HorCare's own books: view the journal and reports. */
+  'ledger.read',
+  /** Post bills/payments to the books, reverse entries, add manual entries. */
+  'ledger.post',
+  /** Set up the ledger: chart of accounts, posting accounts, close periods. */
+  'ledger.manage',
   'audit_log.read',
   'member.read', 'member.manage',
 ] as const;
@@ -55,7 +61,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   property_manager: ALL.filter(p => p !== 'member.manage'),
   finance: [
     'room.read', 'tenant.read', 'finance.read', 'meter.read',
-    'payment.create', 'payment.update', 'payment.reconcile', 'contract.read', 'accounting.export',
+    'payment.create', 'payment.update', 'payment.reconcile', 'contract.read', 'accounting.export', 'ledger.read', 'ledger.post',
   ],
   front_desk: [
     'room.read', 'tenant.read', 'invitation.read', 'invitation.create', 'meter.read',

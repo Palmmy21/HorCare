@@ -5,8 +5,8 @@
 // Rules: an entry is balanced, has at least two lines and positive single-sided amounts; entries are never
 // edited or deleted — a mistake is corrected by a reversal; a locked period accepts no new entries.
 
-import type { ChannelKey, PostingProfile, RevenueCategory, Voucher } from './accounting';
-import { thDate } from './accounting';
+import type { ChannelKey, PostingProfile, RevenueCategory, Voucher } from './accounting.js';
+import { thDate } from './accounting.js';
 
 // ── Chart of accounts ───────────────────────────────────────────────────────
 

@@ -276,6 +276,15 @@ service cloud.firestore {
       }
 
       // ── Activity log — append-only. Nobody (owner included) can edit or delete. ──
+      // HorCare's own books: written only by /api/ledger. Entries are never edited or deleted.
+      match /ledgers/{ledgerId} {
+        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'ledger.read');
+        allow write: if false;
+        match /entries/{entryId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'ledger.read');
+          allow write: if false;
+        }
+      }
       // Accounting export profiles + batches: written only by /api/accounting.
       match /accounting_profiles/{profileId} {
         allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
@@ -320,10 +329,10 @@ service cloud.firestore {
       // a permissive wildcard here would let the owner rewrite history.
       match /{subCol}/{docId} {
         allow read: if isOwner(userId) && isNotBanned() && subCol != 'audit_logs' && subCol != 'members'
-                     && subCol != 'accounting_profiles' && subCol != 'accounting_batches';
+                     && subCol != 'accounting_profiles' && subCol != 'accounting_batches' && subCol != 'ledgers';
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId)
                      && subCol != 'audit_logs' && subCol != 'members'
-                     && subCol != 'accounting_profiles' && subCol != 'accounting_batches';
+                     && subCol != 'accounting_profiles' && subCol != 'accounting_batches' && subCol != 'ledgers';
       }
     }
 
