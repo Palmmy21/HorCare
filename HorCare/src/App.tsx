@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, LayoutGrid, Wallet,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -49,7 +49,6 @@ const AccountingPage = lazy(() => import('./components/Accounting/AccountingPage
 const LedgerPage = lazy(() => import('./components/Ledger/LedgerPage'));
 const LeasingPage = lazy(() => import('./components/Leasing/LeasingPage'));
 const CollectionsPage = lazy(() => import('./components/Collections/CollectionsPage'));
-const ModulesHome = lazy(() => import('./components/Modules/ModulesHome'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
 
@@ -83,7 +82,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'modules' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -413,7 +412,6 @@ function App() {
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
     { id: 'ledger' as ViewMode, icon: BookOpen, label: 'สมุดบัญชี' },
     { id: 'leasing' as ViewMode, icon: KeyRound, label: 'ปล่อยเช่า' },
-    { id: 'modules' as ViewMode, icon: LayoutGrid, label: 'โมดูล ERP' },
     { id: 'accounting' as ViewMode, icon: BookOpenCheck, label: 'บัญชี · Export Mango' },
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
@@ -1640,9 +1638,6 @@ function App() {
         )}
         {currentView === 'collections' && user && activeBuildingId && !maidSession && collectionStyle !== 'monthly' && (
           <CollectionsPage ownerUid={user.uid} buildingId={activeBuildingId} style={collectionStyle} />
-        )}
-        {currentView === 'modules' && !maidSession && (
-          <ModulesHome isMarket={terms.isMarket} style={collectionStyle} available={new Set(visibleNavItems.map(i => i.id))} onOpen={view => setCurrentView(view as ViewMode)} />
         )}
 
         {currentView === 'ledger' && user && !maidSession && (

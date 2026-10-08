@@ -39,8 +39,8 @@ describe('groupNav', () => {
   });
 
   it('the new ERP views land in their modules', () => {
-    const groups = groupNav([item('dashboard'), item('modules'), item('leasing'), item('tenants'), item('ledger'), item('accounting'), item('market'), item('announcements')], navGroupDefs(false));
-    expect(ids(groups.find(g => g.id === 'overview')!.items)).toEqual(['dashboard', 'modules']);
+    const groups = groupNav([item('dashboard'), item('leasing'), item('tenants'), item('ledger'), item('accounting'), item('market'), item('announcements')], navGroupDefs(false));
+    expect(ids(groups.find(g => g.id === 'overview')!.items)).toEqual(['dashboard']);
     expect(ids(groups.find(g => g.id === 'leasing')!.items)).toEqual(['leasing', 'tenants']);
     expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['ledger', 'accounting']);
     expect(ids(groups.find(g => g.id === 'residents')!.items)).toEqual(['market', 'announcements']);
