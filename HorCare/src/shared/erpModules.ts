@@ -13,7 +13,7 @@ export interface ErpModule {
 }
 
 export const VIEW_LABELS_TH: Record<string, string> = {
-  rooms: 'จัดการห้อง/แผง', recording: 'จดมิเตอร์', leasing: 'ปล่อยเช่า (ผู้สนใจ จอง สัญญา)', tenants: 'ผู้เช่า',
+  rooms: 'จัดการห้อง/แผง', collections: 'เก็บค่าห้อง / เก็บเงินแผง (รายวัน รายสัปดาห์)', recording: 'จดมิเตอร์', leasing: 'ปล่อยเช่า (ผู้สนใจ จอง สัญญา)', tenants: 'ผู้เช่า',
   payments: 'การชำระเงิน', ledger: 'สมุดบัญชี', accounting: 'ส่งออกไป Mango', summary: 'สรุปยอด', archives: 'คลังเอกสาร',
   maintenance: 'แจ้งซ่อม', cleaning: 'งานแม่บ้าน', workorders: 'ใบงานช่าง/แม่บ้าน', operations: 'ระบบจัดการ (สต็อก ทรัพย์สิน ค่าใช้จ่าย)',
   parcels: 'พัสดุ', market: 'ร้านค้าแจ้งหยุด / ขาจร', messages: 'ข้อความ LINE', announcements: 'ประกาศและตอบอัตโนมัติ',
@@ -25,7 +25,7 @@ export function erpModules(isMarket: boolean): ErpModule[] {
     {
       id: 'property', label: isMarket ? 'แผงค้าและพื้นที่' : 'ทรัพย์สิน',
       purpose: isMarket ? 'ทะเบียนแผง โซน และมิเตอร์' : 'ทะเบียนห้อง/ยูนิต สิ่งอำนวยความสะดวก และมิเตอร์น้ำไฟ',
-      views: ['rooms', 'recording', 'summary'],
+      views: ['rooms', 'collections', 'recording', 'summary'],
       planned: ['ผังชั้น/โซน', 'เจ้าของทรัพย์สิน (กรณีบริหารแทน)'],
     },
     {

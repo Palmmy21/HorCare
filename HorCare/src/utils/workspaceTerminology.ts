@@ -102,6 +102,11 @@ export function rentUnitLabel(rentType: RentType | undefined, type: BuildingKind
   if (r === 'daily') return type === 'resort' || type === 'hotel' ? 'คืน' : 'วัน';
   return { weekly: 'สัปดาห์', monthly: 'เดือน', semester: 'เทอม', yearly: 'ปี' }[r];
 }
+/** How a property collects money: its saved choice, else what its building type starts with. */
+export function collectionStyleOf(config: Pick<DormConfig, 'building_type' | 'collection_style'> | undefined): 'monthly' | 'nightly' | 'stall' {
+  return config?.collection_style ?? defaultCollectionStyle(config?.building_type);
+}
+
 export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): WorkspaceTerms {
   const type = buildingType || 'dormitory';
 
