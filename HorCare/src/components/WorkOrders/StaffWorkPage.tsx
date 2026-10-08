@@ -45,7 +45,21 @@ export default function StaffWorkPage() {
         if (im.ok) setImages(im.data.images ?? []);
     }, [link]);
 
-    useEffect(() => { if (link) void load(); }, [link, load]);
+    // Initial load (after-send refreshes reuse `load`)
+    useEffect(() => {
+        if (!link) return;
+        let cancelled = false;
+        void (async () => {
+            const v = await call<{ work_order: StaffWorkView }>(link, { action: 'staff_view' });
+            if (cancelled) return;
+            if (!v.ok) { setState('gone'); return; }
+            setJob(v.data.work_order);
+            setState('ready');
+            const im = await call<{ images: WorkImage[] }>(link, { action: 'staff_images' });
+            if (!cancelled && im.ok) setImages(im.data.images ?? []);
+        })();
+        return () => { cancelled = true; };
+    }, [link]);
 
     const addPhoto = async (kind: 'before' | 'after', files: FileList | null) => {
         if (!files) return;
