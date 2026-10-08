@@ -7,8 +7,7 @@ const DELETE_FIELD = Symbol('delete-field');
 type Data = Record<string, unknown>;
 const store = new Map<string, Data>();
 const authUsers = new Map<string, { uid: string; email: string; displayName?: string }>();
-const storageObjects = new Map<string, { data: Buffer; contentType?: string }>();
-let storageShouldFail = false;
+let failWritePrefix: string | null = null;
 
 function snap(path: string) {
     const data = store.get(path);
@@ -33,7 +32,10 @@ function docRef(path: string) {
         path,
         id: path.split('/').pop() as string,
         get: async () => snap(path),
-        set: async (data: Data) => { store.set(path, structuredClone(data)); },
+        set: async (data: Data) => {
+            if (failWritePrefix && path.startsWith(failWritePrefix)) throw new Error('write failed');
+            store.set(path, structuredClone(data));
+        },
         update: async (patch: Data) => {
             const cur = store.get(path);
             if (!cur) throw new Error(`NOT_FOUND: ${path}`);
@@ -84,17 +86,6 @@ export const admin = {
             return u;
         },
     }),
-    storage: () => ({
-        bucket: () => ({
-            file: (path: string) => ({
-                save: async (data: Buffer, opts?: { contentType?: string }) => {
-                    if (storageShouldFail) throw new Error('storage down');
-                    storageObjects.set(path, { data, contentType: opts?.contentType });
-                },
-                getSignedUrl: async (): Promise<[string]> => [`https://signed.example/${path}?sig=1`],
-            }),
-        }),
-    }),
     firestore: {
         FieldValue: { serverTimestamp: () => ({ __serverTimestamp: true }), delete: () => DELETE_FIELD },
     },
@@ -103,10 +94,9 @@ export const admin = {
 export const firebaseMock = { db, admin };
 
 // ── test helpers ─────────────────────────────────────────────────────────────
-export function resetFake() { store.clear(); authUsers.clear(); storageObjects.clear(); storageShouldFail = false; }
-export function readObject(path: string) { return storageObjects.get(path); }
-export function listObjects(prefix = '') { return [...storageObjects.keys()].filter(p => p.startsWith(prefix)); }
-export function failStorage(on = true) { storageShouldFail = on; }
+export function resetFake() { store.clear(); authUsers.clear(); failWritePrefix = null; }
+/** Make every set() under this path prefix throw (null to stop). */
+export function failWritesTo(prefix: string | null) { failWritePrefix = prefix; }
 export function seed(path: string, data: object) { store.set(path, structuredClone(data) as Data); }
 export function read(path: string) { return store.get(path); }
 export function listPaths(prefix: string) { return [...store.keys()].filter(p => p.startsWith(prefix)); }

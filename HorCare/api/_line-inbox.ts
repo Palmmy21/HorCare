@@ -13,7 +13,7 @@ import { db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { linePush } from './_line.js';
-import { signedUrlFor, mediaPathPrefix } from './_line-media.js';
+import { loadMediaDataUrl } from './_line-media.js';
 import {
     MAX_INCOMING_CHARS, MAX_OUTGOING_CHARS,
     type LineMessage, type LineThread, type MessageKind, type MessageMedia,
@@ -81,7 +81,7 @@ export async function recordInbound(
 }
 
 interface Body {
-    action?: 'send' | 'mark_read' | 'media_url';
+    action?: 'send' | 'mark_read' | 'media';
     message_id?: string;
     owner_uid?: string;
     building_id?: string;
@@ -97,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = (req.body ?? {}) as Body;
     const buildingId = body.building_id;
     if (!buildingId || typeof buildingId !== 'string') { res.status(400).json({ error: 'building_id is required' }); return; }
-    if (body.action !== 'send' && body.action !== 'mark_read' && body.action !== 'media_url') { res.status(400).json({ error: 'unknown_action' }); return; }
+    if (body.action !== 'send' && body.action !== 'mark_read' && body.action !== 'media') { res.status(400).json({ error: 'unknown_action' }); return; }
     if (typeof body.line_user_id !== 'string' || !LINE_ID_RE.test(body.line_user_id)) { res.status(400).json({ error: 'invalid_input' }); return; }
 
     const ctx = await authorize(req, res, {
@@ -111,20 +111,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!snap.exists) { res.status(404).json({ error: 'not_found' }); return; }
     const thread = snap.data() as LineThread;
 
-    if (body.action === 'media_url') {
+    if (body.action === 'media') {
         const id = body.message_id;
         if (typeof id !== 'string' || !MESSAGE_ID_RE.test(id)) { res.status(400).json({ error: 'invalid_input' }); return; }
+        // The file's chunks live under this message, inside this property's thread, so another
+        // property's (or tenant's) file can't be reached by any id the caller supplies.
         const msgSnap = await db.doc(`${ref.path}/messages/${id}`).get();
         const media = msgSnap.exists ? (msgSnap.data() as LineMessage).media : undefined;
-        // Belt and braces: the file must live under this property and this tenant's folder.
-        if (!media || !media.path.startsWith(`${mediaPathPrefix(ctx.ownerUid, buildingId)}${body.line_user_id}/`)) {
-            res.status(404).json({ error: 'not_found' });
-            return;
-        }
+        if (!media) { res.status(404).json({ error: 'not_found' }); return; }
         try {
-            res.status(200).json({ url: await signedUrlFor(media.path), content_type: media.content_type, expires_in: 900 });
+            const dataUrl = await loadMediaDataUrl(`${ref.path}/messages/${id}`, media);
+            if (!dataUrl) { res.status(404).json({ error: 'not_found' }); return; }
+            res.status(200).json({ data_url: dataUrl, content_type: media.content_type });
         } catch (err) {
-            console.error('[line-inbox] sign failed:', (err as Error).message);
+            console.error('[line-inbox] media load failed:', (err as Error).message);
             res.status(502).json({ error: 'media_unavailable', message: 'เปิดไฟล์ไม่สำเร็จ กรุณาลองใหม่' });
         }
         return;

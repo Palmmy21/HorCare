@@ -509,6 +509,7 @@ async function storeInboxMedia(
         ownerUid: link.uid, buildingId: link.building_id, lineUserId, messageId,
         kind, buffer: content.buffer, contentType: content.contentType,
     });
+    if (!saved.ok) console.warn('[line-inbox] media not stored:', saved.reason, kind);
     const label = kind === 'image' ? (caption ?? '[รูปภาพ]') : '[ข้อความเสียง]';
     // If the file can't be stored the tenant's message still reaches the owner, as text.
     return recordInbound(lineUserId, {

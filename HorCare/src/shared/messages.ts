@@ -6,11 +6,12 @@
 export type MessageDirection = 'in' | 'out';
 export type MessageKind = 'text' | 'sticker' | 'image' | 'audio' | 'video' | 'file';
 
-/** Files from tenants (photos, voice messages) live in Cloud Storage; the message only points at them. */
+/** Files from tenants (photos, voice messages) are kept in Firestore chunks; the message only describes them. */
 export interface MessageMedia {
-  path: string;
   content_type: string;
   size: number;
+  /** Number of base64 chunks stored under the message (see api/_line-media.ts). */
+  chunks: number;
 }
 
 export interface LineThread {

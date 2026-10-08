@@ -28,18 +28,21 @@ function when(iso: string): string {
     return sameDay ? d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 }
 
-// Signed URLs last 15 minutes server-side; reuse them for 10 so scrolling doesn't re-request.
-const urlCache = new Map<string, { url: string; expires: number }>();
+// Files come back as data URLs. They never change, so keep a few in memory while scrolling
+// (bounded: the oldest entry is dropped first).
+const MEDIA_CACHE_MAX = 40;
+const mediaCache = new Map<string, string>();
 
 async function fetchMediaUrl(ownerUid: string, buildingId: string, lineUserId: string, messageId: string): Promise<string> {
     const key = `${ownerUid}/${buildingId}/${lineUserId}/${messageId}`;
-    const hit = urlCache.get(key);
-    if (hit && hit.expires > Date.now()) return hit.url;
-    const { url } = await apiPost<{ url: string }>('line-inbox', {
-        action: 'media_url', owner_uid: ownerUid, building_id: buildingId, line_user_id: lineUserId, message_id: messageId,
+    const hit = mediaCache.get(key);
+    if (hit) return hit;
+    const { data_url } = await apiPost<{ data_url: string }>('line-inbox', {
+        action: 'media', owner_uid: ownerUid, building_id: buildingId, line_user_id: lineUserId, message_id: messageId,
     });
-    urlCache.set(key, { url, expires: Date.now() + 10 * 60 * 1000 });
-    return url;
+    mediaCache.set(key, data_url);
+    if (mediaCache.size > MEDIA_CACHE_MAX) mediaCache.delete(mediaCache.keys().next().value as string);
+    return data_url;
 }
 
 /** A tenant's photo or voice message. Files are fetched through a permission-checked signed link. */
