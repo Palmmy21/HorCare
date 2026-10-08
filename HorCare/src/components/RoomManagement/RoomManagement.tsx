@@ -5,7 +5,7 @@ import BulkRoomModal from './BulkRoomModal';
 import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
 import { formatCurrency } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
-import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
+import { getWorkspaceTerms, rentTypeLabel, rentTypeOptions } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface RoomManagementProps {
@@ -624,8 +624,8 @@ export default function RoomManagement({
                                     <th className="text-center">{terms.tenantLabel}</th>
                                     <th className="text-right">{terms.rentLabel}</th>
                                     <th className="text-center">การชำระ</th>
-                                    <th className="text-right">{terms.isMarket ? 'ไฟแผง (หน่วย)' : 'มิเตอร์ไฟ'}</th>
-                                    <th className="text-right">{terms.isMarket ? 'น้ำ (หน่วย)' : 'มิเตอร์น้ำ'}</th>
+                                    {terms.usesMeters && <th className="text-right">{terms.isMarket ? 'ไฟแผง (หน่วย)' : 'มิเตอร์ไฟ'}</th>}
+                                    {terms.usesMeters && <th className="text-right">{terms.isMarket ? 'น้ำ (หน่วย)' : 'มิเตอร์น้ำ'}</th>}
                                     {hasAnyCommercial && <th className="text-center">ค่าน้ำ/ไฟ</th>}
                                     <th className="text-center" style={{ width: '180px' }}>จัดการ</th>
                                 </tr>
@@ -777,30 +777,16 @@ export default function RoomManagement({
                                                     value={editRentType}
                                                     onChange={e => setEditRentType(e.target.value as Room['rent_type'])}
                                                 >
-                                                    <option value="monthly">รายเดือน</option>
-                                                    <option value="daily">รายวัน</option>
-                                                    <option value="weekly">รายสัปดาห์</option>
-                                                    <option value="semester">รายเทอม</option>
-                                                    <option value="yearly">รายปี</option>
+                                                    {rentTypeOptions(config?.building_type).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                                 </select>
                                             ) : (
                                                 <span className={`badge ${room.rent_type === 'semester' || room.rent_type === 'yearly' ? 'badge-warning' : room.rent_type === 'daily' || room.rent_type === 'weekly' ? 'badge-info' : 'badge-success'}`}>
-                                                    {room.rent_type === 'semester' ? (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarDays size={12} /> รายเทอม</span>
-                                                    ) : room.rent_type === 'yearly' ? (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarDays size={12} /> รายปี</span>
-                                                    ) : room.rent_type === 'daily' ? (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายวัน</span>
-                                                    ) : room.rent_type === 'weekly' ? (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายสัปดาห์</span>
-                                                    ) : (
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><CalendarCheck size={12} /> รายเดือน</span>
-                                                    )}
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{room.rent_type === 'semester' || room.rent_type === 'yearly' ? <CalendarDays size={12} /> : <CalendarCheck size={12} />} {rentTypeLabel(room.rent_type, config?.building_type)}</span>
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="text-right mono">{room.current_meter_elec.toLocaleString()}</td>
-                                        <td className="text-right mono">{room.current_meter_water.toLocaleString()}</td>
+                                        {terms.usesMeters && <td className="text-right mono">{room.current_meter_elec.toLocaleString()}</td>}
+                                        {terms.usesMeters && <td className="text-right mono">{room.current_meter_water.toLocaleString()}</td>}
                                         {hasAnyCommercial && (
                                             <td className="text-center" style={{ fontSize: '0.75rem' }}>
                                                 {(room.room_type || 'dormitory') === 'commercial' ? (
@@ -930,7 +916,7 @@ export default function RoomManagement({
                                     </tr>
                                     {editingRoom === room.id && (
                                         <tr key={`${room.id}-lang`} style={{ background: 'rgba(96,165,250,0.06)' }}>
-                                            <td colSpan={hasAnyCommercial ? 11 : 10} style={{ padding: '0.5rem 2rem 0.5rem', borderTop: 'none' }}>
+                                            <td colSpan={(hasAnyCommercial ? 11 : 10) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.5rem 2rem 0.5rem', borderTop: 'none' }}>
                                                 <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                                                     <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                                         <Globe size={14} color="#0EA5E9" /> ภาษาบิล/แจ้งเตือนห้องนี้:
@@ -980,7 +966,7 @@ export default function RoomManagement({
                                     )}
                                     {editingRoom === room.id && (
                                         <tr key={`${room.id}-amenities`} style={{ background: 'rgba(96,165,250,0.06)' }}>
-                                            <td colSpan={hasAnyCommercial ? 11 : 10} style={{ padding: '0.5rem 2rem', borderTop: 'none' }}>
+                                            <td colSpan={(hasAnyCommercial ? 11 : 10) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.5rem 2rem', borderTop: 'none' }}>
                                                 <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
                                                     <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.5rem' }}>สิ่งอำนวยความสะดวก</div>
                                                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -1009,7 +995,7 @@ export default function RoomManagement({
                                     )}
                                     {editingRoom === room.id && commonFees.length > 0 && (
                                         <tr key={`${room.id}-fees`} style={{ background: 'rgba(96,165,250,0.06)' }}>
-                                            <td colSpan={hasAnyCommercial ? 10 : 9} style={{ padding: '0.75rem 2rem', borderTop: 'none' }}>
+                                            <td colSpan={(hasAnyCommercial ? 10 : 9) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.75rem 2rem', borderTop: 'none' }}>
                                                 <div style={{ background: 'var(--color-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
                                                     <div style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                         <Building2 size={16} color="#4F46E5" />

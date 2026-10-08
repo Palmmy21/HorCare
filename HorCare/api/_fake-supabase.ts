@@ -18,7 +18,7 @@ const DEFAULTS: Record<string, () => Row> = {
     bookings: () => ({ status: 'reserved', adults: 1, guest_phone: null, charge_id: null, source: 'staff', notes: null }),
     stall_plans: () => ({ status: 'active', rate_satang: null, ends_on: null }),
     charges: () => ({ paid_satang: 0, status: 'open', room_id: null, room_number: null, party_phone: null, booking_id: null, description: '' }),
-    charge_payments: () => ({ kind: 'payment', bank_account_id: null, note: null }),
+    charge_payments: () => ({ kind: 'payment', bank_account_id: null, note: null, verification: 'n/a', slip_ref: null, slip_details: null }),
 };
 
 const UNIQUES: Unique[] = [
@@ -26,6 +26,7 @@ const UNIQUES: Unique[] = [
     { table: 'leases', name: 'leases_one_active_per_room', key: r => (r.status === 'active' ? `${r.owner_uid}|${r.building_id}|${r.room_id}` : null) },
     { table: 'stall_plans', name: 'stall_plans_one_active_per_room', key: r => (r.status === 'active' ? `${r.owner_uid}|${r.building_id}|${r.room_id}` : null) },
     { table: 'charges', name: 'charges_owner_uid_building_id_dedupe_key_key', key: r => `${r.owner_uid}|${r.building_id}|${r.dedupe_key}` },
+    { table: 'charge_payments', name: 'charge_payments_one_slip', key: r => (r.slip_ref ? `||` : null) },
     { table: 'day_closes', name: 'day_closes_owner_uid_building_id_close_date_key', key: r => `${r.owner_uid}|${r.building_id}|${r.close_date}` },
     { table: 'stall_attendance', name: 'stall_attendance_owner_uid_building_id_room_id_visit_date_key', key: r => `${r.owner_uid}|${r.building_id}|${r.room_id}|${r.visit_date}` },
 ];

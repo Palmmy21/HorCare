@@ -5,6 +5,7 @@ import {
 import { db } from '../firebase/config';
 import { logActivity, diffFields } from '../utils/auditLog';
 import { findDuplicates, MAX_BULK_ROOMS } from '../utils/bulkRooms';
+import { defaultRentType } from '../utils/workspaceTerminology';
 import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee } from '../types';
 import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth } from '../utils/calculations';
 
@@ -277,7 +278,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             current_meter_water: 0,
             is_active: true,
             rent_amount: config.room_rent,
-            rent_type: 'monthly'
+            rent_type: defaultRentType(config.building_type, config.market_config?.default_rent_cycle)
         };
         await setDoc(doc(db, userPath, 'rooms', roomId), newRoom);
         logActivity({
@@ -285,7 +286,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             resourceLabel: `Room ${roomNumber}`, after: { room_number: roomNumber, rent_amount: newRoom.rent_amount },
         });
         return newRoom;
-    }, [userPath, config.room_rent, config.building_type]);
+    }, [userPath, config.room_rent, config.building_type, config.market_config?.default_rent_cycle]);
 
     /**
      * Create many rooms atomically per chunk. Rejects (creating nothing) if any room
@@ -313,7 +314,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             current_meter_water: 0,
             is_active: true,
             rent_amount: config.room_rent,
-            rent_type: 'monthly',
+            rent_type: defaultRentType(config.building_type, config.market_config?.default_rent_cycle),
             ...input,
             room_number: String(input.room_number).trim(),
             id: `room_${stamp}_${i}`,
@@ -337,7 +338,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             note: 'bulk create',
         });
         return { created: docs.length };
-    }, [userPath, rooms, config.building_type, config.room_rent]);
+    }, [userPath, rooms, config.building_type, config.room_rent, config.market_config?.default_rent_cycle]);
 
     const updateRoom = useCallback(async (roomId: string, updates: Partial<Room>) => {
         if (!userPath) return;

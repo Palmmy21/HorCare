@@ -46,6 +46,9 @@ export function defaultChart(): Account[] {
     a('4103', 'รายได้ค่าน้ำ', 'revenue'),
     a('4104', 'รายได้ค่าส่วนกลางและบริการ', 'revenue'),
     a('4105', 'รายได้ค่าปรับ', 'revenue'),
+    a('4106', 'รายได้ค่าห้องพักรายคืน', 'revenue'),
+    a('4107', 'รายได้ค่าเช่าแผงรายวัน/สัปดาห์', 'revenue'),
+    a('4108', 'รายได้ค่าแผงขาจร', 'revenue'),
     a('4901', 'รายได้อื่น', 'revenue'),
     a('5101', 'ค่าใช้จ่ายทั่วไป', 'expense'),
   ];
@@ -100,7 +103,7 @@ export interface Ledger {
 export function emptyLedger(id: string): Ledger {
   return {
     id, name: '', legal_entity_name: '', property_ids: [], property_codes: {}, accounts: defaultChart(),
-    posting: { ar_account: '1140', revenue_accounts: { rent: '4101', electric: '4102', water: '4103', common_fee: '4104', fine: '4105' }, channels: { cash: '1101' } },
+    posting: { ar_account: '1140', revenue_accounts: { rent: '4101', electric: '4102', water: '4103', common_fee: '4104', fine: '4105', stay: '4106', stall: '4107', walk_in: '4108', other_income: '4901' }, channels: { cash: '1101' } },
     options: { invoice_date_basis: 'issued_at', count_unverified_transfers: false, opening_cutoff_month: null },
     locked_through: null, created_at: '', updated_at: '',
   };
@@ -173,7 +176,7 @@ export interface JournalEntry {
   memo: string;
   lines: EntryLine[];
   total_satang: number;
-  sources: { kind: 'bill' | 'fine' | 'payment'; id: string; revision: string }[];
+  sources: { kind: 'bill' | 'fine' | 'charge' | 'payment'; id: string; revision: string }[];
   posted_at: string;
   posted_by: string;
   posted_by_name: string;

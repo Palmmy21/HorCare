@@ -138,10 +138,16 @@ create table if not exists charge_payments (
   received_by text not null,
   received_by_name text not null,
   received_at timestamptz not null default now(),
+  -- evidence of a transfer: what the AI read off the slip, and whether the money was confirmed against the bank
+  verification text not null default 'n/a' check (verification in ('n/a', 'unverified', 'verified', 'rejected')),
+  slip_ref text,
+  slip_details jsonb,
   check ((kind = 'refund') = (amount_satang < 0)),
   check (method <> 'transfer' or bank_account_id is not null)
 );
 create index if not exists charge_payments_scope on charge_payments (owner_uid, building_id, received_at);
+-- the same slip can never pay twice
+create unique index if not exists charge_payments_one_slip on charge_payments (owner_uid, building_id, slip_ref) where slip_ref is not null;
 
 -- ── daily-actual stalls: who turned up (or did not) on a day ──
 create table if not exists stall_attendance (

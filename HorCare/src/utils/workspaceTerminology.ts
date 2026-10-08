@@ -66,6 +66,42 @@ export function defaultCollectionStyle(type: string | undefined): 'monthly' | 'n
   return 'monthly';
 }
 
+type RentType = 'monthly' | 'semester' | 'yearly' | 'daily' | 'weekly';
+type BuildingKind = DormConfig['building_type'] | undefined;
+
+/** The rent cycle a new room/stall starts with. Hotels/resorts price per night, markets collect per day or week, the rest monthly. */
+export function defaultRentType(type: BuildingKind, marketCycle?: 'daily' | 'weekly' | 'monthly'): RentType {
+  if (type === 'resort' || type === 'hotel') return 'daily';
+  if (type === 'market') return marketCycle ?? 'daily';
+  return 'monthly';
+}
+
+/** How a rent cycle is worded in this workspace (a hotel has "per night", a market "collected as scheduled" - never "monthly"). */
+export function rentTypeLabel(rentType: RentType | undefined, type: BuildingKind): string {
+  const r = rentType ?? 'monthly';
+  if (type === 'resort' || type === 'hotel') {
+    return { daily: 'ต่อคืน', weekly: 'รายสัปดาห์', monthly: 'พักรายเดือน', semester: 'รายเทอม', yearly: 'รายปี' }[r];
+  }
+  if (type === 'market') {
+    return { daily: 'เก็บรายวัน', weekly: 'เก็บรายสัปดาห์', monthly: 'เก็บตามกำหนด', semester: 'เก็บตามกำหนด', yearly: 'เก็บตามกำหนด' }[r];
+  }
+  return { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน', semester: 'รายเทอม', yearly: 'รายปี' }[r];
+}
+
+/** Cycles offered when creating/editing a room in this workspace, most relevant first. */
+export function rentTypeOptions(type: BuildingKind): { value: RentType; label: string }[] {
+  const order: RentType[] = type === 'resort' || type === 'hotel' ? ['daily', 'weekly', 'monthly']
+    : type === 'market' ? ['daily', 'weekly', 'monthly']
+    : ['monthly', 'daily', 'weekly', 'semester', 'yearly'];
+  return order.map(value => ({ value, label: rentTypeLabel(value, type) }));
+}
+
+/** Unit the room price is quoted per ("บาท/คืน"). */
+export function rentUnitLabel(rentType: RentType | undefined, type: BuildingKind): string {
+  const r = rentType ?? 'monthly';
+  if (r === 'daily') return type === 'resort' || type === 'hotel' ? 'คืน' : 'วัน';
+  return { weekly: 'สัปดาห์', monthly: 'เดือน', semester: 'เทอม', yearly: 'ปี' }[r];
+}
 export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): WorkspaceTerms {
   const type = buildingType || 'dormitory';
 
