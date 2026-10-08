@@ -42,6 +42,13 @@ describe('RBAC catalog', () => {
     }
   });
 
+  it('accounting: only owner and manager set up the profile; finance may export; others may not', () => {
+    for (const role of ROLES) {
+      expect(can(role, 'accounting.manage')).toBe(role === 'owner' || role === 'property_manager');
+      expect(can(role, 'accounting.export')).toBe(role === 'owner' || role === 'property_manager' || role === 'finance');
+    }
+  });
+
   it('finance can reconcile, front desk can invite tenants', () => {
         expect(can('finance', 'payment.reconcile')).toBe(true);
         expect(can('front_desk', 'invitation.create')).toBe(true);

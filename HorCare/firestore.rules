@@ -228,6 +228,10 @@ service cloud.firestore {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'audit_log.read');
           allow write: if false;
         }
+        match /payments/{paymentId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'finance.read');
+          allow write: if false;
+        }
         match /faqs/{faqId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'chatbot.manage');
           allow write: if false;
@@ -272,6 +276,19 @@ service cloud.firestore {
       }
 
       // ── Activity log — append-only. Nobody (owner included) can edit or delete. ──
+      // Accounting export profiles + batches: written only by /api/accounting.
+      match /accounting_profiles/{profileId} {
+        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
+        allow write: if false;
+      }
+      match /accounting_batches/{batchId} {
+        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
+        allow write: if false;
+        match /items/{itemId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
+          allow write: if false;
+        }
+      }
       match /audit_logs/{eventId} {
         allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'audit_log.read');
         allow create: if isNotBanned()
@@ -302,9 +319,11 @@ service cloud.firestore {
       // Excludes audit_logs/members: those have their own (stricter) rules above and
       // a permissive wildcard here would let the owner rewrite history.
       match /{subCol}/{docId} {
-        allow read: if isOwner(userId) && isNotBanned() && subCol != 'audit_logs' && subCol != 'members';
+        allow read: if isOwner(userId) && isNotBanned() && subCol != 'audit_logs' && subCol != 'members'
+                     && subCol != 'accounting_profiles' && subCol != 'accounting_batches';
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId)
-                     && subCol != 'audit_logs' && subCol != 'members';
+                     && subCol != 'audit_logs' && subCol != 'members'
+                     && subCol != 'accounting_profiles' && subCol != 'accounting_batches';
       }
     }
 

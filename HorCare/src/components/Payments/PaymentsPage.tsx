@@ -9,6 +9,7 @@ import PaymentMethodModal from './PaymentMethodModal';
 import BankAccountsModal from './BankAccountsModal';
 import ReconciliationModal from './ReconciliationModal';
 import { useBankTransactions } from '../../hooks/useBankTransactions';
+import { useBuildingPayments } from '../../hooks/useAccountingData';
 import BankLogo from './BankLogo';
 import SlipChecksPanel from './SlipChecksPanel';
 import { useBankAccounts } from '../../hooks/useBankAccounts';
@@ -104,7 +105,8 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
   const [showRecon, setShowRecon] = useState(false);
     const { accounts, activeAccounts, loading: accountsLoading } = useBankAccounts(uid ?? null, buildingId ?? null);
   const { transactions: bankTxs, loading: bankTxsLoading } = useBankTransactions(uid ?? null, buildingId ?? null);
-  const reconPending = bankTxs.filter(t => t.status !== 'reconciled').length;
+  const { payments: recordedPayments } = useBuildingPayments(uid ?? null, buildingId ?? null);
+  const reconPending =bankTxs.filter(t => t.status !== 'reconciled').length;
     const accountById = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
     // Only the account owner (not staff) manages receiving accounts; the server enforces this too.
     const canManageAccounts = !!uid && auth.currentUser?.uid === uid;
@@ -687,7 +689,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
 
             {showRecon && uid && buildingId && (
                 <ReconciliationModal
-                    ownerUid={uid} buildingId={buildingId} accounts={activeAccounts} transactions={bankTxs} loading={bankTxsLoading}
+                    ownerUid={uid} buildingId={buildingId} accounts={activeAccounts} transactions={bankTxs} loading={bankTxsLoading} payments={recordedPayments}
                     onClose={() => setShowRecon(false)}
                 />
             )}

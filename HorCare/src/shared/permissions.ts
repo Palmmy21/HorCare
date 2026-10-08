@@ -38,6 +38,10 @@ export const PERMISSIONS = [
   'chatbot.manage',
   /** Publish / edit / archive announcements to tenants. */
   'announcement.manage',
+  /** Accounting export: set up the profile / code mappings (the accountant's approval). */
+  'accounting.manage',
+  /** Accounting export: preview, create, download and confirm the import of export files. */
+  'accounting.export',
   'audit_log.read',
   'member.read', 'member.manage',
 ] as const;
@@ -51,7 +55,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   property_manager: ALL.filter(p => p !== 'member.manage'),
   finance: [
     'room.read', 'tenant.read', 'finance.read', 'meter.read',
-    'payment.create', 'payment.update', 'payment.reconcile', 'contract.read',
+    'payment.create', 'payment.update', 'payment.reconcile', 'contract.read', 'accounting.export',
   ],
   front_desk: [
     'room.read', 'tenant.read', 'invitation.read', 'invitation.create', 'meter.read',
