@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { BarChart3, BookOpen, FileBarChart, ListOrdered, Send, Settings2 } from 'lucide-react';
+import { BarChart3, BookOpen, FileBarChart, Landmark, Receipt, ListOrdered, Send, Settings2 } from 'lucide-react';
 import type { Building } from '../../types';
 import { useLedgerEntries, useLedgers } from '../../hooks/useLedgerData';
 import PostingTab from './PostingTab';
 import JournalTab from './JournalTab';
 import ReportsTab from './ReportsTab';
 import LedgerSettingsTab from './LedgerSettingsTab';
+import StatementsTab from './StatementsTab';
+import GuidedEntryTab from './GuidedEntryTab';
 import FinanceOverviewTab from '../Accounting/FinanceOverviewTab';
 
-type Tab = 'overview' | 'post' | 'journal' | 'reports' | 'settings';
+type Tab = 'overview' | 'guided' | 'statements' | 'post' | 'journal' | 'reports' | 'settings';
 
 export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; buildings: Building[] }) {
     const { ledgers, loading, error } = useLedgers(ownerUid);
@@ -20,6 +22,8 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
     const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
         { id: 'overview', label: 'ภาพรวม (กราฟ)', icon: BarChart3 },
         { id: 'post', label: 'ลงบัญชี', icon: Send },
+        { id: 'guided', label: 'บันทึกค่าใช้จ่าย / ยอดยกมา', icon: Receipt },
+        { id: 'statements', label: 'งบกำไรขาดทุน / งบดุล', icon: Landmark },
         { id: 'journal', label: 'สมุดรายวัน', icon: ListOrdered },
         { id: 'reports', label: 'รายงาน', icon: FileBarChart },
         { id: 'settings', label: 'ตั้งค่า', icon: Settings2 },
@@ -53,6 +57,8 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
             {error && <div style={{ color: '#B91C1C' }}>คุณไม่มีสิทธิ์ดูสมุดบัญชี หรือโหลดไม่สำเร็จ</div>}
             {activeTab === 'overview' && <FinanceOverviewTab key={current?.id ?? 'all'} ownerUid={ownerUid} buildings={chartBuildings.length ? chartBuildings : buildings} />}
             {!loading && activeTab === 'settings' && <LedgerSettingsTab ownerUid={ownerUid} buildings={buildings} ledgers={ledgers} selectedId={selected || current?.id || 'new'} onSelect={setSelected} />}
+            {current && activeTab === 'guided' && <GuidedEntryTab ownerUid={ownerUid} ledger={current} />}
+            {current && activeTab === 'statements' && (entriesLoading ? <div>กำลังโหลด…</div> : <StatementsTab ledger={current} entries={entries} />)}
             {current && activeTab === 'post' && <PostingTab ownerUid={ownerUid} ledger={current} />}
             {current && activeTab === 'journal' && (entriesLoading ? <div>กำลังโหลด…</div> : <JournalTab ownerUid={ownerUid} ledger={current} entries={entries} />)}
             {current && activeTab === 'reports' && (entriesLoading ? <div>กำลังโหลด…</div> : <ReportsTab ownerUid={ownerUid} ledger={current} entries={entries} />)}

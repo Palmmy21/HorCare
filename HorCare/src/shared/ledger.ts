@@ -39,7 +39,10 @@ export function defaultChart(): Account[] {
     a('1140', 'ลูกหนี้ค่าเช่าและบริการ', 'asset'),
     a('2101', 'เงินรับล่วงหน้า', 'liability'),
     a('2102', 'เงินมัดจำรับ', 'liability'),
+    a('1160', 'ภาษีซื้อ', 'asset'),
+    a('2110', 'เจ้าหนี้การค้า', 'liability'),
     a('2201', 'ภาษีมูลค่าเพิ่มรอนำส่ง', 'liability'),
+    a('2210', 'ภาษีหัก ณ ที่จ่ายรอนำส่ง', 'liability'),
     a('3101', 'ทุน / ส่วนของเจ้าของ', 'equity'),
     a('4101', 'รายได้ค่าเช่า', 'revenue'),
     a('4102', 'รายได้ค่าไฟฟ้า', 'revenue'),
@@ -308,6 +311,64 @@ export function revenueByAccount(entries: JournalEntry[], accounts: Account[], f
     for (const l of e.lines) if (rev.has(l.account)) sums.set(l.account, (sums.get(l.account) ?? 0) + l.cr_satang - l.dr_satang);
   }
   return [...sums].map(([code, v]) => ({ account: rev.get(code)!, amount_satang: v })).sort((a, b) => a.account.code.localeCompare(b.account.code, 'th', { numeric: true }));
+}
+
+// ── Profit and loss, balance sheet, payables ────────────────────────────────
+
+export interface PnlRow { account: Account; amount_satang: number }
+
+/** Income statement for a period: revenue less expenses, from the entries dated inside it. */
+export function profitAndLoss(entries: JournalEntry[], accounts: Account[], from: string, to: string) {
+  const byCode = new Map(accounts.map(a => [a.code, a]));
+  const sums = new Map<string, { dr: number; cr: number }>();
+  for (const e of entries) {
+    if (e.date < from || e.date > to) continue;
+    for (const l of e.lines) {
+      const a = byCode.get(l.account);
+      if (!a || (a.type !== 'revenue' && a.type !== 'expense')) continue;
+      const s = sums.get(l.account) ?? { dr: 0, cr: 0 };
+      s.dr += l.dr_satang; s.cr += l.cr_satang; sums.set(l.account, s);
+    }
+  }
+  const rows = (type: AccountType): PnlRow[] => [...sums]
+    .map(([code, s]) => ({ account: byCode.get(code)!, amount_satang: type === 'revenue' ? s.cr - s.dr : s.dr - s.cr }))
+    .filter(r => r.account.type === type && r.amount_satang !== 0)
+    .sort((x, y) => x.account.code.localeCompare(y.account.code, 'th', { numeric: true }));
+  const revenue = rows('revenue'), expenses = rows('expense');
+  const revenue_satang = revenue.reduce((s, r) => s + r.amount_satang, 0);
+  const expense_satang = expenses.reduce((s, r) => s + r.amount_satang, 0);
+  return { revenue, expenses, revenue_satang, expense_satang, net_satang: revenue_satang - expense_satang };
+}
+
+/**
+ * Balance sheet at a date. Profit not yet closed to equity is shown as "current earnings" so the two sides agree:
+ * assets = liabilities + equity + earnings. `balanced` is false only if the books themselves are out of balance.
+ */
+export function balanceSheet(entries: JournalEntry[], accounts: Account[], asOf: string) {
+  const trial = trialBalance(entries, accounts, asOf).filter(r => r.balance_satang !== 0);
+  const of = (type: AccountType) => trial.filter(r => r.account.type === type);
+  const sum = (rows: TrialRow[]) => rows.reduce((s, r) => s + r.balance_satang, 0);
+  const assets = of('asset'), liabilities = of('liability'), equity = of('equity');
+  const earnings_satang = sum(of('revenue')) - sum(of('expense'));
+  const assets_satang = sum(assets), liabilities_satang = sum(liabilities), equity_satang = sum(equity);
+  return {
+    assets, liabilities, equity, earnings_satang, assets_satang, liabilities_satang, equity_satang,
+    balanced: assets_satang === liabilities_satang + equity_satang + earnings_satang,
+  };
+}
+
+/** Outstanding payable per supplier: credits to the payable account minus debits. */
+export function payablesByParty(entries: JournalEntry[], apAccount: string, asOf?: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const e of entries) {
+    if (asOf && e.date > asOf) continue;
+    for (const l of e.lines) {
+      if (l.account !== apAccount) continue;
+      const k = l.party_id ?? '(ไม่ระบุ)';
+      out.set(k, (out.get(k) ?? 0) + l.cr_satang - l.dr_satang);
+    }
+  }
+  return new Map([...out].filter(([, v]) => v !== 0));
 }
 
 /** Today in Thailand — the default date of a manual entry. */
