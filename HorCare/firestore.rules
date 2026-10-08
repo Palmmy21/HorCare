@@ -57,6 +57,13 @@ service cloud.firestore {
         && perm in get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.permissions;
     }
 
+    // Same, but also requires the member to have been granted this property
+    // (multi-property isolation). property_ids may contain '*' for all properties.
+    function memberHasPermOn(ownerId, buildingId, perm) {
+      return memberHasPerm(ownerId, perm)
+        && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.property_ids.hasAny(['*', buildingId]);
+    }
+
     // Fields only the backend (or admin) should write — never the user directly (updates only)
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
@@ -180,6 +187,22 @@ service cloud.firestore {
         // ── ค่าบริการส่วนกลาง (owner only) ──────────────────────────────
         match /common_fees/{docId} {
           allow read, write: if isOwner(userId) && isNotBanned();
+        }
+
+        // ── Parcels — written only by /api/parcels (permission checks, audit, notifications).
+        // Staff with parcel.read on THIS property may read; tenants use the API's minimal view.
+        match /parcels/{parcelId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'parcel.read');
+          allow write: if false;
+        }
+        match /parcel_images/{parcelId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'parcel.read');
+          allow write: if false;
+        }
+        // In-app notification records produced by the central notification service.
+        match /notifications/{notificationId} {
+          allow read: if isOwner(userId) && isNotBanned();
+          allow write: if false;
         }
       }
 

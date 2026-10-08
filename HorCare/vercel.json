@@ -23,6 +23,7 @@
   "crons": [
     { "path": "/api/prune-slips", "schedule": "0 3 * * *" },
     { "path": "/api/remind-bills", "schedule": "0 2 * * *" },
+    { "path": "/api/remind-parcels", "schedule": "30 2 * * *" },
     { "path": "/api/cron-check-expiry", "schedule": "0 1 * * *" }
   ]
 }

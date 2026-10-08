@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -38,6 +38,7 @@ const CleaningPage    = lazy(() => import('./components/Cleaning/CleaningPage'))
 const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'));
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
 const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
+const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
 
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
@@ -69,7 +70,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -379,6 +380,7 @@ function App() {
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
+    { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
 
     { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
@@ -1502,6 +1504,15 @@ function App() {
         )}
 
 
+
+        {currentView === 'parcels' && user && activeBuildingId && !maidSession && (
+          <ParcelsPage
+            ownerUid={user.uid}
+            buildingId={activeBuildingId}
+            rooms={rooms}
+            unitName={terms.unitName}
+          />
+        )}
 
         {currentView === 'security' && user && !maidSession && (
           <SecurityPage

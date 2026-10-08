@@ -26,6 +26,7 @@ import generatePayload from 'promptpay-qr';
 import { PROMPTPAY_LOGO_DATA_URI } from '../../assets/promptpayLogo';
 import toast from 'react-hot-toast';
 import TenantContractSection from './TenantContractSection';
+import TenantParcelSection from './TenantParcelSection';
 
 // ── Image compression (canvas) ────────────────────────────────────────────────
 async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
@@ -1207,6 +1208,9 @@ export default function TenantPortalPage() {
 
         {/* ── Main Body Sections ── */}
         <div style={{ padding: '0.75rem 1.125rem 3rem', background: '#F8FAFC' }}>
+
+          {/* Parcels waiting at the front desk (hidden when there are none) */}
+          <TenantParcelSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
 
           {/* Digital Lease Contract (E-Signature) */}
           {profile?.signed_contract && (

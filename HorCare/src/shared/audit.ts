@@ -23,7 +23,7 @@ export const AUDIT_ACTION_LABELS_TH: Record<AuditAction, string> = {
 
 export type AuditResourceType =
   | 'session' | 'room' | 'tenant' | 'meter' | 'bill' | 'payment'
-  | 'contract' | 'invitation' | 'member' | 'property' | 'config';
+  | 'contract' | 'invitation' | 'member' | 'property' | 'config' | 'parcel';
 
 export interface AuditEntry {
   event_id: string;
