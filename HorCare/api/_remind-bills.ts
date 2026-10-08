@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { linePush, buildBillFlex, thaiMonthLabel, runPooled } from './_line.js';
+import type { BillLanguage, MonthlyBill } from '../src/types/index.js';
 
 /**
  * ทวงบิลอัตโนมัติ (Vercel Cron — ดู vercel.json, รันทุกวัน 09:00 เวลาไทย)
@@ -85,11 +86,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dormName = cfg.bill_customization?.dorm_name || 'หอพัก';
             const dueDay = Number(cfg.bill_customization?.due_day) || 5;
             const lineByRoom = new Map<string, string>();
-            const langByRoom = new Map<string, any>();
+            const langByRoom = new Map<string, BillLanguage>();
             roomsSnap.docs.forEach(r => {
                 const rdata = r.data();
                 if (rdata.line_user_id) lineByRoom.set(r.id, rdata.line_user_id);
-                if (rdata.language) langByRoom.set(r.id, rdata.language);
+                if (rdata.language) langByRoom.set(r.id, rdata.language as BillLanguage);
             });
 
             await runPooled(bills, PUSH_CONCURRENCY, async (billDoc) => {
@@ -134,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 try {
                     await linePush(lineUserId, [
                         { type: 'text', text },
-                        buildBillFlex(bill, dormName, dueDay, bill.month as string, { lang: roomLang, bilingual, secLang }),
+                        buildBillFlex(bill as MonthlyBill, dormName, dueDay, bill.month as string, { lang: roomLang, bilingual, secLang }),
                     ]);
                     await billDoc.ref.update({
                         last_reminded_at: new Date().toISOString(),

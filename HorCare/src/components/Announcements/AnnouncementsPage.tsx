@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { Megaphone, Bot, Plus, Pin, Archive, Trash2, Loader2, Send, Pencil } from 'lucide-react';
+import { Megaphone, Bot, Plus, Pin, Archive, Trash2, Loader2, Send, Pencil, Zap, Droplets, Wrench } from 'lucide-react';
+import {
+    ANNOUNCEMENT_TEMPLATES, buildAnnouncement, missingFields, templateById,
+    type TemplateField, type TemplateId, type TemplateValues,
+} from '../../shared/announcementTemplates';
+
+const TEMPLATE_ICONS = { Zap, Droplets, Wrench, Megaphone } as const;
+const TEMPLATE_COLORS = { Zap: '#F97316', Droplets: '#0EA5E9', Wrench: '#94A3B8', Megaphone: '#E11D48' } as const;
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { useAnnouncements, useFaqs } from '../../hooks/useChatbotData';
@@ -104,6 +111,28 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
     const [show, setShow] = useState(false);
     const [form, setForm] = useState({ title: '', body: '', pinned: false, expires: '', sendLine: true });
     const [busy, setBusy] = useState(false);
+    const [templateId, setTemplateId] = useState<TemplateId>('general');
+    const [values, setValues] = useState<TemplateValues>({});
+    /** Once the owner edits the text by hand, changing a field no longer overwrites it. */
+    const [edited, setEdited] = useState(false);
+    const template = templateById(templateId);
+    const missing = missingFields(templateId, values);
+
+    const fill = (id: TemplateId, v: TemplateValues) => {
+        const t = buildAnnouncement(id, v);
+        setForm(f => ({ ...f, title: t.title, body: t.body }));
+    };
+    const pickTemplate = (id: TemplateId) => {
+        setTemplateId(id);
+        setValues({});
+        setEdited(false);
+        setForm(f => ({ ...f, ...buildAnnouncement(id, {}), pinned: templateById(id).pinned }));
+    };
+    const changeValue = (key: TemplateField['key'], value: string) => {
+        const next = { ...values, [key]: value };
+        setValues(next);
+        if (!edited) fill(templateId, next);
+    };
 
     const publish = async () => {
         setBusy(true);
@@ -116,6 +145,7 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
             toast.success(form.sendLine ? `เผยแพร่แล้ว · ส่ง LINE ${a.line_sent} คน${a.line_failed ? ` (ไม่สำเร็จ ${a.line_failed})` : ''}` : 'เผยแพร่แล้ว');
             setShow(false);
             setForm({ title: '', body: '', pinned: false, expires: '', sendLine: true });
+            setTemplateId('general'); setValues({}); setEdited(false);
         } catch (e) {
             const err = e as ApiError;
             toast.error(ERRORS[err.code] ?? err.message ?? 'ดำเนินการไม่สำเร็จ');
@@ -134,8 +164,41 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
 
             {show && (
                 <div style={card}>
-                    <input style={input} placeholder="หัวข้อประกาศ" maxLength={ANNOUNCEMENT_LIMITS.title} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
-                    <textarea style={{ ...input, minHeight: 110 }} placeholder="รายละเอียด" maxLength={ANNOUNCEMENT_LIMITS.body} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} />
+                    <strong style={{ fontSize: '0.95rem' }}>เลือก Template</strong>
+                    <div role="radiogroup" aria-label="เลือก Template" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                        {ANNOUNCEMENT_TEMPLATES.map(t => {
+                            const Icon = TEMPLATE_ICONS[t.icon];
+                            const active = t.id === templateId;
+                            return (
+                                <button key={t.id} type="button" role="radio" aria-checked={active} onClick={() => pickTemplate(t.id)} style={{
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '0.9rem 0.5rem', cursor: 'pointer', font: 'inherit', fontSize: '0.85rem',
+                                    borderRadius: 12, background: active ? '#EFF6FF' : 'var(--color-white, #fff)', border: active ? '2px solid #111827' : '2px solid #E5E7EB',
+                                }}>
+                                    <Icon size={26} color={TEMPLATE_COLORS[t.icon]} />
+                                    {t.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {template.fields.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+                            {template.fields.map(f => (
+                                <label key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.8rem' }}>
+                                    {f.label}{f.required ? ' *' : ''}
+                                    <input type={f.type} style={input} placeholder={f.placeholder} maxLength={f.type === 'text' ? 100 : undefined}
+                                        value={values[f.key] ?? ''} onChange={e => changeValue(f.key, e.target.value)} />
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                    {edited && template.fields.length > 0 && (
+                        <div><button type="button" className="btn btn-outline btn-sm" onClick={() => { setEdited(false); fill(templateId, values); }}>สร้างข้อความใหม่จากแบบฟอร์ม</button></div>
+                    )}
+
+                    <input style={input} placeholder="หัวข้อประกาศ" maxLength={ANNOUNCEMENT_LIMITS.title} value={form.title} onChange={e => { setEdited(true); setForm({ ...form, title: e.target.value }); }} />
+                    <textarea style={{ ...input, minHeight: 130 }} placeholder="รายละเอียด" maxLength={ANNOUNCEMENT_LIMITS.body} value={form.body} onChange={e => { setEdited(true); setForm({ ...form, body: e.target.value }); }} />
+                    {missing.length > 0 && <div style={{ fontSize: '0.8rem', color: '#B45309' }}>ยังไม่ได้กรอก: {missing.join(', ')}</div>}
                     <label style={{ fontSize: '0.85rem', display: 'flex', gap: 6, alignItems: 'center' }}>
                         แสดงถึงวันที่ (ถ้าไม่ระบุ จะแสดงจนกว่าจะเก็บ)
                         <input type="datetime-local" style={{ ...input, width: 'auto' }} value={form.expires} onChange={e => setForm({ ...form, expires: e.target.value })} />
@@ -143,7 +206,7 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
                     <label style={{ fontSize: '0.85rem', display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={form.pinned} onChange={e => setForm({ ...form, pinned: e.target.checked })} /> ปักหมุดไว้บนสุด</label>
                     <label style={{ fontSize: '0.85rem', display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={form.sendLine} onChange={e => setForm({ ...form, sendLine: e.target.checked })} /> ส่งเข้า LINE ลูกบ้านทุกคนทันที</label>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn btn-primary btn-sm" disabled={busy || !form.title.trim() || !form.body.trim()} onClick={() => void publish()} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                        <button className="btn btn-primary btn-sm" disabled={busy || !form.title.trim() || !form.body.trim() || missing.length > 0} onClick={() => void publish()} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                             {busy ? <Loader2 size={14} className="spin" /> : <Send size={14} />} เผยแพร่
                         </button>
                         <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => setShow(false)}>ยกเลิก</button>

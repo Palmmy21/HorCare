@@ -30,6 +30,9 @@ const ERRORS: Record<string, string> = {
     amount_mismatch: 'ยอดเงินไม่ตรงกัน จึงจับคู่ไม่ได้',
     already_reconciled: 'รายการนี้ยืนยันไปแล้ว',
     item_already_reconciled: 'บิลนี้ถูกยืนยันกับรายการธนาคารอื่นแล้ว',
+    use_payment_verification: 'บิลนี้บันทึกรับเงินแบบตัดหลายบิลไว้ — ให้กด "ยืนยันกับรับชำระ" ที่รายการธนาคารแทน',
+    transaction_already_used: 'รายการธนาคารนี้ถูกใช้ยืนยันไปแล้ว',
+    account_mismatch: 'คนละบัญชีธนาคาร จึงยืนยันไม่ได้',
     account_not_found: 'ไม่พบบัญชีที่เลือก',
 };
 

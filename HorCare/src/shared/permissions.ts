@@ -48,6 +48,10 @@ export const PERMISSIONS = [
   'ledger.post',
   /** Set up the ledger: chart of accounts, posting accounts, close periods. */
   'ledger.manage',
+  /** Leasing: view leads, reservations and leases. */
+  'leasing.read',
+  /** Leasing: manage leads, reserve rooms, sign / renew / end leases. */
+  'leasing.manage',
   'audit_log.read',
   'member.read', 'member.manage',
 ] as const;
@@ -61,13 +65,13 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   property_manager: ALL.filter(p => p !== 'member.manage'),
   finance: [
     'room.read', 'tenant.read', 'finance.read', 'meter.read',
-    'payment.create', 'payment.update', 'payment.reconcile', 'contract.read', 'accounting.export', 'ledger.read', 'ledger.post',
+    'payment.create', 'payment.update', 'payment.reconcile', 'contract.read', 'accounting.export', 'ledger.read', 'ledger.post', 'leasing.read',
   ],
   front_desk: [
     'room.read', 'tenant.read', 'invitation.read', 'invitation.create', 'meter.read',
     'payment.create', 'parcel.read', 'parcel.create', 'parcel.update',
     'work_order.read', 'work_order.create', 'visitor.read', 'visitor.create',
-    'message.read', 'message.send', 'announcement.manage',
+    'message.read', 'message.send', 'announcement.manage', 'leasing.read', 'leasing.manage',
   ],
   technician: ['room.read', 'meter.read', 'work_order.read', 'work_order.update'],
   housekeeping: ['room.read', 'work_order.read', 'work_order.update'],

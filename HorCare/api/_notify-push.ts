@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { errorInfo } from '../src/shared/errorInfo.js';
 
 export const config = { maxDuration: 15 };
 
@@ -51,7 +52,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     icon: '/logo-icon.png',
                     badge: '/logo-icon.png',
                     lang: 'th',
-                    // @ts-expect-error vibrate
                     vibrate: [200, 100, 200],
                     requireInteraction: false,
                     data: { url: url || '/' },
@@ -62,8 +62,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const response = await admin.messaging().sendEachForMulticast(message);
         res.status(200).json({ success: true, sent: response.successCount });
-    } catch (err: any) {
-        console.warn('notify-push error:', err?.message || err);
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
+        console.warn('notify-push error:', err?.message || errRaw);
         // Do not fail client workflow if push notification fails
         res.status(200).json({ success: false, error: err?.message });
     }

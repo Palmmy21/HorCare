@@ -10,12 +10,14 @@ export interface NavGroupDef {
 /** Category layout. Labels adapt to a market workspace. Views not listed fall into the last group. */
 export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
   return [
-    { id: 'overview', label: 'ภาพรวม', items: ['dashboard'] },
-    { id: 'property', label: isMarket ? 'แผงค้า' : 'ห้องพัก', items: ['rooms', 'recording'] },
-    { id: 'people', label: isMarket ? 'ผู้เช่า/ร้านค้า' : 'ผู้เช่า', items: ['tenants', 'parcels', 'market'] },
-    { id: 'money', label: 'การเงิน', items: ['payments', 'ledger', 'accounting', 'summary', 'archives'] },
-    { id: 'service', label: 'งานบริการ', items: ['maintenance', 'cleaning', 'workorders', 'operations'] },
-    { id: 'comms', label: 'สื่อสาร', items: ['messages', 'announcements'] },
+    // Real-estate ERP modules: property → leasing → billing → accounting → operations → residents → system
+    { id: 'overview', label: 'ภาพรวม', items: ['dashboard', 'modules'] },
+    { id: 'property', label: isMarket ? 'แผงค้า' : 'ทรัพย์สิน', items: ['rooms', 'recording', 'summary'] },
+    { id: 'leasing', label: 'ปล่อยเช่า', items: ['leasing', 'tenants'] },
+    { id: 'billing', label: 'เรียกเก็บและรับเงิน', items: ['payments'] },
+    { id: 'accounting', label: 'บัญชี', items: ['ledger', 'accounting', 'archives'] },
+    { id: 'service', label: 'ซ่อมบำรุงและบริการ', items: ['maintenance', 'cleaning', 'workorders', 'operations'] },
+    { id: 'residents', label: isMarket ? 'ผู้ค้าและการสื่อสาร' : 'ลูกบ้านและการสื่อสาร', items: ['parcels', 'market', 'messages', 'announcements'] },
     { id: 'system', label: 'ระบบ', items: ['security', 'settings', 'pricing', 'admin'] },
   ];
 }

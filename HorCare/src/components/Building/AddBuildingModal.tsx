@@ -7,6 +7,7 @@ import type { DormConfig, WaterConfig, BillLanguage } from '../../types';
 import './AddBuildingModal.css';
 
 import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
+import { errorInfo } from '../../shared/errorInfo';
 
 interface AddBuildingModalProps {
   isOpen: boolean;
@@ -96,7 +97,8 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
       setWaterUnitRate(18);
       setRoomRent(3500);
       onClose();
-    } catch (err: any) {
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
       setError(err?.message || 'เกิดข้อผิดพลาดในการสร้างสาขา');
     } finally {
       setLoading(false);

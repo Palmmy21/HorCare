@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 
+
 export const config = { maxDuration: 15 };
 
 interface NotifyPayload {
@@ -100,8 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const result = await sendFCMToOwner(uid, body);
         console.log(`notify-owner uid=${uid} building=${body.building_id} sent=${result.sent} pruned=${result.pruned}`);
         res.status(200).json({ data: result });
-    } catch (err: any) {
-        console.error('notify-owner error:', err);
+    } catch (errRaw) {
+        console.error('notify-owner error:', errRaw);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }

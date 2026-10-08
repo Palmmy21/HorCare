@@ -7,6 +7,7 @@ import {
 import { authenticateHousekeeper } from '../../hooks/useHousekeepers';
 import type { HousekeeperSession, DormConfig, WaterConfig, InitialBuildingConfig } from '../../types';
 import horcareLogo from '../../assets/horcare_logo.png';
+import { errorInfo } from '../../shared/errorInfo';
 const PricingPage = lazy(() => import('../Pricing/PricingPage'));
 
 interface LoginPageProps {
@@ -138,10 +139,11 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                     window.location.reload();
                 }
             } else {
-                setMaidError('เบอร์โทรหรือรหัสผ่านไม่ถูกต้อง หรือบัญชีแม่บ้านถูกปิดใช้งาน');
+                setMaidError('เบอร์โทรหรือรหัสผ่านไม่ถูกต้อง หรือบัญชีถูกปิดใช้งาน');
             }
-        } catch (err: any) {
-            setMaidError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบแม่บ้าน');
+        } catch (errRaw) {
+            const err = errorInfo(errRaw);
+            setMaidError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
         } finally {
             setIsLoading(false);
         }
@@ -312,7 +314,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                         }}
                     >
                         <Sparkles size={14} color={mode === 'maid' ? 'var(--color-primary, #0ea5e9)' : '#64748b'} />
-                        แม่บ้าน
+                        แอดมิน หรือ staff
                     </button>
                     <button
                         type="button"
@@ -332,7 +334,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                 {mode === 'maid' ? (
                     <form onSubmit={handleMaidSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div style={{ background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.25)', borderRadius: 10, padding: '0.75rem 0.875rem', fontSize: '0.825rem', color: 'var(--color-primary, #0284c7)', lineHeight: 1.4 }}>
-                            สำหรับแม่บ้านประจำหอพัก เข้าสู่ระบบด้วยเบอร์โทรศัพท์และรหัสผ่านที่เจ้าของหอพักกำหนดให้
+                            สำหรับแอดมินหรือ staff ประจำหอพัก เข้าสู่ระบบด้วยเบอร์โทรศัพท์และรหัสผ่านที่เจ้าของหอพักกำหนดให้
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -399,7 +401,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                             ) : (
                                 <>
                                     <Sparkles size={18} />
-                                    เข้าสู่ระบบแม่บ้าน
+                                    เข้าสู่ระบบแอดมิน / staff
                                     <ArrowRight size={18} />
                                 </>
                             )}

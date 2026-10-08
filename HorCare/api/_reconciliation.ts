@@ -68,9 +68,11 @@ function toItem(kind: 'bill' | 'fine', data: MonthlyBill | Fine): ReconItem {
 async function loadItems(owner: string, bld: string): Promise<ReconItem[]> {
     const base = baseOf(owner, bld);
     const [bills, fines] = await Promise.all([db.collection(`${base}/bills`).get(), db.collection(`${base}/fines`).get()]);
+    // Items settled through payments + allocations are verified payment by payment, so they are never suggested here.
+    const tracked = (d: { data: () => unknown }) => !!(d.data() as { payments_recorded?: boolean }).payments_recorded;
     return [
-        ...bills.docs.map(d => toItem('bill', d.data() as MonthlyBill)),
-        ...fines.docs.map(d => toItem('fine', d.data() as Fine)),
+        ...bills.docs.filter(d => !tracked(d)).map(d => toItem('bill', d.data() as MonthlyBill)),
+        ...fines.docs.filter(d => !tracked(d)).map(d => toItem('fine', d.data() as Fine)),
     ].filter(i => Number.isFinite(i.amount) && i.amount > 0);
 }
 
@@ -91,6 +93,10 @@ async function confirmMatch(
         if (tx.status === 'reconciled') throw new HttpError(409, 'already_reconciled');
         if (!sameAmount(tx.amount, item.amount)) throw new HttpError(400, 'amount_mismatch');
         if (item.bank_transaction_id && item.bank_transaction_id !== tx.id) throw new HttpError(409, 'item_already_reconciled');
+        // A bill whose money was recorded through payments + allocations (partial / several bills) is verified
+        // payment by payment (/api/accounting verify_payment). Marking the whole bill paid here would
+        // contradict those payments and leave its receivable open in the books.
+        if ((itemSnap.data() as { payments_recorded?: boolean }).payments_recorded) throw new HttpError(409, 'use_payment_verification');
 
         const now = new Date().toISOString();
         const wasPaid = item.payment_status === 'paid';

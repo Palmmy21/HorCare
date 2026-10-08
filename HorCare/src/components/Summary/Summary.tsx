@@ -17,6 +17,11 @@ import { toPng } from 'html-to-image';
 import html2canvas from 'html2canvas';
 import { triggerFileDownload, dataUrlToBlob } from '../../utils/fileDownload';
 
+import { errorInfo } from '../../shared/errorInfo';
+
+/** The Web Share API is not in every browser's typings; both members are optional. */
+type ShareNavigator = { share?: (data: ShareData) => Promise<void>; canShare?: (data: ShareData) => boolean };
+
 interface SummaryProps {
     bills: MonthlyBill[];
     rooms: Room[];
@@ -268,7 +273,7 @@ export default function Summary({
         const fileName = `bill_${bill.room_number}_${currentMonth}.png`;
         const blob = dataUrlToBlob(dataUrl);
 
-        const nav = navigator as any;
+        const nav = navigator as unknown as ShareNavigator;
         if (useShare && nav.share && nav.canShare) {
             try {
                 const file = new File([blob], fileName, { type: 'image/png' });
@@ -279,9 +284,10 @@ export default function Summary({
                     });
                     return;
                 }
-            } catch (err: any) {
+            } catch (errRaw) {
+                const err = errorInfo(errRaw);
                 if (err.name !== 'AbortError') {
-                    console.error('Share failed, falling back to download:', err);
+                    console.error('Share failed, falling back to download:', errRaw);
                 }
             }
         }
@@ -309,7 +315,7 @@ export default function Summary({
         setIsDownloadingAll(true);
         setDownloadAllProgress(0);
         
-        const nav = navigator as any;
+        const nav = navigator as unknown as ShareNavigator;
         const canShareFiles = nav.share && nav.canShare && nav.canShare({
             files: [new File([''], 'test.png', { type: 'image/png' })]
         });
@@ -377,7 +383,7 @@ export default function Summary({
     };
 
     const handleShareAll = async () => {
-        const nav = navigator as any;
+        const nav = navigator as unknown as ShareNavigator;
         if (nav.share && nav.canShare && nav.canShare({ files: preparedFiles })) {
             try {
                 await nav.share({
@@ -387,9 +393,10 @@ export default function Summary({
                 setShowShareModal(false);
                 setPreparedFiles([]);
                 return;
-            } catch (err: any) {
+            } catch (errRaw) {
+                const err = errorInfo(errRaw);
                 if (err.name !== 'AbortError') {
-                    console.warn('Share all failed, falling back to direct download:', err);
+                    console.warn('Share all failed, falling back to direct download:', errRaw);
                 }
             }
         }

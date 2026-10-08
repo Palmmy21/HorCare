@@ -93,6 +93,23 @@ describe('confirm', () => {
         expect(read(`${B}/bank_transactions/${tx.id}`)).toMatchObject({ status: 'reconciled', reconciled_by: 'fin' });
     });
 
+    it('refuses a bill whose money is tracked by payments + allocations (verify the payment instead)', async () => {
+        seed(`${B}/bills/b1`, { ...read(`${B}/bills/b1`)!, payments_recorded: true, allocated_satang: 150000 });
+        await imp([row()]);
+        const [tx] = txs();
+        const res = await call('fin', { action: 'confirm', tx_id: tx.id, item_kind: 'bill', item_id: 'b1' });
+        expect(res.statusCode).toBe(409);
+        expect(res.body.error).toBe('use_payment_verification');
+        expect(read(`${B}/bills/b1`)!.verification_status).toBe('unverified');
+        expect(read(`${B}/bank_transactions/${tx.id}`)!.status).not.toBe('reconciled');
+    });
+
+    it('never suggests allocation-tracked bills in the first place', async () => {
+        seed(`${B}/bills/b1`, { ...read(`${B}/bills/b1`)!, payments_recorded: true, allocated_satang: 150000 });
+        await imp([row()]);
+        expect(txs()[0]).toMatchObject({ status: 'unmatched', matched: null, candidates: [] });
+    });
+
     it('can mark an unpaid bill paid when the money is seen first', async () => {
         await imp([row({ amount: 4200, reference: null, occurred_at: '2026-10-06T09:00:00.000Z' })]);
         const [tx] = txs();

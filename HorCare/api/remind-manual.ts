@@ -2,6 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildBillFlex, buildPromptpayMessages, linePush, runPooled, thaiMonthLabel } from './_line.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+import type { MonthlyBill } from '../src/types/index.js';
+
 const PUSH_CONCURRENCY = 8;
 export const config = { maxDuration: 60 };
 
@@ -100,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                 const messages: object[] = [
                     { type: 'text', text },
-                    buildBillFlex(bill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })
+                    buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })
                 ];
                 
                 if (promptpayNumber) {
@@ -117,15 +120,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 
                 sent++;
                 results.push(`✅ ห้อง ${bill.room_number}`);
-            } catch (err: any) {
+            } catch (errRaw) {
+                const err = errorInfo(errRaw);
                 results.push(`❌ ห้อง ${bill.room_number}: ${err.message}`);
             }
         });
 
         res.status(200).json({ data: { sent, skipped, results } });
 
-    } catch (error: any) {
-        console.error('Manual remind error:', error);
+    } catch (errorRaw) {
+        console.error('Manual remind error:', errorRaw);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }

@@ -13,6 +13,7 @@ import { db } from '../../firebase/config';
 import type { TenantProfile, Room, DormConfig, SignedContractData, BillLanguage } from '../../types';
 import SignaturePad from '../ESignature/SignaturePad';
 import horcareLogo from '../../assets/horcare_logo.png';
+import { errorInfo } from '../../shared/errorInfo';
 
 interface TenantContractSectionProps {
   profile: TenantProfile | null;
@@ -111,8 +112,9 @@ export default function TenantContractSection({
       toast.success('ลงนามสัญญาดิจิทัลสำเร็จเรียบร้อยแล้ว! 🎉', { id: toastId });
       setShowSignModal(false);
       setShowPreviewModal(true);
-    } catch (err: any) {
-      console.error(err);
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
+      console.error(errRaw);
       toast.error('เกิดข้อผิดพลาดในการบันทึก: ' + (err?.message || 'กรุณาลองใหม่'), { id: toastId });
     } finally {
       setIsSubmitting(false);

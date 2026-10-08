@@ -9,6 +9,7 @@ import { raiseBindingAlert } from './_security-alerts.js';
 import { latestAnnouncementsText } from './_announcements.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
+import type { MonthlyBill } from '../src/types/index.js';
 
 export const config = {
     api: {
@@ -67,17 +68,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = JSON.parse(rawBodyString);
-    const events: any[] = body.events ?? [];
+    const events: LineEvent[] = Array.isArray(body.events) ? body.events : [];
 
     await Promise.all(events.map(handleEvent));
 
     res.status(200).send('OK');
 }
 
-async function handleEvent(event: any) {
+/** The parts of a LINE webhook event this handler reads. */
+interface LineEvent {
+    type?: string;
+    replyToken?: string;
+    source?: { userId?: string };
+    message?: { type?: string; id: string; text?: string };
+}
+
+async function handleEvent(event: LineEvent) {
     if (event.type !== 'message') return;
-    const lineUserId: string = event.source?.userId;
-    const replyToken: string = event.replyToken;
+    const lineUserId = event.source?.userId;
+    const replyToken = event.replyToken;
     if (!lineUserId || !replyToken) return;
 
     // กันทั้ง webhook ล้มเพราะ event เดียว — log แล้วตอบข้อความสุภาพแทนการเงียบหาย
@@ -94,7 +103,7 @@ async function handleEvent(event: any) {
     }
 }
 
-async function dispatchEvent(event: any, lineUserId: string, replyToken: string) {
+async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: string) {
     // ── Slip image: tenant sends a payment slip photo ─────────────
     if (event.message?.type === 'image') {
         await handleImage(lineUserId, replyToken, event.message.id);
@@ -447,7 +456,7 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
     }
 
     const bill = billDoc.data();
-    await lineReply(replyToken, [buildBillFlex(bill, dorm_name || '-', due_day ?? 5, bill.month as string)]);
+    await lineReply(replyToken, [buildBillFlex(bill as MonthlyBill, dorm_name || '-', due_day ?? 5, bill.month as string)]);
 }
 
 /** ส่งลิงก์พอร์ทัลส่วนตัวของลูกหอ */
@@ -667,10 +676,11 @@ async function handleSlipImage(
                 room_number,
                 created_at: admin.firestore.FieldValue.serverTimestamp(),
             });
-        } catch (e: any) {
+        } catch (e) {
+            const code = (e as { code?: unknown } | null)?.code;
             // ซ้ำจริงเฉพาะ ALREADY_EXISTS (gRPC code 6) — error อื่น (network/quota)
             // ต้อง throw ให้ handler ชั้นนอกตอบ "ระบบขัดข้อง" ไม่ใช่หลอกว่าสลิปซ้ำ
-            if (e?.code === 6 || e?.code === 'already-exists') {
+            if (code === 6 || code === 'already-exists') {
                 duplicate = true;
             } else {
                 throw e;

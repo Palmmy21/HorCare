@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { errorInfo } from '../src/shared/errorInfo.js';
 
 export const config = { maxDuration: 60 };
 
@@ -87,7 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     await lineSupportPush(lineSupportId, message);
                     notifiedCount++;
                     console.log(`Notified user ${doc.id} (days remaining: ${roundedDays})`);
-                } catch (err: any) {
+                } catch (errRaw) {
+                    const err = errorInfo(errRaw);
                     console.error(`Failed to notify user ${doc.id}:`, err.message);
                     skippedCount++;
                 }
@@ -95,7 +97,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         res.status(200).json({ ok: true, notifiedCount, skippedCount });
-    } catch (err: any) {
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
         console.error('cron-check-expiry failed:', err.message);
         res.status(500).json({ ok: false, error: err.message });
     }

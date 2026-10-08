@@ -24,6 +24,8 @@ import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import ContractSignModal from '../ESignature/ContractSignModal';
 import ShareContractModal from '../ESignature/ShareContractModal';
 
+import { errorInfo } from '../../shared/errorInfo';
+
 interface TenantProfilePageProps {
   room: Room;
   uid: string;
@@ -157,8 +159,9 @@ export default function TenantProfilePage({
       });
       setIsEditing(false);
       toast.success('บันทึกข้อมูลเรียบร้อยแล้ว');
-    } catch (e: any) {
-      console.error(e);
+    } catch (eRaw) {
+        const e = errorInfo(eRaw);
+      console.error(eRaw);
       toast.error('บันทึกไม่สำเร็จ: ' + (e?.message || 'กรุณาลองใหม่'));
     } finally {
       setSaving(false);
@@ -202,8 +205,9 @@ export default function TenantProfilePage({
 
       toast.success(`บันทึกสัญญาดิจิทัล ${signedContract.contract_number} เรียบร้อยแล้ว!`);
       setShowContractModal(false);
-    } catch (err: any) {
-      console.error('Error saving signed contract:', err);
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
+      console.error('Error saving signed contract:', errRaw);
       toast.error('ไม่สามารถบันทึกสัญญาได้: ' + (err.message || ''));
     } finally {
       setSaving(false);

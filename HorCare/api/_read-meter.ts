@@ -16,6 +16,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { aiGenerate, extractJson } from './_ai.js';
 
+import { errorInfo } from '../src/shared/errorInfo.js';
+
 // ── Plan helpers (inline — ไม่ import จาก src เพราะ API ไม่ bundle React) ──
 function isPlusOrAbove(license: string): boolean {
     if (license === 'active') return true;
@@ -138,8 +140,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         res.status(200).json({ data: result });
 
-    } catch (err: any) {
-        console.error('[read-meter] error:', err?.message ?? err);
+    } catch (errRaw) {
+        const err = errorInfo(errRaw);
+        console.error('[read-meter] error:', err?.message ?? errRaw);
         res.status(500).json({ error: 'internal_error', message: `API Error: ${err?.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่'}` });
     }
 }
