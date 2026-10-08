@@ -216,6 +216,8 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
               </div>
             </div>
 
+            {collectionStyle !== 'nightly' && (
+            <>
             {/* Section 2: ค่าน้ำ - ค่าไฟ */}
             <div>
               <div className="ab-section-title">
@@ -310,6 +312,8 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                 )}
               </div>
             </div>
+            </>
+            )}
 
             {/* Section 3: ค่าเช่า & บิล */}
             <div>

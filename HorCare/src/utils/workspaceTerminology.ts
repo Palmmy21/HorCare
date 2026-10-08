@@ -40,6 +40,8 @@ export interface WorkspaceTerms {
   // Booleans
   isMarket: boolean;
   isCommercial: boolean;
+  /** Meter reading + utility bills. Off for hotels/resorts: the room price is all-in, collected per stay. */
+  usesMeters: boolean;
   buildingType: DormConfig['building_type'];
 }
 
@@ -50,6 +52,12 @@ export const DEFAULT_MARKET_ZONES = [
   'โซน D (เครื่องดื่ม เบเกอรี่ คาเฟ่)',
   'โซน E (เปิดท้าย ลานโปรโมชัน)',
 ];
+
+/** Asset type as the owner names it (branch cards, headers). */
+export const BUILDING_TYPE_LABELS: Record<DormConfig['building_type'], string> = {
+  dormitory: 'หอพัก', market: 'ตลาด / แผงค้า', commercial: 'อาคารพาณิชย์', apartment: 'อพาร์ตเมนต์',
+  condo: 'คอนโดมิเนียม', house: 'บ้านเช่า / ทาวน์โฮม', resort: 'รีสอร์ท', hotel: 'โรงแรม', office: 'ออฟฟิศ', other: 'อื่น ๆ',
+};
 
 /** The collection style a building type starts with; the owner can still change it. */
 export function defaultCollectionStyle(type: string | undefined): 'monthly' | 'nightly' | 'stall' {
@@ -96,6 +104,7 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
       isMarket: true,
       isCommercial: true,
+      usesMeters: true,
       buildingType: type,
     };
   }
@@ -135,6 +144,7 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
       isMarket: false,
       isCommercial: true,
+      usesMeters: true,
       buildingType: type,
     };
   }
@@ -174,6 +184,7 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
     isMarket: false,
     isCommercial: ['resort', 'hotel', 'office'].includes(type),
+    usesMeters: !['resort', 'hotel'].includes(type),
     buildingType: type,
   };
 }

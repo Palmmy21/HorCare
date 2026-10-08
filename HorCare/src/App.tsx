@@ -392,7 +392,7 @@ function App() {
   const navItems = [
     { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'rooms'       as ViewMode, icon: terms.isMarket ? Store : Home, label: terms.manageUnitsLabel || 'จัดการห้อง' },
-    { id: 'recording'   as ViewMode, icon: FileText,        label: terms.meterRecordingLabel || 'จดมิเตอร์' },
+    ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
     { id: 'tenants'     as ViewMode, icon: Users,           label: terms.tenantLabel || 'ผู้เช่า' },
     { id: 'maintenance' as ViewMode, icon: Wrench,          label: 'แจ้งซ่อม' },
     { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
@@ -418,7 +418,7 @@ function App() {
   const visibleNavItems = maidSession
     ? [
         { id: 'cleaning' as ViewMode, icon: Sparkles, label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
-        { id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' },
+        ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
       ]
     : navItems;
 
