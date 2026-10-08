@@ -21,6 +21,7 @@ import lineInboxHandler from './_line-inbox.js';
 import bankAccountsHandler from './_bank-accounts.js';
 import reconciliationHandler from './_reconciliation.js';
 import chatbotHandler from './_chatbot.js';
+import marketHandler from './_market.js';
 import announcementsHandler from './_announcements.js';
 import remindParcelsHandler from './_remind-parcels.js';
 
@@ -43,6 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'bank-accounts': return bankAccountsHandler(req, res);
         case 'reconciliation': return reconciliationHandler(req, res);
         case 'chatbot': return chatbotHandler(req, res);
+        case 'market': return marketHandler(req, res);
         case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
         case 'nong-care': return nongCareHandler(req, res);

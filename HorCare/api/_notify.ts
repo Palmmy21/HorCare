@@ -15,8 +15,10 @@ import { linePush, staffLineToken } from './_line.js';
 export type NotificationEvent =
     | 'parcel.received'
     | 'parcel.overdue'
-    | 'work_order.assigned';
-// Planned: 'invoice.overdue' | 'contract.expiring' | 'shop.closure_submitted' | 'visitor.arriving'
+    | 'work_order.assigned'
+    | 'shop.closure_submitted'
+    | 'visitor.arriving';
+// Planned: 'invoice.overdue' | 'contract.expiring'
 
 export type Channel = 'line' | 'in_app';
 export type ChannelResult = 'sent' | 'failed' | 'skipped';
@@ -118,6 +120,16 @@ export function renderMessage(
             return {
                 title: 'พัสดุค้างรับ',
                 body: `⏰ ${dormName}\nห้อง ${room} มีพัสดุค้างรับ${carrier} มาแล้ว ${data.days ?? '?'} วัน${where}\nกรุณามารับพัสดุนะคะ\n\n${url}`,
+            };
+        case 'shop.closure_submitted':
+            return {
+                title: 'ร้านค้าแจ้งหยุด',
+                body: `🔕 ${dormName}\nแผง ${room} แจ้งหยุด ${data.from_date}${data.to_date && data.to_date !== data.from_date ? ' ถึง ' + data.to_date : ''}${data.reason ? ' (' + data.reason + ')' : ''}`,
+            };
+        case 'visitor.arriving':
+            return {
+                title: 'ขาจรแจ้งเข้าขาย',
+                body: `🧺 ${dormName}\nขาจร ${data.name ?? ''} แจ้งเข้าขายวันที่ ${data.date ?? ''} (${data.goods ?? ''})`,
             };
         case 'work_order.assigned':
             return {

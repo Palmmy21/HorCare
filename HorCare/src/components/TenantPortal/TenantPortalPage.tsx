@@ -28,6 +28,7 @@ import toast from 'react-hot-toast';
 import TenantContractSection from './TenantContractSection';
 import TenantParcelSection from './TenantParcelSection';
 import TenantBankSection from './TenantBankSection';
+import TenantClosureSection from './TenantClosureSection';
 import TenantAnnouncementSection from './TenantAnnouncementSection';
 
 // โ”€โ”€ Image compression (canvas) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
@@ -1257,6 +1258,7 @@ export default function TenantPortalPage() {
           </section>
 
           <TenantBankSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
+          {config?.building_type === 'market' && <TenantClosureSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />}
 
           {/* PromptPay standalone (when no bill yet) */}
           {!currentBill && promptpay.number && (

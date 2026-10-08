@@ -42,6 +42,7 @@ const OperationsPage  = lazy(() => import('./components/Operations/OperationsPag
 const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
 const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
 const AnnouncementsPage = lazy(() => import('./components/Announcements/AnnouncementsPage'));
+const MarketPage = lazy(() => import('./components/Market/MarketPage'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
 
@@ -75,7 +76,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -396,6 +397,7 @@ function App() {
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
+    ...(terms.isMarket ? [{ id: 'market' as ViewMode, icon: Store, label: 'ร้านค้า & ขาจร' }] : []),
     { id: 'workorders'  as ViewMode, icon: ClipboardCheck,  label: 'ใบงานช่าง/แม่บ้าน' },
     { id: 'messages'    as ViewMode, icon: MessageSquare,   label: 'ข้อความ LINE' },
     { id: 'announcements' as ViewMode, icon: Megaphone, label: 'ประกาศ & ตอบอัตโนมัติ' },
@@ -1606,6 +1608,10 @@ function App() {
         )}
 
 
+
+        {currentView === 'market' && user && activeBuildingId && !maidSession && terms.isMarket && (
+          <MarketPage ownerUid={user.uid} buildingId={activeBuildingId} />
+        )}
 
         {currentView === 'announcements' && user && activeBuildingId && !maidSession && (
           <AnnouncementsPage ownerUid={user.uid} buildingId={activeBuildingId} />
