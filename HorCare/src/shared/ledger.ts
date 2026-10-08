@@ -28,7 +28,7 @@ export interface Account {
 }
 
 export const MAX_ACCOUNTS = 300;
-export const ACCOUNT_CODE_RE = /^[A-Za-z0-9][A-Za-z0-9.\-]{0,19}$/;
+export const ACCOUNT_CODE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 
 /** A sensible starting chart for a rental business. Codes are suggestions the owner/accountant can change. */
 export function defaultChart(): Account[] {
