@@ -30,6 +30,22 @@ beforeEach(() => {
 });
 
 describe('/api/members', () => {
+    it('adds a member by the phone number on their profile, in any common format, and refuses unknown or shared numbers', async () => {
+        seed('users/desk', { uid: 'desk', phone: '0812345678' });
+        seed('users/mgr', { uid: 'mgr', phone: '081-999-0000' });
+        const ok = await call(OWNER, { action: 'add', phone: '081 234 5678', role: 'front_desk', property_ids: ['*'] });
+        expect(ok.statusCode).toBe(200);
+        expect(ok.body.member.uid).toBe('desk');
+        expect((await call(OWNER, { action: 'add', phone: '0819990000', role: 'front_desk', property_ids: ['*'] })).body.member.uid).toBe('mgr'); // stored with dashes
+        expect((await call(OWNER, { action: 'add', phone: '0800000000', role: 'front_desk', property_ids: ['*'] })).statusCode).toBe(404);
+        expect((await call(OWNER, { action: 'add', phone: '12345', role: 'front_desk', property_ids: ['*'] })).statusCode).toBe(400);
+        seed('users/dup', { uid: 'dup', phone: '+66855550000' });
+        seed('users/dup2', { uid: 'dup2', phone: '0855550000' });
+        addAuthUser('dup', 'dup@x.com'); addAuthUser('dup2', 'dup2@x.com');
+        expect((await call(OWNER, { action: 'add', phone: '0855550000', role: 'front_desk', property_ids: ['*'] })).statusCode).toBe(409);
+        expect((await call('mgr', { action: 'add', phone: '0812345678', role: 'front_desk', property_ids: ['*'] })).statusCode).toBe(403);
+    });
+
     it('owner adds a member; permissions are derived from the role and the change is audited', async () => {
         const res = await call(OWNER, { action: 'add', email: 'desk@x.com', role: 'front_desk', property_ids: ['bld-A'] });
         expect(res.statusCode).toBe(200);

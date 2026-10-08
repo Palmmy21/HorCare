@@ -247,7 +247,8 @@ function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageP
 
     const add = async () => {
         if (!email.trim()) return;
-        const ok = await act({ action: 'add', email: email.trim(), role, property_ids: scope.length ? scope : ['*'] }, 'เพิ่มสมาชิกแล้ว');
+        const who = email.trim();
+        const ok = await act({ action: 'add', ...(who.includes('@') ? { email: who } : { phone: who }), role, property_ids: scope.length ? scope : ['*'] }, 'เพิ่มสมาชิกแล้ว');
         if (ok) setEmail('');
     };
 
@@ -284,8 +285,8 @@ function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageP
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.625rem' }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <span className="form-label">อีเมลบัญชี HorCare</span>
-                        <input className="form-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@example.com" />
+                        <span className="form-label">อีเมล หรือ เบอร์โทรที่สมัคร HorCare</span>
+                        <input className="form-input" type="text" inputMode="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="staff@example.com หรือ 0812345678" />
                     </label>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         <span className="form-label">บทบาท</span>

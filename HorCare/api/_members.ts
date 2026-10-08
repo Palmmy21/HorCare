@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { admin, db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
+import { cleanPhone } from '../src/shared/leasing.js';
 import {
     ASSIGNABLE_ROLES, isRole, permissionsForRole, type MemberDoc, type Role,
 } from '../src/shared/permissions.js';
@@ -12,6 +13,8 @@ interface Body {
     action?: 'list' | 'add' | 'update' | 'remove';
     owner_uid?: string;
     email?: string;
+    /** Alternative to email: the phone number the person registered with. */
+    phone?: string;
     member_uid?: string;
     role?: string;
     property_ids?: unknown;
@@ -22,6 +25,20 @@ function parsePropertyIds(value: unknown): string[] | null {
     if (!Array.isArray(value) || value.length === 0) return null;
     if (!value.every(v => typeof v === 'string' && v.length > 0 && v.length <= 100)) return null;
     return [...new Set(value as string[])];
+}
+
+/** The ways a Thai mobile number may be stored on a profile: 0812345678, 081-234-5678, +66812345678, 66812345678. */
+function phoneVariants(p: string): string[] {
+    const intl = p.slice(1);
+    return [p, `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}`, `${p.slice(0, 3)}-${p.slice(3)}`, `+66${intl}`, `66${intl}`];
+}
+
+async function uidsByPhone(phone: string): Promise<string[]> {
+    const found = new Set<string>();
+    for (const v of phoneVariants(phone)) {
+        for (const d of (await db.collection('users').where('phone', '==', v).get()).docs) found.add(d.id);
+    }
+    return [...found];
 }
 
 /** Manage staff access to an owner's organization. Owner-only (`member.manage`). */
@@ -44,16 +61,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'add') {
         const email = (body.email ?? '').trim().toLowerCase();
+        const phone = email ? null : cleanPhone(body.phone);
         const role = body.role;
         const propertyIds = parsePropertyIds(body.property_ids);
-        if (!email || !isRole(role) || !ASSIGNABLE_ROLES.includes(role) || !propertyIds) {
+        if ((!email && !phone) || !isRole(role) || !ASSIGNABLE_ROLES.includes(role) || !propertyIds) {
             res.status(400).json({ error: 'invalid_input' });
             return;
         }
 
         let target: admin.auth.UserRecord;
         try {
-            target = await admin.auth().getUserByEmail(email);
+            if (phone) {
+                const uids = await uidsByPhone(phone);
+                if (uids.length > 1) { res.status(409).json({ error: 'ambiguous_phone', message: 'มีหลายบัญชีใช้เบอร์นี้ — เพิ่มด้วยอีเมลแทน' }); return; }
+                if (uids.length === 0) throw new Error('not_found');
+                target = await admin.auth().getUser(uids[0]);
+            } else {
+                target = await admin.auth().getUserByEmail(email);
+            }
         } catch {
             res.status(404).json({ error: 'user_not_found', message: 'ผู้ใช้นี้ยังไม่มีบัญชี HorCare — ให้สมัครสมาชิกก่อน' });
             return;
@@ -72,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const member: MemberDoc = {
             uid: target.uid,
             email: target.email ?? email,
-            display_name: target.displayName ?? target.email ?? email,
+            display_name: target.displayName ?? target.email ?? email ?? phone ?? '',
             role,
             permissions: permissionsForRole(role),
             property_ids: propertyIds,

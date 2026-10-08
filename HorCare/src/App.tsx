@@ -15,6 +15,7 @@ import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 import { collectionStyleOf, getWorkspaceTerms } from './utils/workspaceTerminology';
+import { HIDDEN_VIEWS } from './shared/erpModules';
 import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
@@ -418,12 +419,13 @@ function App() {
     { id: 'pricing'     as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
 
+  const hiddenViews = HIDDEN_VIEWS[collectionStyle];
   const visibleNavItems = maidSession
     ? [
         { id: 'cleaning' as ViewMode, icon: Sparkles, label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
         ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
       ]
-    : navItems;
+    : navItems.filter(i => !hiddenViews.includes(i.id));
 
   const isAdmin = profile?.role === 'admin';
 
@@ -1628,7 +1630,7 @@ function App() {
           <CollectionsPage ownerUid={user.uid} buildingId={activeBuildingId} style={collectionStyle} />
         )}
         {currentView === 'modules' && !maidSession && (
-          <ModulesHome isMarket={terms.isMarket} available={new Set(visibleNavItems.map(i => i.id))} onOpen={view => setCurrentView(view as ViewMode)} />
+          <ModulesHome isMarket={terms.isMarket} style={collectionStyle} available={new Set(visibleNavItems.map(i => i.id))} onOpen={view => setCurrentView(view as ViewMode)} />
         )}
 
         {currentView === 'ledger' && user && !maidSession && (

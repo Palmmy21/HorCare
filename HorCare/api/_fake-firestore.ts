@@ -80,6 +80,11 @@ export const admin = {
             if (!u) throw new Error('invalid token');
             return { uid: u.uid, email: u.email, name: u.displayName };
         },
+        getUser: async (uid: string) => {
+            const u = authUsers.get(uid);
+            if (!u) throw new Error('auth/user-not-found');
+            return u;
+        },
         getUserByEmail: async (email: string) => {
             const u = [...authUsers.values()].find(x => x.email === email);
             if (!u) throw new Error('auth/user-not-found');

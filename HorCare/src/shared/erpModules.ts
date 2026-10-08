@@ -20,11 +20,17 @@ export const VIEW_LABELS_TH: Record<string, string> = {
   security: 'ความปลอดภัยและสิทธิ์', settings: 'ตั้งค่า',
 };
 
-export function erpModules(isMarket: boolean): ErpModule[] {
+export type ModuleStyle = 'monthly' | 'nightly' | 'stall';
+
+/** Views a workspace does not use: a hotel prices per night, so it has no monthly bill summary and no lease pipeline. */
+export const HIDDEN_VIEWS: Record<ModuleStyle, string[]> = { monthly: [], nightly: ['summary', 'leasing', 'recording'], stall: [] };
+
+export function erpModules(isMarket: boolean, style: ModuleStyle = 'monthly'): ErpModule[] {
+  const nightly = style === 'nightly';
   return [
     {
       id: 'property', label: isMarket ? 'แผงค้าและพื้นที่' : 'ทรัพย์สิน',
-      purpose: isMarket ? 'ทะเบียนแผง โซน และมิเตอร์' : 'ทะเบียนห้อง/ยูนิต สิ่งอำนวยความสะดวก และมิเตอร์น้ำไฟ',
+      purpose: isMarket ? 'ทะเบียนแผง โซน การเก็บเงินรายวัน/รายสัปดาห์ และมิเตอร์' : nightly ? 'ทะเบียนห้องพัก สิ่งอำนวยความสะดวก ปฏิทินการจอง และการเก็บค่าห้องต่อคืน' : 'ทะเบียนห้อง/ยูนิต สิ่งอำนวยความสะดวก และมิเตอร์น้ำไฟ',
       views: ['rooms', 'collections', 'recording', 'summary'],
       planned: ['ผังชั้น/โซน', 'เจ้าของทรัพย์สิน (กรณีบริหารแทน)'],
     },
@@ -36,7 +42,7 @@ export function erpModules(isMarket: boolean): ErpModule[] {
     },
     {
       id: 'billing', label: 'เรียกเก็บและรับเงิน',
-      purpose: 'บิลรายเดือน ค่าปรับ รับเงินสด/โอน อ่านสลิป และกระทบยอดธนาคาร',
+      purpose: nightly ? 'รับเงินสด/โอน อ่านสลิป ค่าปรับ และกระทบยอดธนาคาร (ค่าห้องต่อคืนเก็บที่หน้า เก็บค่าห้อง)' : 'บิลรายเดือน ค่าปรับ รับเงินสด/โอน อ่านสลิป และกระทบยอดธนาคาร',
       views: ['payments'],
       planned: ['ใบกำกับภาษี / VAT', 'เตือนค้างชำระอัตโนมัติ', 'ค่าปรับล่าช้าอัตโนมัติ'],
     },

@@ -115,7 +115,7 @@ export function useAuth() {
                 license: 'free',
                 access_until: 0, // 0 = no expiry (Firestore rules treat this as permanent)
                 created_at: new Date().toISOString(),
-                ...(initialBuilding?.phone ? { phone: initialBuilding.phone } : {}),
+                ...(initialBuilding?.phone ? { phone: initialBuilding.phone.replace(/\D/g, '') || initialBuilding.phone } : {}),
                 ...(initialBuilding?.referral_sources ? { referral_sources: initialBuilding.referral_sources } : {}),
             };
 
