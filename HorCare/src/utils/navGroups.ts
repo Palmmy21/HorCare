@@ -15,7 +15,7 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
     { id: 'people', label: isMarket ? 'ผู้เช่า/ร้านค้า' : 'ผู้เช่า', items: ['tenants', 'parcels'] },
     { id: 'money', label: 'การเงิน', items: ['payments', 'summary', 'archives'] },
     { id: 'service', label: 'งานบริการ', items: ['maintenance', 'cleaning', 'workorders', 'operations'] },
-    { id: 'comms', label: 'สื่อสาร', items: ['messages'] },
+    { id: 'comms', label: 'สื่อสาร', items: ['messages', 'announcements'] },
     { id: 'system', label: 'ระบบ', items: ['security', 'settings', 'pricing', 'admin'] },
   ];
 }

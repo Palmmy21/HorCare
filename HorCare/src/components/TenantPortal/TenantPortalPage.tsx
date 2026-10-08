@@ -28,8 +28,9 @@ import toast from 'react-hot-toast';
 import TenantContractSection from './TenantContractSection';
 import TenantParcelSection from './TenantParcelSection';
 import TenantBankSection from './TenantBankSection';
+import TenantAnnouncementSection from './TenantAnnouncementSection';
 
-// ── Image compression (canvas) ────────────────────────────────────────────────
+// โ”€โ”€ Image compression (canvas) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -46,21 +47,21 @@ async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): P
   });
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// โ”€โ”€ Helpers โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function fmt(n?: number) {
-  if (n === undefined || n === null) return '—';
+  if (n === undefined || n === null) return 'โ€”';
   return n.toLocaleString('th-TH');
 }
 function fmtCurrency(n?: number) {
-  if (n === undefined || n === null) return '—';
-  return `฿${n.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
+  if (n === undefined || n === null) return 'โ€”';
+  return `เธฟ${n.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 }
 function getCurrentMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// ── Maintenance config ────────────────────────────────────────────────────────
+// โ”€โ”€ Maintenance config โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 const PORTAL_CATEGORY_OPTIONS: { value: MaintenanceCategory; Icon: React.ElementType; color: string }[] = [
   { value: 'electric',    Icon: Zap,      color: '#F59E0B' },
   { value: 'plumbing',    Icon: Droplets, color: '#0EA5E9' },
@@ -86,7 +87,7 @@ function getStatusCfg(status: string, lang: BillLanguage) {
   };
 }
 
-// ── Maintenance hook (room-scoped) ────────────────────────────────────────────
+// โ”€โ”€ Maintenance hook (room-scoped) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function useRoomMaintenance(uid: string, buildingId: string, roomId: string) {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +112,7 @@ function useRoomMaintenance(uid: string, buildingId: string, roomId: string) {
   return { requests, loading };
 }
 
-// ── Cleaning hook (room-scoped) ───────────────────────────────────────────────
+// โ”€โ”€ Cleaning hook (room-scoped) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function useRoomCleaning(uid: string, buildingId: string, roomId: string) {
   const [requests, setRequests] = useState<CleaningRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,7 +137,7 @@ function useRoomCleaning(uid: string, buildingId: string, roomId: string) {
   return { requests, loading };
 }
 
-// ── Load tenant data ──────────────────────────────────────────────────────────
+// โ”€โ”€ Load tenant data โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 interface PortalData {
   room: Room | null;
   config: DormConfig | null;
@@ -198,7 +199,7 @@ function useTenantData(uid: string, buildingId: string, roomId: string) {
   return { data, loading, error };
 }
 
-// ── Language Selector Component ───────────────────────────────────────────────
+// โ”€โ”€ Language Selector Component โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 export function PortalLanguageSelector({
   lang,
   onSelect,
@@ -316,7 +317,7 @@ export function PortalLanguageSelector({
   );
 }
 
-// ── Payment Status component ─────────────────────────────────────────────────
+// โ”€โ”€ Payment Status component โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function PaymentStatus({ status, lang }: { status?: string; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const cfg = {
@@ -339,7 +340,7 @@ function PaymentStatus({ status, lang }: { status?: string; lang: BillLanguage }
   );
 }
 
-// ── PromptPay QR ─────────────────────────────────────────────────────────────
+// โ”€โ”€ PromptPay QR โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function PromptPayCard({ number, name, amount, title, lang }: { number: string; name: string; amount: number; title?: string; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   return (
@@ -390,7 +391,7 @@ function PromptPayCard({ number, name, amount, title, lang }: { number: string; 
   );
 }
 
-// ── Slip Uploader ─────────────────────────────────────────────────────────────
+// โ”€โ”€ Slip Uploader โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function SlipUploader({
   uid, buildingId, roomId, itemId, itemType, lang,
 }: {
@@ -447,7 +448,7 @@ function SlipUploader({
   );
 }
 
-// ── Bill Card ─────────────────────────────────────────────────────────────────
+// โ”€โ”€ Bill Card โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
   bill: MonthlyBill;
   defaultOpen: boolean; promptpay: { number: string; name: string };
@@ -536,7 +537,7 @@ function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
                   <Zap size={13} color="#F59E0B" /> {t.elec_meter}
                 </span>
                 <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
-                  {fmt(bill.prev_elec)} → {fmt(bill.curr_elec)}
+                  {fmt(bill.prev_elec)} โ’ {fmt(bill.curr_elec)}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -544,7 +545,7 @@ function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
                   <Droplets size={13} color="#3B82F6" /> {t.water_meter}
                 </span>
                 <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
-                  {fmt(bill.prev_water)} → {fmt(bill.curr_water)}
+                  {fmt(bill.prev_water)} โ’ {fmt(bill.curr_water)}
                 </span>
               </div>
             </div>
@@ -585,7 +586,7 @@ function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
   );
 }
 
-// ── Fine Card ─────────────────────────────────────────────────────────────────
+// โ”€โ”€ Fine Card โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function FineCard({ fine, promptpay, portalIds, lang }: { fine: Fine; promptpay: { number: string; name: string }; portalIds: { uid: string, buildingId: string, roomId: string }; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [open, setOpen] = useState(fine.status !== 'paid');
@@ -671,7 +672,7 @@ function FineCard({ fine, promptpay, portalIds, lang }: { fine: Fine; promptpay:
   );
 }
 
-// ── Tenant Profile Section ────────────────────────────────────────────────────
+// โ”€โ”€ Tenant Profile Section โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function TenantProfileSection({ uid, buildingId, roomId, profile, lang }: {
   uid: string; buildingId: string; roomId: string; profile: TenantProfile | null; lang: BillLanguage;
 }) {
@@ -912,7 +913,7 @@ function TenantProfileSection({ uid, buildingId, roomId, profile, lang }: {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// โ”€โ”€ Main Page โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 export default function TenantPortalPage() {
   const params = new URLSearchParams(window.location.search);
   const uid = params.get('uid') ?? '';
@@ -965,7 +966,7 @@ export default function TenantPortalPage() {
     name: config?.bill_customization?.promptpay_name ?? '',
   };
 
-  // ── Invalid link ──
+  // โ”€โ”€ Invalid link โ”€โ”€
   if (!uid || !buildingId || !roomId) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#F8FAFC', position: 'relative' }}>
@@ -982,7 +983,7 @@ export default function TenantPortalPage() {
     );
   }
 
-  // ── Loading ──
+  // โ”€โ”€ Loading โ”€โ”€
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', fontFamily: 'var(--font-sans)', position: 'relative' }}>
@@ -997,7 +998,7 @@ export default function TenantPortalPage() {
     );
   }
 
-  // ── Error ──
+  // โ”€โ”€ Error โ”€โ”€
   if (error || !room) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', color: '#0F172A', fontFamily: 'var(--font-sans)', position: 'relative' }}>
@@ -1014,7 +1015,7 @@ export default function TenantPortalPage() {
     );
   }
 
-  // ── PIN Gate ──
+  // โ”€โ”€ PIN Gate โ”€โ”€
   const requiredPin = config?.portal_pin;
   if (requiredPin && !pinUnlocked) {
     const handlePinSubmit = () => {
@@ -1048,7 +1049,7 @@ export default function TenantPortalPage() {
             type="password"
             inputMode="numeric"
             maxLength={4}
-            placeholder="• • • •"
+            placeholder="โ€ข โ€ข โ€ข โ€ข"
             value={pinInput}
             onChange={e => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError(false); }}
             onKeyDown={e => e.key === 'Enter' && handlePinSubmit()}
@@ -1080,7 +1081,7 @@ export default function TenantPortalPage() {
     );
   }
 
-  // ── Main Portal ──
+  // โ”€โ”€ Main Portal โ”€โ”€
   return (
     <div className="portal-shell" style={{
       minHeight: '100vh',
@@ -1097,7 +1098,7 @@ export default function TenantPortalPage() {
         borderRight: '1px solid #E2E8F0'
       }}>
 
-        {/* ── Hero ── */}
+        {/* โ”€โ”€ Hero โ”€โ”€ */}
         <div style={{
           background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 40%, #10B981 100%)',
           padding: '1.75rem 1.25rem 2rem',
@@ -1169,7 +1170,7 @@ export default function TenantPortalPage() {
                   <Home size={13} /> {t.room} {room.room_number}
                 </span>
                 {profile?.phone && (
-                  <><span style={{ opacity: 0.5 }}>·</span> <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'rgba(255, 255, 255, 0.95)', fontWeight: 600 }}><Phone size={12} /> {profile.phone}</span></>
+                  <><span style={{ opacity: 0.5 }}>ยท</span> <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'rgba(255, 255, 255, 0.95)', fontWeight: 600 }}><Phone size={12} /> {profile.phone}</span></>
                 )}
               </div>
             </div>
@@ -1179,7 +1180,7 @@ export default function TenantPortalPage() {
           <div style={{ display: 'flex', gap: '0.625rem', marginTop: '1.35rem', flexWrap: 'wrap' }}>
             {[
               { label: t.rent, value: fmtCurrency(room.rent_amount) },
-              { label: t.this_month, value: currentBill ? fmtCurrency(currentBill.total_bill) : '—' },
+              { label: t.this_month, value: currentBill ? fmtCurrency(currentBill.total_bill) : 'โ€”' },
               {
                 label: t.status,
                 value: currentBill?.payment_status === 'paid' ? t.paid
@@ -1207,16 +1208,17 @@ export default function TenantPortalPage() {
           </div>
         </div>
 
-        {/* ── Main Body Sections ── */}
+        {/* โ”€โ”€ Main Body Sections โ”€โ”€ */}
         <div style={{ padding: '0.75rem 1.125rem 3rem', background: '#F8FAFC' }}>
 
           {/* Parcels waiting at the front desk (hidden when there are none) */}
+          <TenantAnnouncementSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
           <TenantParcelSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
 
           {/* Digital Lease Contract (E-Signature) */}
           {profile?.signed_contract && (
             <section>
-              <SectionLabel icon={<FileText size={14} />} label="สัญญาเช่าดิจิทัล (Digital Lease Contract)" />
+              <SectionLabel icon={<FileText size={14} />} label="เธชเธฑเธเธเธฒเน€เธเนเธฒเธ”เธดเธเธดเธ—เธฑเธฅ (Digital Lease Contract)" />
               <TenantContractSection
                 profile={profile}
                 room={room}
@@ -1363,7 +1365,7 @@ export default function TenantPortalPage() {
   );
 }
 
-// ── Maintenance section (shown in tenant portal) ──────────────────────────────
+// โ”€โ”€ Maintenance section (shown in tenant portal) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
   uid: string; buildingId: string; roomId: string; roomNumber: string; lang: BillLanguage;
 }) {
@@ -1417,8 +1419,8 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
           body: JSON.stringify({
             uid,
             buildingId,
-            title: `แจ้งซ่อมใหม่ ห้อง ${roomNumber}`,
-            body: `[${catLabel}${form.urgency === 'urgent' ? ' (ด่วน)' : ''}] ${form.description.trim().slice(0, 80)}`,
+            title: `เนเธเนเธเธเนเธญเธกเนเธซเธกเน เธซเนเธญเธ ${roomNumber}`,
+            body: `[${catLabel}${form.urgency === 'urgent' ? ' (เธ”เนเธงเธ)' : ''}] ${form.description.trim().slice(0, 80)}`,
             data: { type: 'maintenance', roomId, roomNumber },
           }),
         });
@@ -1494,7 +1496,7 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
                 {req.photo_url && (
                   <img
                     src={req.photo_url}
-                    alt="รูปแจ้งซ่อม"
+                    alt="เธฃเธนเธเนเธเนเธเธเนเธญเธก"
                     style={{ marginTop: '0.5rem', width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-gray-200)', cursor: 'pointer' }}
                     onClick={() => window.open(req.photo_url, '_blank')}
                   />
@@ -1713,7 +1715,7 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
   );
 }
 
-// ── Cleaning section (shown in tenant portal) ────────────────────────────────
+// โ”€โ”€ Cleaning section (shown in tenant portal) โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang }: {
   uid: string; buildingId: string; roomId: string; roomNumber: string; tenantName?: string; lang: BillLanguage;
 }) {
@@ -1733,16 +1735,16 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
   }>({
     service_type: 'general',
     preferred_date: '',
-    preferred_time_slot: 'เช้า (09:00 - 12:00)',
+    preferred_time_slot: 'เน€เธเนเธฒ (09:00 - 12:00)',
     description: '',
   });
 
   const cleaningTypeOpts: { value: CleaningServiceType; label: string; desc: string }[] = [
-    { value: 'general', label: 'ทำความสะอาดทั่วไป', desc: 'กวาด ถู ปัดฝุ่น' },
-    { value: 'bathroom', label: 'ขัดล้างห้องน้ำ', desc: 'ล้างสุขภัณฑ์/พื้น' },
-    { value: 'balcony', label: 'ล้างระเบียง', desc: 'ขัดพื้น/ซักล้าง' },
-    { value: 'deep', label: 'บิ๊กคลีนนิ่ง', desc: 'ทำความสะอาดละเอียด' },
-    { value: 'checkout', label: 'ก่อนย้ายออก', desc: 'เคลียร์ห้อง' },
+    { value: 'general', label: 'เธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”เธ—เธฑเนเธงเนเธ', desc: 'เธเธงเธฒเธ” เธ–เธน เธเธฑเธ”เธเธธเนเธ' },
+    { value: 'bathroom', label: 'เธเธฑเธ”เธฅเนเธฒเธเธซเนเธญเธเธเนเธณ', desc: 'เธฅเนเธฒเธเธชเธธเธเธ เธฑเธ“เธ‘เน/เธเธทเนเธ' },
+    { value: 'balcony', label: 'เธฅเนเธฒเธเธฃเธฐเน€เธเธตเธขเธ', desc: 'เธเธฑเธ”เธเธทเนเธ/เธเธฑเธเธฅเนเธฒเธ' },
+    { value: 'deep', label: 'เธเธดเนเธเธเธฅเธตเธเธเธดเนเธ', desc: 'เธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”เธฅเธฐเน€เธญเธตเธขเธ”' },
+    { value: 'checkout', label: 'เธเนเธญเธเธขเนเธฒเธขเธญเธญเธ', desc: 'เน€เธเธฅเธตเธขเธฃเนเธซเนเธญเธ' },
   ];
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1786,8 +1788,8 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
           body: JSON.stringify({
             uid,
             buildingId,
-            title: `แจ้งทำความสะอาดใหม่ ห้อง ${roomNumber}`,
-            body: `${form.service_type} - ${form.description.trim().slice(0, 80) || 'ไม่มีบันทึกเพิ่มเติม'}`,
+            title: `เนเธเนเธเธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”เนเธซเธกเน เธซเนเธญเธ ${roomNumber}`,
+            body: `${form.service_type} - ${form.description.trim().slice(0, 80) || 'เนเธกเนเธกเธตเธเธฑเธเธ—เธถเธเน€เธเธดเนเธกเน€เธ•เธดเธก'}`,
             data: { type: 'cleaning', roomId, roomNumber },
           }),
         });
@@ -1795,7 +1797,7 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
         /* push error ignored */
       }
 
-      setForm({ service_type: 'general', preferred_date: '', preferred_time_slot: 'เช้า (09:00 - 12:00)', description: '' });
+      setForm({ service_type: 'general', preferred_date: '', preferred_time_slot: 'เน€เธเนเธฒ (09:00 - 12:00)', description: '' });
       setPhoto(null);
       setShowForm(false);
       toast.success(t.cleaning_success_toast);
@@ -1871,7 +1873,7 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.25rem' }}>
                     <CalendarDays size={12} />
                     <span>
-                      {req.preferred_date ? formatPortalDate(req.preferred_date, lang) : 'วันนัดหมาย'}{' '}
+                      {req.preferred_date ? formatPortalDate(req.preferred_date, lang) : 'เธงเธฑเธเธเธฑเธ”เธซเธกเธฒเธข'}{' '}
                       {req.preferred_time_slot ? `(${req.preferred_time_slot})` : ''}
                     </span>
                   </div>
@@ -1879,20 +1881,20 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
 
                 {req.assigned_maid_name && (
                   <div style={{ fontSize: '0.775rem', color: '#0369A1', background: '#F0F9FF', padding: '0.3rem 0.55rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                    <CheckCircle2 size={12} /> ผู้รับผิดชอบ: <strong>{req.assigned_maid_name}</strong>
+                    <CheckCircle2 size={12} /> เธเธนเนเธฃเธฑเธเธเธดเธ”เธเธญเธ: <strong>{req.assigned_maid_name}</strong>
                   </div>
                 )}
 
                 {req.completed_note && (
                   <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#15803D', borderLeft: '3px solid #16A34A', paddingLeft: '0.5rem', lineHeight: 1.4 }}>
-                    <strong>ผลการทำความสะอาด:</strong> {req.completed_note}
+                    <strong>เธเธฅเธเธฒเธฃเธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”:</strong> {req.completed_note}
                   </div>
                 )}
 
                 {req.image_url && (
                   <img
                     src={req.image_url}
-                    alt="รูปทำความสะอาด"
+                    alt="เธฃเธนเธเธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”"
                     style={{ marginTop: '0.5rem', width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-gray-200)', cursor: 'pointer' }}
                     onClick={() => { if (req.image_url) window.open(req.image_url, '_blank'); }}
                   />
@@ -1938,7 +1940,7 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
           {/* Service type options */}
           <div style={{ marginBottom: '0.875rem' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
-              ประเภทบริการทำความสะอาด
+              เธเธฃเธฐเน€เธ เธ—เธเธฃเธดเธเธฒเธฃเธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.4rem' }}>
               {cleaningTypeOpts.map(opt => {
@@ -1971,7 +1973,7 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem', marginBottom: '0.875rem' }}>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.35rem' }}>
-                วันที่ต้องการ (ถ้ามี)
+                เธงเธฑเธเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃ (เธ–เนเธฒเธกเธต)
               </label>
               <input
                 type="date"
@@ -1982,17 +1984,17 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
             </div>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.35rem' }}>
-                ช่วงเวลา
+                เธเนเธงเธเน€เธงเธฅเธฒ
               </label>
               <select
                 value={form.preferred_time_slot}
                 onChange={e => setForm(f => ({ ...f, preferred_time_slot: e.target.value }))}
                 style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #E5E7EB', padding: '0.5rem', fontSize: '0.85rem' }}
               >
-                <option value="เช้า (09:00 - 12:00)">เช้า (09:00 - 12:00)</option>
-                <option value="บ่าย (13:00 - 16:00)">บ่าย (13:00 - 16:00)</option>
-                <option value="เย็น (16:00 - 18:00)">เย็น (16:00 - 18:00)</option>
-                <option value="สะดวกทั้งวัน">สะดวกทั้งวัน</option>
+                <option value="เน€เธเนเธฒ (09:00 - 12:00)">เน€เธเนเธฒ (09:00 - 12:00)</option>
+                <option value="เธเนเธฒเธข (13:00 - 16:00)">เธเนเธฒเธข (13:00 - 16:00)</option>
+                <option value="เน€เธขเนเธ (16:00 - 18:00)">เน€เธขเนเธ (16:00 - 18:00)</option>
+                <option value="เธชเธฐเธ”เธงเธเธ—เธฑเนเธเธงเธฑเธ">เธชเธฐเธ”เธงเธเธ—เธฑเนเธเธงเธฑเธ</option>
               </select>
             </div>
           </div>
@@ -2000,11 +2002,11 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
           {/* Description */}
           <div style={{ marginBottom: '0.875rem' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
-              รายละเอียดเพิ่มเติม / จุดที่เน้นเป็นพิเศษ
+              เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก / เธเธธเธ”เธ—เธตเนเน€เธเนเธเน€เธเนเธเธเธดเน€เธจเธฉ
             </label>
             <textarea
               rows={2}
-              placeholder="เช่น เน้นขัดร่องกระเบื้องห้องน้ำ, ทำความสะอาดตู้เย็น..."
+              placeholder="เน€เธเนเธ เน€เธเนเธเธเธฑเธ”เธฃเนเธญเธเธเธฃเธฐเน€เธเธทเนเธญเธเธซเนเธญเธเธเนเธณ, เธ—เธณเธเธงเธฒเธกเธชเธฐเธญเธฒเธ”เธ•เธนเนเน€เธขเนเธ..."
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               style={{
@@ -2105,7 +2107,7 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
   );
 }
 
-// ── Section label helper ──────────────────────────────────────────────────────
+// โ”€โ”€ Section label helper โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€
 function SectionLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '1.5rem 0 0.65rem' }}>

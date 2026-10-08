@@ -3,7 +3,9 @@ import { db, admin } from './_firebase.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
-import { getTenantLink, recordInbound } from './_line-inbox.js';
+import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
+import { findFaqAnswer } from './_chatbot.js';
+import { latestAnnouncementsText } from './_announcements.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 
@@ -153,6 +155,13 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
         return;
     }
 
+    // ── 2c2. ประกาศ — latest notices from the property (registered tenants only) ──
+    if (text === 'ประกาศ') {
+        const link = await getTenantLink(lineUserId);
+        const msg = link ? await latestAnnouncementsText(link).catch(() => null) : null;
+        await lineReply(replyToken, [{ type: 'text', text: link ? (msg ?? 'ตอนนี้ยังไม่มีประกาศค่ะ') : 'กรุณาลงทะเบียนกับหอพักก่อนนะคะ' }]);
+        return;
+    }
     // ── 2d. Rich Menu — ติดต่อแอดมิน ──────────────────────────────
     if (text === 'ติดต่อแอดมิน') {
         await lineReply(replyToken, [{
@@ -215,6 +224,14 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
         return { recorded: false, shouldAck: false };
     });
     if (inbound.recorded) {
+        // The owner's own Q&A answers first; anything it can't answer is left for a person.
+        const link = await getTenantLink(lineUserId);
+        const answer = link ? await findFaqAnswer(link, text).catch(() => null) : null;
+        if (answer) {
+            await lineReply(replyToken, [{ type: 'text', text: answer }]);
+            await recordBotReply(lineUserId, answer).catch(() => undefined);
+            return;
+        }
         if (inbound.shouldAck) {
             await lineReply(replyToken, [{
                 type: 'text',

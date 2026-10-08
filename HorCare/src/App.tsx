@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -41,6 +41,7 @@ const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
 const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
 const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
+const AnnouncementsPage = lazy(() => import('./components/Announcements/AnnouncementsPage'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
 
@@ -74,7 +75,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -397,6 +398,7 @@ function App() {
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
     { id: 'workorders'  as ViewMode, icon: ClipboardCheck,  label: 'ใบงานช่าง/แม่บ้าน' },
     { id: 'messages'    as ViewMode, icon: MessageSquare,   label: 'ข้อความ LINE' },
+    { id: 'announcements' as ViewMode, icon: Megaphone, label: 'ประกาศ & ตอบอัตโนมัติ' },
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
 
     { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
@@ -1604,6 +1606,10 @@ function App() {
         )}
 
 
+
+        {currentView === 'announcements' && user && activeBuildingId && !maidSession && (
+          <AnnouncementsPage ownerUid={user.uid} buildingId={activeBuildingId} />
+        )}
 
         {currentView === 'messages' && user && activeBuildingId && !maidSession && (
           <MessagesPage

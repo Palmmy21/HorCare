@@ -80,6 +80,19 @@ export async function recordInbound(
     return { recorded: true, shouldAck };
 }
 
+/**
+ * Store an automatic answer in the thread so the property sees what the bot told the tenant.
+ * Unlike a staff reply it leaves the unread count alone: a person may still want to follow up.
+ */
+export async function recordBotReply(lineUserId: string, text: string): Promise<void> {
+    const link = await getTenantLink(lineUserId);
+    if (!link) return;
+    const ref = db.doc(threadPath(link.uid, link.building_id, lineUserId));
+    const now = new Date().toISOString();
+    const msg: LineMessage = { id: randomUUID(), direction: 'out', kind: 'text', text: text.slice(0, MAX_OUTGOING_CHARS), at: now, by: 'ตอบอัตโนมัติ' };
+    await db.doc(`${ref.path}/messages/${msg.id}`).set(msg);
+    await ref.update({ last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out' });
+}
 interface Body {
     action?: 'send' | 'mark_read' | 'media';
     message_id?: string;
