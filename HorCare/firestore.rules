@@ -214,6 +214,17 @@ service cloud.firestore {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.read');
           allow write: if false;
         }
+        // ── LINE inbox: tenant conversations. Written by the LINE webhook and /api/line-inbox only.
+        // Reading needs message.read on THIS property.
+        match /line_threads/{lineUserId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'message.read');
+          allow write: if false;
+
+          match /messages/{messageId} {
+            allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'message.read');
+            allow write: if false;
+          }
+        }
         // In-app notification records produced by the central notification service.
         match /notifications/{notificationId} {
           allow read: if isOwner(userId) && isNotBanned();

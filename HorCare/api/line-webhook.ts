@@ -3,6 +3,7 @@ import { db, admin } from './_firebase.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
+import { recordInbound } from './_line-inbox.js';
 
 export const config = {
     api: {
@@ -95,6 +96,12 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
         return;
     }
 
+    // Stickers carry no command but are still part of the conversation in the HorCare inbox.
+    if (event.message?.type === 'sticker') {
+        await recordInbound(lineUserId, { kind: 'sticker', text: '[สติกเกอร์]' }).catch(() => undefined);
+        return;
+    }
+
     if (event.message?.type !== 'text') return;
     const text: string = event.message.text?.trim() ?? '';
 
@@ -183,8 +190,25 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
     }
 
     // ── 6. Default ─────────────────────────────────────────────────
+    // Free text from a registered tenant is a message for the property: it goes to the
+    // HorCare inbox, and the tenant gets one short acknowledgement (throttled to once per
+    // few hours so a chatty conversation isn't answered by a bot every time).
+    const inbound = await recordInbound(lineUserId, { kind: 'text', text }).catch(err => {
+        console.error('recordInbound failed:', (err as Error).message);
+        return { recorded: false, shouldAck: false };
+    });
+    if (inbound.recorded) {
+        if (inbound.shouldAck) {
+            await lineReply(replyToken, [{
+                type: 'text',
+                text: 'ได้รับข้อความแล้วค่ะ 🙏 เจ้าของหอจะตอบกลับโดยเร็วที่สุด\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลยนะคะ',
+            }]);
+        }
+        return;
+    }
     const isRegistered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
     if (isRegistered) {
+        // Registered, but the message couldn't be stored — keep the old helpful reply.
         await lineReply(replyToken, [{
             type: 'text',
             text: 'สวัสดีค่ะ 😊\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุด',

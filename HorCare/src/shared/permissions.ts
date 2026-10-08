@@ -30,6 +30,8 @@ export const PERMISSIONS = [
   'parcel.read', 'parcel.create', 'parcel.update',
   'shop.read', 'shop.update',
   'visitor.read', 'visitor.create',
+  /** LINE inbox: read tenant conversations / reply as the property. */
+  'message.read', 'message.send',
   'audit_log.read',
   'member.read', 'member.manage',
 ] as const;
@@ -49,6 +51,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'room.read', 'tenant.read', 'invitation.read', 'invitation.create', 'meter.read',
     'payment.create', 'parcel.read', 'parcel.create', 'parcel.update',
     'work_order.read', 'work_order.create', 'visitor.read', 'visitor.create',
+    'message.read', 'message.send',
   ],
   technician: ['room.read', 'meter.read', 'work_order.read', 'work_order.update'],
   housekeeping: ['room.read', 'work_order.read', 'work_order.update'],

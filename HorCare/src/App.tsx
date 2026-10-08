@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
+import { useLineThreads } from './hooks/useLineThreads';
 import { useFCMToken } from './hooks/useFCMToken';
 import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
@@ -40,6 +41,7 @@ const OperationsPage  = lazy(() => import('./components/Operations/OperationsPag
 const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
 const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
+const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
 
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
@@ -71,7 +73,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -351,6 +353,10 @@ function App() {
   // Payment slip badge — bills waiting for owner confirmation
   const pendingSlipCount = bills.filter(b => b.payment_status === 'pending').length;
 
+  // LINE inbox — live conversations (shared with the Messages page) and the unread badge
+  const { threads: lineThreads, unreadTotal: unreadMessages, loading: threadsLoading, error: threadsError } =
+    useLineThreads(maidSession ? null : (user?.uid ?? null), maidSession ? null : activeBuildingId);
+
   // Stock badge — real-time count of items below minimum quantity
   const { items: _stockItems } = useStockItems(effectiveUid, effectiveBuildingId);
   const lowStockCount = _stockItems.filter(
@@ -383,6 +389,7 @@ function App() {
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
     { id: 'workorders'  as ViewMode, icon: ClipboardCheck,  label: 'ใบงานช่าง/แม่บ้าน' },
+    { id: 'messages'    as ViewMode, icon: MessageSquare,   label: 'ข้อความ LINE' },
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
 
     { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
@@ -1055,12 +1062,14 @@ function App() {
                 (item.id === 'cleaning' && pendingCleaningCount > 0) ||
                 (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
                 (item.id === 'operations' && lowStockCount > 0) ||
-                (item.id === 'payments' && pendingSlipCount > 0)
+                (item.id === 'payments' && pendingSlipCount > 0) ||
+                (item.id === 'messages' && unreadMessages > 0)
               )
             );
             const badgeCount = item.id === 'cleaning' ? pendingCleaningCount
               : item.id === 'maintenance' ? pendingMaintenanceCount
               : item.id === 'payments' ? pendingSlipCount
+              : item.id === 'messages' ? unreadMessages
               : lowStockCount;
             return (
               <button
@@ -1506,6 +1515,17 @@ function App() {
         )}
 
 
+
+        {currentView === 'messages' && user && activeBuildingId && !maidSession && (
+          <MessagesPage
+            ownerUid={user.uid}
+            buildingId={activeBuildingId}
+            unitName={terms.unitName}
+            threads={lineThreads}
+            loading={threadsLoading}
+            error={threadsError}
+          />
+        )}
 
         {currentView === 'workorders' && user && activeBuildingId && !maidSession && (
           <WorkOrdersPage
