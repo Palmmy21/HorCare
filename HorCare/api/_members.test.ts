@@ -9,7 +9,7 @@ import { permissionsForRole } from '../src/shared/permissions.js';
 const OWNER = 'owner-1';
 
 async function call(uid: string | undefined, body: Record<string, unknown>) {
-    const res = fakeRes();
+    const res = fakeRes() as { statusCode: number; body: any };
     await handler(fakeReq({ owner_uid: OWNER, ...body }, uid), res as never);
     return res;
 }

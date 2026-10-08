@@ -404,6 +404,23 @@ describe('snapshot', () => {
     });
 });
 
+describe('finance series', () => {
+    it('gives the owner 13 months of charges and receipts without personal details, and open charges from any age', async () => {
+        await stayRate(1000);
+        const id = (await book({ check_in: d(2), check_out: d(3), guest_phone: '0812345678' })).body.booking.charge_id;
+        await call(OWNER, { action: 'charge_pay', charge_id: id, method: 'cash', amount: 400 });
+        sb.seed('charges', { id: 'ancient', owner_uid: OWNER, building_id: B1, kind: 'extra', party_name: 'ค้างนาน', period_start: '2024-01-01', period_end: '2024-01-01', amount_satang: 500, dedupe_key: 'extra:ancient' });
+        const r = await call('fin', { action: 'finance_series' });
+        expect(r.statusCode).toBe(200);
+        expect(r.body.charges.map((c: { id: string }) => c.id)).toContain('ancient');
+        expect(r.body.charges.find((c: { id: string }) => c.id === id)).toMatchObject({ amount_satang: 100000, paid_satang: 40000 });
+        expect(JSON.stringify(r.body)).not.toContain('0812345678');
+        expect(r.body.payments).toEqual([expect.objectContaining({ amount_satang: 40000, method: 'cash' })]);
+        expect((await call('tech', { action: 'finance_series' })).statusCode).toBe(403);
+        expect((await call(OWNER, { action: 'finance_series' }, B2)).body.charges).toEqual([]);
+    });
+});
+
 describe('the books', () => {
     const ledger = () => {
         const l = emptyLedger('L1');

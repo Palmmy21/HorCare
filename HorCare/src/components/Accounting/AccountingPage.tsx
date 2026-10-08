@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { BookOpenCheck, FileSpreadsheet, Settings2, Wallet } from 'lucide-react';
+import { BarChart3, BookOpenCheck, FileSpreadsheet, Settings2, Wallet } from 'lucide-react';
 import type { Building } from '../../types';
 import { useMangoProfiles } from '../../hooks/useAccountingData';
 import MangoExportTab from './MangoExportTab';
 import MangoSettingsTab from './MangoSettingsTab';
 import RecordPaymentTab from './RecordPaymentTab';
+import FinanceOverviewTab from './FinanceOverviewTab';
 
-type Tab = 'export' | 'settings' | 'payment';
+type Tab = 'overview' | 'export' | 'settings' | 'payment';
 
 export default function AccountingPage({ ownerUid, buildings }: { ownerUid: string; buildings: Building[] }) {
     const { profiles, loading, error } = useMangoProfiles(ownerUid);
-    const [tab, setTab] = useState<Tab>('export');
+    const [tab, setTab] = useState<Tab>('overview');
     const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+        { id: 'overview', label: 'ภาพรวมการเงิน (กราฟ)', icon: BarChart3 },
         { id: 'export', label: 'ส่งออก Mango', icon: FileSpreadsheet },
         { id: 'settings', label: 'ตั้งค่า Mango', icon: Settings2 },
         { id: 'payment', label: 'บันทึกรับชำระแบบตัดหลายบิล', icon: Wallet },
@@ -34,6 +36,7 @@ export default function AccountingPage({ ownerUid, buildings }: { ownerUid: stri
                 ))}
             </div>
             {error && <div style={{ color: '#B91C1C' }}>คุณไม่มีสิทธิ์ดูข้อมูลบัญชี หรือโหลดไม่สำเร็จ</div>}
+            {tab === 'overview' && <FinanceOverviewTab ownerUid={ownerUid} buildings={buildings} />}
             {!loading && tab === 'export' && <MangoExportTab ownerUid={ownerUid} profiles={profiles} />}
             {!loading && tab === 'settings' && <MangoSettingsTab ownerUid={ownerUid} buildings={buildings} profiles={profiles} />}
             {tab === 'payment' && <RecordPaymentTab ownerUid={ownerUid} buildings={buildings} />}

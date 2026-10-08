@@ -6,7 +6,7 @@
  * Firestore, where they still live. The server is the only one that prices things: stay totals and stall charges are
  * computed here from the rates and plans, never taken from the browser (a manager may override a stay total).
  *
- * read:    snapshot | quote
+ * read:    snapshot | quote | finance_series (13 months of charges and receipts, for the owner's charts)
  * manage:  rate_save | plan_save | plan_end | charge_extra | charge_void | week_generate
  * collect: stall_charge | stall_attendance | walk_in_charge | charge_pay | charge_slip
  * booking: booking_create | booking_status | booking_cancel
@@ -38,10 +38,10 @@ export const config = { maxDuration: 60 };
 type Action =
     | 'snapshot' | 'quote' | 'rate_save' | 'plan_save' | 'plan_end' | 'charge_extra' | 'charge_void' | 'week_generate'
     | 'stall_charge' | 'stall_attendance' | 'walk_in_charge' | 'charge_pay' | 'charge_slip'
-    | 'booking_create' | 'booking_status' | 'booking_cancel' | 'day_close';
+    | 'booking_create' | 'booking_status' | 'booking_cancel' | 'day_close' | 'finance_series';
 
 const PERMISSION: Record<Action, Permission> = {
-    snapshot: 'collections.read', quote: 'booking.read',
+    snapshot: 'collections.read', quote: 'booking.read', finance_series: 'collections.read',
     rate_save: 'collections.manage', plan_save: 'collections.manage', plan_end: 'collections.manage', charge_extra: 'collections.manage',
     charge_void: 'collections.manage', week_generate: 'collections.collect',
     stall_charge: 'collections.collect', stall_attendance: 'collections.collect', walk_in_charge: 'collections.collect',
@@ -189,6 +189,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 rooms: roomList.filter(r => r.is_active), closures: closureList.filter(c => c.status === 'active' && c.from_date <= to && c.to_date >= from),
                 rates: rateList, plans, bookings, charges, payments, attendance, day_closes: closes,
             });
+            return;
+        }
+
+        // ── finance_series: what the owner's charts are drawn from ───────────────
+        if (action === 'finance_series') {
+            const months = Math.min(24, Math.max(1, Number.isInteger(body.months) ? (body.months as number) : 13));
+            const [y, m] = today.slice(0, 7).split('-').map(Number);
+            const idx = y * 12 + (m - 1) - (months - 1);
+            const from = `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}-01`;
+            const mine = (t: string) => sb.from(t).select('*').eq('owner_uid', owner).eq('building_id', buildingId);
+            const [recent, open, pays] = await Promise.all([
+                mine('charges').gte('period_start', from).limit(20000),
+                mine('charges').eq('status', 'open').limit(5000),
+                mine('charge_payments').gte('received_at', `${addDays(from, -1)}T00:00:00Z`).limit(50000),
+            ]);
+            for (const r of [recent, open, pays]) if (r.error) fail(r.error);
+            const byId = new Map<string, Charge>();
+            for (const c of [...(recent.data ?? []), ...(open.data ?? [])] as Charge[]) byId.set(c.id, c);
+            const trim = (c: Charge) => ({ id: c.id, kind: c.kind, room_number: c.room_number, party_name: c.party_name, period_start: c.period_start, period_end: c.period_end, amount_satang: c.amount_satang, paid_satang: c.paid_satang, status: c.status });
+            res.status(200).json({ from, charges: [...byId.values()].map(trim), payments: ((pays.data ?? []) as ChargePayment[]).map(p => ({ amount_satang: p.amount_satang, method: p.method, received_at: p.received_at })) });
             return;
         }
 
