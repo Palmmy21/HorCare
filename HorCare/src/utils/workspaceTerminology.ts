@@ -40,6 +40,8 @@ export interface WorkspaceTerms {
   // Booleans
   isMarket: boolean;
   isCommercial: boolean;
+  /** Meter reading + utility bills. Off for hotels/resorts: the room price is all-in, collected per stay. */
+  usesMeters: boolean;
   buildingType: DormConfig['building_type'];
 }
 
@@ -50,6 +52,60 @@ export const DEFAULT_MARKET_ZONES = [
   'โซน D (เครื่องดื่ม เบเกอรี่ คาเฟ่)',
   'โซน E (เปิดท้าย ลานโปรโมชัน)',
 ];
+
+/** Asset type as the owner names it (branch cards, headers). */
+export const BUILDING_TYPE_LABELS: Record<DormConfig['building_type'], string> = {
+  dormitory: 'หอพัก', market: 'ตลาด / แผงค้า', commercial: 'อาคารพาณิชย์', apartment: 'อพาร์ตเมนต์',
+  condo: 'คอนโดมิเนียม', house: 'บ้านเช่า / ทาวน์โฮม', resort: 'รีสอร์ท', hotel: 'โรงแรม', office: 'ออฟฟิศ', other: 'อื่น ๆ',
+};
+
+/** The collection style a building type starts with; the owner can still change it. */
+export function defaultCollectionStyle(type: string | undefined): 'monthly' | 'nightly' | 'stall' {
+  if (type === 'resort' || type === 'hotel') return 'nightly';
+  if (type === 'market') return 'stall';
+  return 'monthly';
+}
+
+type RentType = 'monthly' | 'semester' | 'yearly' | 'daily' | 'weekly';
+type BuildingKind = DormConfig['building_type'] | undefined;
+
+/** The rent cycle a new room/stall starts with. Hotels/resorts price per night, markets collect per day or week, the rest monthly. */
+export function defaultRentType(type: BuildingKind, marketCycle?: 'daily' | 'weekly' | 'monthly'): RentType {
+  if (type === 'resort' || type === 'hotel') return 'daily';
+  if (type === 'market') return marketCycle ?? 'daily';
+  return 'monthly';
+}
+
+/** How a rent cycle is worded in this workspace (a hotel has "per night", a market "collected as scheduled" - never "monthly"). */
+export function rentTypeLabel(rentType: RentType | undefined, type: BuildingKind): string {
+  const r = rentType ?? 'monthly';
+  if (type === 'resort' || type === 'hotel') {
+    return { daily: 'ต่อคืน', weekly: 'รายสัปดาห์', monthly: 'พักรายเดือน', semester: 'รายเทอม', yearly: 'รายปี' }[r];
+  }
+  if (type === 'market') {
+    return { daily: 'เก็บรายวัน', weekly: 'เก็บรายสัปดาห์', monthly: 'เก็บตามกำหนด', semester: 'เก็บตามกำหนด', yearly: 'เก็บตามกำหนด' }[r];
+  }
+  return { daily: 'รายวัน', weekly: 'รายสัปดาห์', monthly: 'รายเดือน', semester: 'รายเทอม', yearly: 'รายปี' }[r];
+}
+
+/** Cycles offered when creating/editing a room in this workspace, most relevant first. */
+export function rentTypeOptions(type: BuildingKind): { value: RentType; label: string }[] {
+  const order: RentType[] = type === 'resort' || type === 'hotel' ? ['daily', 'weekly', 'monthly']
+    : type === 'market' ? ['daily', 'weekly', 'monthly']
+    : ['monthly', 'daily', 'weekly', 'semester', 'yearly'];
+  return order.map(value => ({ value, label: rentTypeLabel(value, type) }));
+}
+
+/** Unit the room price is quoted per ("บาท/คืน"). */
+export function rentUnitLabel(rentType: RentType | undefined, type: BuildingKind): string {
+  const r = rentType ?? 'monthly';
+  if (r === 'daily') return type === 'resort' || type === 'hotel' ? 'คืน' : 'วัน';
+  return { weekly: 'สัปดาห์', monthly: 'เดือน', semester: 'เทอม', yearly: 'ปี' }[r];
+}
+/** How a property collects money: its saved choice, else what its building type starts with. */
+export function collectionStyleOf(config: Pick<DormConfig, 'building_type' | 'collection_style'> | undefined): 'monthly' | 'nightly' | 'stall' {
+  return config?.collection_style ?? defaultCollectionStyle(config?.building_type);
+}
 
 export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): WorkspaceTerms {
   const type = buildingType || 'dormitory';
@@ -89,6 +145,7 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
       isMarket: true,
       isCommercial: true,
+      usesMeters: true,
       buildingType: type,
     };
   }
@@ -128,6 +185,7 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
       isMarket: false,
       isCommercial: true,
+      usesMeters: true,
       buildingType: type,
     };
   }
@@ -167,6 +225,7 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
     isMarket: false,
     isCommercial: ['resort', 'hotel', 'office'].includes(type),
+    usesMeters: !['resort', 'hotel'].includes(type),
     buildingType: type,
   };
 }

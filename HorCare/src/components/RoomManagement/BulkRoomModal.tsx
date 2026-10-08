@@ -6,6 +6,7 @@ import {
     buildRoomNumbers, findDuplicates, validatePattern, MAX_BULK_ROOMS, type PatternError,
 } from '../../utils/bulkRooms';
 import { BUILTIN_AMENITIES } from '../../utils/amenities';
+import { defaultRentType, getWorkspaceTerms, rentTypeOptions, rentUnitLabel } from '../../utils/workspaceTerminology';
 
 interface BulkRoomModalProps {
     existingRooms: Room[];
@@ -37,6 +38,8 @@ export default function BulkRoomModal({
     const [roomType, setRoomType] = useState<'dormitory' | 'commercial'>(
         config.building_type === 'commercial' ? 'commercial' : 'dormitory',
     );
+    const terms = getWorkspaceTerms(config.building_type);
+    const [rentType, setRentType] = useState<Room['rent_type']>(defaultRentType(config.building_type, config.market_config?.default_rent_cycle));
     const [rent, setRent] = useState(String(config.room_rent ?? 0));
     const [deposit, setDeposit] = useState('');
     const [elecRate, setElecRate] = useState('');
@@ -85,13 +88,13 @@ export default function BulkRoomModal({
                 room_number: n,
                 room_type: roomType,
                 rent_amount: Number(rent) || 0,
-                rent_type: 'monthly',
+                rent_type: rentType,
                 room_status: status,
                 ...(buildingName.trim() ? { building_name: buildingName.trim() } : {}),
                 ...(floor.trim() ? { floor: floor.trim() } : {}),
                 ...(deposit !== '' ? { deposit_amount: Number(deposit) || 0 } : {}),
-                ...(elecRate !== '' ? { custom_electricity_rate: Number(elecRate) || 0 } : {}),
-                ...(waterRate !== '' ? { custom_water_config: { type: 'normal' as const, unit_rate: Number(waterRate) || 0 } } : {}),
+                ...(terms.usesMeters && elecRate !== '' ? { custom_electricity_rate: Number(elecRate) || 0 } : {}),
+                ...(terms.usesMeters && waterRate !== '' ? { custom_water_config: { type: 'normal' as const, unit_rate: Number(waterRate) || 0 } } : {}),
                 ...(amenities.size > 0 ? { amenities: [...amenities] } : {}),
             }));
             const { created } = await onCreate(rooms);
@@ -210,25 +213,31 @@ export default function BulkRoomModal({
                         <div className="form-label" style={{ marginBottom: '0.5rem', fontWeight: 700 }}>ราคา</div>
                         <div style={grid}>
                             <label style={field}>
-                                <span className="form-label">ค่าเช่า/เดือน (฿)</span>
+                                <span className="form-label">รูปแบบการเก็บเงิน</span>
+                                <select className="form-input" value={rentType} onChange={e => setRentType(e.target.value as Room['rent_type'])}>
+                                    {rentTypeOptions(config.building_type).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                </select>
+                            </label>
+                            <label style={field}>
+                                <span className="form-label">{terms.isMarket ? 'ค่าเช่าแผง' : terms.usesMeters ? 'ค่าเช่า' : 'ราคาห้อง'}/{rentUnitLabel(rentType, config.building_type)} (฿)</span>
                                 <input className="form-input mono" inputMode="decimal" value={rent} onChange={e => setRent(e.target.value)} />
                             </label>
                             <label style={field}>
                                 <span className="form-label">เงินมัดจำ (฿)</span>
                                 <input className="form-input mono" inputMode="decimal" value={deposit} onChange={e => setDeposit(e.target.value)} />
                             </label>
-                            <label style={field}>
+                            {terms.usesMeters && <label style={field}>
                                 <span className="form-label">ค่าไฟ/หน่วย (฿)</span>
                                 <input className="form-input mono" inputMode="decimal" placeholder={`ค่าเริ่มต้น ${config.electricity_rate}`} value={elecRate} onChange={e => setElecRate(e.target.value)} />
-                            </label>
-                            <label style={field}>
+                            </label>}
+                            {terms.usesMeters && <label style={field}>
                                 <span className="form-label">ค่าน้ำ/หน่วย (฿)</span>
                                 <input className="form-input mono" inputMode="decimal" placeholder="ใช้ค่าเริ่มต้น" value={waterRate} onChange={e => setWaterRate(e.target.value)} />
-                            </label>
+                            </label>}
                         </div>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', margin: '0.375rem 0 0' }}>
+                        {terms.usesMeters && <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', margin: '0.375rem 0 0' }}>
                             เว้นว่างค่าไฟ/ค่าน้ำเพื่อใช้อัตราเริ่มต้นของสถานที่
-                        </p>
+                        </p>}
                     </section>
 
                     <section>

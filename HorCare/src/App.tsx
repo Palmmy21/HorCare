@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, LayoutGrid,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, LayoutGrid, Wallet,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -14,7 +14,7 @@ import { useFCMToken } from './hooks/useFCMToken';
 import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
-import { getWorkspaceTerms } from './utils/workspaceTerminology';
+import { collectionStyleOf, getWorkspaceTerms } from './utils/workspaceTerminology';
 import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
@@ -47,6 +47,7 @@ const MarketPage = lazy(() => import('./components/Market/MarketPage'));
 const AccountingPage = lazy(() => import('./components/Accounting/AccountingPage'));
 const LedgerPage = lazy(() => import('./components/Ledger/LedgerPage'));
 const LeasingPage = lazy(() => import('./components/Leasing/LeasingPage'));
+const CollectionsPage = lazy(() => import('./components/Collections/CollectionsPage'));
 const ModulesHome = lazy(() => import('./components/Modules/ModulesHome'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
@@ -81,7 +82,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'modules' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'modules' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -388,11 +389,13 @@ function App() {
   const stats = getMonthStats(currentMonth);
   const monthBills = getBillsForMonth(currentMonth);
   const terms = getWorkspaceTerms(config?.building_type);
+  const collectionStyle = collectionStyleOf(config);
 
   const navItems = [
     { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'rooms'       as ViewMode, icon: terms.isMarket ? Store : Home, label: terms.manageUnitsLabel || 'จัดการห้อง' },
-    { id: 'recording'   as ViewMode, icon: FileText,        label: terms.meterRecordingLabel || 'จดมิเตอร์' },
+    ...(collectionStyle !== 'monthly' ? [{ id: 'collections' as ViewMode, icon: Wallet, label: collectionStyle === 'stall' ? 'เก็บเงินแผง' : 'เก็บค่าห้อง' }] : []),
+    ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
     { id: 'tenants'     as ViewMode, icon: Users,           label: terms.tenantLabel || 'ผู้เช่า' },
     { id: 'maintenance' as ViewMode, icon: Wrench,          label: 'แจ้งซ่อม' },
     { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
@@ -418,7 +421,7 @@ function App() {
   const visibleNavItems = maidSession
     ? [
         { id: 'cleaning' as ViewMode, icon: Sparkles, label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
-        { id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' },
+        ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
       ]
     : navItems;
 
@@ -1620,6 +1623,9 @@ function App() {
 
         {currentView === 'leasing' && user && activeBuildingId && !maidSession && (
           <LeasingPage ownerUid={user.uid} buildingId={activeBuildingId} />
+        )}
+        {currentView === 'collections' && user && activeBuildingId && !maidSession && collectionStyle !== 'monthly' && (
+          <CollectionsPage ownerUid={user.uid} buildingId={activeBuildingId} style={collectionStyle} />
         )}
         {currentView === 'modules' && !maidSession && (
           <ModulesHome isMarket={terms.isMarket} available={new Set(visibleNavItems.map(i => i.id))} onOpen={view => setCurrentView(view as ViewMode)} />

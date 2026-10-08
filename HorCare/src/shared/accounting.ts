@@ -29,15 +29,16 @@ export function monthEnd(month: string): string {
 
 // ── Source documents ────────────────────────────────────────────────────────
 
-export const REVENUE_CATEGORIES = ['rent', 'electric', 'water', 'common_fee', 'fine'] as const;
+export const REVENUE_CATEGORIES = ['rent', 'electric', 'water', 'common_fee', 'fine', 'stay', 'stall', 'walk_in', 'other_income'] as const;
 export type RevenueCategory = (typeof REVENUE_CATEGORIES)[number];
 export const REVENUE_CATEGORY_LABELS_TH: Record<RevenueCategory, string> = {
   rent: 'ค่าเช่า', electric: 'ค่าไฟ', water: 'ค่าน้ำ', common_fee: 'ค่าส่วนกลาง/บริการ', fine: 'ค่าปรับ',
+  stay: 'ค่าห้องพักรายคืน', stall: 'ค่าเช่าแผง (รายวัน/สัปดาห์)', walk_in: 'ค่าแผงขาจร', other_income: 'รายได้อื่น',
 };
 
-/** A bill or fine, reduced to what accounting needs. */
+/** A bill, a fine or a daily/weekly collection charge (stay, stall week/day, walk-in), reduced to what accounting needs. */
 export interface ReceivableDoc {
-  kind: 'bill' | 'fine';
+  kind: 'bill' | 'fine' | 'charge';
   id: string;
   room_id: string;
   room_number: string;
@@ -69,7 +70,7 @@ export interface PaymentRec {
   gross_satang: number;
   verification: 'unverified' | 'verified' | 'rejected' | 'n/a';
   status: 'active' | 'void';
-  allocations: { target_kind: 'bill' | 'fine'; target_id: string; amount_satang: number }[];
+  allocations: { target_kind: 'bill' | 'fine' | 'charge'; target_id: string; amount_satang: number }[];
   revision: string;
 }
 
@@ -188,15 +189,15 @@ export interface Voucher {
   lines: JournalLine[];
   total_dr_satang: number;
   total_cr_satang: number;
-  sources: { kind: 'bill' | 'fine' | 'payment'; id: string; revision: string }[];
+  sources: { kind: 'bill' | 'fine' | 'charge' | 'payment'; id: string; revision: string }[];
 }
 
 export interface Problem {
   code: string;
   message: string;
-  source: { kind: 'bill' | 'fine' | 'payment'; id: string; label: string };
+  source: { kind: 'bill' | 'fine' | 'charge' | 'payment'; id: string; label: string };
 }
-export interface Excluded { source: { kind: 'bill' | 'fine' | 'payment'; id: string; label: string }; reason: string }
+export interface Excluded { source: { kind: 'bill' | 'fine' | 'charge' | 'payment'; id: string; label: string }; reason: string }
 
 export interface PostingResult { vouchers: Voucher[]; problems: Problem[]; excluded: Excluded[] }
 
@@ -239,10 +240,11 @@ export interface PostingInput {
   exported: Map<string, string>;
 }
 
-const label = (d: ReceivableDoc) => `${d.kind === 'bill' ? 'บิล' : 'ค่าปรับ'} ${d.room_number} ${d.period}`;
+const label = (d: ReceivableDoc) => `${d.kind === 'bill' ? 'บิล' : d.kind === 'charge' ? 'ค่าเก็บรายวัน/สัปดาห์' : 'ค่าปรับ'} ${d.room_number} ${d.period}`;
 
 export function docRef(d: ReceivableDoc): string {
   const prefix = d.property_code ? `${d.property_code}-` : '';
+  if (d.kind === 'charge') return `IVC-${prefix}${d.id.slice(0, 8).toUpperCase()}`;
   return d.kind === 'bill' ? `IV-${prefix}${d.room_number}-${d.period}` : `IVF-${prefix}${d.room_number}-${d.id.slice(0, 6).toUpperCase()}`;
 }
 export const receiptRef = (paymentId: string) => `RC-${paymentId.slice(0, 8).toUpperCase()}`;

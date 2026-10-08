@@ -14,7 +14,7 @@ import { authorize, buildingExists, type AuthContext } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { loadBuilding } from './_accounting-data.js';
 import {
-    buildVouchers, sumCr, sumDr, thDate, toSatang, type PostingResult, type VoucherKind,
+    buildVouchers, REVENUE_CATEGORIES, sumCr, sumDr, thDate, toSatang, type PostingResult, type VoucherKind,
 } from '../src/shared/accounting.js';
 import {
     ACCOUNT_TYPES, isLocked, ledgerGaps, MAX_MEMO, postedSources, postingProfile, reversalLines, validateChart, validateEntryLines, voucherToLines,
@@ -79,7 +79,7 @@ export function cleanLedger(raw: unknown, id: string): Ledger | null {
     if (ar === null) return null;
     const rev: Ledger['posting']['revenue_accounts'] = {};
     for (const [k, v] of Object.entries(p.revenue_accounts ?? {})) {
-        if (!['rent', 'electric', 'water', 'common_fee', 'fine'].includes(k)) return null;
+        if (!(REVENUE_CATEGORIES as readonly string[]).includes(k)) return null;
         const c = str(v, 20); if (c === null) return null; if (c) rev[k as keyof typeof rev] = c;
     }
     const channels: Record<string, string> = {};

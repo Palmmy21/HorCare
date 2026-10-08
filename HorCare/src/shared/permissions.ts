@@ -52,6 +52,18 @@ export const PERMISSIONS = [
   'leasing.read',
   /** Leasing: manage leads, reserve rooms, sign / renew / end leases. */
   'leasing.manage',
+  /** Collections: see the collector's round, rates, stall plans and day totals. */
+  'collections.read',
+  /** Collections: take money in the field (cash / transfer), mark a stall absent. */
+  'collections.collect',
+  /** Collections: set rates and stall plans, void a charge, add extra charges. */
+  'collections.manage',
+  /** Collections: close the day's cash (counted vs expected). */
+  'collections.close',
+  /** Bookings (hotel / resort): view the calendar. */
+  'booking.read',
+  /** Bookings: create, check in / out, cancel. */
+  'booking.manage',
   'audit_log.read',
   'member.read', 'member.manage',
 ] as const;
@@ -66,18 +78,20 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   finance: [
     'room.read', 'tenant.read', 'finance.read', 'meter.read',
     'payment.create', 'payment.update', 'payment.reconcile', 'contract.read', 'accounting.export', 'ledger.read', 'ledger.post', 'leasing.read',
+    'collections.read', 'collections.close', 'booking.read',
   ],
   front_desk: [
     'room.read', 'tenant.read', 'invitation.read', 'invitation.create', 'meter.read',
     'payment.create', 'parcel.read', 'parcel.create', 'parcel.update',
     'work_order.read', 'work_order.create', 'visitor.read', 'visitor.create',
     'message.read', 'message.send', 'announcement.manage', 'leasing.read', 'leasing.manage',
+    'collections.read', 'collections.collect', 'booking.read', 'booking.manage',
   ],
   technician: ['room.read', 'meter.read', 'work_order.read', 'work_order.update'],
   housekeeping: ['room.read', 'work_order.read', 'work_order.update'],
   market_admin: [
     'room.read', 'room.update', 'tenant.read', 'shop.read', 'shop.update',
-    'visitor.read', 'visitor.create',
+    'visitor.read', 'visitor.create', 'collections.read', 'collections.collect',
   ],
   shop_owner: ['shop.read'],
   tenant: [],

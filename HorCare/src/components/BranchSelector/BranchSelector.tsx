@@ -1,6 +1,7 @@
 import { Building2, Store, Plus } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
 import type { Building } from '../../types';
+import { BUILDING_TYPE_LABELS } from '../../utils/workspaceTerminology';
 import './BranchSelector.css';
 
 interface BranchSelectorProps {
@@ -51,22 +52,14 @@ export default function BranchSelector({
                   )}
                 </div>
                 <div className="branch-card-content">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', justifyContent: 'center' }}>
-                    <h3>{b.name}</h3>
-                    {isMarket && (
-                      <span style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        background: '#FEF3C7',
-                        color: '#B45309',
-                        padding: '0.1rem 0.4rem',
-                        borderRadius: '999px',
-                        border: '1px solid #FDE68A',
-                      }}>
-                        ตลาด
-                      </span>
-                    )}
-                  </div>
+                  <h3>{b.name}</h3>
+                  <span style={{
+                    display: 'inline-block', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.6rem', borderRadius: '999px',
+                    background: isMarket ? '#FEF3C7' : '#E0F2FE', color: isMarket ? '#B45309' : '#0369A1',
+                    border: isMarket ? '1px solid #FDE68A' : '1px solid #BAE6FD', margin: '0.25rem 0 0.375rem',
+                  }}>
+                    {BUILDING_TYPE_LABELS[b.building_type ?? 'dormitory'] ?? 'หอพัก'}
+                  </span>
                   <span>เข้าสู่ระบบจัดการ &rarr;</span>
                 </div>
               </button>

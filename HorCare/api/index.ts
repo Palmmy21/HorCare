@@ -55,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'accounting': return (await import('./_accounting.js')).default(req, res);
         case 'ledger': return (await import('./_ledger.js')).default(req, res);
         case 'leasing': return (await import('./_leasing.js')).default(req, res);
+        case 'collections': return (await import('./_collections.js')).default(req, res);
         case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
         case 'qr': return qrHandler(req, res);

@@ -99,7 +99,11 @@ export interface MarketConfig {
   zones?: string[];                  // รายชื่อโซนตลาด e.g. ['โซน A (อาหาร)', 'โซน B (ของสด)']
 }
 
+/** How this property collects money: monthly bills, nightly stays (hotel/resort), or market stalls (weekly in advance / daily as they trade). */
+export type CollectionStyle = 'monthly' | 'nightly' | 'stall';
+
 export interface DormConfig {
+  collection_style?: CollectionStyle;
   building_type: 'dormitory' | 'commercial' | 'resort' | 'hotel' | 'apartment' | 'condo' | 'house' | 'office' | 'market' | 'other';
   electricity_rate: number;
   water_config: WaterConfig; // Default for dormitory rooms

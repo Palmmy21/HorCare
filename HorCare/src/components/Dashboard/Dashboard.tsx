@@ -347,7 +347,7 @@ export default function Dashboard({
             )}
 
             {/* ── Progress Bar ── */}
-            {isEnabled('progress') && (
+            {isEnabled('progress') && terms.usesMeters && (
                 <div className="card mb-6">
                     <div className="progress-container">
                         <div className="progress-header">
