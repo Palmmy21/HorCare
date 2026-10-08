@@ -4477,3 +4477,46 @@ html.dark .btn-meter-photo:hover {
   margin-bottom: 0.25rem;
 }
 
+/* ===== Sidebar categories ===== */
+.nav-group { display: flex; flex-direction: column; gap: 0.125rem; }
+
+.nav-group-header {
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  opacity: 0.95;
+}
+
+.nav-group-header.has-active { background: rgba(255, 255, 255, 0.12); }
+
+.nav-subitems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin: 0.125rem 0 0.375rem 1.1rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.nav-subitem { padding: 0.5rem 0.75rem; font-size: 0.84rem; }
+
+/* Icon-only rail: category names are hidden, so categories are separated by a thin line instead of repeating an icon
+   per category; every page keeps its own icon and a tooltip with its name. */
+.sidebar.collapsed .nav-group-header { display: none; }
+.sidebar.collapsed .nav-subitems { margin: 0; padding: 0; border-left: none; }
+.sidebar.collapsed .nav-subitem { padding: var(--space-3); }
+.sidebar.collapsed .nav-group + .nav-group,
+.sidebar.collapsed .nav-group + .nav-item,
+.sidebar.collapsed .nav-item + .nav-group {
+  margin-top: 0.375rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Phone: roomy touch targets in the drawer, and the drawer never covers more than the screen */
+@media (max-width: 768px) {
+  .sidebar { width: min(300px, 86vw); left: max(-300px, -86vw); height: 100dvh; overflow: hidden; }
+  .sidebar.open { left: 0; }
+  .nav-item { min-height: 44px; }
+  .nav-subitem { min-height: 44px; }
+}

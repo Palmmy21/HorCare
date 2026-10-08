@@ -101,9 +101,18 @@ function App() {
     try { return parseSavedState(localStorage.getItem('horcare_nav_groups_v1')); } catch { return {}; }
   });
   const [transientClose, setTransientClose] = useState<TransientClose | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+  const [sidebarCollapsedPref, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('horcare_sidebar_collapsed') === 'true';
   });
+  // On a phone the menu is a full-width drawer: the icon-only rail is a desktop/tablet choice.
+  const [isNarrow, setIsNarrow] = useState(() => window.matchMedia('(max-width: 768px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 768px)');
+    const onChange = () => setIsNarrow(media.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+  const sidebarCollapsed = sidebarCollapsedPref && !isNarrow;
 
   const handleToggleSidebar = () => {
     if (window.innerWidth <= 768) {
@@ -498,6 +507,9 @@ function App() {
         key={item.id}
         className={`nav-item ${nested ? 'nav-subitem' : ''} ${currentView === item.id ? 'active' : ''} ${isLocked ? 'nav-item-locked' : ''}`}
         onClick={() => handleNavClick(item.id)}
+        title={item.label}
+        aria-label={item.label}
+        aria-current={currentView === item.id ? 'page' : undefined}
       >
         {/* Icon with optional red dot */}
         <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
