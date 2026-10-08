@@ -435,6 +435,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 gross_satang: gross, verification: method === 'cash' ? 'n/a' : 'unverified', status: 'active',
                 allocations: cleaned.map(a => ({ target_kind: a.kind as 'bill' | 'fine', target_id: a.id as string, amount_satang: a.satang })),
                 revision: '', bank_account_id: method === 'bank_transfer' ? body.bank_account_id : null, transaction_ref: ref,
+                room_number: String((roomSnap.data() as { room_number?: string }).room_number ?? ''),
                 note, created_at: now, created_by: who.uid, received_by: who.displayName,
             };
             payment.revision = `${gross}|${payment.paid_at}|${payment.channel}|${payment.allocations.map(x => `${x.target_kind}:${x.target_id}=${x.amount_satang}`).join(',')}`;

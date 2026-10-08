@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { ExportBatch, MangoProfile } from '../shared/accounting';
+import type { ExportBatch, MangoProfile, PaymentRec } from '../shared/accounting';
 import type { Fine, MonthlyBill, Room } from '../types';
 
 function useLive<T>(path: string | null) {
@@ -31,6 +31,13 @@ export function useExportBatches(ownerUid: string | null) {
 export function useBuildingRooms(ownerUid: string | null, buildingId: string | null) {
   const { list, loading } = useLive<Room & { id: string }>(ownerUid && buildingId ? `users/${ownerUid}/buildings/${buildingId}/rooms` : null);
   return { rooms: useMemo(() => list.filter(r => r.is_active !== false).sort((a, b) => a.room_number.localeCompare(b.room_number, 'th', { numeric: true })), [list]), loading };
+}
+
+/** A payment recorded with allocations (see /api/accounting record_payment). */
+export type RecordedPayment = PaymentRec & { bank_account_id?: string | null; room_number?: string; transaction_ref?: string | null; bank_transaction_id?: string };
+export function useBuildingPayments(ownerUid: string | null, buildingId: string | null) {
+  const { list, loading } = useLive<RecordedPayment>(ownerUid && buildingId ? `users/${ownerUid}/buildings/${buildingId}/payments` : null);
+  return { payments: useMemo(() => [...list].sort((a, b) => b.paid_at.localeCompare(a.paid_at)), [list]), loading };
 }
 
 export type BillingItem = (MonthlyBill | Fine) & { allocated_satang?: number; payments_recorded?: boolean };

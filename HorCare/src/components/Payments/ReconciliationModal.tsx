@@ -8,6 +8,8 @@ import {
     type BankTransaction, type ReconStatus,
 } from '../../shared/reconciliation';
 import { bankAccountLabel, type BankAccount } from '../../shared/banks';
+import { toSatang } from '../../shared/accounting';
+import type { RecordedPayment } from '../../hooks/useAccountingData';
 import BankLogo from './BankLogo';
 
 interface Props {
@@ -16,6 +18,8 @@ interface Props {
     accounts: BankAccount[];
     transactions: BankTransaction[];
     loading: boolean;
+    /** Payments recorded with allocations; unverified transfers here can be confirmed against a bank transaction. */
+    payments: RecordedPayment[];
     onClose: () => void;
 }
 
@@ -41,7 +45,7 @@ const baht = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2
 const when = (iso: string) => new Date(iso).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 const kindLabel = (k: 'bill' | 'fine') => (k === 'bill' ? 'บิล' : 'ค่าปรับ');
 
-export default function ReconciliationModal({ ownerUid, buildingId, accounts, transactions, loading, onClose }: Props) {
+export default function ReconciliationModal({ ownerUid, buildingId, accounts, transactions, loading, payments, onClose }: Props) {
     const [filter, setFilter] = useState<ReconStatus | 'all'>('all');
     const [accountId, setAccountId] = useState(accounts.find(a => a.is_default)?.id ?? accounts[0]?.id ?? '');
     const [busy, setBusy] = useState<string | null>(null);
@@ -98,6 +102,22 @@ export default function ReconciliationModal({ ownerUid, buildingId, accounts, tr
     const confirm = async (tx: BankTransaction, kind: 'bill' | 'fine', id: string) => {
         const r = await call('c:' + tx.id, { action: 'confirm', tx_id: tx.id, item_kind: kind, item_id: id });
         if (r) toast.success('ยืนยันแล้ว — การชำระเงินนี้ตรวจสอบกับบัญชีธนาคารแล้ว');
+    };
+    /** Recorded transfers (multi-bill / partial) waiting for money to be seen in the bank. */
+    const unverified = useMemo(
+        () => payments.filter(p => p.method === 'bank_transfer' && p.status === 'active' && p.verification !== 'verified' && p.verification !== 'rejected'),
+        [payments],
+    );
+    const paymentsFor = (tx: BankTransaction) => unverified.filter(p => p.bank_account_id === tx.bank_account_id && p.gross_satang === toSatang(tx.amount));
+    const verifyPayment = async (tx: BankTransaction, p: RecordedPayment) => {
+        setBusy('v:' + tx.id);
+        try {
+            await apiPost('accounting', { owner_uid: ownerUid, action: 'verify_payment', building_id: buildingId, payment_id: p.id, bank_transaction_id: tx.id });
+            toast.success('ยืนยันการรับชำระกับรายการธนาคารแล้ว — นับเป็นเงินรับในไฟล์บัญชี');
+        } catch (e) {
+            const err = e as ApiError;
+            toast.error(ERRORS[err.code] ?? err.message ?? 'ดำเนินการไม่สำเร็จ');
+        } finally { setBusy(null); }
     };
     const reject = async (tx: BankTransaction) => {
         if (await call('r:' + tx.id, { action: 'reject', tx_id: tx.id })) toast.success('ไม่ใช่รายการนี้ — ระบบจะไม่แนะนำซ้ำ');
@@ -224,6 +244,12 @@ export default function ReconciliationModal({ ownerUid, buildingId, accounts, tr
                                                         <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => void reject(tx)}>ไม่ใช่รายการนี้</button>
                                                     </>
                                                 )}
+                                                {paymentsFor(tx).map(p => (
+                                                    <button key={p.id} className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => void verifyPayment(tx, p)}
+                                                        title="การรับชำระที่บันทึกแบบตัดหลายบิล ยอดและบัญชีตรงกับรายการธนาคารนี้">
+                                                        ยืนยันกับรับชำระห้อง {p.room_number ?? '-'} ({new Date(p.paid_at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })})
+                                                    </button>
+                                                ))}
                                                 {tx.candidates.filter(c => c.id !== tx.matched?.id && !c.taken).map(c => (
                                                     <button key={c.id} className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => void confirm(tx, c.kind, c.id)}
                                                         title={c.reasons.map(r => MATCH_REASON_LABELS_TH[r] ?? r).join(', ')}>
