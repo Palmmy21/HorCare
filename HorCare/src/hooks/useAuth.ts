@@ -142,8 +142,6 @@ export function useAuth() {
                     dorm_name: dormName,
                     dorm_address: '',
                     dorm_phone: initialBuilding?.phone || '',
-                    promptpay_number: '',
-                    promptpay_name: '',
                     footer_text: 'กรุณาชำระภายในวันที่กำหนด ขอบคุณครับ',
                     due_day: Number(initialBuilding?.due_day) || 5,
                     default_language: 'th',

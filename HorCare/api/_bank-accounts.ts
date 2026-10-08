@@ -13,6 +13,7 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { bankByCode, digitsOnly, isValidAccountNumber, type BankAccount } from '../src/shared/banks.js';
+import { cleanPromptPayId } from '../src/shared/thaiQr.js';
 
 export const config = { maxDuration: 15 };
 
@@ -26,7 +27,15 @@ interface Body {
     account_name?: string;
     account_number?: string;
     nickname?: string;
+    /** PromptPay mobile number or 13-digit national/tax ID of this account's owner; empty/null clears it. */
+    promptpay_id?: unknown;
     status?: string;
+}
+
+/** undefined = malformed, null = empty/cleared, string = digits of a valid PromptPay id. */
+function cleanPromptPay(v: unknown): string | null | undefined {
+    if (v === undefined || v === null || v === '') return null;
+    return cleanPromptPayId(v) ?? undefined;
 }
 
 const last4 = (n: string) => `••••${digitsOnly(n).slice(-4)}`;
@@ -55,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const accounts = snap.docs.map(d => d.data() as BankAccount)
             .filter(a => a.status === 'active')
             .sort((a, b) => Number(b.is_default) - Number(a.is_default))
-            .map(a => ({ id: a.id, bank_code: a.bank_code, bank_short: a.bank_short, account_name: a.account_name, account_number: a.account_number, nickname: a.nickname ?? null, is_default: a.is_default }));
+            .map(a => ({ id: a.id, bank_code: a.bank_code, bank_short: a.bank_short, account_name: a.account_name, account_number: a.account_number, nickname: a.nickname ?? null, promptpay_id: a.promptpay_id ?? null, is_default: a.is_default }));
         res.status(200).json({ accounts });
         return;
     }
@@ -79,7 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const bank = bankByCode(body.bank_code);
         const name = cleanText(body.account_name, 2, 100);
         const nick = cleanText(body.nickname, 1, 40);
-        if (!bank || !name || nick === undefined || typeof body.account_number !== 'string' || !isValidAccountNumber(body.account_number)) {
+        const promptpay = cleanPromptPay(body.promptpay_id);
+        if (!bank || !name || nick === undefined || promptpay === undefined || typeof body.account_number !== 'string' || !isValidAccountNumber(body.account_number)) {
             res.status(400).json({ error: 'invalid_input' });
             return;
         }
@@ -94,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const now = new Date().toISOString();
         const account: BankAccount = {
             id: randomUUID(), bank_code: bank.code, bank_short: bank.short, account_name: name, account_number: number,
-            nickname: nick, status: 'active',
+            nickname: nick, promptpay_id: promptpay, status: 'active',
             // the first account becomes the default automatically
             is_default: !docs.some(a => a.status === 'active' && a.is_default),
             created_at: now, updated_at: now,
@@ -149,6 +159,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (n === undefined) { res.status(400).json({ error: 'invalid_input' }); return; }
         updates.nickname = n;
     }
+    if (body.promptpay_id !== undefined) {
+        const p = cleanPromptPay(body.promptpay_id);
+        if (p === undefined) { res.status(400).json({ error: 'invalid_promptpay' }); return; }
+        updates.promptpay_id = p;
+    }
     if (body.status !== undefined) {
         if (body.status !== 'active' && body.status !== 'inactive') { res.status(400).json({ error: 'invalid_input' }); return; }
         updates.status = body.status;
@@ -168,8 +183,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     await ref.update({ ...updates, updated_at: now });
     await audit('UPDATE', { ...current, ...updates } as BankAccount, {
-        before: { status: current.status, name: current.account_name, number: last4(current.account_number) },
-        after: { ...updates, ...(updates.account_number ? { account_number: last4(updates.account_number) } : {}) },
+        before: { status: current.status, name: current.account_name, number: last4(current.account_number), promptpay: current.promptpay_id ? 'set' : 'none' },
+        // the audit log never holds a full account number or PromptPay id (a PromptPay id may be a national ID number)
+        after: {
+            ...updates,
+            ...(updates.account_number ? { account_number: last4(updates.account_number) } : {}),
+            ...('promptpay_id' in updates ? { promptpay_id: updates.promptpay_id ? 'set' : 'cleared' } : {}),
+        },
     });
     res.status(200).json({ ok: true });
 }

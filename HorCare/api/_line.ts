@@ -191,54 +191,6 @@ export function buildBillFlex(
     };
 }
 
-/** สร้าง PromptPay QR image URL (EMVCo) จาก phone + amount */
-export function buildPromptpayQrImageUrl(phone: string, amount: number): string {
-    const normalized = phone.replace(/[-\s]/g, '');
-    const accountId = normalized.startsWith('0') ? '0066' + normalized.slice(1) : normalized;
-    const merchantInfo = `0016A000000677010111` + `01${String(accountId.length).padStart(2, '0')}${accountId}`;
-    const amtStr = amount.toFixed(2);
-    const raw = `000201010212` +
-        `${String(merchantInfo.length + 4).padStart(2, '0')}` + // tag 29 placeholder — computed below
-        merchantInfo +
-        `5802TH5303764` +
-        `54${String(amtStr.length).padStart(2, '0')}${amtStr}` +
-        `6304`;
-    // Rebuild correctly: tag 29 wraps merchantInfo
-    const tag29 = `29${String(merchantInfo.length).padStart(2, '0')}${merchantInfo}`;
-    const withoutCrc = `000201010212${tag29}5802TH5303764` +
-        `54${String(amtStr.length).padStart(2, '0')}${amtStr}6304`;
-    void raw;
-    let crc = 0xFFFF;
-    for (let i = 0; i < withoutCrc.length; i++) {
-        crc ^= withoutCrc.charCodeAt(i) << 8;
-        for (let j = 0; j < 8; j++) crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : (crc << 1);
-    }
-    const payload = withoutCrc + (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(payload)}`;
-}
-
-/** ข้อความ PromptPay สำหรับส่งแยกหลังบิล */
-export function buildPromptpayMessages(
-    promptpayNumber: string,
-    promptpayName: string,
-    total: number,
-    lang: BillLanguage = 'th',
-): object[] {
-    const qrUrl = buildPromptpayQrImageUrl(promptpayNumber, total);
-    const slipNotice = t('flex_send_slip', lang);
-    return [
-        {
-            type: 'image',
-            originalContentUrl: qrUrl,
-            previewImageUrl: qrUrl,
-        },
-        {
-            type: 'text',
-            text: `💳 PromptPay${promptpayName ? `: ${promptpayName}` : ''}\n📞 ${promptpayNumber}\n💰 ฿${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })}\n\n${slipNotice}`,
-        },
-    ];
-}
-
 /**
  * ใบเสร็จรับเงิน — ส่งให้ลูกหออัตโนมัติเมื่อเจ้าของกดยืนยันการชำระ
  * โทนเขียว แยกจากบิล (น้ำเงิน) ให้รู้ทันทีว่าจ่ายสำเร็จแล้ว

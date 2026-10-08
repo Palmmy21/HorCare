@@ -1,39 +1,16 @@
-import { useEffect, useState } from 'react';
 import { Landmark, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import BankLogo from '../Payments/BankLogo';
 import { bankByCode, formatAccountNumber } from '../../shared/banks';
+import type { TenantAccount } from '../../hooks/useTenantBankAccounts';
 
 interface Props {
-  uid: string;
-  buildingId: string;
-  roomId: string;
+  accounts: TenantAccount[];
   Label: React.ComponentType<{ icon: React.ReactNode; label: string }>;
 }
 
-interface TenantAccount {
-  id: string; bank_code: string; bank_short: string; account_name: string;
-  account_number: string; nickname: string | null; is_default: boolean;
-}
-
 /** Bank accounts the tenant can transfer rent to. Renders nothing while loading, on error, or when none are set up. */
-export default function TenantBankSection({ uid, buildingId, roomId, Label }: Props) {
-  const [accounts, setAccounts] = useState<TenantAccount[]>([]);
-
-  useEffect(() => {
-    if (!uid || !buildingId || !roomId) return;
-    let cancelled = false;
-    fetch('/api/bank-accounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'tenant_list', owner_uid: uid, building_id: buildingId, room_id: roomId }),
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: { accounts?: TenantAccount[] } | null) => { if (!cancelled && data?.accounts) setAccounts(data.accounts); })
-      .catch(() => { /* optional section */ });
-    return () => { cancelled = true; };
-  }, [uid, buildingId, roomId]);
-
+export default function TenantBankSection({ accounts, Label }: Props) {
   if (accounts.length === 0) return null;
 
   const copy = (n: string) => {

@@ -26,6 +26,7 @@ import securityAlertsHandler from './_security-alerts.js';
 import tenantLinkHandler from './_tenant-link.js';
 import announcementsHandler from './_announcements.js';
 import remindParcelsHandler from './_remind-parcels.js';
+import qrHandler from './_qr.js';
 
 // Apply the maximum duration config globally to this API gateway
 export const config = { maxDuration: 60 };
@@ -56,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'leasing': return (await import('./_leasing.js')).default(req, res);
         case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
+        case 'qr': return qrHandler(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);
         case 'notify-payment': return notifyPaymentHandler(req, res);

@@ -2,9 +2,9 @@ import { forwardRef } from 'react';
 import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization, BillLanguage } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 import { t, tBilingual, formatBillDate, formatBillMonth, formatDueNotice } from '../../utils/i18n/billTranslations';
-import generatePayload from 'promptpay-qr';
 import { QRCodeSVG } from 'qrcode.react';
-import { PROMPTPAY_LOGO_DATA_URI } from '../../assets/promptpayLogo';
+import { paymentQrPayload } from '../../shared/thaiQr';
+import { bankByCode, type PayAccount } from '../../shared/banks';
 
 interface InvoiceBillProps {
     bill: MonthlyBill;
@@ -13,13 +13,17 @@ interface InvoiceBillProps {
     effectiveElecRate?: number;
     effectiveWaterConfig?: WaterConfig;
     billCustomization?: BillCustomization;
+    /** The account the printed QR pays into (the property's default active account). No account → no QR. */
+    payTo?: PayAccount | null;
     language?: BillLanguage;
     bilingualMode?: boolean;
     secondaryLanguage?: BillLanguage;
 }
 
 const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
-    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, language, bilingualMode, secondaryLanguage }, ref) => {
+    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, payTo, language, bilingualMode, secondaryLanguage }, ref) => {
+        let qrPayload: string | null = null;
+        try { qrPayload = payTo ? paymentQrPayload(payTo, bill.total_bill) : null; } catch { qrPayload = null; } // a malformed account simply prints no QR
         const lang: BillLanguage = language ?? billCustomization?.default_language ?? 'th';
         const isBilingual: boolean = bilingualMode ?? billCustomization?.bilingual_mode ?? false;
         const secLang: BillLanguage = secondaryLanguage ?? billCustomization?.secondary_language ?? 'en';
@@ -204,27 +208,15 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 {/* QR Code + Footer Section */}
                 <div className="invoice-bottom-section">
                     {/* QR Code */}
-                    {billCustomization?.promptpay_number && (
+                    {payTo && qrPayload && (
                         <div className="invoice-qr-section">
                             <div className="invoice-qr-label">{tBilingual('scan_promptpay', lang, isBilingual, secLang)}</div>
                             <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', display: 'inline-block' }}>
-                                <QRCodeSVG 
-                                    value={generatePayload(billCustomization.promptpay_number, { amount: bill.total_bill })}
-                                    size={140}
-                                    level="H"
-                                    imageSettings={{
-                                        src: PROMPTPAY_LOGO_DATA_URI,
-                                        height: 20,
-                                        width: 50,
-                                        excavate: true,
-                                    }}
-                                />
+                                <QRCodeSVG value={qrPayload} size={140} level="M" />
                             </div>
-                            {billCustomization.promptpay_name && (
-                                <div style={{ fontSize: '13px', marginTop: '8px', textAlign: 'center', color: '#475569', fontWeight: 500 }}>
-                                    {billCustomization.promptpay_name}
-                                </div>
-                            )}
+                            <div style={{ fontSize: '13px', marginTop: '8px', textAlign: 'center', color: '#475569', fontWeight: 500 }}>
+                                {bankByCode(payTo.bank_code)?.name_th ?? payTo.bank_short} · {payTo.account_name}
+                            </div>
                         </div>
                     )}
 

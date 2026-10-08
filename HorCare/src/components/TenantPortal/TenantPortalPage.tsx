@@ -21,9 +21,8 @@ import {
   User, Save, Heart, Lock, Sparkles, FileText,
 } from 'lucide-react';
 import horcareLogo from '../../assets/horcare_logo.png';
-import { QRCodeSVG } from 'qrcode.react';
-import generatePayload from 'promptpay-qr';
-import { PROMPTPAY_LOGO_DATA_URI } from '../../assets/promptpayLogo';
+import BankQrCard from '../Payments/BankQrCard';
+import { useTenantBankAccounts, type TenantAccount } from '../../hooks/useTenantBankAccounts';
 import toast from 'react-hot-toast';
 import TenantContractSection from './TenantContractSection';
 import TenantParcelSection from './TenantParcelSection';
@@ -342,57 +341,6 @@ function PaymentStatus({ status, lang }: { status?: string; lang: BillLanguage }
   );
 }
 
-// ── PromptPay QR ─────────────────────────────────────────────────────────────
-function PromptPayCard({ number, name, amount, title, lang }: { number: string; name: string; amount: number; title?: string; lang: BillLanguage }) {
-  const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
-  return (
-    <div style={{
-      background: 'linear-gradient(135deg, #034A6E 0%, #0369A1 100%)',
-      borderRadius: '20px',
-      padding: '1.25rem',
-      color: '#FFFFFF',
-      boxShadow: '0 8px 24px -4px rgba(3, 105, 161, 0.35)',
-      marginTop: '0.75rem',
-      textAlign: 'center',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.8125rem', fontWeight: 700, color: 'rgba(255,255,255,0.9)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.875rem' }}>
-        <CreditCard size={14} /> {title || t.scan_qr}
-      </div>
-
-      {/* QR Code Container */}
-      <div style={{
-        background: '#FFFFFF',
-        borderRadius: '16px',
-        padding: '0.875rem',
-        display: 'inline-block',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-      }}>
-        <QRCodeSVG
-          value={generatePayload(number, { amount })}
-          size={168}
-          imageSettings={{
-            src: PROMPTPAY_LOGO_DATA_URI,
-            x: undefined,
-            y: undefined,
-            height: 36,
-            width: 36,
-            excavate: true,
-          }}
-        />
-      </div>
-
-      <div style={{ marginTop: '0.875rem' }}>
-        <div style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#38BDF8' }}>
-          {fmtCurrency(amount)}
-        </div>
-        <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.85)', marginTop: '0.2rem' }}>
-          PromptPay: <strong>{number}</strong> {name ? `(${name})` : ''}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Slip Uploader ─────────────────────────────────────────────────────────────
 function SlipUploader({
   uid, buildingId, roomId, itemId, itemType, lang,
@@ -452,9 +400,9 @@ function SlipUploader({
 }
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
-function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
+function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
   bill: MonthlyBill;
-  defaultOpen: boolean; promptpay: { number: string; name: string };
+  defaultOpen: boolean; payTo: TenantAccount | null;
   portalIds: { uid: string, buildingId: string, roomId: string };
   lang: BillLanguage;
 }) {
@@ -555,9 +503,9 @@ function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
           </div>
 
           {/* QR for unpaid */}
-          {isUnpaid && promptpay.number && (
+          {isUnpaid && payTo && (
             <div style={{ marginTop: '1rem' }}>
-              <PromptPayCard number={promptpay.number} name={promptpay.name} amount={bill.total_bill} title={t.scan_qr} lang={lang} />
+              <BankQrCard account={payTo} amount={bill.total_bill} title={t.scan_qr} formatAmount={fmtCurrency} />
               <SlipUploader
                 uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId}
                 itemId={bill.id} itemType="bill" lang={lang}
@@ -590,7 +538,7 @@ function BillCard({ bill, defaultOpen, promptpay, portalIds, lang }: {
 }
 
 // ── Fine Card ─────────────────────────────────────────────────────────────────
-function FineCard({ fine, promptpay, portalIds, lang }: { fine: Fine; promptpay: { number: string; name: string }; portalIds: { uid: string, buildingId: string, roomId: string }; lang: BillLanguage }) {
+function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantAccount | null; portalIds: { uid: string, buildingId: string, roomId: string }; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [open, setOpen] = useState(fine.status !== 'paid');
   const isUnpaid = !fine.status || fine.status === 'unpaid';
@@ -641,9 +589,9 @@ function FineCard({ fine, promptpay, portalIds, lang }: { fine: Fine; promptpay:
           </div>
 
           {/* QR for unpaid */}
-          {isUnpaid && promptpay.number && (
+          {isUnpaid && payTo && (
             <div style={{ marginTop: '1rem' }}>
-              <PromptPayCard number={promptpay.number} name={promptpay.name} amount={fine.amount} title={t.scan_qr_fine} lang={lang} />
+              <BankQrCard account={payTo} amount={fine.amount} title={t.scan_qr_fine} formatAmount={fmtCurrency} />
               <SlipUploader
                 uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId}
                 itemId={fine.id} itemType="fine" lang={lang}
@@ -955,10 +903,9 @@ export default function TenantPortalPage() {
   const pendingFines = data.fines.filter(f => f.status !== 'paid');
   const paidFines = data.fines.filter(f => f.status === 'paid');
 
-  const promptpay = {
-    number: config?.bill_customization?.promptpay_number ?? '',
-    name: config?.bill_customization?.promptpay_name ?? '',
-  };
+  // Where the QR pays: the property's default active account (the list arrives default-first).
+  const tenantAccounts = useTenantBankAccounts(uid, buildingId, roomId);
+  const payTo = tenantAccounts[0] ?? null;
 
   // ── Invalid link ──
   if (!uid || !buildingId || !roomId) {
@@ -1208,7 +1155,7 @@ export default function TenantPortalPage() {
           {/* Parcels waiting at the front desk (hidden when there are none) */}
           <TenantAnnouncementSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
           <TenantParcelSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
-          <TenantBankSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
+          <TenantBankSection accounts={tenantAccounts} Label={SectionLabel} />
           {config?.building_type === 'market' && <TenantClosureSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />}
 
           {/* Digital Lease Contract (E-Signature) */}
@@ -1237,7 +1184,7 @@ export default function TenantPortalPage() {
           <section>
             <SectionLabel icon={<Receipt size={14} />} label={`${t.monthly_bill} ${formatPortalMonth(currentMonth, lang)}`} />
             {currentBill ? (
-              <BillCard bill={currentBill} defaultOpen={true} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} lang={lang} />
+              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
             ) : (
               <div style={{
                 background: 'var(--color-white)', borderRadius: '16px', padding: '1.5rem',
@@ -1252,11 +1199,11 @@ export default function TenantPortalPage() {
             )}
           </section>
 
-          {/* PromptPay standalone (when no bill yet) */}
-          {!currentBill && promptpay.number && (
+          {/* Pay-to QR standalone (when no bill yet) */}
+          {!currentBill && payTo && (
             <section>
               <SectionLabel icon={<CreditCard size={14} />} label={t.payment_channel} />
-              <PromptPayCard number={promptpay.number} name={promptpay.name} amount={room.rent_amount} title={t.payment_channel} lang={lang} />
+              <BankQrCard account={payTo} amount={room.rent_amount} title={t.payment_channel} formatAmount={fmtCurrency} />
             </section>
           )}
 
@@ -1266,7 +1213,7 @@ export default function TenantPortalPage() {
               <SectionLabel icon={<AlertTriangle size={14} />} label={`${t.unpaid_fines} (${pendingFines.length})`} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {pendingFines.map(f => (
-                  <FineCard key={f.id} fine={f} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
                 ))}
               </div>
             </section>
@@ -1278,10 +1225,10 @@ export default function TenantPortalPage() {
               <SectionLabel icon={<CalendarDays size={14} />} label={t.history} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {paidFines.map(f => (
-                  <FineCard key={f.id} fine={f} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
                 ))}
                 {prevBills.map(b => (
-                  <BillCard key={b.id} bill={b} defaultOpen={false} promptpay={promptpay} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
                 ))}
               </div>
             </section>

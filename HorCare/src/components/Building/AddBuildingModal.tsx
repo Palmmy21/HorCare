@@ -71,8 +71,6 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
           dorm_name: name.trim(),
           dorm_address: '',
           dorm_phone: '',
-          promptpay_number: '',
-          promptpay_name: '',
           footer_text: 'กรุณาชำระภายในวันที่กำหนด ขอบคุณครับ',
           due_day: Number(dueDay) || 5,
           default_language: defaultLang,

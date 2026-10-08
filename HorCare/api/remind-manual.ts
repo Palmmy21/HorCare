@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { buildBillFlex, buildPromptpayMessages, linePush, runPooled, thaiMonthLabel } from './_line.js';
+import { buildBillFlex, linePush, runPooled, thaiMonthLabel } from './_line.js';
+import { loadPayAccount, paymentQrMessages } from './_payment-qr.js';
+import { appBaseUrl } from './_notify.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
@@ -46,8 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const cfg = configSnap.data() ?? {};
         const dormName       = cfg.bill_customization?.dorm_name || 'หอพัก';
         const dueDay         = Number(cfg.bill_customization?.due_day) || 5;
-        const promptpayNumber = (cfg.bill_customization?.promptpay_number ?? '') as string;
-        const promptpayName   = (cfg.bill_customization?.promptpay_name ?? '') as string;
+        const payAccount = await loadPayAccount(uid, building_id);
         let appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
         if (appUrl && !appUrl.startsWith('http')) appUrl = `https://${appUrl}`;
 
@@ -106,9 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })
                 ];
                 
-                if (promptpayNumber) {
-                    messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, bill.total_bill as number, roomLang));
-                }
+                messages.push(...paymentQrMessages(payAccount, bill.total_bill as number, appUrl || appBaseUrl(), roomLang));
 
                 await linePush(lineUserId, messages);
                 

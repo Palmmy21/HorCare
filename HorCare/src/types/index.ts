@@ -77,8 +77,10 @@ export interface BillCustomization {
   dorm_name: string;          // ชื่อหอพัก
   dorm_address: string;       // ที่อยู่
   dorm_phone: string;         // เบอร์โทร
-  promptpay_number: string;   // เลข PromptPay
-  promptpay_name: string;     // ชื่อบัญชี PromptPay
+  /** @deprecated moved onto bank accounts (BankAccount.promptpay_id); kept only so old data can be carried over */
+  promptpay_number?: string;
+  /** @deprecated see promptpay_number */
+  promptpay_name?: string;
   footer_text: string;        // ข้อความด้านล่างบิล
   due_day: number;            // กำหนดชำระวันที่
   dorm_logo?: string;         // base64 โลโก้หอพัก (แสดงในพอร์ทัลผู้เช่า)

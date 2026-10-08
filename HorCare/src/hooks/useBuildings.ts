@@ -85,8 +85,6 @@ export function useBuildings(userId: string | null) {
                 dorm_name: name.trim(),
                 dorm_address: '',
                 dorm_phone: '',
-                promptpay_number: '',
-                promptpay_name: '',
                 footer_text: 'กรุณาชำระภายในวันที่กำหนด ขอบคุณครับ',
                 due_day: initialConfig?.bill_customization?.due_day ?? 5,
                 default_language: initialConfig?.bill_customization?.default_language || 'th',

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useBankAccounts } from '../../hooks/useBankAccounts';
 import {
     CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer, BarChart3,
@@ -85,6 +86,9 @@ export default function Summary({
     const hiddenReportRef = useRef<HTMLDivElement>(null);
 
     const billCustomization = config.bill_customization;
+    // The printed/shared bill's QR pays into the default active receiving account.
+    const { activeAccounts } = useBankAccounts(uid ?? null, buildingId ?? null);
+    const payTo = activeAccounts.find(a => a.is_default) ?? activeAccounts[0] ?? null;
 
     const monthBills = bills.filter(b => b.month === currentMonth);
     const isLocked = monthBills.some(b => b.is_locked);
@@ -896,7 +900,7 @@ export default function Summary({
                                         billDate={billDate}
                                         effectiveElecRate={rates?.electricityRate}
                                         effectiveWaterConfig={rates?.waterConfig}
-                                        billCustomization={billCustomization}
+                                        billCustomization={billCustomization} payTo={payTo}
                                         language={activeLang}
                                     />
                                 );
@@ -1000,7 +1004,7 @@ export default function Summary({
                             billDate={billDate}
                             effectiveElecRate={rates?.electricityRate}
                             effectiveWaterConfig={rates?.waterConfig}
-                            billCustomization={billCustomization}
+                            billCustomization={billCustomization} payTo={payTo}
                             language={captureLang}
                         />
                     );
