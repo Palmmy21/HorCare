@@ -199,6 +199,21 @@ service cloud.firestore {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'parcel.read');
           allow write: if false;
         }
+        // ── Work orders, their photos and the staff directory — written only by /api/work-orders
+        // (permission checks, audit, LINE notification). Staff themselves use a per-job link
+        // through that API and never touch Firestore.
+        match /work_orders/{orderId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.read');
+          allow write: if false;
+        }
+        match /work_order_images/{imageId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.read');
+          allow write: if false;
+        }
+        match /staff/{staffId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.read');
+          allow write: if false;
+        }
         // In-app notification records produced by the central notification service.
         match /notifications/{notificationId} {
           allow read: if isOwner(userId) && isNotBanned();

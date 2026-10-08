@@ -25,6 +25,8 @@ export const PERMISSIONS = [
   'payment.create', 'payment.update', 'payment.reconcile',
   'contract.read', 'contract.create', 'contract.sign',
   'work_order.read', 'work_order.create', 'work_order.update',
+  /** Verify, close or reopen a completed job — kept apart from `update` so the person who did the work can't sign it off. */
+  'work_order.verify',
   'parcel.read', 'parcel.create', 'parcel.update',
   'shop.read', 'shop.update',
   'visitor.read', 'visitor.create',

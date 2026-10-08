@@ -17,6 +17,7 @@
   "rewrites": [
     { "source": "/api/stripe-webhook", "destination": "/api/stripe-webhook" },
     { "source": "/api/line-webhook", "destination": "/api/line-webhook" },
+    { "source": "/api/line-staff-webhook", "destination": "/api/line-staff-webhook" },
     { "source": "/api/(.*)", "destination": "/api/index?route=$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

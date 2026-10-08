@@ -16,6 +16,7 @@ import invitationsHandler from './_invitations.js';
 import membersHandler from './_members.js';
 import meterOcrHandler from './_meter-ocr.js';
 import parcelsHandler from './_parcels.js';
+import workOrdersHandler from './_work-orders.js';
 import remindParcelsHandler from './_remind-parcels.js';
 
 // Apply the maximum duration config globally to this API gateway
@@ -32,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'members': return membersHandler(req, res);
         case 'meter-ocr': return meterOcrHandler(req, res);
         case 'parcels': return parcelsHandler(req, res);
+        case 'work-orders': return workOrdersHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);

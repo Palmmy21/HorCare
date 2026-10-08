@@ -12,8 +12,14 @@ export function verifyLineSignature(rawBody: Buffer | string, secret: string, si
     }
 }
 
-export async function lineReply(replyToken: string, messages: object[]): Promise<void> {
-    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+/**
+ * Staff (technician / housekeeping) use a separate LINE Official Account from tenants,
+ * with its own channel credentials. Pass this as the 	oken of lineReply/linePush.
+ */
+export const staffLineToken = (): string | undefined => process.env.LINE_STAFF_CHANNEL_ACCESS_TOKEN;
+
+/** 	oken defaults to the tenant OA's access token. */
+export async function lineReply(replyToken: string, messages: object[], token: string | undefined = process.env.LINE_CHANNEL_ACCESS_TOKEN): Promise<void> {
     if (!token) return;
     await fetch('https://api.line.me/v2/bot/message/reply', {
         method: 'POST',
@@ -35,8 +41,7 @@ export async function getLineImageContent(messageId: string): Promise<{ buffer: 
     return { buffer, contentType };
 }
 
-export async function linePush(to: string, messages: object[]): Promise<void> {
-    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+export async function linePush(to: string, messages: object[], token: string | undefined = process.env.LINE_CHANNEL_ACCESS_TOKEN): Promise<void> {
     if (!token) return;
 
     // ยิงพร้อม retry สั้นๆ เมื่อโดน rate-limit (429) — ตอน 1000 หอบิลจะไม่หายเงียบ.

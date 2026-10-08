@@ -1,13 +1,19 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Local dev forwards /api to a deployed copy of the functions. Defaults to production;
+  // set API_PROXY_TARGET in .env.local to test unreleased API routes against a Vercel
+  // Preview deployment (e.g. https://hor-care-git-<branch>-<team>.vercel.app).
+  const env = loadEnv(mode, process.cwd(), '')
+  const apiTarget = env.API_PROXY_TARGET || 'https://hor-care.vercel.app'
+
+  return {
   server: {
     proxy: {
-      // Local dev forwards API calls to the deployed production functions
       '/api': {
-        target: 'https://hor-care.vercel.app',
+        target: apiTarget,
         changeOrigin: true,
       },
     },
@@ -98,4 +104,5 @@ export default defineConfig({
       },
     }),
   ],
+  }
 })

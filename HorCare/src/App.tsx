@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -39,6 +39,7 @@ const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
 const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
 const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
+const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
@@ -70,7 +71,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'rooms' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -381,6 +382,7 @@ function App() {
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
+    { id: 'workorders'  as ViewMode, icon: ClipboardCheck,  label: 'ใบงานช่าง/แม่บ้าน' },
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
 
     { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
@@ -1504,6 +1506,15 @@ function App() {
         )}
 
 
+
+        {currentView === 'workorders' && user && activeBuildingId && !maidSession && (
+          <WorkOrdersPage
+            ownerUid={user.uid}
+            buildingId={activeBuildingId}
+            rooms={rooms}
+            unitName={terms.unitName}
+          />
+        )}
 
         {currentView === 'parcels' && user && activeBuildingId && !maidSession && (
           <ParcelsPage
