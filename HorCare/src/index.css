@@ -4520,3 +4520,38 @@ html.dark .btn-meter-photo:hover {
   .nav-item { min-height: 44px; }
   .nav-subitem { min-height: 44px; }
 }
+
+/* ===== Phone-first safeguards for the older screens ===== */
+/* Tables never push the page sideways: the card that holds one scrolls instead. */
+.card:has(> table),
+.card:has(> div > table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 768px) {
+  /* Dialogs become bottom sheets: full width, scroll inside, never taller than the screen */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal {
+    width: 100%;
+    max-width: 100% !important;
+    max-height: 92dvh;
+    margin: 0;
+    border-radius: 16px 16px 0 0;
+    overflow-y: auto;
+  }
+  .modal-footer { position: sticky; bottom: 0; background: inherit; flex-wrap: wrap; gap: 0.5rem; }
+  .modal-footer .btn { flex: 1 1 140px; }
+
+  /* 16px inputs stop iOS from zooming in on focus; comfortable touch targets */
+  input, select, textarea, .form-input { font-size: 16px; }
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 36px; }
+
+  /* Multi-column form rows stack */
+  .form-row, .ab-row-2, .stats-grid, .form-grid { grid-template-columns: 1fr !important; }
+  .card { padding: var(--space-4); }
+  .page-header { margin-bottom: var(--space-4); }
+}
+
+@media (max-width: 480px) {
+  .main-content { padding: var(--space-3); }
+  .page-title { font-size: 1.3rem; }
+}

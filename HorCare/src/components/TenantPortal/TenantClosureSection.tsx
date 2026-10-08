@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BellOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AntiBot, { captchaRequired } from '../Common/AntiBot';
 import {
   CLOSURE_REASONS, CLOSURE_REASON_LABELS_TH, MAX_CLOSURE_DAYS, addDays, todayTh,
   type ClosureReason, type ShopClosure,
@@ -17,6 +18,8 @@ const ERR: Record<string, string> = {
   invalid_input: 'ข้อมูลไม่ถูกต้อง ตรวจสอบวันที่ (ต้องไม่ใช่อดีต)',
   overlaps_existing: 'ช่วงวันนี้ซ้ำกับที่แจ้งไว้แล้ว',
   limit_reached: 'แจ้งหยุดล่วงหน้าได้ไม่เกิน 10 รายการ',
+  too_many_requests: 'ส่งบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
+  captcha_failed: 'ยืนยันตัวตนไม่ผ่าน กรุณาลองใหม่อีกครั้ง',
 };
 const day = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 
@@ -32,6 +35,8 @@ export default function TenantClosureSection({ uid, buildingId, roomId, Label }:
   const [items, setItems] = useState<ShopClosure[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [trap, setTrap] = useState('');
+  const [token, setToken] = useState('');
   const today = todayTh();
   const [form, setForm] = useState<{ from: string; to: string; reason: ClosureReason; note: string }>({ from: today, to: today, reason: 'personal', note: '' });
   const ids = { owner_uid: uid, building_id: buildingId, room_id: roomId };
@@ -44,7 +49,7 @@ export default function TenantClosureSection({ uid, buildingId, roomId, Label }:
   const submit = async () => {
     setBusy(true);
     try {
-      await post({ action: 'closure_submit', ...ids, from_date: form.from, to_date: form.to, reason: form.reason, note: form.note });
+      await post({ action: 'closure_submit', ...ids, from_date: form.from, to_date: form.to, reason: form.reason, note: form.note, website: trap, captcha_token: token });
       toast.success('แจ้งหยุดเรียบร้อยแล้ว');
       setOpen(false);
       await load();
@@ -81,8 +86,9 @@ export default function TenantClosureSection({ uid, buildingId, roomId, Label }:
               {CLOSURE_REASONS.map(r => <option key={r} value={r}>{CLOSURE_REASON_LABELS_TH[r]}</option>)}
             </select>
             <input style={field} placeholder="หมายเหตุ (ถ้ามี)" maxLength={200} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
+            <AntiBot trap={trap} onTrap={setTrap} onToken={setToken} />
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" disabled={busy || !form.from || !form.to} onClick={() => void submit()} style={{ flex: 1, padding: '0.6rem', borderRadius: 10, border: 'none', background: '#0F766E', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>{busy ? 'กำลังส่ง…' : 'ส่งแจ้งหยุด'}</button>
+              <button type="button" disabled={busy || !form.from || !form.to || (captchaRequired && token === '')} onClick={() => void submit()} style={{ flex: 1, padding: '0.6rem', borderRadius: 10, border: 'none', background: '#0F766E', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>{busy ? 'กำลังส่ง…' : 'ส่งแจ้งหยุด'}</button>
               <button type="button" disabled={busy} onClick={() => setOpen(false)} style={{ padding: '0.6rem 1rem', borderRadius: 10, border: '1px solid rgba(0,0,0,0.2)', background: 'transparent', cursor: 'pointer' }}>ปิด</button>
             </div>
           </div>

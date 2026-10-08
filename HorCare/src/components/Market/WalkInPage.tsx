@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AntiBot, { captchaRequired } from '../Common/AntiBot';
 import { addDays, todayTh, WALKIN_MAX_DAYS_AHEAD } from '../../shared/market';
 
 const ERR: Record<string, string> = {
@@ -6,6 +7,8 @@ const ERR: Record<string, string> = {
   already_requested: 'เบอร์นี้แจ้งวันนี้ไปแล้ว รอเจ้าหน้าที่พิจารณานะคะ',
   day_full: 'วันที่เลือกเต็มแล้ว กรุณาเลือกวันอื่น',
   not_found: 'ลิงก์นี้ไม่ถูกต้อง กรุณาขอลิงก์ใหม่จากตลาด',
+  too_many_requests: 'ส่งบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
+  captcha_failed: 'ยืนยันตัวตนไม่ผ่าน กรุณาลองใหม่อีกครั้ง',
 };
 
 /** Public form (no login): a walk-in vendor tells the market the day they want to sell. Opened from ?walkin=1&uid=&bid=. */
@@ -17,6 +20,8 @@ export default function WalkInPage() {
   const [form, setForm] = useState({ date: today, name: '', phone: '', goods: '' });
   const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [trap, setTrap] = useState('');
+  const [token, setToken] = useState('');
 
   const submit = async () => {
     setState('busy');
@@ -24,7 +29,7 @@ export default function WalkInPage() {
     try {
       const res = await fetch('/api/market', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'walkin_submit', owner_uid: uid, building_id: bid, ...form }),
+        body: JSON.stringify({ action: 'walkin_submit', owner_uid: uid, building_id: bid, ...form, website: trap, captcha_token: token }),
       });
       const data = await res.json().catch(() => ({})) as { error?: string };
       if (!res.ok) { setError(ERR[data.error ?? ''] ?? 'ส่งไม่สำเร็จ กรุณาลองใหม่'); setState('idle'); return; }
@@ -35,7 +40,7 @@ export default function WalkInPage() {
   };
 
   const field: React.CSSProperties = { padding: '0.7rem', border: '1px solid #CBD5E1', borderRadius: 10, font: 'inherit', width: '100%', boxSizing: 'border-box' };
-  const ready = form.name.trim().length >= 2 && form.phone.replace(/\D/g, '').length >= 9 && form.goods.trim().length >= 2;
+  const ready = form.name.trim().length >= 2 && form.phone.replace(/\D/g, '').length >= 9 && form.goods.trim().length >= 2 && (!captchaRequired || token !== '');
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', justifyContent: 'center', padding: '1rem' }}>
@@ -49,6 +54,7 @@ export default function WalkInPage() {
             <input style={field} placeholder="ชื่อ-นามสกุล" maxLength={60} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             <input style={field} placeholder="เบอร์โทรศัพท์" inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
             <input style={field} placeholder="สินค้าที่จะขาย เช่น ผลไม้ เสื้อผ้า" maxLength={100} value={form.goods} onChange={e => setForm({ ...form, goods: e.target.value })} />
+            <AntiBot trap={trap} onTrap={setTrap} onToken={setToken} />
             {error && <div role="alert" style={{ color: '#B91C1C', fontSize: '0.9rem' }}>{error}</div>}
             <button type="button" disabled={state === 'busy' || !ready} onClick={() => void submit()}
               style={{ padding: '0.8rem', borderRadius: 12, border: 'none', background: ready ? '#0F766E' : '#94A3B8', color: '#fff', fontWeight: 700, font: 'inherit', cursor: ready ? 'pointer' : 'default' }}>

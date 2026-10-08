@@ -5,7 +5,7 @@ import BulkRoomModal from './BulkRoomModal';
 import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
 import { formatCurrency } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
-import { getWorkspaceTerms, rentTypeLabel, rentTypeOptions } from '../../utils/workspaceTerminology';
+import { defaultRentType, getWorkspaceTerms, rentTypeLabel, rentTypeOptions } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
 interface RoomManagementProps {
@@ -203,6 +203,13 @@ export default function RoomManagement({
     const toggleSelectAll = () => {
         setSelectedRooms(isAllSelected ? new Set() : new Set(rooms.map(r => r.id)));
     };
+
+    const setRentTypeFor = async (ids: string[], to: Room['rent_type']) => {
+        await Promise.all(ids.map(id => onUpdateRoom(id, { rent_type: to })));
+        setSelectedRooms(new Set());
+    };
+    const wantedRentType = defaultRentType(config?.building_type, config?.market_config?.default_rent_cycle);
+    const offCycle = rooms.filter(r => (r.rent_type || 'monthly') !== wantedRentType && wantedRentType !== 'monthly' && (r.rent_type || 'monthly') === 'monthly');
 
     const handleBulkDelete = () => {
         selectedRooms.forEach(id => onDeleteRoom(id));
@@ -554,6 +561,17 @@ export default function RoomManagement({
                 </div>
             </div>
 
+            {offCycle.length > 0 && (
+                <div className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', background: '#FFFBEB', borderColor: '#FCD34D' }}>
+                    <span style={{ flex: 1, minWidth: 220, fontSize: '0.875rem' }}>
+                        มี {offCycle.length} {terms.unitName}ที่ยังตั้งเป็น "{rentTypeLabel('monthly', config?.building_type)}" — {terms.isMarket ? 'ตลาดนี้เก็บเงินรายวัน/รายสัปดาห์' : 'ที่นี่เก็บเงินต่อคืน'}
+                    </span>
+                    <button className="btn btn-primary btn-sm" onClick={() => void setRentTypeFor(offCycle.map(r => r.id), wantedRentType)}>
+                        เปลี่ยนทั้งหมดเป็น "{rentTypeLabel(wantedRentType, config?.building_type)}"
+                    </button>
+                </div>
+            )}
+
             {/* Room List */}
             <div className="card">
                 <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -565,6 +583,11 @@ export default function RoomManagement({
                             <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
                                 เลือก {selectedRooms.size} {terms.unitName}
                             </span>
+                            <select className="form-input" style={{ width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.8rem' }} value="" aria-label="เปลี่ยนรูปแบบการเก็บเงิน"
+                                onChange={e => { if (e.target.value) void setRentTypeFor([...selectedRooms], e.target.value as Room['rent_type']); }}>
+                                <option value="">เปลี่ยนรูปแบบเก็บเงิน…</option>
+                                {rentTypeOptions(config?.building_type).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
                             <button
                                 className="btn btn-sm"
                                 onClick={() => setShowBulkDeleteConfirm(true)}

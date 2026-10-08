@@ -15,6 +15,7 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { notify } from './_notify.js';
+import { honeypotTripped, rateLimit, verifyCaptcha } from './_abuse-guard.js';
 import {
     CLOSURE_REASON_LABELS_TH, MAX_ACTIVE_CLOSURES_PER_ROOM, WALKIN_MAX_PER_DAY,
     cleanClosureInput, cleanWalkInInput, todayTh, upcomingClosures,
@@ -33,9 +34,17 @@ interface Body {
     status?: string;
     from_date?: unknown; to_date?: unknown; reason?: unknown; note?: unknown;
     date?: unknown; name?: unknown; phone?: unknown; goods?: unknown;
+    /** Hidden field: a person never fills it in. */
+    website?: unknown;
+    /** Cloudflare Turnstile token (only checked when TURNSTILE_SECRET is set). */
+    captcha_token?: unknown;
 }
 
 const PUBLIC = new Set(['closure_submit', 'closure_cancel', 'closure_list', 'walkin_submit']);
+/** Calls per visitor per hour, by public action: writes are tight, reads are loose. */
+const PUBLIC_LIMITS: Record<string, number> = { closure_submit: 10, walkin_submit: 5, closure_cancel: 30, closure_list: 120 };
+const WRITES = new Set(['closure_submit', 'walkin_submit']);
+
 const STAFF_PERM = { closure_ack: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create' } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -51,6 +60,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (PUBLIC.has(action)) {
         if (typeof body.owner_uid !== 'string' || !body.owner_uid) { res.status(400).json({ error: 'invalid_input' }); return; }
         owner = body.owner_uid;
+        const limited = await rateLimit(req, `market:${action}:${buildingId}`, PUBLIC_LIMITS[action], 3600);
+        if (!limited.ok) { res.setHeader?.('Retry-After', String(limited.retryAfterSec)); res.status(429).json({ error: 'too_many_requests', retry_after_sec: limited.retryAfterSec }); return; }
+        if (WRITES.has(action)) {
+            // bots that fill the hidden field get a normal-looking answer and nothing is stored
+            if (honeypotTripped(body.website)) { res.status(200).json({ ok: true, status: 'pending' }); return; }
+            if (!(await verifyCaptcha(body.captcha_token, req))) { res.status(400).json({ error: 'captcha_failed' }); return; }
+        }
         if (!(await buildingExists(owner, buildingId))) { res.status(404).json({ error: 'not_found' }); return; }
         const cfg = (await db.doc(`users/${owner}/buildings/${buildingId}/data/config`).get()).data();
         if (cfg?.building_type !== 'market') { res.status(404).json({ error: 'not_found' }); return; }

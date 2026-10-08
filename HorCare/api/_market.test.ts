@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).firebaseMock);
+// these tests exercise the market rules with many calls from one address; the limiter has its own tests (_abuse-guard.test.ts)
+vi.mock('./_abuse-guard.js', async () => ({ ...(await vi.importActual<typeof import('./_abuse-guard.js')>('./_abuse-guard.js')), rateLimit: async () => ({ ok: true, retryAfterSec: 0 }) }));
 
 import handler from './_market.js';
 import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
