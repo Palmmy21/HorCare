@@ -275,8 +275,6 @@ export default function Settings(props: SettingsProps) {
         dorm_name: config.bill_customization?.dorm_name || '',
         dorm_address: config.bill_customization?.dorm_address || '',
         dorm_phone: config.bill_customization?.dorm_phone || '',
-        promptpay_number: config.bill_customization?.promptpay_number || '',
-        promptpay_name: config.bill_customization?.promptpay_name || '',
         footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
         due_day: config.bill_customization?.due_day || 5,
         default_language: (config.bill_customization?.default_language || 'th') as BillLanguage,
@@ -309,8 +307,6 @@ export default function Settings(props: SettingsProps) {
             dorm_name: config.bill_customization?.dorm_name || '',
             dorm_address: config.bill_customization?.dorm_address || '',
             dorm_phone: config.bill_customization?.dorm_phone || '',
-            promptpay_number: config.bill_customization?.promptpay_number || '',
-            promptpay_name: config.bill_customization?.promptpay_name || '',
             footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
             due_day: config.bill_customization?.due_day || 5,
             default_language: (config.bill_customization?.default_language || 'th') as BillLanguage,
@@ -407,14 +403,14 @@ export default function Settings(props: SettingsProps) {
                 dorm_name: billForm.dorm_name,
                 dorm_address: billForm.dorm_address,
                 dorm_phone: billForm.dorm_phone,
-                promptpay_number: billForm.promptpay_number,
-                promptpay_name: billForm.promptpay_name,
                 footer_text: billForm.footer_text,
                 due_day: Number(billForm.due_day) || 5,
                 default_language: billForm.default_language,
                 bilingual_mode: billForm.bilingual_mode,
                 secondary_language: billForm.secondary_language,
                 ...(dormLogo ? { dorm_logo: dormLogo } : {}),
+                // legacy PromptPay values stay until they are moved onto a bank account (Payments → receiving accounts)
+                ...(config.bill_customization?.promptpay_number ? { promptpay_number: config.bill_customization.promptpay_number, promptpay_name: config.bill_customization.promptpay_name ?? '' } : {}),
             },
             ...(dormCode ? { dorm_code: dormCode } : {}),
             ...(portalPin.length === 4 ? { portal_pin: portalPin } : {}),
@@ -1481,29 +1477,8 @@ export default function Settings(props: SettingsProps) {
                     />
                 </div>
 
-                <div className="settings-grid">
-                    <div className="form-group">
-                        <label className="form-label">เลข PromptPay (เบอร์โทร หรือ บัตรประชาชน)</label>
-                        <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
-                            value={billForm.promptpay_number}
-                            onChange={e => handleBillFormChange('promptpay_number', e.target.value)}
-                            placeholder="เช่น 0812345678"
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">ชื่อบัญชี PromptPay</label>
-                        <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
-                            value={billForm.promptpay_name}
-                            onChange={e => handleBillFormChange('promptpay_name', e.target.value)}
-                            placeholder="เช่น นาย สมมติ ทดสอบ"
-                        />
-                    </div>
+                <div className="form-group" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.25)', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                    <strong>QR สำหรับรับเงินในบิล</strong> สร้างจากบัญชีรับเงินหลักของสถานที่นี้ ตั้งค่าได้ที่หน้า <em>การชำระเงิน → บัญชีรับเงิน</em> (ใส่เลข PromptPay เบอร์โทรหรือเลขบัตรประชาชนที่บัญชีนั้นได้)
                 </div>
 
                 <div className="settings-grid">

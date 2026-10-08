@@ -95,8 +95,6 @@ export default function TenantProfilePage({
       dorm_name: terms.isMarket ? 'ตลาดกลางพาณิชย์' : 'หอพัก',
       dorm_address: '',
       dorm_phone: '',
-      promptpay_number: '',
-      promptpay_name: '',
       footer_text: '',
       due_day: 5,
     },

@@ -168,12 +168,45 @@ describe('tenant_list', () => {
         expect(res.statusCode).toBe(200);
         expect(res.body.accounts[0].id).toBe(b.body.account.id);
         expect(res.body.accounts.map((a: any) => a.bank_code)).not.toContain('006');
-        expect(Object.keys(res.body.accounts[0]).sort()).toEqual(['account_name', 'account_number', 'bank_code', 'bank_short', 'id', 'is_default', 'nickname']);
+        expect(Object.keys(res.body.accounts[0]).sort()).toEqual(['account_name', 'account_number', 'bank_code', 'bank_short', 'id', 'is_default', 'nickname', 'promptpay_id']);
     });
 
     it('rejects unknown rooms and other properties', async () => {
         expect((await list({ room_id: 'nope' })).statusCode).toBe(404);
         expect((await list({ building_id: 'bld-B' })).statusCode).toBe(404);
         expect((await list({ room_id: undefined })).statusCode).toBe(400);
+    });
+});
+
+describe('PromptPay id on an account', () => {
+    it('is stored as digits (10-digit mobile or 13-digit ID), optional, and returned to the tenant portal', async () => {
+        const mobile = await create(OWNER, { promptpay_id: '081-234-5678' });
+        expect(mobile.body.account.promptpay_id).toBe('0812345678');
+        const idCard = await create(OWNER, { bank_code: '014', account_number: '9876543210', promptpay_id: '1-2345-67890-12-3' });
+        expect(idCard.body.account.promptpay_id).toBe('1234567890123');
+        const none = await create(OWNER, { bank_code: '002', account_number: '1111111111' });
+        expect(none.body.account.promptpay_id).toBeNull();
+        seed(`users/${OWNER}/buildings/${BLD}/rooms/r1`, { id: 'r1' });
+        const list = await call(undefined, { action: 'tenant_list', room_id: 'r1' });
+        expect(list.body.accounts.map((a: any) => a.promptpay_id).sort()).toEqual(['0812345678', '1234567890123', null].sort());
+    });
+
+    it('rejects malformed ids on create and update', async () => {
+        for (const bad of ['12345', '1812345678', 'abcdefghij', '08123456789']) expect((await create(OWNER, { promptpay_id: bad })).statusCode).toBe(400);
+        const id = (await create(OWNER)).body.account.id;
+        const r = await call(OWNER, { action: 'update', account_id: id, promptpay_id: '123' });
+        expect(r.statusCode).toBe(400);
+        expect(r.body.error).toBe('invalid_promptpay');
+    });
+
+    it('can be set, changed and cleared; the audit log keeps neither the old nor the new number', async () => {
+        const id = (await create(OWNER)).body.account.id;
+        expect((await call(OWNER, { action: 'update', account_id: id, promptpay_id: '0812345678' })).statusCode).toBe(200);
+        expect(read(`${COL}/${id}`)!.promptpay_id).toBe('0812345678');
+        expect((await call(OWNER, { action: 'update', account_id: id, promptpay_id: '' })).statusCode).toBe(200);
+        expect(read(`${COL}/${id}`)!.promptpay_id).toBeNull();
+        const logs = JSON.stringify(listPaths(`users/${OWNER}/audit_logs/`).map(p => read(p)));
+        expect(logs).not.toContain('0812345678');
+        expect(logs).toContain('cleared');
     });
 });

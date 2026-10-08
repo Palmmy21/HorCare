@@ -683,7 +683,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
             {showAccounts && uid && buildingId && (
                 <BankAccountsModal
                     ownerUid={uid} buildingId={buildingId} accounts={accounts} loading={accountsLoading}
-                    canManage={canManageAccounts} onClose={() => setShowAccounts(false)}
+                    canManage={canManageAccounts} legacyPromptPay={config.bill_customization?.promptpay_number} onClose={() => setShowAccounts(false)}
                 />
             )}
 

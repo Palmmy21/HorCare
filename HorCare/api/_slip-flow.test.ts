@@ -116,29 +116,36 @@ describe('evaluateSlip', () => {
         expect(e.fields.bank_account_id).toBeUndefined();
     });
 
-    it('treats the configured PromptPay name/number as a receiving account', async () => {
+    it('a transfer to the account\'s PromptPay id (slip shows the masked phone, not the account number) is credited to that account', async () => {
+        seed(`${B}/bank_accounts/acc1`, { ...read(`${B}/bank_accounts/acc1`)!, promptpay_id: '0812345678' });
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), receiver_account: 'xxx-xxx-5678' }));
+        const e = await run();
+        expect(e.autoApprove).toBe(true);
+        expect(e.fields).toMatchObject({ bank_account_id: 'acc1', slip_account_id: 'acc1', bank_account: 'KBANK ••••7890' });
+        // and a slip to someone else is still refused
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), receiver_name: 'นาย อื่น คนอื่น', receiver_account: 'xxx-xxx-0000' }));
+        expect((await run()).autoApprove).toBe(false);
+    });
+
+    it('a PromptPay number that only lived in the old settings no longer counts as a receiver', async () => {
         seed(`${B}/bank_accounts/acc1`, { ...read(`${B}/bank_accounts/acc1`)!, status: 'inactive' });
         seed(`${B}/data/config`, { bill_customization: { promptpay_name: 'สมชาย ใจดี', promptpay_number: '0812345678' } });
         fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), receiver_account: 'xxx-xxx-5678' }));
         const e = await run();
-        expect(e.autoApprove).toBe(true);
-        expect(e.fields).toMatchObject({ bank_account: 'PromptPay' });
+        expect(e.fields.bank_account).toBeUndefined();
         expect(e.fields.bank_account_id).toBeUndefined();
-        // and a slip to someone else is refused
-        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), receiver_name: 'นาย อื่น คนอื่น', receiver_account: 'xxx-xxx-0000' }));
-        expect((await run()).autoApprove).toBe(false);
     });
 });
 
 describe('loadReceiverCandidates', () => {
-    it('lists active accounts and PromptPay, with masked labels', async () => {
-        seed(`${B}/bank_accounts/acc2`, { id: 'acc2', bank_code: '014', bank_short: 'SCB', account_name: 'X', account_number: '9876543210', status: 'inactive' });
-        seed(`${B}/data/config`, { bill_customization: { promptpay_name: 'P', promptpay_number: '081-234-5678' } });
+    it('lists active accounts (twice when an account has a PromptPay id), with masked labels', async () => {
+        seed(`${B}/bank_accounts/acc2`, { id: 'acc2', bank_code: '014', bank_short: 'SCB', account_name: 'X', account_number: '9876543210', status: 'inactive', promptpay_id: '0899999999' });
+        seed(`${B}/bank_accounts/acc1`, { ...read(`${B}/bank_accounts/acc1`)!, promptpay_id: '081-234-5678' });
         const { candidates, accounts } = await loadReceiverCandidates(OWNER, BLD);
         expect(accounts.map(a => a.id)).toEqual(['acc1']);
         expect(candidates).toEqual([
             { id: 'acc1', name: 'สมชาย ใจดี', number: '1234567890', label: 'KBANK ••••7890' },
-            { id: 'promptpay', name: 'P', number: '0812345678', label: 'PromptPay' },
+            { id: 'acc1', name: 'สมชาย ใจดี', number: '0812345678', label: 'KBANK ••••7890' },
         ]);
     });
 });

@@ -25,23 +25,18 @@ export interface SlipEvaluation {
     aiAmount: number | null;
 }
 
-const PROMPTPAY_ID = 'promptpay';
-
 export async function loadReceiverCandidates(ownerUid: string, buildingId: string): Promise<{ candidates: ReceiverCandidate[]; accounts: BankAccount[] }> {
     const base = `users/${ownerUid}/buildings/${buildingId}`;
-    const [accSnap, cfgSnap] = await Promise.all([
-        db.collection(`${base}/bank_accounts`).get(),
-        db.doc(`${base}/data/config`).get(),
-    ]);
+    const accSnap = await db.collection(`${base}/bank_accounts`).get();
     const accounts = accSnap.docs.map(d => d.data() as BankAccount).filter(a => a.status === 'active');
     const candidates: ReceiverCandidate[] = accounts.map(a => ({
         id: a.id, name: a.account_name, number: a.account_number, label: bankAccountLabel(a),
     }));
-    const bc = cfgSnap.data()?.bill_customization as { promptpay_name?: string; promptpay_number?: string } | undefined;
-    if (bc?.promptpay_name || bc?.promptpay_number) {
-        candidates.push({
-            id: PROMPTPAY_ID, name: bc.promptpay_name || null, number: bc.promptpay_number ? digitsOnly(bc.promptpay_number) : null, label: 'PromptPay',
-        });
+    // A transfer made to the account's PromptPay id shows the receiver's name and the masked phone / ID, not the
+    // account number — so the id is a second way to recognise the same account (same candidate id).
+    for (const a of accounts) {
+        const id = a.promptpay_id ? digitsOnly(a.promptpay_id) : '';
+        if (id) candidates.push({ id: a.id, name: a.account_name, number: id, label: bankAccountLabel(a) });
     }
     return { candidates, accounts };
 }
@@ -75,8 +70,7 @@ export async function evaluateSlip(input: {
     });
 
     const qr = parseSlipQr(input.qrPayload);
-    const matched = verdict.matched_candidate_id && verdict.matched_candidate_id !== PROMPTPAY_ID
-        ? candidates.find(c => c.id === verdict.matched_candidate_id) : undefined;
+    const matched = verdict.matched_candidate_id ? candidates.find(c => c.id === verdict.matched_candidate_id) : undefined;
 
     const fields: Record<string, unknown> = compact({
         slip_amount: details.amount,
@@ -98,7 +92,7 @@ export async function evaluateSlip(input: {
             // Slip evidence only — not yet matched to a real bank transaction.
             verification_status: 'unverified',
             bank_account_id: matched?.id,
-            bank_account: matched?.label ?? (verdict.matched_candidate_id === PROMPTPAY_ID ? 'PromptPay' : undefined),
+            bank_account: matched?.label,
         }));
     }
 

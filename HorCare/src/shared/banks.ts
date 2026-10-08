@@ -65,11 +65,16 @@ export interface BankAccount {
   /** Digits only. Shown masked in the UI except to people who manage accounts. */
   account_number: string;
   nickname: string | null;
+  /** PromptPay mobile number (10 digits) or national/tax ID (13 digits) of the account's owner — optional. */
+  promptpay_id?: string | null;
   status: 'active' | 'inactive';
   is_default: boolean;
   created_at: string;
   updated_at: string;
 }
+
+/** What is needed to pay into an account: used for QR codes and the tenant portal. */
+export type PayAccount = Pick<BankAccount, 'bank_code' | 'bank_short' | 'account_name' | 'account_number' | 'promptpay_id'>;
 
 /** Short label used on payments, e.g. "KBANK ••••7890". */
 export function bankAccountLabel(a: Pick<BankAccount, 'bank_short' | 'account_number'>): string {

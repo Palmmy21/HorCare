@@ -5,6 +5,7 @@ import { apiPost, ApiError } from '../../utils/api';
 import {
     BANKS, bankByCode, isValidAccountNumber, maskAccountNumber, type BankAccount,
 } from '../../shared/banks';
+import { cleanPromptPayId, maskPromptPayId } from '../../shared/thaiQr';
 import BankLogo from './BankLogo';
 
 interface Props {
@@ -14,21 +15,25 @@ interface Props {
     loading: boolean;
     /** Owner / property manager. Others only see the list. */
     canManage: boolean;
+    /** PromptPay number the property used to keep in Settings; offered once so it can be moved onto an account. */
+    legacyPromptPay?: string | null;
     onClose: () => void;
 }
 
 const ERRORS: Record<string, string> = {
     duplicate_account: 'มีบัญชีนี้อยู่แล้ว',
     invalid_input: 'ข้อมูลไม่ถูกต้อง ตรวจสอบธนาคาร ชื่อบัญชี และเลขบัญชี (10–15 หลัก)',
+    invalid_promptpay: 'เลข PromptPay ไม่ถูกต้อง ต้องเป็นเบอร์โทร 10 หลัก (ขึ้นต้นด้วย 0) หรือเลขบัตรประชาชน/เลขผู้เสียภาษี 13 หลัก',
     forbidden: 'คุณไม่มีสิทธิ์จัดการบัญชีรับเงิน',
     unauthenticated: 'กรุณาเข้าสู่ระบบใหม่',
     account_inactive: 'บัญชีที่ปิดใช้งานตั้งเป็นบัญชีหลักไม่ได้',
 };
 
-interface FormState { bank_code: string; account_name: string; account_number: string; nickname: string }
-const EMPTY: FormState = { bank_code: '', account_name: '', account_number: '', nickname: '' };
+interface FormState { bank_code: string; account_name: string; account_number: string; nickname: string; promptpay_id: string }
+const EMPTY: FormState = { bank_code: '', account_name: '', account_number: '', nickname: '', promptpay_id: '' };
 
-export default function BankAccountsModal({ ownerUid, buildingId, accounts, loading, canManage, onClose }: Props) {
+export default function BankAccountsModal({ ownerUid, buildingId, accounts, loading, canManage, legacyPromptPay: legacyRaw, onClose }: Props) {
+    const legacyPromptPay = legacyRaw ? cleanPromptPayId(legacyRaw) : null;
     const [form, setForm] = useState<FormState>(EMPTY);
     const [editingId, setEditingId] = useState<string | null>(null);   // null + showForm = adding
     const [showForm, setShowForm] = useState(false);
@@ -60,16 +65,17 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
 
     const openAdd = () => { setForm(EMPTY); setEditingId(null); setShowForm(true); setError(null); };
     const openEdit = (a: BankAccount) => {
-        setForm({ bank_code: a.bank_code, account_name: a.account_name, account_number: a.account_number, nickname: a.nickname ?? '' });
+        setForm({ bank_code: a.bank_code, account_name: a.account_name, account_number: a.account_number, nickname: a.nickname ?? '', promptpay_id: a.promptpay_id ?? '' });
         setEditingId(a.id); setShowForm(true); setError(null);
     };
 
     const numberOk = isValidAccountNumber(form.account_number);
-    const canSubmit = !busy && !!bankByCode(form.bank_code) && form.account_name.trim().length >= 2 && numberOk;
+    const promptpayOk = form.promptpay_id.trim() === '' || cleanPromptPayId(form.promptpay_id) !== null;
+    const canSubmit = !busy && !!bankByCode(form.bank_code) && form.account_name.trim().length >= 2 && numberOk && promptpayOk;
 
     const submit = async () => {
         if (!canSubmit) return;
-        const payload = { bank_code: form.bank_code, account_name: form.account_name.trim(), account_number: form.account_number, nickname: form.nickname.trim() };
+        const payload = { bank_code: form.bank_code, account_name: form.account_name.trim(), account_number: form.account_number, nickname: form.nickname.trim(), promptpay_id: form.promptpay_id.trim() };
         const ok = editingId
             ? await call('save', { action: 'update', account_id: editingId, ...payload }, 'บันทึกบัญชีแล้ว')
             : await call('save', { action: 'create', ...payload }, 'เพิ่มบัญชีแล้ว');
@@ -90,7 +96,7 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                 <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-gray-600)' }}>
                         เมื่อลูกบ้านส่งสลิป ระบบจะอ่านยอด ชื่อผู้รับ เลขบัญชี และวันเวลาจากสลิป แล้วเทียบกับบัญชีเหล่านี้
-                        (และ PromptPay ที่ตั้งไว้ในการตั้งค่า) การอนุมัติอัตโนมัติจากสลิปยังไม่ใช่การยืนยันกับบัญชีธนาคารจริง
+                        (รวมถึงเลข PromptPay ของบัญชี) การอนุมัติอัตโนมัติจากสลิปยังไม่ใช่การยืนยันกับบัญชีธนาคารจริง ส่วน QR ที่ลูกบ้านสแกนจ่ายสร้างจากบัญชีหลักนี้
                     </p>
 
                     {loading ? (
@@ -116,7 +122,7 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                                                     {a.status !== 'active' && <span style={{ fontSize: '0.68rem', color: '#6B7280', fontWeight: 700 }}>ปิดใช้งาน</span>}
                                                 </div>
                                                 <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-600)' }}>
-                                                    {a.account_name}{a.nickname ? ` · ${a.nickname}` : ''}
+                                                    {a.account_name}{a.nickname ? ` · ${a.nickname}` : ''}{a.promptpay_id ? ` · PromptPay ${maskPromptPayId(a.promptpay_id)}` : ''}
                                                 </div>
                                                 <div className="mono" style={{ fontSize: '0.8125rem' }}>
                                                     {shown ? a.account_number.replace(/^(\d{3})(\d)(\d{5})(\d+)$/, '$1-$2-$3-$4') : maskAccountNumber(a.account_number)}
@@ -183,11 +189,17 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                                 <label style={field}><span className="form-label">เลขบัญชี *</span>
                                     <input className="form-input mono" inputMode="numeric" maxLength={20} value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} />
                                     {form.account_number !== '' && !numberOk && <span style={{ color: '#DC2626', fontSize: '0.72rem' }}>เลขบัญชีต้องมี 10–15 หลัก</span>}</label>
+                                <label style={field}><span className="form-label">เลข PromptPay — เบอร์โทร หรือ เลขบัตรประชาชน (ไม่บังคับ)</span>
+                                    <input className="form-input mono" inputMode="numeric" maxLength={17} placeholder="เช่น 0812345678" value={form.promptpay_id} onChange={e => setForm(f => ({ ...f, promptpay_id: e.target.value }))} />
+                                    {legacyPromptPay && form.promptpay_id.trim() === '' && (
+                                        <button type="button" className="btn btn-outline btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setForm(f => ({ ...f, promptpay_id: legacyPromptPay }))}>ใช้ PromptPay เดิมจากการตั้งค่า</button>
+                                    )}
+                                    {!promptpayOk && <span style={{ color: '#DC2626', fontSize: '0.72rem' }}>ต้องเป็นเบอร์โทร 10 หลัก (ขึ้นต้นด้วย 0) หรือเลข 13 หลัก</span>}</label>
                                 <label style={field}><span className="form-label">ชื่อเรียก (ไม่บังคับ)</span>
                                     <input className="form-input" maxLength={40} placeholder="เช่น บัญชีค่าเช่า" value={form.nickname} onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))} /></label>
                             </div>
                             <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--color-gray-500)' }}>
-                                ใส่ชื่อให้ตรงกับที่ปรากฏบนสลิปโอนเงิน ระบบใช้เทียบชื่อผู้รับ (สลิปมักแสดงชื่อแบบย่อ ซึ่งรองรับ)
+                                ใส่ชื่อให้ตรงกับที่ปรากฏบนสลิปโอนเงิน ระบบใช้เทียบชื่อผู้รับ (สลิปมักแสดงชื่อแบบย่อ ซึ่งรองรับ) ถ้าใส่เลข PromptPay ลูกบ้านจะสแกน QR PromptPay ซึ่งแอปธนาคารรองรับทุกแห่ง ถ้าไม่ใส่จะสร้าง QR จากเลขบัญชี (ยังไม่ได้ทดสอบกับทุกแอปธนาคาร)
                             </p>
 
                             {error && <div role="alert" style={{ color: '#DC2626', fontSize: '0.8125rem' }}>{error}</div>}

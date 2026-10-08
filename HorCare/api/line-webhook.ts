@@ -506,7 +506,7 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
                     { type: 'separator', margin: 'md' },
                     {
                         type: 'text',
-                        text: 'ดูบิล · สถานะการชำระ · แจ้งซ่อม · QR PromptPay',
+                        text: 'ดูบิล · สถานะการชำระ · แจ้งซ่อม · QR โอนเงิน',
                         size: 'xs',
                         color: '#888888',
                         margin: 'md',

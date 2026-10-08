@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { buildFineFlex, buildPromptpayMessages, linePush } from './_line.js';
+import { buildFineFlex, linePush } from './_line.js';
+import { loadPayAccount, paymentQrMessages } from './_payment-qr.js';
+import { appBaseUrl } from './_notify.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { Fine } from '../src/types/index.js';
@@ -44,8 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const configSnap = await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get();
         const cfg = configSnap.data() ?? {};
         const dormName       = cfg.bill_customization?.dorm_name || 'หอพัก';
-        const promptpayNumber = (cfg.bill_customization?.promptpay_number ?? '') as string;
-        const promptpayName   = (cfg.bill_customization?.promptpay_name ?? '') as string;
+        const payAccount = await loadPayAccount(uid, building_id);
         let appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
         if (appUrl && !appUrl.startsWith('http')) appUrl = `https://${appUrl}`;
 
@@ -82,9 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             : undefined;
 
         const messages: object[] = [buildFineFlex(fine as Fine, dormName, { portalUrl })];
-        if (promptpayNumber && fine.amount > 0) {
-            messages.push(...buildPromptpayMessages(promptpayNumber, promptpayName, fine.amount));
-        }
+        messages.push(...paymentQrMessages(payAccount, fine.amount, appUrl || appBaseUrl()));
 
         await linePush(lineUserId, messages);
 
