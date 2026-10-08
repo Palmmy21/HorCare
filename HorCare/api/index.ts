@@ -19,6 +19,8 @@ import parcelsHandler from './_parcels.js';
 import workOrdersHandler from './_work-orders.js';
 import lineInboxHandler from './_line-inbox.js';
 import bankAccountsHandler from './_bank-accounts.js';
+import chatbotHandler from './_chatbot.js';
+import announcementsHandler from './_announcements.js';
 import remindParcelsHandler from './_remind-parcels.js';
 
 // Apply the maximum duration config globally to this API gateway
@@ -38,6 +40,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         case 'work-orders': return workOrdersHandler(req, res);
         case 'line-inbox': return lineInboxHandler(req, res);
         case 'bank-accounts': return bankAccountsHandler(req, res);
+        case 'chatbot': return chatbotHandler(req, res);
+        case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);

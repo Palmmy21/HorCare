@@ -216,6 +216,14 @@ service cloud.firestore {
         }
         // ── LINE inbox: tenant conversations. Written by the LINE webhook and /api/line-inbox only.
         // Reading needs message.read on THIS property.
+        match /faqs/{faqId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'chatbot.manage');
+          allow write: if false;
+        }
+        match /announcements/{announcementId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'announcement.manage');
+          allow write: if false;
+        }
         match /line_threads/{lineUserId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'message.read');
           allow write: if false;

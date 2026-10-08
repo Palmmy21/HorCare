@@ -35,6 +35,13 @@ describe('RBAC catalog', () => {
     expect(can('finance', 'finance.read')).toBe(true);
   });
 
+  it('only owner and manager edit the chatbot; front desk may also publish announcements; finance and staff may not', () => {
+    for (const role of ROLES) {
+      expect(can(role, 'chatbot.manage')).toBe(role === 'owner' || role === 'property_manager');
+      expect(can(role, 'announcement.manage')).toBe(role === 'owner' || role === 'property_manager' || role === 'front_desk');
+    }
+  });
+
   it('finance can reconcile, front desk can invite tenants', () => {
         expect(can('finance', 'payment.reconcile')).toBe(true);
         expect(can('front_desk', 'invitation.create')).toBe(true);
