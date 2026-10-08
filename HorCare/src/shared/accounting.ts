@@ -371,3 +371,30 @@ export function buildVouchers(input: PostingInput): PostingResult {
 
 export const sumDr = (vs: Voucher[]) => vs.reduce((s, v) => s + v.total_dr_satang, 0);
 export const sumCr = (vs: Voucher[]) => vs.reduce((s, v) => s + v.total_cr_satang, 0);
+
+// ── Export batches (as stored by the API) ────────────────────────────────────
+
+export interface ExportBatch {
+  id: string;
+  profile_id: string;
+  kind: VoucherKind;
+  from: string;
+  to: string;
+  template_version: string;
+  file_name: string;
+  status: 'ready';
+  import_outcome: 'unknown' | 'confirmed' | 'failed' | 'partial';
+  import_note: string | null;
+  import_by?: string;
+  import_at?: string;
+  vouchers_count: number;
+  lines_count: number;
+  dr_satang: number;
+  cr_satang: number;
+  created_at: string;
+  created_by_name: string;
+}
+
+export const IMPORT_OUTCOME_LABELS_TH: Record<ExportBatch['import_outcome'], string> = {
+  unknown: 'ยังไม่ทราบผลนำเข้า', confirmed: 'นำเข้า Mango สำเร็จ', failed: 'นำเข้าล้มเหลว', partial: 'นำเข้าบางส่วน',
+};
