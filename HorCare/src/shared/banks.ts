@@ -75,3 +75,9 @@ export interface BankAccount {
 export function bankAccountLabel(a: Pick<BankAccount, 'bank_short' | 'account_number'>): string {
   return `${a.bank_short} ${maskAccountNumber(a.account_number).slice(-8)}`;
 }
+
+/** Full account number grouped the way Thai banks print it (10 digits → xxx-x-xxxxx-x); other lengths unchanged. */
+export function formatAccountNumber(raw: string): string {
+    const d = digitsOnly(raw);
+    return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 4)}-${d.slice(4, 9)}-${d.slice(9)}` : d;
+}
