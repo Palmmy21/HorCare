@@ -201,6 +201,7 @@ export interface MonthlyBill {
   slip_checks?: SlipChecks;
   transaction_ref?: string;        // bank / gateway reference
   verification_status?: PaymentVerification; // transfers: has the money been seen in the account?
+  bank_transaction_id?: string;    // the bank transaction this payment was reconciled with
   payment_note?: string;
 
   // ── Auto reminders (written by /api/remind-bills cron) ──
@@ -488,6 +489,7 @@ export interface Fine {
   bank_account_id?: string;
   transaction_ref?: string;
   verification_status?: PaymentVerification;
+  bank_transaction_id?: string;
   payment_note?: string;
   slip_receiver_name?: string;
   slip_receiver_account?: string;
