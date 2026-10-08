@@ -53,6 +53,9 @@ export interface ReceivableDoc {
   revision: string;
   /** Optional short code of the property, to keep document numbers unique across properties. */
   property_code?: string;
+  /** Tenant name / phone for the optional customer block of the file. */
+  customer_name?: string;
+  customer_tel?: string;
 }
 
 export type ChannelKey = string; // 'cash' | 'bank:<bankAccountId>' | 'bank:unknown' | 'qr_gateway' | 'other'
@@ -96,8 +99,12 @@ export interface MangoProfile {
     customer_code_all_lines: boolean;
     /** Fill "Voucher no." with HorCare's document number (otherwise left for Mango). */
     voucher_no_from_horcare: boolean;
-    /** How dates are written in the file — not confirmed by Mango yet, so the accountant picks. */
-    date_format: 'dd/mm/yyyy' | 'dd/mm/yyyy_be' | 'yyyy-mm-dd';
+    /** Display format of date cells (they are real Excel dates). 'template' keeps the format of Mango's sample. */
+    date_format: 'template' | 'dd/mm/yyyy' | 'yyyy-mm-dd';
+    /** Fill Ref No./Ref Date (header) and Ref no./Ref Date (detail). Mango's sample leaves them empty, so off by default. */
+    fill_reference_columns: boolean;
+    /** Fill Customer Name (AM) and Tel No. (AQ) as the sample does. */
+    fill_customer_block: boolean;
     /** Repeat the header fields (voucher no., date, remarks…) on every line of a voucher, or only on its first line. */
     header_on_every_line: boolean;
   };
@@ -123,7 +130,7 @@ export interface MangoProfile {
 export function emptyProfile(id: string): MangoProfile {
   return {
     id, name: '', legal_entity_name: '', template_version: '', property_ids: [], property_codes: {}, status: 'draft',
-    options: { invoice_date_basis: 'issued_at', count_unverified_transfers: false, opening_cutoff_month: null, customer_code_all_lines: false, voucher_no_from_horcare: false, date_format: 'dd/mm/yyyy', header_on_every_line: true },
+    options: { invoice_date_basis: 'issued_at', count_unverified_transfers: false, opening_cutoff_month: null, customer_code_all_lines: true, voucher_no_from_horcare: false, date_format: 'template', fill_reference_columns: false, fill_customer_block: false, header_on_every_line: true },
     codes: { ar_account: '', project: null, job: null, department: null, cost_code: null, book: null, pu_cost_yn: null, ac_type: null, data_type: null },
     remarks: { invoice: 'บันทึกตั้งลูกหนี้', receipt: 'บันทึกตัดลูกหนี้' },
     revenue_accounts: {}, channels: {}, customers: {},
@@ -173,6 +180,8 @@ export interface Voucher {
   voucher_date: string;
   remark1: string;
   customer_code: string;
+  customer_name?: string;
+  customer_tel?: string;
   room_number: string;
   lines: JournalLine[];
   total_dr_satang: number;
@@ -303,7 +312,7 @@ export function buildVouchers(input: PostingInput): PostingResult {
       ]);
       const v = finish({
         key: `${entity}|invoice|${d.kind}:${d.id}|${d.revision}`, kind: 'invoice', doc_ref: ref, voucher_date: date,
-        remark1: profile.remarks.invoice, customer_code: code, room_number: d.room_number, lines,
+        remark1: profile.remarks.invoice, customer_code: code, customer_name: d.customer_name, customer_tel: d.customer_tel, room_number: d.room_number, lines,
         sources: [{ kind: d.kind, id: d.id, revision: d.revision }],
       }, problems, src);
       if (v) vouchers.push(v);
@@ -361,7 +370,7 @@ export function buildVouchers(input: PostingInput): PostingResult {
     ]);
     const v = finish({
       key: `${entity}|receipt|payment:${p.id}|${p.revision}`, kind: 'receipt', doc_ref: ref, voucher_date: date,
-      remark1: profile.remarks.receipt, customer_code: code, room_number: targets[0].room_number, lines,
+      remark1: profile.remarks.receipt, customer_code: code, customer_name: targets[0].customer_name, customer_tel: targets[0].customer_tel, room_number: targets[0].room_number, lines,
       sources: [{ kind: 'payment', id: p.id, revision: p.revision }],
     }, problems, src);
     if (v) vouchers.push(v);

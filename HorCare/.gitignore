@@ -34,3 +34,6 @@ functions/.env.*
 
 .vercel
 .env*
+
+# Customer sample/template files contain real customer data — never commit or serve them
+public/mango-*.xlsx

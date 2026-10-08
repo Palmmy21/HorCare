@@ -110,14 +110,16 @@ export function legacyPayment(kind: 'bill' | 'fine', item: PaidItem): PaymentRec
 
 async function loadBuilding(owner: string, bld: string, code?: string) {
     const base = bldBase(owner, bld);
-    const [bills, fines, pays] = await Promise.all([
-        db.collection(`${base}/bills`).get(), db.collection(`${base}/fines`).get(), db.collection(`${base}/payments`).get(),
+    const [bills, fines, pays, tenants] = await Promise.all([
+        db.collection(`${base}/bills`).get(), db.collection(`${base}/fines`).get(), db.collection(`${base}/payments`).get(), db.collection(`${base}/tenants`).get(),
     ]);
+    const tenantOf = new Map(tenants.docs.map(t => [t.id, t.data() as { full_name?: string; phone?: string }]));
     const docs: ReceivableDoc[] = [];
     const payments: PaymentRec[] = [];
     for (const d of bills.docs) { const b = d.data() as PaidItem & MonthlyBill; docs.push(billToDoc(b, code)); const l = legacyPayment('bill', b); if (l) payments.push(l); }
     for (const d of fines.docs) { const f = d.data() as PaidItem & Fine; docs.push(fineToDoc(f, code)); const l = legacyPayment('fine', f); if (l) payments.push(l); }
     for (const d of pays.docs) payments.push(d.data() as PaymentRec);
+    for (const d of docs) { const t = tenantOf.get(d.room_id); if (t) { d.customer_name = t.full_name; d.customer_tel = t.phone; } }
     return { docs, payments };
 }
 
@@ -154,8 +156,8 @@ export function cleanProfile(raw: unknown, id: string): MangoProfile | null {
     const cutoff = o.opening_cutoff_month === null || o.opening_cutoff_month === undefined || o.opening_cutoff_month === '' ? null : String(o.opening_cutoff_month);
     if (cutoff !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)) return null;
     if (!['issued_at', 'month_end'].includes(o.invoice_date_basis)) return null;
-    if (!['dd/mm/yyyy', 'dd/mm/yyyy_be', 'yyyy-mm-dd'].includes(o.date_format)) return null;
-    for (const k of ['count_unverified_transfers', 'customer_code_all_lines', 'voucher_no_from_horcare', 'header_on_every_line']) if (typeof o[k] !== 'boolean') return null;
+    if (!['template', 'dd/mm/yyyy', 'yyyy-mm-dd'].includes(o.date_format)) return null;
+    for (const k of ['count_unverified_transfers', 'customer_code_all_lines', 'voucher_no_from_horcare', 'header_on_every_line', 'fill_reference_columns', 'fill_customer_block']) if (typeof o[k] !== 'boolean') return null;
 
     const code = (v: unknown) => optStr(v, 40);
     const codes = {
@@ -191,7 +193,8 @@ export function cleanProfile(raw: unknown, id: string): MangoProfile | null {
         id, name, legal_entity_name: entity, template_version: tmpl, property_ids: [...new Set<string>(r.property_ids)], property_codes,
         status: r.status === 'approved' ? 'approved' : 'draft',
         options: { invoice_date_basis: o.invoice_date_basis, count_unverified_transfers: o.count_unverified_transfers, opening_cutoff_month: cutoff,
-            customer_code_all_lines: o.customer_code_all_lines, voucher_no_from_horcare: o.voucher_no_from_horcare, date_format: o.date_format, header_on_every_line: o.header_on_every_line },
+            customer_code_all_lines: o.customer_code_all_lines, voucher_no_from_horcare: o.voucher_no_from_horcare, date_format: o.date_format, header_on_every_line: o.header_on_every_line,
+            fill_reference_columns: o.fill_reference_columns, fill_customer_block: o.fill_customer_block },
         codes: { ...codes, ar_account: codes.ar_account! } as MangoProfile['codes'],
         remarks: { invoice, receipt }, revenue_accounts: rev, channels, customers,
     };
