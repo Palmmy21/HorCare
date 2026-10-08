@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, Search, Send, Loader2, ArrowLeft, MessageCircle } from 'lucide-react';
+import { MessageSquare, Search, Send, Loader2, ArrowLeft, MessageCircle, Play } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useThreadMessages } from '../../hooks/useLineThreads';
 import { apiPost, ApiError } from '../../utils/api';
-import { MAX_OUTGOING_CHARS, type LineThread } from '../../shared/messages';
+import { MAX_OUTGOING_CHARS, type LineMessage, type LineThread } from '../../shared/messages';
 
 interface Props {
     ownerUid: string;
@@ -28,7 +28,70 @@ function when(iso: string): string {
     return sameDay ? d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 }
 
+// Signed URLs last 15 minutes server-side; reuse them for 10 so scrolling doesn't re-request.
+const urlCache = new Map<string, { url: string; expires: number }>();
+
+async function fetchMediaUrl(ownerUid: string, buildingId: string, lineUserId: string, messageId: string): Promise<string> {
+    const key = `${ownerUid}/${buildingId}/${lineUserId}/${messageId}`;
+    const hit = urlCache.get(key);
+    if (hit && hit.expires > Date.now()) return hit.url;
+    const { url } = await apiPost<{ url: string }>('line-inbox', {
+        action: 'media_url', owner_uid: ownerUid, building_id: buildingId, line_user_id: lineUserId, message_id: messageId,
+    });
+    urlCache.set(key, { url, expires: Date.now() + 10 * 60 * 1000 });
+    return url;
+}
+
+/** A tenant's photo or voice message. Files are fetched through a permission-checked signed link. */
+function MediaBubble({ ownerUid, buildingId, lineUserId, message, onZoom }: {
+    ownerUid: string; buildingId: string; lineUserId: string; message: LineMessage; onZoom: (url: string) => void;
+}) {
+    const [url, setUrl] = useState<string | null>(null);
+    const [failed, setFailed] = useState(false);
+    const [loadingAudio, setLoadingAudio] = useState(false);
+    const isImage = message.kind === 'image';
+
+    // Photos load as soon as they appear; voice messages wait until the owner presses play.
+    useEffect(() => {
+        if (!isImage) return;
+        let cancelled = false;
+        fetchMediaUrl(ownerUid, buildingId, lineUserId, message.id)
+            .then(u => { if (!cancelled) setUrl(u); })
+            .catch(() => { if (!cancelled) setFailed(true); });
+        return () => { cancelled = true; };
+    }, [isImage, ownerUid, buildingId, lineUserId, message.id]);
+
+    if (isImage) {
+        if (failed) return <div style={{ fontSize: '0.8rem', fontStyle: 'italic' }}>โหลดรูปไม่ได้</div>;
+        if (!url) return <div style={{ width: 160, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={18} className="spin" /></div>;
+        return (
+            <button type="button" onClick={() => onZoom(url)} aria-label="ขยายรูป" style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}>
+                <img src={url} alt="รูปจากผู้เช่า" loading="lazy" style={{ maxWidth: 240, maxHeight: 280, borderRadius: 10, display: 'block' }} />
+            </button>
+        );
+    }
+
+    // audio
+    if (url) return <audio controls autoPlay src={url} style={{ maxWidth: 240 }} />;
+    return (
+        <button
+            type="button" disabled={loadingAudio}
+            onClick={() => {
+                setLoadingAudio(true);
+                fetchMediaUrl(ownerUid, buildingId, lineUserId, message.id)
+                    .then(setUrl)
+                    .catch(() => toast.error('เปิดข้อความเสียงไม่ได้ กรุณาลองใหม่'))
+                    .finally(() => setLoadingAudio(false));
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'inherit', fontWeight: 600 }}
+        >
+            {loadingAudio ? <Loader2 size={16} className="spin" /> : <Play size={16} />} ฟังข้อความเสียง
+        </button>
+    );
+}
+
 export default function MessagesPage({ ownerUid, buildingId, unitName, threads, loading, error }: Props) {
+    const [zoomUrl, setZoomUrl] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [draft, setDraft] = useState('');
@@ -155,7 +218,11 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                                                 padding: '0.5rem 0.75rem', borderRadius: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                                 background: mine ? '#06C755' : '#fff', color: mine ? '#fff' : 'var(--color-gray-800)',
                                                 border: mine ? 'none' : '1px solid var(--color-gray-200)', fontStyle: m.kind === 'sticker' ? 'italic' : 'normal',
-                                            }}>{m.text}</div>
+                                            }}>
+                                                {(m.kind === 'image' || m.kind === 'audio') && m.media ? (
+                                                    <MediaBubble ownerUid={ownerUid} buildingId={buildingId} lineUserId={selected.line_user_id} message={m} onZoom={setZoomUrl} />
+                                                ) : m.text}
+                                            </div>
                                             <div style={{ fontSize: '0.65rem', color: 'var(--color-gray-400)', textAlign: mine ? 'right' : 'left', marginTop: 2 }}>
                                                 {when(m.at)}{mine && m.by ? ` · ${m.by}` : ''}
                                             </div>
@@ -185,6 +252,11 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                     )}
                 </div>
             </div>
+            {zoomUrl && (
+                <div onClick={() => setZoomUrl(null)} style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                    <img src={zoomUrl} alt="รูปจากผู้เช่า" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} />
+                </div>
+            )}
             <style>{`
                 .messages-back { display: none; }
                 @media (max-width: 760px) {

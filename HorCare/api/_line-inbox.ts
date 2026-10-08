@@ -13,9 +13,10 @@ import { db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { linePush } from './_line.js';
+import { signedUrlFor, mediaPathPrefix } from './_line-media.js';
 import {
     MAX_INCOMING_CHARS, MAX_OUTGOING_CHARS,
-    type LineMessage, type LineThread, type MessageKind,
+    type LineMessage, type LineThread, type MessageKind, type MessageMedia,
 } from '../src/shared/messages.js';
 
 export const config = { maxDuration: 15 };
@@ -31,12 +32,21 @@ export interface RecordResult {
     shouldAck: boolean;
 }
 
-export async function recordInbound(lineUserId: string, input: { kind: MessageKind; text: string }): Promise<RecordResult> {
-    const link = await db.collection('line_rooms').doc(lineUserId).get();
-    if (!link.exists) return { recorded: false, shouldAck: false };
-    const { uid, building_id, room_id, room_number } = link.data() as {
-        uid: string; building_id: string; room_id: string; room_number: string;
-    };
+export interface TenantLink { uid: string; building_id: string; room_id: string; room_number: string; slip_expected_until?: number }
+
+/** Which owner / property / room a LINE user is registered to (null if not a registered tenant). */
+export async function getTenantLink(lineUserId: string): Promise<TenantLink | null> {
+    const snap = await db.collection('line_rooms').doc(lineUserId).get();
+    return snap.exists ? (snap.data() as TenantLink) : null;
+}
+
+export async function recordInbound(
+    lineUserId: string,
+    input: { kind: MessageKind; text: string; media?: MessageMedia; messageId?: string },
+): Promise<RecordResult> {
+    const link = await getTenantLink(lineUserId);
+    if (!link) return { recorded: false, shouldAck: false };
+    const { uid, building_id, room_id, room_number } = link;
 
     const text = input.text.trim().slice(0, MAX_INCOMING_CHARS);
     if (!text) return { recorded: false, shouldAck: false };
@@ -47,7 +57,10 @@ export async function recordInbound(lineUserId: string, input: { kind: MessageKi
     const ref = db.doc(threadPath(uid, building_id, lineUserId));
     const now = new Date();
     const nowIso = now.toISOString();
-    const msg: LineMessage = { id: randomUUID(), direction: 'in', kind: input.kind, text, at: nowIso, by: null };
+    const msg: LineMessage = {
+        id: input.messageId ?? randomUUID(), direction: 'in', kind: input.kind, text, at: nowIso, by: null,
+        ...(input.media ? { media: input.media } : {}),
+    };
 
     // One transaction so two quick messages can't lose an unread increment.
     const shouldAck = await db.runTransaction<boolean>(async tx => {
@@ -68,7 +81,8 @@ export async function recordInbound(lineUserId: string, input: { kind: MessageKi
 }
 
 interface Body {
-    action?: 'send' | 'mark_read';
+    action?: 'send' | 'mark_read' | 'media_url';
+    message_id?: string;
     owner_uid?: string;
     building_id?: string;
     line_user_id?: string;
@@ -76,13 +90,14 @@ interface Body {
 }
 
 const LINE_ID_RE = /^U[0-9a-f]{32}$/;
+const MESSAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
     const body = (req.body ?? {}) as Body;
     const buildingId = body.building_id;
     if (!buildingId || typeof buildingId !== 'string') { res.status(400).json({ error: 'building_id is required' }); return; }
-    if (body.action !== 'send' && body.action !== 'mark_read') { res.status(400).json({ error: 'unknown_action' }); return; }
+    if (body.action !== 'send' && body.action !== 'mark_read' && body.action !== 'media_url') { res.status(400).json({ error: 'unknown_action' }); return; }
     if (typeof body.line_user_id !== 'string' || !LINE_ID_RE.test(body.line_user_id)) { res.status(400).json({ error: 'invalid_input' }); return; }
 
     const ctx = await authorize(req, res, {
@@ -95,6 +110,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const snap = await ref.get();
     if (!snap.exists) { res.status(404).json({ error: 'not_found' }); return; }
     const thread = snap.data() as LineThread;
+
+    if (body.action === 'media_url') {
+        const id = body.message_id;
+        if (typeof id !== 'string' || !MESSAGE_ID_RE.test(id)) { res.status(400).json({ error: 'invalid_input' }); return; }
+        const msgSnap = await db.doc(`${ref.path}/messages/${id}`).get();
+        const media = msgSnap.exists ? (msgSnap.data() as LineMessage).media : undefined;
+        // Belt and braces: the file must live under this property and this tenant's folder.
+        if (!media || !media.path.startsWith(`${mediaPathPrefix(ctx.ownerUid, buildingId)}${body.line_user_id}/`)) {
+            res.status(404).json({ error: 'not_found' });
+            return;
+        }
+        try {
+            res.status(200).json({ url: await signedUrlFor(media.path), content_type: media.content_type, expires_in: 900 });
+        } catch (err) {
+            console.error('[line-inbox] sign failed:', (err as Error).message);
+            res.status(502).json({ error: 'media_unavailable', message: 'เปิดไฟล์ไม่สำเร็จ กรุณาลองใหม่' });
+        }
+        return;
+    }
 
     if (body.action === 'mark_read') {
         if (thread.unread_count > 0) await ref.update({ unread_count: 0 });

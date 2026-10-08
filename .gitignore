@@ -9,3 +9,6 @@ unzip.bat
 
 .vercel
 .env*
+
+# Claude Code personal settings
+.claude/settings.local.json

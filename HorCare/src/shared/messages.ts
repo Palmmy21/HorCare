@@ -4,7 +4,14 @@
 //   users/{owner}/buildings/{b}/line_threads/{lineUserId}/messages/{id}
 
 export type MessageDirection = 'in' | 'out';
-export type MessageKind = 'text' | 'sticker';
+export type MessageKind = 'text' | 'sticker' | 'image' | 'audio' | 'video' | 'file';
+
+/** Files from tenants (photos, voice messages) live in Cloud Storage; the message only points at them. */
+export interface MessageMedia {
+  path: string;
+  content_type: string;
+  size: number;
+}
 
 export interface LineThread {
   /** The tenant's LINE user id (also the document id). */
@@ -30,6 +37,8 @@ export interface LineMessage {
   at: string;
   /** For outgoing messages: who sent it (display name). */
   by: string | null;
+  /** Present for stored photos / voice messages. */
+  media?: MessageMedia;
 }
 
 export const MAX_OUTGOING_CHARS = 1000;

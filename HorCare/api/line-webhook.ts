@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } from './_line.js';
-import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl } from './_slip.js';
+import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
-import { recordInbound } from './_line-inbox.js';
+import { getTenantLink, recordInbound } from './_line-inbox.js';
+import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 
 export const config = {
     api: {
@@ -92,7 +93,18 @@ async function handleEvent(event: any) {
 async function dispatchEvent(event: any, lineUserId: string, replyToken: string) {
     // ── Slip image: tenant sends a payment slip photo ─────────────
     if (event.message?.type === 'image') {
-        await handleSlipImage(lineUserId, replyToken, event.message.id);
+        await handleImage(lineUserId, replyToken, event.message.id);
+        return;
+    }
+
+    // Voice messages and other files go to the HorCare inbox (never treated as slips).
+    if (event.message?.type === 'audio') {
+        await handleInboxMedia(lineUserId, replyToken, event.message.id, 'audio');
+        return;
+    }
+    if (event.message?.type === 'video' || event.message?.type === 'file') {
+        const kind = event.message.type as 'video' | 'file';
+        await recordInbound(lineUserId, { kind, text: kind === 'video' ? '[วิดีโอ]' : '[ไฟล์]', messageId: String(event.message.id) }).catch(() => undefined);
         return;
     }
 
@@ -121,6 +133,10 @@ async function dispatchEvent(event: any, lineUserId: string, replyToken: string)
     // ── 2b. Rich Menu — ส่งสลิป ──────────────────────────────────
     if (text === 'ส่งสลิป') {
         const isRegistered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
+        // For the next 30 minutes any photo from this tenant is treated as a slip, even if its QR is unreadable.
+        if (isRegistered) {
+            await db.collection('line_rooms').doc(lineUserId).update({ slip_expected_until: Date.now() + SLIP_WINDOW_MS });
+        }
         await lineReply(replyToken, [{
             type: 'text',
             text: isRegistered
@@ -475,11 +491,84 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
     }]);
 }
 
+const MEDIA_ACK_TEXT = 'ได้รับรูปแล้วค่ะ 🙏 เจ้าของหอจะดูและตอบกลับโดยเร็วที่สุด\n\nหากเป็นสลิปโอนเงิน กรุณากดเมนู "ส่งสลิป" แล้วส่งรูปที่เห็น QR ชัดเจนนะคะ';
+const VOICE_ACK_TEXT = 'ได้รับข้อความเสียงแล้วค่ะ 🙏 เจ้าของหอจะฟังและตอบกลับโดยเร็วที่สุด';
+
+/** Download a tenant's photo / voice message, keep it in Storage and add it to the inbox. */
+async function storeInboxMedia(
+    lineUserId: string,
+    messageId: string,
+    kind: 'image' | 'audio',
+    content: { buffer: Buffer; contentType: string },
+    caption?: string,
+) {
+    const link = await getTenantLink(lineUserId);
+    if (!link) return { recorded: false, shouldAck: false };
+    const saved = await saveMedia({
+        ownerUid: link.uid, buildingId: link.building_id, lineUserId, messageId,
+        kind, buffer: content.buffer, contentType: content.contentType,
+    });
+    const label = kind === 'image' ? (caption ?? '[รูปภาพ]') : '[ข้อความเสียง]';
+    // If the file can't be stored the tenant's message still reaches the owner, as text.
+    return recordInbound(lineUserId, {
+        kind, text: saved.ok ? label : `${label} (เปิดไฟล์ไม่ได้)`, messageId,
+        ...(saved.ok ? { media: saved.media } : {}),
+    });
+}
+
+/**
+ * Photos from a tenant. A payment slip (readable Thai slip QR, or the tenant just pressed
+ * "ส่งสลิป") goes through the slip flow exactly as before; any other photo is a chat
+ * message for the owner. Both end up in the inbox so the owner sees the whole conversation.
+ */
+async function handleImage(lineUserId: string, replyToken: string, messageId: string) {
+    const link = await getTenantLink(lineUserId);
+    if (!link) {
+        // Unregistered: keep the old behaviour (asks them to register).
+        await handleSlipImage(lineUserId, replyToken, messageId);
+        return;
+    }
+    const img = await getLineImageContent(messageId);
+    if (!img) {
+        await lineReply(replyToken, [{ type: 'text', text: 'ขออภัยค่ะ โหลดรูปไม่สำเร็จ กรุณาส่งใหม่อีกครั้งนะคะ' }]);
+        return;
+    }
+    const qr = await decodeSlipQR(img.buffer);
+    const slip = isSlipImage({ hasQr: !!qr.payload, expectedUntil: link.slip_expected_until });
+
+    const inbound = await storeInboxMedia(lineUserId, messageId, 'image', img, slip ? '[รูปภาพ — สลิปโอนเงิน]' : undefined)
+        .catch(err => { console.error('storeInboxMedia failed:', (err as Error).message); return { recorded: false, shouldAck: false }; });
+
+    if (slip) {
+        await handleSlipImage(lineUserId, replyToken, messageId, { img, qr });
+        return;
+    }
+    if (inbound.shouldAck) await lineReply(replyToken, [{ type: 'text', text: MEDIA_ACK_TEXT }]);
+}
+
+async function handleInboxMedia(lineUserId: string, replyToken: string, messageId: string, kind: 'audio') {
+    const link = await getTenantLink(lineUserId);
+    if (!link) {
+        await lineReply(replyToken, [{ type: 'text', text: 'สวัสดีค่ะ 😊\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนก่อนนะคะ' }]);
+        return;
+    }
+    const content = await getLineImageContent(messageId);
+    if (!content) return;
+    const inbound = await storeInboxMedia(lineUserId, messageId, kind, content)
+        .catch(err => { console.error('storeInboxMedia failed:', (err as Error).message); return { recorded: false, shouldAck: false }; });
+    if (inbound.shouldAck) await lineReply(replyToken, [{ type: 'text', text: VOICE_ACK_TEXT }]);
+}
+
 /**
  * รับสลิปจากลูกหอ → decode QR กันสลิปซ้ำ (ฟรี ไม่จำกัด) → ตั้งเป็น "รอตรวจสอบ"
  * ให้เจ้าของยืนยันยอดในแอป. สลิปซ้ำ/เคยใช้แล้วจะถูกปฏิเสธทันที.
  */
-async function handleSlipImage(lineUserId: string, replyToken: string, messageId: string) {
+async function handleSlipImage(
+    lineUserId: string,
+    replyToken: string,
+    messageId: string,
+    preloaded?: { img: { buffer: Buffer; contentType: string }; qr: SlipQR },
+) {
     // 1. ต้องลงทะเบียนก่อน
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
     if (!lineRoomSnap.exists) {
@@ -522,7 +611,7 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     }
 
     // 3. โหลดรูปสลิปจาก LINE
-    const img = await getLineImageContent(messageId);
+    const img = preloaded?.img ?? await getLineImageContent(messageId);
     if (!img) {
         await lineReply(replyToken, [{
             type: 'text',
@@ -532,7 +621,7 @@ async function handleSlipImage(lineUserId: string, replyToken: string, messageId
     }
 
     // 4. decode QR ในสลิป (ฟรี ไม่จำกัด)
-    const qr = await decodeSlipQR(img.buffer);
+    const qr = preloaded?.qr ?? await decodeSlipQR(img.buffer);
 
     // 5. กันสลิปซ้ำ — claim fingerprint แบบ atomic ด้วย create()
     let duplicate = false;
