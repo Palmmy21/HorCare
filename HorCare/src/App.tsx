@@ -8,6 +8,7 @@ import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
 import { useLineThreads } from './hooks/useLineThreads';
+import { groupNav, groupOfView, isGroupOpen, navGroupDefs, parseSavedState, type NavGroupState, type TransientClose } from './utils/navGroups';
 import { useFCMToken } from './hooks/useFCMToken';
 import { usePushNotification } from './hooks/usePushNotification';
 import { useTheme } from './hooks/useTheme';
@@ -85,6 +86,12 @@ function App() {
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Sidebar categories: which groups the user left expanded (saved), plus a one-off collapse
+  // of the group that holds the page they are on (only valid for that page).
+  const [navGroupState, setNavGroupState] = useState<NavGroupState>(() => {
+    try { return parseSavedState(localStorage.getItem('horcare_nav_groups_v1')); } catch { return {}; }
+  });
+  const [transientClose, setTransientClose] = useState<TransientClose | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('horcare_sidebar_collapsed') === 'true';
   });
@@ -429,6 +436,88 @@ function App() {
     }
     setCurrentView(view);
     setMobileMenuOpen(false);
+  };
+
+  // Sidebar: red badge count per view (paid features only), grouped into categories.
+  const badgeOf = (id: string): number => {
+    if (!hasPaidSubscription) return 0;
+    switch (id) {
+      case 'cleaning': return pendingCleaningCount;
+      case 'maintenance': return pendingMaintenanceCount;
+      case 'operations': return lowStockCount;
+      case 'payments': return pendingSlipCount;
+      case 'messages': return unreadMessages;
+      default: return 0;
+    }
+  };
+
+  const navGroups = groupNav(visibleNavItems, navGroupDefs(terms.isMarket));
+  const activeNavGroupId = groupOfView(navGroups, currentView);
+  const NAV_GROUP_ICONS: Record<string, React.ElementType> = {
+    property: terms.isMarket ? Store : Home, people: Users, money: CreditCard,
+    service: Wrench, comms: MessageSquare, system: SettingsIcon, overview: LayoutDashboard,
+  };
+
+  const toggleNavGroup = (groupId: string) => {
+    if (groupId === activeNavGroupId) {
+      // Collapse/expand the group holding the current page; forgotten when the page changes.
+      setTransientClose(prev => (prev && prev.groupId === groupId && prev.view === currentView) ? null : { groupId, view: currentView });
+      return;
+    }
+    setNavGroupState(prev => {
+      const next: NavGroupState = { ...prev, [groupId]: prev[groupId] === 'open' ? 'closed' : 'open' };
+      try { localStorage.setItem('horcare_nav_groups_v1', JSON.stringify(next)); } catch { /* storage blocked */ }
+      return next;
+    });
+  };
+
+  const renderNavItem = (item: (typeof navItems)[number], nested = false) => {
+    const isLocked = !maidSession && START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
+    const badgeCount = badgeOf(item.id);
+    const showBadge = badgeCount > 0;
+    return (
+      <button
+        key={item.id}
+        className={`nav-item ${nested ? 'nav-subitem' : ''} ${currentView === item.id ? 'active' : ''} ${isLocked ? 'nav-item-locked' : ''}`}
+        onClick={() => handleNavClick(item.id)}
+      >
+        {/* Icon with optional red dot */}
+        <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+          <item.icon size={nested ? 18 : 20} />
+          {showBadge && (
+            <span className="nav-item-badge" style={{
+              position: 'absolute', top: -3, right: -4,
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#EF4444',
+              border: '1.5px solid #FFFFFF',
+              boxShadow: '0 0 6px rgba(239,68,68,0.7)',
+            }} />
+          )}
+        </span>
+        <span className="nav-label">{item.label}</span>
+        {/* Badge count on the right when not locked */}
+        {showBadge && (
+          <span className="nav-item-badge" style={{
+            marginLeft: 'auto',
+            minWidth: 18, height: 18, borderRadius: 9,
+            background: '#EF4444',
+            color: '#fff', fontSize: '0.6875rem', fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 5px',
+            boxShadow: '0 2px 6px rgba(239,68,68,0.5)',
+          }}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
+        {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', color: '#BAE6FD', opacity: 0.8 }} />}
+      </button>
+    );
+  };
+  // Sidebar branch button: back to the "choose a branch" welcome page.
+  const goToBranchSelector = () => {
+    setBuildingMenuOpen(false);
+    setMobileMenuOpen(false);
+    setHasSelectedBranch(false);
   };
 
   const handleLogin = async (email: string, password: string) => {
@@ -800,10 +889,12 @@ function App() {
         {/* Building Switcher — Plus/Pro (multiple buildings) */}
         {!sidebarCollapsed && canAddBuilding && (
           <div ref={buildingMenuRef} className="sidebar-building-switcher" style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'stretch' }}>
             <button
-              onClick={() => setBuildingMenuOpen(v => !v)}
+              onClick={goToBranchSelector}
+              title="เลือก/สลับสาขา"
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.5rem',
                 background: 'rgba(255, 255, 255, 0.18)', border: '1px solid rgba(255, 255, 255, 0.35)',
                 borderRadius: '12px', padding: '0.55rem 0.75rem', cursor: 'pointer',
                 color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 700,
@@ -815,8 +906,23 @@ function App() {
               <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeBuilding?.name ?? '—'}
               </span>
-              <ChevronDown size={14} style={{ flexShrink: 0, color: '#BAE6FD', transform: buildingMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              <ChevronDown size={14} style={{ flexShrink: 0, color: '#BAE6FD', transform: 'rotate(-90deg)' }} />
             </button>
+            {/* Manage branches (rename / delete / add) — the old dropdown, kept reachable. */}
+            <button
+              type="button"
+              onClick={() => setBuildingMenuOpen(v => !v)}
+              aria-expanded={buildingMenuOpen}
+              title="จัดการสาขา (เปลี่ยนชื่อ / ลบ / เพิ่ม)"
+              style={{
+                flexShrink: 0, width: 38, background: 'rgba(255, 255, 255, 0.18)',
+                border: '1px solid rgba(255, 255, 255, 0.35)', borderRadius: '12px', color: '#BAE6FD',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Pencil size={15} />
+            </button>
+            </div>
 
             {buildingMenuOpen && (
               <div style={{
@@ -1055,60 +1161,43 @@ function App() {
 
 
         <nav className="sidebar-nav">
-          {visibleNavItems.map(item => {
-            const isLocked = !maidSession && START_ONLY_VIEWS.includes(item.id) && !hasPaidSubscription;
-            const showBadge = (
-              hasPaidSubscription && (
-                (item.id === 'cleaning' && pendingCleaningCount > 0) ||
-                (item.id === 'maintenance' && pendingMaintenanceCount > 0) ||
-                (item.id === 'operations' && lowStockCount > 0) ||
-                (item.id === 'payments' && pendingSlipCount > 0) ||
-                (item.id === 'messages' && unreadMessages > 0)
-              )
-            );
-            const badgeCount = item.id === 'cleaning' ? pendingCleaningCount
-              : item.id === 'maintenance' ? pendingMaintenanceCount
-              : item.id === 'payments' ? pendingSlipCount
-              : item.id === 'messages' ? unreadMessages
-              : lowStockCount;
-            return (
-              <button
-                key={item.id}
-                className={`nav-item ${currentView === item.id ? 'active' : ''} ${isLocked ? 'nav-item-locked' : ''}`}
-                onClick={() => handleNavClick(item.id)}
-              >
-                {/* Icon with optional red dot */}
-                <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
-                  <item.icon size={20} />
-                  {showBadge && (
-                    <span className="nav-item-badge" style={{
-                      position: 'absolute', top: -3, right: -4,
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: '#EF4444',
-                      border: '1.5px solid #FFFFFF',
-                      boxShadow: '0 0 6px rgba(239,68,68,0.7)',
-                    }} />
-                  )}
-                </span>
-                <span className="nav-label">{item.label}</span>
-                {/* Badge count on the right when not locked */}
-                {showBadge && (
-                  <span className="nav-item-badge" style={{
-                    marginLeft: 'auto',
-                    minWidth: 18, height: 18, borderRadius: 9,
-                    background: '#EF4444',
-                    color: '#fff', fontSize: '0.6875rem', fontWeight: 700,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 5px',
-                    boxShadow: '0 2px 6px rgba(239,68,68,0.5)',
-                  }}>
-                    {badgeCount > 99 ? '99+' : badgeCount}
-                  </span>
-                )}
-                {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', color: '#BAE6FD', opacity: 0.8 }} />}
-              </button>
-            );
-          })}
+          {maidSession
+            ? visibleNavItems.map(item => renderNavItem(item))
+            : navGroups.map(group => {
+                // A category with a single page is shown as a plain item (e.g. Dashboard).
+                if (group.items.length === 1) return renderNavItem(group.items[0]);
+                const GroupIcon = NAV_GROUP_ICONS[group.id] ?? SettingsIcon;
+                // A collapsed sidebar shows only icons, so every page stays reachable.
+                const open = sidebarCollapsed || isGroupOpen(group.id, activeNavGroupId, navGroupState, transientClose, currentView);
+                const hasActive = group.id === activeNavGroupId;
+                const groupBadge = group.items.reduce((n, i) => n + badgeOf(i.id), 0);
+                return (
+                  <div key={group.id} className="nav-group">
+                    <button
+                      type="button"
+                      className={`nav-item nav-group-header ${hasActive ? 'has-active' : ''}`}
+                      aria-expanded={open}
+                      onClick={() => toggleNavGroup(group.id)}
+                    >
+                      <GroupIcon size={20} />
+                      <span className="nav-label">{group.label}</span>
+                      {!open && groupBadge > 0 && (
+                        <span className="nav-item-badge" style={{
+                          marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9, background: '#EF4444',
+                          color: '#fff', fontSize: '0.6875rem', fontWeight: 700, display: 'inline-flex',
+                          alignItems: 'center', justifyContent: 'center', padding: '0 5px',
+                        }}>{groupBadge > 99 ? '99+' : groupBadge}</span>
+                      )}
+                      <ChevronDown
+                        size={16}
+                        className="nav-group-chevron"
+                        style={{ marginLeft: !open && groupBadge > 0 ? 6 : 'auto', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                      />
+                    </button>
+                    {open && <div className="nav-subitems">{group.items.map(i => renderNavItem(i, true))}</div>}
+                  </div>
+                );
+              })}
         </nav>
 
         {/* Upgrade nudge for free users */}
