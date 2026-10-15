@@ -16,6 +16,7 @@ import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 import { collectionStyleOf, getWorkspaceTerms } from './utils/workspaceTerminology';
 import { HIDDEN_VIEWS } from './shared/erpModules';
+import { isAdminUser } from './shared/admin';
 import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
@@ -426,6 +427,13 @@ function App() {
     { id: 'pricing'     as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
 
+  const isAdmin = isAdminUser(user?.email, profile?.role);
+
+  // Must be added before visibleNavItems is built (filter() copies the array).
+  if (isAdmin) {
+    navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
+  }
+
   const hiddenViews = HIDDEN_VIEWS[collectionStyle];
   const visibleNavItems = maidSession
     ? [
@@ -433,12 +441,6 @@ function App() {
         ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
       ]
     : navItems.filter(i => !hiddenViews.includes(i.id));
-
-  const isAdmin = profile?.role === 'admin';
-
-  if (isAdmin) {
-    navItems.push({ id: 'admin' as ViewMode, icon: Shield, label: 'Admin' });
-  }
 
   // Start+ features (any paid plan: Start / Plus / Pro)
   const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'cleaning', 'operations', 'payments', 'archives'];

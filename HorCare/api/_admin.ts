@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { admin, db } from './_firebase.js';
-
-const ADMIN_EMAIL = 'horcare.admin@gmail.com';
+import { ADMIN_EMAIL } from '../src/shared/admin.js';
 
 async function verifyAdmin(req: VercelRequest): Promise<string | null> {
     const authHeader = req.headers.authorization;
@@ -112,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     } catch (err: unknown) {
         console.error(`admin/${action} error:`, err);
-        res.status(500).json({ error: 'Internal Server Error' });
+        // Caller is already verified as admin, so exposing the message is safe and makes this debuggable.
+        res.status(500).json({ error: 'Internal Server Error', message: (err as Error)?.message ?? String(err) });
     }
 }

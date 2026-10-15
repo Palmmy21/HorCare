@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useFirestore } from '../../hooks/useFirestore';
 import type { UserProfile, LicenseType } from '../../types';
+import { isAdminUser } from '../../shared/admin';
 import {
     Search, Loader2, Clock, Shield, AlertTriangle,
     Users, Timer, XCircle, Key, Infinity as InfinityIcon,
@@ -482,7 +483,10 @@ export default function AdminDashboard() {
             const res = await fetch('/api/admin?action=list-users', {
                 headers: { 'Authorization': `Bearer ${idToken}` },
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) {
+                const body = await res.json().catch(() => null) as { message?: string; error?: string } | null;
+                throw new Error(`HTTP ${res.status}${body?.message || body?.error ? ` — ${body.message || body.error}` : ''}`);
+            }
             const data = await res.json() as { users: AdminUserRow[] };
             setUsers(data.users);
             setLastSyncTime(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -732,7 +736,7 @@ export default function AdminDashboard() {
         URL.revokeObjectURL(url);
     };
 
-    const isAdmin = profile?.role === 'admin' || user?.email === 'horcare.admin@gmail.com';
+    const isAdmin = isAdminUser(user?.email, profile?.role);
     if (!isAdmin) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', background: '#090D16', color: '#F8FAFC' }}>
