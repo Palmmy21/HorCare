@@ -90,6 +90,30 @@ describe('closure_ack (staff)', () => {
     });
 });
 
+describe('closure_add (staff)', () => {
+    const add = (uid: string | null, over: Record<string, unknown> = {}) =>
+        call(uid, { action: 'closure_add', room_id: 's1', from_date: d(1), to_date: d(2), reason: 'holiday', ...over });
+
+    it('staff records a closure for a stall: already acknowledged, audited, no notification', async () => {
+        const res = await add('mkt');
+        expect(res.statusCode).toBe(200);
+        expect(res.body.closure).toMatchObject({ room_id: 's1', room_number: 'A01', status: 'active', ack_by: 'Market' });
+        expect(listPaths(`users/${OWNER}/audit_logs/`)).toHaveLength(1);
+        expect(notes()).toHaveLength(0);
+        // the stall sees it in its portal list
+        expect((await call(null, { action: 'closure_list', room_id: 's1' })).body.closures).toHaveLength(1);
+    });
+
+    it('needs shop.update and keeps the same date and overlap rules', async () => {
+        for (const uid of ['fin', 'shop', 'stranger']) expect((await add(uid)).statusCode).toBe(403);
+        expect((await add(null)).statusCode).toBe(401);
+        expect((await add(OWNER, { from_date: d(-1) })).statusCode).toBe(400);
+        expect((await add(OWNER, { room_id: 'ghost' })).statusCode).toBe(404);
+        await add(OWNER);
+        expect((await add(OWNER, { from_date: d(2), to_date: d(3) })).body.error).toBe('overlaps_existing');
+    });
+});
+
 describe('walk-in vendors', () => {
     it('a vendor announces a day, lands as pending, and the public gets no vendor data back', async () => {
         const res = await walkin();

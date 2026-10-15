@@ -3,9 +3,10 @@ import { Store, Footprints, Check, X, Loader2, Copy, Plus, BellOff } from 'lucid
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { useShopClosures, useWalkIns } from '../../hooks/useMarketData';
+import { useBuildingRooms } from '../../hooks/useAccountingData';
 import {
-    CLOSURE_REASON_LABELS_TH, WALKIN_STATUS_LABELS_TH, addDays, closuresOn, todayTh, upcomingClosures,
-    type WalkIn,
+    CLOSURE_REASONS, CLOSURE_REASON_LABELS_TH, MAX_CLOSURE_DAYS, WALKIN_STATUS_LABELS_TH, addDays, closuresOn, todayTh, upcomingClosures,
+    type ClosureReason, type WalkIn,
 } from '../../shared/market';
 
 interface Props { ownerUid: string; buildingId: string }
@@ -16,7 +17,23 @@ const ERRORS: Record<string, string> = {
     unauthenticated: 'กรุณาเข้าสู่ระบบใหม่',
     already_requested: 'เบอร์นี้มีรายการวันนั้นอยู่แล้ว',
     day_full: 'วันนั้นเต็มแล้ว',
+    overlaps_existing: 'แผงนี้แจ้งหยุดช่วงวันนั้นไว้แล้ว',
+    limit_reached: 'แผงนี้แจ้งหยุดล่วงหน้าครบ 10 รายการแล้ว',
 };
+
+/** Shown instead of an empty list when Firestore refuses the read, so it is not mistaken for "no submissions". */
+function ReadError({ code }: { code: string }) {
+    return (
+        <div role="alert" style={{ ...card, background: '#FEE2E2', color: '#991B1B' }}>
+            <strong>โหลดรายการไม่ได้ ({code})</strong>
+            <span style={{ fontSize: '0.85rem' }}>
+                {code === 'permission-denied'
+                    ? 'บัญชีนี้ไม่มีสิทธิ์อ่านข้อมูลนี้ หรือยังไม่ได้ deploy Firestore rules ล่าสุด (firebase deploy --only firestore:rules)'
+                    : 'ลองรีเฟรชหน้าอีกครั้ง'}
+            </span>
+        </div>
+    );
+}
 const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--color-white, #fff)' };
 const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
 const dayLabel = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' });
@@ -33,19 +50,51 @@ async function call(ownerUid: string, buildingId: string, body: Record<string, u
 }
 
 function ClosuresTab({ ownerUid, buildingId }: Props) {
-    const { closures, loading } = useShopClosures(ownerUid, buildingId);
+    const { closures, loading, error } = useShopClosures(ownerUid, buildingId);
+    const { rooms } = useBuildingRooms(ownerUid, buildingId);
     const today = todayTh();
     const closedToday = useMemo(() => closuresOn(closures, today), [closures, today]);
     const upcoming = useMemo(() => upcomingClosures(closures, today), [closures, today]);
+    const [show, setShow] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [form, setForm] = useState<{ room_id: string; from: string; to: string; reason: ClosureReason; note: string }>({ room_id: '', from: today, to: today, reason: 'personal', note: '' });
+
+    const add = async () => {
+        setBusy(true);
+        const ok = await call(ownerUid, buildingId, { action: 'closure_add', room_id: form.room_id, from_date: form.from, to_date: form.to, reason: form.reason, note: form.note });
+        setBusy(false);
+        if (ok) { toast.success('บันทึกการแจ้งหยุดแล้ว'); setForm({ room_id: '', from: today, to: today, reason: 'personal', note: '' }); setShow(false); }
+    };
 
     if (loading) return <Loader2 className="spin" />;
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {error && <ReadError code={error} />}
             <div style={{ ...card, background: closedToday.length ? '#FEF3C7' : undefined }}>
                 <strong><BellOff size={14} style={{ verticalAlign: -2 }} /> หยุดวันนี้ {closedToday.length} แผง</strong>
                 <span style={{ fontSize: '0.9rem' }}>{closedToday.length ? closedToday.map(c => c.room_number).join(', ') : 'ทุกแผงเปิดตามปกติ'}</span>
             </div>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-gray-500)' }}>ผู้ค้าแจ้งหยุดได้จากพอร์ทัลของแผงตัวเอง รายการจะขึ้นที่นี่และแจ้งเตือนในระบบ</p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-gray-500)', flex: '1 1 220px' }}>ผู้ค้าแจ้งหยุดได้จากพอร์ทัลของแผงตัวเอง หรือเจ้าหน้าที่บันทึกแทนได้ที่นี่</p>
+                <button className="btn btn-outline btn-sm" onClick={() => setShow(s => !s)} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Plus size={14} /> แจ้งหยุดแทนแผง</button>
+            </div>
+            {show && (
+                <div style={{ ...card, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select style={{ ...input, flex: '1 1 120px' }} value={form.room_id} onChange={e => setForm({ ...form, room_id: e.target.value })} aria-label="แผง">
+                        <option value="">เลือกแผง</option>
+                        {rooms.map(r => <option key={r.id} value={r.id}>แผง {r.room_number}</option>)}
+                    </select>
+                    <input type="date" style={input} min={today} max={addDays(today, 365)} value={form.from} aria-label="ตั้งแต่วันที่"
+                        onChange={e => e.target.value && setForm({ ...form, from: e.target.value, to: e.target.value > form.to ? e.target.value : form.to })} />
+                    <input type="date" style={input} min={form.from} max={addDays(form.from, MAX_CLOSURE_DAYS - 1)} value={form.to} aria-label="ถึงวันที่"
+                        onChange={e => e.target.value && setForm({ ...form, to: e.target.value })} />
+                    <select style={input} value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value as ClosureReason })} aria-label="เหตุผล">
+                        {CLOSURE_REASONS.map(r => <option key={r} value={r}>{CLOSURE_REASON_LABELS_TH[r]}</option>)}
+                    </select>
+                    <input style={{ ...input, flex: '1 1 160px' }} placeholder="หมายเหตุ (ถ้ามี)" maxLength={200} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
+                    <button className="btn btn-primary btn-sm" disabled={busy || !form.room_id} onClick={() => void add()}>{busy ? <Loader2 size={14} className="spin" /> : 'บันทึก'}</button>
+                </div>
+            )}
             {upcoming.length === 0 ? <div style={{ color: 'var(--color-gray-500)' }}>ไม่มีการแจ้งหยุดที่กำลังจะมาถึง</div> : upcoming.map(c => (
                 <div key={c.id} style={card}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -64,7 +113,7 @@ function ClosuresTab({ ownerUid, buildingId }: Props) {
 }
 
 function WalkInsTab({ ownerUid, buildingId }: Props) {
-    const { walkIns, loading } = useWalkIns(ownerUid, buildingId);
+    const { walkIns, loading, error } = useWalkIns(ownerUid, buildingId);
     const today = todayTh();
     const [date, setDate] = useState(today);
     const [show, setShow] = useState(false);
@@ -92,6 +141,7 @@ function WalkInsTab({ ownerUid, buildingId }: Props) {
     if (loading) return <Loader2 className="spin" />;
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {error && <ReadError code={error} />}
             <div style={card}>
                 <strong>ลิงก์ให้ขาจรแจ้งล่วงหน้า</strong>
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>ส่งลิงก์นี้ให้ขาจรทาง LINE หรือพิมพ์เป็น QR ที่หน้าตลาด แจ้งได้ล่วงหน้าไม่เกิน 14 วัน</span>

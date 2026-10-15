@@ -26,6 +26,16 @@ const when = (iso: string) => new Date(iso).toLocaleString('th-TH', { day: 'nume
 const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--color-white, #fff)' };
 const input: React.CSSProperties = { padding: '0.5rem 0.65rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, width: '100%', boxSizing: 'border-box' };
 
+/** Shown instead of "nothing yet" when Firestore refuses the read, which otherwise looks like a publish that never happened. */
+function ReadError() {
+    return (
+        <div role="alert" style={{ ...card, background: '#FEE2E2', color: '#991B1B' }}>
+            <strong>โหลดรายการไม่ได้</strong>
+            <span style={{ fontSize: '0.85rem' }}>บัญชีนี้ไม่มีสิทธิ์อ่านข้อมูลนี้ หรือยังไม่ได้ deploy Firestore rules ล่าสุด (firebase deploy --only firestore:rules)</span>
+        </div>
+    );
+}
+
 async function call(ownerUid: string, buildingId: string, route: string, body: Record<string, unknown>): Promise<boolean> {
     try {
         await apiPost(route, { owner_uid: ownerUid, building_id: buildingId, ...body });
@@ -40,7 +50,7 @@ async function call(ownerUid: string, buildingId: string, route: string, body: R
 // ── Q&A ─────────────────────────────────────────────────────────────────────
 
 function FaqTab({ ownerUid, buildingId }: Props) {
-    const { faqs, loading } = useFaqs(ownerUid, buildingId);
+    const { faqs, loading, error } = useFaqs(ownerUid, buildingId);
     const [editing, setEditing] = useState<FaqEntry | 'new' | null>(null);
     const [form, setForm] = useState({ title: '', keywords: '', answer: '' });
     const [busy, setBusy] = useState(false);
@@ -83,7 +93,7 @@ function FaqTab({ ownerUid, buildingId }: Props) {
                 </div>
             )}
 
-            {loading ? <Loader2 className="spin" /> : faqs.length === 0 ? (
+            {loading ? <Loader2 className="spin" /> : error ? <ReadError /> : faqs.length === 0 ? (
                 <div style={{ color: 'var(--color-gray-500)', padding: '1rem 0' }}>ยังไม่มีคำถาม-คำตอบ เริ่มจากเรื่องที่ลูกบ้านถามบ่อย เช่น รหัส Wi-Fi เวลาปิดประตู ที่ซักผ้า</div>
             ) : faqs.map(f => (
                 <div key={f.id} style={{ ...card, opacity: f.enabled ? 1 : 0.6 }}>
@@ -107,7 +117,7 @@ function FaqTab({ ownerUid, buildingId }: Props) {
 // ── Announcements ───────────────────────────────────────────────────────────
 
 function AnnouncementsTab({ ownerUid, buildingId }: Props) {
-    const { announcements, loading } = useAnnouncements(ownerUid, buildingId);
+    const { announcements, loading, error } = useAnnouncements(ownerUid, buildingId);
     const [show, setShow] = useState(false);
     const [form, setForm] = useState({ title: '', body: '', pinned: false, expires: '', sendLine: true });
     const [busy, setBusy] = useState(false);
@@ -214,7 +224,7 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
                 </div>
             )}
 
-            {loading ? <Loader2 className="spin" /> : announcements.length === 0 ? (
+            {loading ? <Loader2 className="spin" /> : error ? <ReadError /> : announcements.length === 0 ? (
                 <div style={{ color: 'var(--color-gray-500)', padding: '1rem 0' }}>ยังไม่มีประกาศ</div>
             ) : announcements.map(a => (
                 <div key={a.id} style={{ ...card, opacity: a.status === 'archived' ? 0.6 : 1 }}>

@@ -6,7 +6,7 @@
  * exists, validates strictly, and is capped:
  *   closure_submit | closure_cancel | closure_list | walkin_submit
  * Staff (signed in, property-checked):
- *   closure_ack   – shop.update     walkin_decide / walkin_add – visitor.create
+ *   closure_ack / closure_add – shop.update     walkin_decide / walkin_add – visitor.create
  * Reading the lists is straight from Firestore under rules needing shop.read / visitor.read.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -25,7 +25,7 @@ import {
 export const config = { maxDuration: 15 };
 
 interface Body {
-    action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'walkin_submit' | 'walkin_add' | 'walkin_decide';
+    action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'closure_add' | 'walkin_submit' | 'walkin_add' | 'walkin_decide';
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -45,7 +45,7 @@ const PUBLIC = new Set(['closure_submit', 'closure_cancel', 'closure_list', 'wal
 const PUBLIC_LIMITS: Record<string, number> = { closure_submit: 10, walkin_submit: 5, closure_cancel: 30, closure_list: 120 };
 const WRITES = new Set(['closure_submit', 'walkin_submit']);
 
-const STAFF_PERM = { closure_ack: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create' } as const;
+const STAFF_PERM = { closure_ack: 'shop.update', closure_add: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create' } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -86,7 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // ── stall closures ──────────────────────────────────────────────────────
-    if (action === 'closure_submit' || action === 'closure_cancel' || action === 'closure_list') {
+    // closure_add: staff records a closure on a stall's behalf (already acknowledged)
+    if (action === 'closure_submit' || action === 'closure_add' || action === 'closure_cancel' || action === 'closure_list') {
         if (typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'invalid_input' }); return; }
         const room = await db.doc(`${base}/rooms/${body.room_id}`).get();
         if (!room.exists) { res.status(404).json({ error: 'not_found' }); return; }
@@ -113,9 +114,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const existing = upcomingClosures(await mine(), todayTh(now));
         if (existing.length >= MAX_ACTIVE_CLOSURES_PER_ROOM) { res.status(409).json({ error: 'limit_reached' }); return; }
         if (existing.some(c => c.from_date <= input.to_date && input.from_date <= c.to_date)) { res.status(409).json({ error: 'overlaps_existing' }); return; }
-        const closure: ShopClosure = { id: randomUUID(), room_id: body.room_id, room_number: roomNumber, ...input, status: 'active', created_at: nowIso };
+        const closure: ShopClosure = {
+            id: randomUUID(), room_id: body.room_id, room_number: roomNumber, ...input, status: 'active', created_at: nowIso,
+            ...(staff ? { ack_at: nowIso, ack_by: staff.displayName } : {}),
+        };
         await db.doc(`${col}/${closure.id}`).set(closure);
-        await notify({
+        if (staff) await audit('CREATE', 'shop_closure', closure.id, `แผง ${roomNumber} หยุด ${input.from_date}`);
+        else await notify({
             event: 'shop.closure_submitted', ownerUid: owner, buildingId,
             data: { room_number: roomNumber, from_date: input.from_date, to_date: input.to_date, reason: CLOSURE_REASON_LABELS_TH[input.reason] },
         });
