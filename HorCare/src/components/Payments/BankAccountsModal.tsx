@@ -71,7 +71,7 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
 
     const numberOk = isValidAccountNumber(form.account_number);
     const promptpayOk = form.promptpay_id.trim() === '' || cleanPromptPayId(form.promptpay_id) !== null;
-    const canSubmit = !busy && !!bankByCode(form.bank_code) && form.account_name.trim().length >= 2 && numberOk && promptpayOk;
+    const canSubmit = !busy && !!bankByCode(form.bank_code) && form.account_name.trim().length >= 2 && form.nickname.trim().length >= 1 && numberOk && promptpayOk;
 
     const submit = async () => {
         if (!canSubmit) return;
@@ -122,7 +122,7 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                                                     {a.status !== 'active' && <span style={{ fontSize: '0.68rem', color: '#6B7280', fontWeight: 700 }}>ปิดใช้งาน</span>}
                                                 </div>
                                                 <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-600)' }}>
-                                                    {a.account_name}{a.nickname ? ` · ${a.nickname}` : ''}{a.promptpay_id ? ` · PromptPay ${maskPromptPayId(a.promptpay_id)}` : ''}
+                                                    {a.account_name}{a.nickname ? ` · ${a.nickname}` : ' · ⚠️ ยังไม่ตั้งชื่อเรียก — กดแก้ไขเพื่อตั้ง (จำเป็นสำหรับการชนยอด)'}{a.promptpay_id ? ` · PromptPay ${maskPromptPayId(a.promptpay_id)}` : ''}
                                                 </div>
                                                 <div className="mono" style={{ fontSize: '0.8125rem' }}>
                                                     {shown ? a.account_number.replace(/^(\d{3})(\d)(\d{5})(\d+)$/, '$1-$2-$3-$4') : maskAccountNumber(a.account_number)}
@@ -195,8 +195,8 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                                         <button type="button" className="btn btn-outline btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setForm(f => ({ ...f, promptpay_id: legacyPromptPay }))}>ใช้ PromptPay เดิมจากการตั้งค่า</button>
                                     )}
                                     {!promptpayOk && <span style={{ color: '#DC2626', fontSize: '0.72rem' }}>ต้องเป็นเบอร์โทร 10 หลัก (ขึ้นต้นด้วย 0) หรือเลข 13 หลัก</span>}</label>
-                                <label style={field}><span className="form-label">ชื่อเรียก (ไม่บังคับ)</span>
-                                    <input className="form-input" maxLength={40} placeholder="เช่น บัญชีค่าเช่า" value={form.nickname} onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))} /></label>
+                                <label style={field}><span className="form-label">ชื่อเรียก (บังคับ — ใช้แยกบัญชีตอนชนยอดสลิป/สเตทเมนต์)</span>
+                                    <input className="form-input" maxLength={40} required placeholder="เช่น บัญชีค่าเช่า" value={form.nickname} onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))} /></label>
                             </div>
                             <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--color-gray-500)' }}>
                                 ใส่ชื่อให้ตรงกับที่ปรากฏบนสลิปโอนเงิน ระบบใช้เทียบชื่อผู้รับ (สลิปมักแสดงชื่อแบบย่อ ซึ่งรองรับ) ถ้าใส่เลข PromptPay ลูกบ้านจะสแกน QR PromptPay ซึ่งแอปธนาคารรองรับทุกแห่ง ถ้าไม่ใส่จะสร้าง QR จากเลขบัญชี (ยังไม่ได้ทดสอบกับทุกแอปธนาคาร)

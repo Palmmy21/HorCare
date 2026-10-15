@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const name = cleanText(body.account_name, 2, 100);
         const nick = cleanText(body.nickname, 1, 40);
         const promptpay = cleanPromptPay(body.promptpay_id);
-        if (!bank || !name || nick === undefined || promptpay === undefined || typeof body.account_number !== 'string' || !isValidAccountNumber(body.account_number)) {
+        if (!bank || !name || !nick || promptpay === undefined || typeof body.account_number !== 'string' || !isValidAccountNumber(body.account_number)) {
             res.status(400).json({ error: 'invalid_input' });
             return;
         }
@@ -99,6 +99,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const docs = existing.docs.map(d => d.data() as BankAccount);
         if (docs.some(a => a.bank_code === bank.code && a.account_number === number)) {
             res.status(409).json({ error: 'duplicate_account', message: 'มีบัญชีนี้อยู่แล้ว' });
+            return;
+        }
+        // the nickname is how the owner tells accounts apart when matching slips and bank statements, so it must be unique
+        if (docs.some(a => (a.nickname ?? '').trim().toLowerCase() === nick.toLowerCase())) {
+            res.status(409).json({ error: 'duplicate_nickname', message: 'มีบัญชีที่ใช้ชื่อเรียกนี้อยู่แล้ว' });
             return;
         }
         const now = new Date().toISOString();
@@ -156,7 +161,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (body.nickname !== undefined) {
         const n = cleanText(body.nickname, 1, 40);
-        if (n === undefined) { res.status(400).json({ error: 'invalid_input' }); return; }
+        if (!n) { res.status(400).json({ error: 'invalid_input' }); return; }
+        const others = (await db.collection(col).get()).docs.map(d => d.data() as BankAccount).filter(a => a.id !== current.id);
+        if (others.some(a => (a.nickname ?? '').trim().toLowerCase() === n.toLowerCase())) { res.status(409).json({ error: 'duplicate_nickname', message: 'มีบัญชีที่ใช้ชื่อเรียกนี้อยู่แล้ว' }); return; }
         updates.nickname = n;
     }
     if (body.promptpay_id !== undefined) {

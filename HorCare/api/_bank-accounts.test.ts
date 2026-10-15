@@ -31,15 +31,17 @@ async function call(uid: string | undefined, body: Record<string, unknown>) {
     return res as { statusCode: number; body: any };
 }
 /** uid null = no Authorization header at all (a default of undefined would silently become the owner). */
+let nick = 0;
+// every account needs a unique nickname (it is how the owner tells accounts apart when matching slips and statements)
 const create = (uid: string | null = OWNER, over: Record<string, unknown> = {}) =>
-    call(uid ?? undefined, { action: 'create', bank_code: '004', account_name: 'สมชาย ใจดี', account_number: '123-4-56789-0', ...over });
+    call(uid ?? undefined, { action: 'create', bank_code: '004', account_name: 'สมชาย ใจดี', account_number: '123-4-56789-0', nickname: `บัญชี ${++nick}`, ...over });
 
 describe('create', () => {
     it('stores digits only, derives the bank, makes the first account the default, and audits without the full number', async () => {
         const res = await create();
         expect(res.statusCode).toBe(200);
         expect(res.body.account).toMatchObject({
-            bank_code: '004', bank_short: 'KBANK', account_name: 'สมชาย ใจดี', account_number: '1234567890', status: 'active', is_default: true, nickname: null,
+            bank_code: '004', bank_short: 'KBANK', account_name: 'สมชาย ใจดี', account_number: '1234567890', status: 'active', is_default: true, nickname: expect.stringMatching(/^บัญชี \d+$/),
         });
         const logs = listPaths(`users/${OWNER}/audit_logs/`).map(p => read(p)!);
         expect(logs).toHaveLength(1);
@@ -53,11 +55,23 @@ describe('create', () => {
         expect(second.body.account.is_default).toBe(false);
     });
 
+    it('the nickname is required and unique within the property, ignoring case and spaces', async () => {
+        expect((await create(OWNER, { nickname: 'บัญชีค่าเช่า' })).statusCode).toBe(200);
+        const same = await create(OWNER, { bank_code: '014', account_number: '9876543210', nickname: '  บัญชีค่าเช่า ' });
+        expect(same.statusCode).toBe(409);
+        expect(same.body.error).toBe('duplicate_nickname');
+        const other = (await create(OWNER, { bank_code: '014', account_number: '9876543210', nickname: 'บัญชีมัดจำ' })).body.account;
+        // renaming may not collide either, and may never blank the name
+        expect((await call(OWNER, { action: 'update', account_id: other.id, nickname: 'บัญชีค่าเช่า' })).body.error).toBe('duplicate_nickname');
+        expect((await call(OWNER, { action: 'update', account_id: other.id, nickname: '' })).statusCode).toBe(400);
+        expect((await call(OWNER, { action: 'update', account_id: other.id, nickname: 'บัญชีมัดจำ' })).statusCode).toBe(200); // keeping its own name is fine
+    });
+
     it('validates input (400)', async () => {
         for (const bad of [
             { bank_code: '999' }, { bank_code: undefined }, { account_name: '' }, { account_name: 'x' }, { account_name: 'x'.repeat(101) },
             { account_number: '123' }, { account_number: '12345678901234567' }, { account_number: 'abcdefghij' }, { account_number: undefined },
-            { nickname: 'n'.repeat(41) }, { nickname: 5 },
+            { nickname: 'n'.repeat(41) }, { nickname: 5 }, { nickname: undefined }, { nickname: '' }, { nickname: '   ' },
         ]) {
             expect((await create(OWNER, bad)).statusCode).toBe(400);
         }
@@ -94,7 +108,7 @@ describe('permissions and isolation', () => {
     });
 
     it('404 for a property that is not the owner\'s', async () => {
-        expect((await call(OWNER, { action: 'create', building_id: 'bld-forged', bank_code: '004', account_name: 'AA', account_number: '1234567890' })).statusCode).toBe(404);
+        expect((await call(OWNER, { action: 'create', building_id: 'bld-forged', bank_code: '004', account_name: 'AA', account_number: '1234567890', nickname: 'x' })).statusCode).toBe(404);
     });
 
     it('rejects unknown actions, a missing building, and non-POST', async () => {
@@ -161,7 +175,7 @@ describe('tenant_list', () => {
         await create(OWNER);
         const b = await create(OWNER, { bank_code: '014', account_number: '9876543210' });
         await create(OWNER, { bank_code: '002', account_number: '1111111111' });
-        const third = (await call(OWNER, { action: 'create', bank_code: '006', account_name: 'ab', account_number: '2222222222' })).body.account;
+        const third = (await call(OWNER, { action: 'create', bank_code: '006', account_name: 'ab', account_number: '2222222222', nickname: 'บัญชีที่สาม' })).body.account;
         await call(OWNER, { action: 'update', account_id: third.id, status: 'inactive' });
         await call(OWNER, { action: 'set_default', account_id: b.body.account.id });
         const res = await list();
