@@ -6,6 +6,7 @@ import { appBaseUrl } from './_notify.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
+import { portalQuery } from './_portal-token.js';
 
 async function fcmPushToOwner(uid: string, title: string, body: string) {
     try {
@@ -110,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             try {
                 const portalUrl = appUrl
-                    ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${bill.room_id}`
+                    ? `${appUrl}/?${portalQuery(uid, building_id, bill.room_id)}`
                     : undefined;
                 const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';
                 const bilingual = !!cfg.bill_customization?.bilingual_mode;

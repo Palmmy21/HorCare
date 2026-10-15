@@ -6,6 +6,7 @@ import { appBaseUrl } from './_notify.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { Fine } from '../src/types/index.js';
+import { portalQuery } from './_portal-token.js';
 
 export const config = { maxDuration: 60 };
 
@@ -79,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const portalUrl = appUrl
-            ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${fine.room_id}`
+            ? `${appUrl}/?${portalQuery(uid, building_id, fine.room_id)}`
             : undefined;
 
         const messages: object[] = [buildFineFlex(fine as Fine, dormName, { portalUrl })];

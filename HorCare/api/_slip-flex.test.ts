@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).firebaseMock);
 
-import { buildSlipResultFlex } from './_slip-flex.js';
+import { buildSlipResultFlex, buildSplitPaidFlex, parseSplitPostback, splitPostbackData } from './_slip-flex.js';
 import type { SlipEvaluation } from './_slip-flow.js';
 
 const details = {
@@ -11,7 +11,7 @@ const details = {
 };
 const evaluation = (over: Partial<SlipEvaluation>): SlipEvaluation => ({
     autoApprove: false, outcome: 'review', problems: [], qrPresent: true, details: null, verdict: null,
-    fields: {}, verifyNote: '', aiAmount: null, ...over,
+    fields: {}, verifyNote: '', aiAmount: null, splitAmount: null, ...over,
 });
 const checks = (amount: 'pass' | 'fail') => ({
     checks: { amount, receiver_name: 'pass', receiver_account: 'pass', datetime: 'pass', duplicate: 'pass', qr: 'pass' } as const,
@@ -38,7 +38,8 @@ describe('buildSlipResultFlex', () => {
         const f = build(evaluation({ outcome: 'approved', autoApprove: true, details, aiAmount: 3500, verdict: checks('pass') })) as { altText: string };
         const all = texts(f);
         expect(all).toEqual(expect.arrayContaining(['ชำระสำเร็จ', 'บ้านสุข', 'ห้อง 101 · บิล ต.ค. 2569', 'น.ส. มาลี', 'ไทยพาณิชย์', '฿3,500.00']));
-        expect(all.filter(t => t === 'ตรง')).toHaveLength(4);
+        expect(all.filter(t => t === 'ตรง')).toHaveLength(3);
+        expect(all).toContain('หลังออกบิล');
         expect(f.altText).toContain('ได้รับยอดชำระ');
     });
 
@@ -56,5 +57,23 @@ describe('buildSlipResultFlex', () => {
         expect(all).toContain('รอตรวจสอบ');
         expect(all).not.toContain('ตรง');
         expect(all).toContain('อ่าน QR ในสลิปไม่ชัด เจ้าของหอจะตรวจสอบให้ค่ะ');
+    });
+
+    it('offers the split-payment button only for a slip that can be a part payment', () => {
+        const e = evaluation({ outcome: 'mismatch', details: { ...details, amount: 2000 }, aiAmount: 2000, verdict: checks('fail'), problems: ['x'], splitAmount: 2000 });
+        const data = splitPostbackData('bill', 'b1', 'abc123def456');
+        const withButton = JSON.stringify(buildSlipResultFlex({ roomNumber: '101', itemLabel: 'บิล', expectedAmount: 3500, evaluation: e, splitPostback: data }));
+        expect(withButton).toContain('"type":"postback"');
+        expect(withButton).toContain('แบ่งจ่าย ฿2,000.00');
+        expect(JSON.stringify(build({ ...e, splitAmount: null }))).not.toContain('postback');
+        expect(parseSplitPostback(data)).toEqual({ kind: 'bill', itemId: 'b1', slipRef: 'abc123def456' });
+        expect(parseSplitPostback('split|x|b1|r')).toBeNull();
+        expect(parseSplitPostback(undefined)).toBeNull();
+    });
+
+    it('split receipt shows paid, total paid and what is left', () => {
+        const all = texts(buildSplitPaidFlex({ roomNumber: '101', itemLabel: 'บิล', paid: 2000, total: 3500, outstanding: 1500 }));
+        expect(all).toEqual(expect.arrayContaining(['รับยอดแบ่งจ่ายแล้ว', '฿2,000.00', '฿3,500.00', '฿1,500.00']));
+        expect(texts(buildSplitPaidFlex({ roomNumber: '101', itemLabel: 'บิล', paid: 1500, total: 3500, outstanding: 0 }))).toContain('ชำระครบแล้ว');
     });
 });

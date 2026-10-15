@@ -30,6 +30,11 @@ export interface SlipEvaluation {
     verifyNote: string;
     /** The amount read from the slip, for the "paid X baht" reply. */
     aiAmount: number | null;
+    /**
+     * Set when the slip is genuine and paid to the property, only for less than what is owed: the tenant
+     * may choose to record it as a part payment (split payment). Baht.
+     */
+    splitAmount: number | null;
 }
 
 export async function loadReceiverCandidates(ownerUid: string, buildingId: string): Promise<{ candidates: ReceiverCandidate[]; accounts: BankAccount[] }> {
@@ -66,7 +71,7 @@ export async function evaluateSlip(input: {
     // Only "not a reused slip" is known here — never word it as if the payment itself was checked.
     const legacyNote = qrPresent ? 'AI ยังไม่ได้ตรวจยอด/ชื่อ — โปรดตรวจสลิปด้วยตา' : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา';
     const none: SlipEvaluation = {
-        autoApprove: false, outcome: 'review', problems: [], qrPresent, details: null, verdict: null, fields: {}, verifyNote: legacyNote, aiAmount: null,
+        autoApprove: false, outcome: 'review', problems: [], qrPresent, details: null, verdict: null, fields: {}, verifyNote: legacyNote, aiAmount: null, splitAmount: null,
     };
 
     if (!input.isPro || !input.imageBase64 || !qrPresent) return none;
@@ -108,6 +113,12 @@ export async function evaluateSlip(input: {
 
     const summary = describeChecks(verdict.checks);
     const problems = slipProblems(verdict, details, input.expectedAmount);
+    const c = verdict.checks;
+    const splitAmount = !verdict.auto_approve && c.amount === 'fail' && !!matched && c.datetime !== 'fail'
+        && details.amount != null && details.amount > 0 && details.amount < input.expectedAmount
+        ? details.amount : null;
+    // remembered on the bill so the "split payment" button can be checked against this exact slip
+    if (splitAmount != null) fields.slip_split_amount = splitAmount;
     return {
         autoApprove: verdict.auto_approve,
         outcome: verdict.auto_approve ? 'approved' : problems.length ? 'mismatch' : 'review',
@@ -115,6 +126,7 @@ export async function evaluateSlip(input: {
         qrPresent,
         details, verdict, fields,
         aiAmount: details.amount,
+        splitAmount,
         verifyNote: verdict.auto_approve
             ? `อนุมัติอัตโนมัติจากสลิป (ยังไม่ยืนยันกับบัญชีธนาคาร) — ${summary}`
             : `ตรวจสลิปแล้ว — ${summary} · โปรดตรวจด้วยตา`,
@@ -129,7 +141,7 @@ function slipProblems(verdict: SlipVerdict, details: SlipDetails, expectedAmount
     const out: string[] = [];
     if (c.amount === 'fail') out.push(`ยอดในสลิป ${baht(details.amount ?? 0)} ไม่ตรงกับยอดที่ต้องชำระ ${baht(expectedAmount)}`);
     if (c.receiver_name === 'fail' || c.receiver_account === 'fail') out.push('ชื่อ/บัญชีผู้รับในสลิปไม่ใช่บัญชีของหอพัก');
-    if (c.datetime === 'fail') out.push('วันที่ในสลิปไม่ถูกต้อง (เก่าเกินไป หรือก่อนออกบิล)');
+    if (c.datetime === 'fail') out.push('สลิปนี้โอนก่อนออกบิล อาจเป็นสลิปเก่า');
     return out;
 }
 

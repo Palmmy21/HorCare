@@ -343,13 +343,39 @@ function PaymentStatus({ status, lang }: { status?: string; lang: BillLanguage }
 
 // ── Slip Uploader ─────────────────────────────────────────────────────────────
 function SlipUploader({
-  uid, buildingId, roomId, itemId, itemType, lang,
+  uid, buildingId, roomId, t: linkToken, itemId, itemType, lang,
 }: {
-  uid: string; buildingId: string; roomId: string; itemId: string; itemType: 'bill' | 'fine'; lang: BillLanguage;
+  uid: string; buildingId: string; roomId: string; t: string; itemId: string; itemType: 'bill' | 'fine'; lang: BillLanguage;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [loading, setLoading] = useState(false);
+  // a genuine slip for less than what is owed: the tenant may record it as a split payment
+  const [splitOffer, setSplitOffer] = useState<{ amount: number; owed: number; slipRef: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const money = (n: number) => `฿${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const fill = (tpl: string, v: Record<string, string>) => tpl.replace(/\{(\w+)\}/g, (_, k: string) => v[k] ?? '');
+
+  const confirmSplit = async () => {
+    if (!splitOffer) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/upload-slip?route=upload-slip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'split', uid, buildingId, roomId, t: linkToken, itemId, itemType, slipRef: splitOffer.slipRef }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Split failed');
+      toast.success(data.outstanding > 0
+        ? fill(t.split_done, { paid: money(data.paid), left: money(data.outstanding) })
+        : t.split_full, { duration: 6000 });
+      setSplitOffer(null);
+    } catch (errRaw) {
+      toast.error(`${t.slip_fail}: ${errorInfo(errRaw).message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -361,12 +387,15 @@ function SlipUploader({
       const res = await fetch('/api/upload-slip?route=upload-slip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, buildingId, roomId, itemId, itemType, base64 })
+        body: JSON.stringify({ uid, buildingId, roomId, t: linkToken, itemId, itemType, base64 })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-      if (data.outcome === 'mismatch') {
+      setSplitOffer(data.split ?? null);
+      if (data.split) {
+        // the offer below explains it; no error toast for a slip the tenant may have meant as a part payment
+      } else if (data.outcome === 'mismatch') {
         // problems are Thai sentences from the server; the heading follows the portal language
         const problems: string[] = Array.isArray(data.problems) ? data.problems : [];
         toast.error([t.slip_mismatch, ...problems.map(p => `• ${p}`)].join('\n'), { duration: 10000, style: { whiteSpace: 'pre-line' } });
@@ -381,6 +410,15 @@ function SlipUploader({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  // An unsigned (old or shared) link can still view the bill, but slips must come through the room's own link or LINE.
+  if (!linkToken) {
+    return (
+      <p style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '12px', background: '#F1F5F9', color: '#475569', fontSize: '0.8125rem', textAlign: 'center' }}>
+        {t.slip_need_link}
+      </p>
+    );
+  }
 
   return (
     <div style={{ marginTop: '0.75rem' }}>
@@ -401,6 +439,18 @@ function SlipUploader({
         {loading ? <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> : <Camera size={16} />}
         {loading ? t.uploading_slip : t.attach_slip}
       </button>
+      {splitOffer && (
+        <div style={{ marginTop: '0.6rem', padding: '0.75rem', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: '0.8125rem', color: '#166534' }}>
+          <p style={{ margin: '0 0 0.5rem' }}>{fill(t.split_offer, { amount: money(splitOffer.amount), owed: money(splitOffer.owed) })}</p>
+          <button
+            disabled={loading}
+            onClick={confirmSplit}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: '#16A34A', color: '#fff', border: 'none', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+          >
+            {fill(t.split_button, { amount: money(splitOffer.amount) })}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -409,7 +459,7 @@ function SlipUploader({
 function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
   bill: MonthlyBill;
   defaultOpen: boolean; payTo: TenantAccount | null;
-  portalIds: { uid: string, buildingId: string, roomId: string };
+  portalIds: { uid: string, buildingId: string, roomId: string, t: string };
   lang: BillLanguage;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
@@ -513,7 +563,7 @@ function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
             <div style={{ marginTop: '1rem' }}>
               <BankQrCard account={payTo} amount={bill.total_bill} title={t.scan_qr} formatAmount={fmtCurrency} />
               <SlipUploader
-                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId}
+                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId} t={portalIds.t}
                 itemId={bill.id} itemType="bill" lang={lang}
               />
             </div>
@@ -544,7 +594,7 @@ function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
 }
 
 // ── Fine Card ─────────────────────────────────────────────────────────────────
-function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantAccount | null; portalIds: { uid: string, buildingId: string, roomId: string }; lang: BillLanguage }) {
+function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantAccount | null; portalIds: { uid: string, buildingId: string, roomId: string, t: string }; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [open, setOpen] = useState(fine.status !== 'paid');
   const isUnpaid = !fine.status || fine.status === 'unpaid';
@@ -599,7 +649,7 @@ function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantA
             <div style={{ marginTop: '1rem' }}>
               <BankQrCard account={payTo} amount={fine.amount} title={t.scan_qr_fine} formatAmount={fmtCurrency} />
               <SlipUploader
-                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId}
+                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId} t={portalIds.t}
                 itemId={fine.id} itemType="fine" lang={lang}
               />
             </div>
@@ -876,6 +926,8 @@ export default function TenantPortalPage() {
   const uid = params.get('uid') ?? '';
   const buildingId = params.get('bid') ?? '';
   const roomId = params.get('rid') ?? '';
+  // signed link token: lets this page upload slips for this room (see api/_portal-token.ts)
+  const linkToken = params.get('t') ?? '';
 
   const { data, loading, error } = useTenantData(uid, buildingId, roomId);
   const { room, config, profile, bills, buildingName } = data;
@@ -1190,7 +1242,7 @@ export default function TenantPortalPage() {
           <section>
             <SectionLabel icon={<Receipt size={14} />} label={`${t.monthly_bill} ${formatPortalMonth(currentMonth, lang)}`} />
             {currentBill ? (
-              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} portalIds={{uid, buildingId, roomId, t: linkToken}} lang={lang} />
             ) : (
               <div style={{
                 background: 'var(--color-white)', borderRadius: '16px', padding: '1.5rem',
@@ -1219,7 +1271,7 @@ export default function TenantPortalPage() {
               <SectionLabel icon={<AlertTriangle size={14} />} label={`${t.unpaid_fines} (${pendingFines.length})`} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {pendingFines.map(f => (
-                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId, t: linkToken}} lang={lang} />
                 ))}
               </div>
             </section>
@@ -1231,10 +1283,10 @@ export default function TenantPortalPage() {
               <SectionLabel icon={<CalendarDays size={14} />} label={t.history} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {paidFines.map(f => (
-                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId, t: linkToken}} lang={lang} />
                 ))}
                 {prevBills.map(b => (
-                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} portalIds={{uid, buildingId, roomId, t: linkToken}} lang={lang} />
                 ))}
               </div>
             </section>

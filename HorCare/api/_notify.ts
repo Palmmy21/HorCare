@@ -11,6 +11,7 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { linePush, staffLineToken } from './_line.js';
+import { portalQuery } from './_portal-token.js';
 
 export type NotificationEvent =
     | 'parcel.received'
@@ -151,7 +152,7 @@ export function appBaseUrl(): string {
 }
 
 export function portalUrlFor(ownerUid: string, buildingId: string, roomId: string): string {
-    return `${appBaseUrl()}/?uid=${encodeURIComponent(ownerUid)}&bid=${encodeURIComponent(buildingId)}&rid=${encodeURIComponent(roomId)}`;
+    return `${appBaseUrl()}/?${portalQuery(ownerUid, buildingId, roomId)}`;
 }
 
 export async function notify(input: NotifyInput): Promise<NotifyResult> {

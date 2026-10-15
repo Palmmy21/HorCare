@@ -6,6 +6,7 @@ import { appBaseUrl } from './_notify.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
+import { portalQuery } from './_portal-token.js';
 
 const PUSH_CONCURRENCY = 8;
 export const config = { maxDuration: 60 };
@@ -95,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const text = `⚠️ แจ้งเตือนยอดค้างชำระ\nบิลห้อง ${bill.room_number} รอบ ${monthThai}\nยอดค้างชำระ ${amount}\n\nรบกวนชำระและส่งสลิปในแชทนี้นะคะ 🙏`;
 
                 const portalUrl = appUrl
-                    ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${bill.room_id}`
+                    ? `${appUrl}/?${portalQuery(uid, building_id, bill.room_id)}`
                     : undefined;
                 
                 const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';

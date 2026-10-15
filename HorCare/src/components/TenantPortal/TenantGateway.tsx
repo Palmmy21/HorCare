@@ -53,7 +53,10 @@ export default function TenantGateway() {
         const profile = await window.liff.getProfile();
         const lineUserId: string = profile.userId;
 
-        const res = await fetch(`/api/line-webhook?lid=${encodeURIComponent(lineUserId)}`);
+        // The ID token lets the server confirm with LINE that this is really this user, and only then sign
+        // the link (needed to upload slips). Without the "openid" scope it is null and the link is view-only.
+        const idToken: string | null = window.liff.getIDToken?.() ?? null;
+        const res = await fetch(`/api/line-webhook?lid=${encodeURIComponent(lineUserId)}${idToken ? `&idt=${encodeURIComponent(idToken)}` : ''}`);
 
         if (res.status === 404) {
           setState({ status: 'not_registered' });
@@ -64,10 +67,10 @@ export default function TenantGateway() {
           return;
         }
 
-        const { uid, building_id, room_id, room_number, dorm_name } = await res.json();
+        const { uid, building_id, room_id, room_number, dorm_name, t } = await res.json();
         setState({ status: 'redirecting', roomNumber: room_number, dormName: dorm_name ?? '' });
         window.location.replace(
-          `/?uid=${encodeURIComponent(uid)}&bid=${encodeURIComponent(building_id)}&rid=${encodeURIComponent(room_id)}`
+          `/?uid=${encodeURIComponent(uid)}&bid=${encodeURIComponent(building_id)}&rid=${encodeURIComponent(room_id)}${t ? `&t=${encodeURIComponent(t)}` : ''}`
         );
       } catch (err) {
         console.error('[TenantGateway]', err);

@@ -150,7 +150,9 @@ export function compareAccount(slipAccount: string | null, number: string | null
 }
 
 // ── Date / time ───────────────────────────────────────────────────────────────
-export const SLIP_MAX_AGE_MS = 30 * 86400_000;
+// Late payment is normal, so a slip is never "too old" by age alone. The only date rule is against
+// reusing an old slip: one dated before the bill was issued (beyond a few days' early payment)
+// cannot be for this bill. A slip dated in the future cannot be genuine.
 export const SLIP_FUTURE_TOLERANCE_MS = 10 * 60_000;
 const BILL_EARLY_TOLERANCE_MS = 3 * 86400_000;
 
@@ -159,10 +161,9 @@ export function checkDatetime(iso: string | null, billCreatedAt: string | null |
     const t = Date.parse(iso);
     if (!Number.isFinite(t)) return 'unknown';
     if (t > now + SLIP_FUTURE_TOLERANCE_MS) return 'fail';        // from the future
-    if (now - t > SLIP_MAX_AGE_MS) return 'fail';                 // stale — likely an old slip
     if (billCreatedAt) {
         const b = Date.parse(billCreatedAt);
-        if (Number.isFinite(b) && t < b - BILL_EARLY_TOLERANCE_MS) return 'fail'; // paid long before the bill existed
+        if (Number.isFinite(b) && t < b - BILL_EARLY_TOLERANCE_MS) return 'fail'; // paid before the bill existed — an old slip
     }
     return 'pass';
 }

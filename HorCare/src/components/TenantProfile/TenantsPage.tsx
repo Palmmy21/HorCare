@@ -10,6 +10,7 @@ import { useTenantProfile } from '../../hooks/useTenantProfiles';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 import InvitationModal from './InvitationModal';
+import { apiPost } from '../../utils/api';
 
 interface TenantsPageProps {
   rooms: Room[];
@@ -54,10 +55,14 @@ function TenantCard({
   const { profile, loading } = useTenantProfile(uid, buildingId, room.id);
   const [copied, setCopied] = useState(false);
 
-  const copyTenantLink = (e: React.MouseEvent) => {
+  const copyTenantLink = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}${window.location.pathname}?uid=${uid}&bid=${buildingId}&rid=${room.id}`;
-    navigator.clipboard.writeText(url).then(() => {
+    // the signed link (lets the tenant upload slips) comes from the server; fall back to a view-only link
+    let query = `uid=${uid}&bid=${buildingId}&rid=${room.id}`;
+    try {
+      query = (await apiPost<{ query: string }>('portal-link', { owner_uid: uid, building_id: buildingId, room_id: room.id })).query;
+    } catch { /* offline / no permission: the view-only link still works */ }
+    navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?${query}`).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

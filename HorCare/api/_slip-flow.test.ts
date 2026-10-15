@@ -78,7 +78,9 @@ describe('evaluateSlip', () => {
         expect(e.aiAmount).toBe(3000);
     });
 
-    it('rejects an old slip and one dated before the bill existed', async () => {
+    it('accepts a late payment, but rejects an old slip dated before the bill existed', async () => {
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), datetime: bangkok(Date.now() - 45 * 86400_000) }));
+        expect((await run({ billCreatedAt: new Date(Date.now() - 60 * 86400_000).toISOString() })).autoApprove).toBe(true);
         fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), datetime: bangkok(Date.now() - 60 * 86400_000) }));
         expect((await run()).autoApprove).toBe(false);
         fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), datetime: bangkok(Date.now() - 20 * 86400_000) }));
@@ -139,6 +141,20 @@ describe('evaluateSlip', () => {
 });
 
 describe('outcome and tenant reply', () => {
+    it('a genuine slip for less than what is owed can be a part payment; a wrong receiver or old slip cannot', async () => {
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 2000 }));
+        const e = await run();
+        expect(e.outcome).toBe('mismatch');
+        expect(e.splitAmount).toBe(2000);
+        expect(e.fields.slip_split_amount).toBe(2000);
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 2000, receiver_name: 'นาย อื่น คนอื่น', receiver_account: 'xxx-x-x9999-x' }));
+        expect((await run()).splitAmount).toBeNull();
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 4000 }));
+        expect((await run()).splitAmount).toBeNull();
+        fetchMock.mockResolvedValue(aiReply(goodSlip()));
+        expect((await run()).splitAmount).toBeNull();
+    });
+
     it('a matching slip is approved and the tenant is told it was received', async () => {
         fetchMock.mockResolvedValue(aiReply(goodSlip()));
         const e = await run();

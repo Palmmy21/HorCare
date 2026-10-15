@@ -8,7 +8,10 @@ import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
 import { latestAnnouncementsText } from './_announcements.js';
 import { evaluateSlip } from './_slip-flow.js';
-import { buildSlipResultFlex } from './_slip-flex.js';
+import { portalQuery, portalToken } from './_portal-token.js';
+import { buildSlipResultFlex, buildSplitPaidFlex, parseSplitPostback, splitPostbackData } from './_slip-flex.js';
+import { applySlipSplit, outstandingSatang, recordSlipPayment } from './_slip-payment.js';
+import type { PaidItem } from './_accounting-data.js';
 import { formatMonthLabel } from './_translations.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 import type { MonthlyBill } from '../src/types/index.js';
@@ -33,6 +36,24 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 /** HC-XXXXXX pattern (6 alphanumeric chars after HC-) */
 const DORM_CODE_RE = /^HC-[A-Z0-9]{6}$/;
 
+/** LINE user id of a LIFF ID token, verified by LINE; null when invalid or LIFF is not configured. */
+async function lineIdTokenSubject(idToken: string): Promise<string | null> {
+    const channelId = (process.env.LIFF_CHANNEL_ID || process.env.VITE_LIFF_ID || '').split('-')[0];
+    if (!channelId) return null;
+    try {
+        const r = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ id_token: idToken, client_id: channelId }).toString(),
+        });
+        if (!r.ok) return null;
+        const j = await r.json() as { sub?: unknown };
+        return typeof j.sub === 'string' ? j.sub : null;
+    } catch {
+        return null;
+    }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // GET /api/line-webhook?lid=... — tenant portal lookup (used by TenantGateway)
     if (req.method === 'GET') {
@@ -46,7 +67,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(404).json({ error: 'not_found' });
         }
         const { uid, building_id, room_id, room_number, dorm_name } = snap.data()!;
-        return res.status(200).json({ uid, building_id, room_id, room_number, dorm_name });
+        // The signed link (which allows uploading slips) only when LINE vouches this is that user:
+        // a LIFF ID token whose subject is the same LINE user. A bare user id gets a view-only link.
+        const idt = typeof req.query.idt === 'string' ? req.query.idt : '';
+        const t = idt && (await lineIdTokenSubject(idt)) === lid ? portalToken(uid, building_id, room_id) : null;
+        return res.status(200).json({ uid, building_id, room_id, room_number, dorm_name, ...(t ? { t } : {}) });
     }
 
     if (req.method !== 'POST') {
@@ -83,10 +108,11 @@ interface LineEvent {
     replyToken?: string;
     source?: { userId?: string };
     message?: { type?: string; id: string; text?: string };
+    postback?: { data?: string };
 }
 
 async function handleEvent(event: LineEvent) {
-    if (event.type !== 'message') return;
+    if (event.type !== 'message' && event.type !== 'postback') return;
     const lineUserId = event.source?.userId;
     const replyToken = event.replyToken;
     if (!lineUserId || !replyToken) return;
@@ -106,6 +132,12 @@ async function handleEvent(event: LineEvent) {
 }
 
 async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: string) {
+    // ── "แบ่งจ่าย" button on a slip card ─────────────
+    if (event.type === 'postback') {
+        await handleSplitPostback(lineUserId, replyToken, event.postback?.data);
+        return;
+    }
+
     // ── Slip image: tenant sends a payment slip photo ─────────────
     if (event.message?.type === 'image') {
         await handleImage(lineUserId, replyToken, event.message.id);
@@ -474,7 +506,7 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
 
     const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
     const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
-    const portalUrl = `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${room_id}`;
+    const portalUrl = `${appUrl}/?${portalQuery(uid, building_id, room_id)}`;
 
     await lineReply(replyToken, [{
         type: 'flex',
@@ -718,12 +750,16 @@ async function handleSlipImage(
     // Read the slip with AI and compare it with the bill and the property's receiving accounts
     // (amount, receiver name / account, date-time). Auto-approval needs every check to hold, and the
     // payment is then recorded as "slip only — not yet confirmed against the bank".
+    // A bill already part-paid (split payment) is checked against what is still owed.
+    const kind = isFine ? 'fine' : 'bill';
+    const partPaid = !!targetData.payments_recorded;
+    const owed = outstandingSatang(kind, targetData as PaidItem) / 100;
     const slipMatch = dataUrl ? dataUrl.match(/^data:(image\/\w+);base64,(.+)$/) : null;
     const evaluation = await evaluateSlip({
         ownerUid: uid, buildingId: building_id,
         imageBase64: slipMatch ? slipMatch[2] : null, mimeType: slipMatch ? slipMatch[1] : 'image/jpeg',
         qrPayload: qr.payload,
-        expectedAmount: isFine ? targetData.amount : targetData.total_bill,
+        expectedAmount: owed,
         billCreatedAt: targetData.created_at as string | undefined,
         isPro,
     });
@@ -733,22 +769,34 @@ async function handleSlipImage(
     // 8. Pending for the owner to confirm, or "paid" when the slip checks all passed
     const now = new Date().toISOString();
     const statusField = isFine ? 'status' : 'payment_status';
+    const slipRef = fingerprint ? fingerprint.slice(0, 12) : null;
+    // the last part of a split payment is recorded as a payment too, so the bill's parts add up
+    const settleAsPayment = autoVerified && partPaid && !!slipRef && typeof evaluation.fields.slip_account_id === 'string';
 
     await targetDoc.ref.update({
-        [statusField]: autoVerified ? 'paid' : 'pending',
+        [statusField]: autoVerified && !settleAsPayment ? 'paid' : 'pending',
         slip_submitted_at: now,
-        ...(autoVerified ? { paid_at: now, payment_date: now.split('T')[0] } : {}),
+        ...(autoVerified && !settleAsPayment ? { paid_at: now, payment_date: now.split('T')[0] } : {}),
         ...(dataUrl ? { slip_image: true } : {}),
-        ...(fingerprint ? { slip_ref: fingerprint.slice(0, 12) } : {}),
+        ...(slipRef ? { slip_ref: slipRef } : {}),
         ...evaluation.fields,
         verify_note: evaluation.verifyNote,
     });
+    if (settleAsPayment) {
+        await recordSlipPayment({
+            ownerUid: uid, buildingId: building_id, kind, itemId: targetDoc.id, amountSatang: Math.round(owed * 100),
+            bankAccountId: evaluation.fields.slip_account_id as string, slipRef: slipRef!,
+            paidAt: evaluation.details?.datetime_iso ?? now, transactionRef: (evaluation.fields.transaction_ref as string | undefined) ?? null,
+            note: 'ชำระส่วนที่เหลือจากสลิป',
+        });
+    }
     await lineReply(replyToken, [buildSlipResultFlex({
         roomNumber: String(room_number),
         dormName: dorm_name,
-        itemLabel: isFine ? 'ค่าปรับ' : `บิล ${formatMonthLabel(String(targetData.month ?? ''), 'th')}`,
-        expectedAmount: Number(isFine ? targetData.amount : targetData.total_bill),
+        itemLabel: slipItemLabel(isFine, targetData),
+        expectedAmount: owed,
         evaluation,
+        splitPostback: slipRef ? splitPostbackData(kind, targetDoc.id, slipRef) : null,
     })]);
 
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
@@ -769,4 +817,31 @@ async function handleSlipImage(
             });
         }
     } catch { /* best-effort */ }
+}
+
+const slipItemLabel = (isFine: boolean, item: object) =>
+    isFine ? 'ค่าปรับ' : `บิล ${formatMonthLabel(String((item as { month?: unknown }).month ?? ''), 'th')}`;
+
+/**
+ * Tenant pressed "แบ่งจ่าย" on a slip card: record that slip's amount as a part payment. Only the slip
+ * the button was made for (same fingerprint still on the bill, AI-read amount, matched account) counts.
+ */
+async function handleSplitPostback(lineUserId: string, replyToken: string, data: string | undefined) {
+    const req = parseSplitPostback(data);
+    if (!req) return;
+    const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
+    if (!lineRoomSnap.exists) return;
+    const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
+    const r = await applySlipSplit({ ownerUid: uid, buildingId: building_id, kind: req.kind, itemId: req.itemId, roomId: room_id, slipRef: req.slipRef });
+    if (r.status !== 'ok') {
+        const text = r.status === 'not_found' ? 'ไม่พบรายการนี้ค่ะ'
+            : r.status === 'stale' ? 'สลิปนี้แบ่งจ่ายไม่ได้แล้วค่ะ (มีสลิปใหม่กว่า หรือเจ้าของหอตรวจสอบไปแล้ว) กรุณาติดต่อเจ้าของหอนะคะ'
+            : 'บันทึกแบ่งจ่ายไม่ได้ค่ะ ยอดอาจเกินยอดคงเหลือ หรือบิลถูกชำระไปแล้ว';
+        await lineReply(replyToken, [{ type: 'text', text }]);
+        return;
+    }
+    await lineReply(replyToken, [buildSplitPaidFlex({
+        roomNumber: String(room_number), dormName: dorm_name, itemLabel: slipItemLabel(req.kind === 'fine', r.item),
+        paid: r.paid, total: r.total, outstanding: r.outstanding,
+    })]);
 }
