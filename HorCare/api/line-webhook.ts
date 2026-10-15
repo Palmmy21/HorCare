@@ -15,6 +15,7 @@ import type { PaidItem } from './_accounting-data.js';
 import { formatMonthLabel } from './_translations.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 import type { MonthlyBill } from '../src/types/index.js';
+import { autoPostSafe } from './_ledger-auto.js';
 
 export const config = {
     api: {
@@ -830,6 +831,8 @@ async function handleSlipImage(
         })]);
     }
 
+    if (autoVerified || split?.status === 'ok') await autoPostSafe(uid, building_id);
+
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
     try {
         const fcmDoc = await db.doc(`users/${uid}/data/fcm`).get();
@@ -900,4 +903,5 @@ async function handleSplitPostback(lineUserId: string, replyToken: string, data:
         roomNumber: String(room_number), dormName: dorm_name, itemLabel: slipItemLabel(req.kind === 'fine', r.item),
         paid: r.paid, total: r.total, outstanding: r.outstanding,
     })]);
+    await autoPostSafe(uid, building_id);
 }

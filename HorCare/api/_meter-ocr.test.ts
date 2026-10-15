@@ -89,3 +89,23 @@ describe('/api/meter-ocr access control', () => {
         expect((await call(OWNER, { ...body, imageBase64: 42 })).statusCode).toBe(400);
     });
 });
+
+describe('parseMeterOcrMulti (meter board photos)', () => {
+    it('reads every meter with serial and position, capped at the per-photo limit', async () => {
+        const { parseMeterOcrMulti, MAX_METERS_PER_PHOTO } = await import('./_meter-ocr.js');
+        const one = { room_number: '101', serial: 'ea-10 01', reading: 1285.6, meter_type: 'electric', confidence: 0.9, box: [0.1, 0.2, 0.3, 0.4] };
+        const r = parseMeterOcrMulti(JSON.stringify({ meters: [one, { ...one, room_number: null, serial: '12', box: [0, 0, 0, 1] }], note: '' }));
+        expect(r.meters).toHaveLength(2);
+        expect(r.meters[0]).toMatchObject({ room_number: '101', serial: 'EA1001', reading: 1286, meter_type: 'electric', box: [0.1, 0.2, 0.3, 0.4] });
+        expect(r.meters[1]).toMatchObject({ room_number: null, serial: null, box: null }); // too-short serial, empty box
+
+        const many = parseMeterOcrMulti(JSON.stringify({ meters: Array.from({ length: 20 }, () => one) }));
+        expect(many.meters).toHaveLength(MAX_METERS_PER_PHOTO);
+        expect(many.note).toContain(`${MAX_METERS_PER_PHOTO}`);
+    });
+
+    it('turns garbage into no meters instead of throwing', async () => {
+        const { parseMeterOcrMulti } = await import('./_meter-ocr.js');
+        for (const raw of ['', 'nope', '[]', '{"meters":"x"}', '{"meters":[null,1,"a"]}']) expect(parseMeterOcrMulti(raw).meters).toEqual([]);
+    });
+});

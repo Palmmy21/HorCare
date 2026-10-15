@@ -3,20 +3,37 @@ import {
     X, Upload, Loader2, CheckCircle2, AlertTriangle, Trash2, RefreshCw, ShieldCheck, Zap, Droplets, Settings2, Save,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import type { Room } from '../../types';
 import { apiPost, ApiError } from '../../utils/api';
 import { compressImage } from '../../utils/imageCompress';
 import {
     DEFAULT_METER_SETTINGS, FLAG_LABELS_TH, canBulkConfirm, canConfirm, computeFlags, groupConfirmed,
-    isBlocking, matchRoom, parseReading,
+    isBlocking, matchMeter, parseReading, serialsToLearn,
     type BatchItem, type MeterFlag, type MeterSettings, type MeterType, type RoomMeterContext, type RoomReadings,
 } from '../../utils/meterBatch';
 
 const MAX_BATCH_IMAGES = 100;
 const CONCURRENCY = 3;
+/** Same limit as the API (api/_meter-ocr.ts MAX_METERS_PER_PHOTO). */
+const MAX_METERS_PER_PHOTO = 12;
+/** Meter boards need more pixels per digit than a single close-up. */
+const PHOTO_MAX_SIDE = 2048;
 
-interface OcrResponse {
-    data: { room_number: string | null; reading: number | null; meter_type: MeterType; confidence: number; note: string };
+interface OcrMeter {
+    room_number: string | null; serial: string | null; reading: number | null; meter_type: MeterType;
+    confidence: number; note: string; box: [number, number, number, number] | null;
+}
+interface OcrResponse { data: { meters: OcrMeter[]; note: string } }
+
+/** A crop of the photo around one meter (CSS only), or the whole photo when the AI gave no box. */
+function cropStyle(url: string | undefined, box: BatchItem['box']): React.CSSProperties {
+    if (!url) return {};
+    if (!box) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+    const [x, y, w, h] = box;
+    const pos = (start: number, size: number) => (size >= 1 ? 0 : (start / (1 - size)) * 100);
+    return { backgroundImage: `url(${url})`, backgroundSize: `${100 / w}% ${100 / h}%`, backgroundPosition: `${pos(x, w)}% ${pos(y, h)}%`, backgroundRepeat: 'no-repeat' };
 }
 
 export interface BatchSaveResult { bills: number; drafts: number; failed: string[] }
@@ -55,6 +72,10 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [saving, setSaving] = useState(false);
     const [zoom, setZoom] = useState<string | null>(null);
+    // Save readings with no flag at all straight away; anything flagged waits for a person.
+    const [autoSave, setAutoSave] = useState(true);
+    const autoDone = useRef(new Set<string>());
+    const autoSavePending = useRef(false);
 
     const files = useRef(new Map<string, File>());
     const previews = useRef(new Map<string, string>());
@@ -86,21 +107,30 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
             running.current++;
             void (async () => {
                 try {
-                    const { base64, mimeType } = await compressImage(file);
+                    const { base64, mimeType } = await compressImage(file, PHOTO_MAX_SIDE);
                     const { data } = await apiPost<OcrResponse>('meter-ocr', {
-                        owner_uid: ownerUid, building_id: buildingId, imageBase64: base64, mimeType,
+                        owner_uid: ownerUid, building_id: buildingId, imageBase64: base64, mimeType, multi: true,
                     });
                     if (!alive.current) return;
-                    const m = matchRoom(rooms, data.room_number);
-                    patch(id, {
-                        status: 'review_required',
-                        ocrRoom: data.room_number,
-                        roomId: m.kind === 'matched' ? m.roomId : null,
-                        meterType: data.meter_type,
-                        reading: data.reading === null ? '' : String(data.reading),
-                        confidence: data.confidence,
-                        note: data.note || undefined,
-                    });
+                    if (data.meters.length === 0) {
+                        patch(id, { status: 'error', error: data.note || 'ไม่พบมิเตอร์ในรูปนี้' });
+                        return;
+                    }
+                    // one photo → one item per meter on it
+                    setItems(prev => prev.flatMap(i => {
+                        if (i.id !== id) return [i];
+                        return data.meters.map((mt, k): BatchItem => {
+                            const m = matchMeter(rooms, mt.room_number, mt.serial, mt.meter_type);
+                            return {
+                                id: `${id}-${k + 1}`, photoId: id,
+                                fileName: data.meters.length > 1 ? `${i.fileName} · ตัวที่ ${k + 1}/${data.meters.length}` : i.fileName,
+                                previewUrl: i.previewUrl, status: 'review_required', ocrRoom: mt.room_number, serial: mt.serial, box: mt.box,
+                                roomId: m.kind === 'matched' ? m.roomId : null, matchedBy: m.kind === 'matched' ? m.by : undefined,
+                                meterType: mt.meter_type, reading: mt.reading === null ? '' : String(mt.reading), confidence: mt.confidence,
+                                note: [mt.note, k === 0 ? data.note : ''].filter(Boolean).join(' · ') || undefined,
+                            };
+                        });
+                    }));
                 } catch (e) {
                     if (!alive.current) return;
                     const err = e as ApiError;
@@ -117,7 +147,7 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
         if (!list) return;
         const images = [...list].filter(f => f.type.startsWith('image/'));
         const skippedType = list.length - images.length;
-        const room = MAX_BATCH_IMAGES - items.length;
+        const room = MAX_BATCH_IMAGES - new Set(items.map(i => i.photoId ?? i.id)).size;
         const accepted = images.slice(0, Math.max(0, room));
         if (skippedType > 0) toast.error(`ข้าม ${skippedType} ไฟล์ที่ไม่ใช่รูปภาพ`);
         if (images.length > accepted.length) toast.error(`รับได้สูงสุด ${MAX_BATCH_IMAGES} รูปต่อชุด — ข้าม ${images.length - accepted.length} รูป`);
@@ -142,11 +172,15 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
     };
 
     const remove = (id: string) => {
-        files.current.delete(id);
-        const url = previews.current.get(id);
-        if (url) URL.revokeObjectURL(url);
-        previews.current.delete(id);
-        queue.current = queue.current.filter(q => q !== id);
+        // several meters can share a photo: free it only when its last meter goes
+        const photo = items.find(i => i.id === id)?.photoId ?? id;
+        if (!items.some(i => i.id !== id && (i.photoId ?? i.id) === photo)) {
+            files.current.delete(photo);
+            const url = previews.current.get(photo);
+            if (url) URL.revokeObjectURL(url);
+            previews.current.delete(photo);
+            queue.current = queue.current.filter(q => q !== photo);
+        }
         setItems(prev => prev.filter(i => i.id !== id));
         setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
     };
@@ -155,7 +189,11 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
     // always refers to exactly the values the person saw.
     const edit = (id: string, changes: Partial<BatchItem>) => {
         const cur = items.find(i => i.id === id);
-        patch(id, { ...changes, ...(cur?.status === 'confirmed' ? { status: 'review_required' as const, overridden: false } : {}) });
+        patch(id, {
+            ...changes,
+            ...('roomId' in changes ? { matchedBy: undefined } : {}), // a person chose the room
+            ...(cur?.status === 'confirmed' ? { status: 'review_required' as const, overridden: false } : {}),
+        });
     };
 
     // ── Validation ───────────────────────────────────────────────────────────
@@ -188,16 +226,22 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
     // ── Save ─────────────────────────────────────────────────────────────────
     const toSave = groupConfirmed(items);
     const confirmedItems = items.filter(i => i.status === 'confirmed');
-    const save = async () => {
+    const save = async (auto = false) => {
         if (toSave.length === 0) return;
         setSaving(true);
         try {
             const overriddenCount = confirmedItems.filter(i => i.overridden).length;
             const r = await onSave(toSave, { overriddenCount });
             const failed = new Set(r.failed);
-            setItems(prev => prev.map(i => (i.status === 'confirmed' && !(i.roomId && failed.has(i.roomId)) ? { ...i, status: 'saved' } : i)));
+            const isSaved = (i: BatchItem) => i.status === 'confirmed' && !(i.roomId && failed.has(i.roomId));
+            const after = items.map(i => (isSaved(i) ? { ...i, status: 'saved' as const } : i));
+            setItems(prev => prev.map(i => (isSaved(i) ? { ...i, status: 'saved' } : i)));
+            // remember each meter's serial on its room, so next month it is matched even without a readable label
+            const learn = serialsToLearn(after, rooms);
+            await Promise.all(learn.map(l => updateDoc(doc(db, `users/${ownerUid}/buildings/${buildingId}/rooms/${l.roomId}`), { [l.field]: l.serial || null })
+                .catch(() => undefined)));
             const parts = [r.bills > 0 && `บันทึกบิล ${r.bills} ห้อง`, r.drafts > 0 && `เก็บเป็นร่าง ${r.drafts} ห้อง (รอค่าอีกชนิด)`].filter(Boolean);
-            toast.success(parts.join(' · ') || 'บันทึกแล้ว');
+            toast.success(`${auto ? 'บันทึกอัตโนมัติ: ' : ''}${parts.join(' · ') || 'บันทึกแล้ว'}`);
             if (r.failed.length > 0) toast.error(`บันทึกไม่สำเร็จ ${r.failed.length} ห้อง`);
         } catch {
             toast.error('บันทึกไม่สำเร็จ กรุณาลองใหม่');
@@ -206,13 +250,31 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
         }
     };
 
+    // ── Auto-save: once every photo is read (duplicates need the whole batch), confirm and save the clean ones ──
+    const processingCount = items.filter(i => i.status === 'processing').length;
+    useEffect(() => {
+        if (!autoSave || saving || processingCount > 0) return;
+        const clean = items.filter(i => i.status === 'review_required' && !autoDone.current.has(i.id) && canBulkConfirm(flags[i.id] ?? []));
+        if (clean.length === 0) return;
+        const ids = new Set(clean.map(i => i.id));
+        ids.forEach(id => autoDone.current.add(id));
+        autoSavePending.current = true;
+        setItems(prev => prev.map(i => (ids.has(i.id) ? { ...i, status: 'confirmed', overridden: false } : i)));
+    }, [autoSave, saving, processingCount, items, flags]);
+    useEffect(() => {
+        if (!autoSavePending.current || saving || toSave.length === 0) return;
+        autoSavePending.current = false;
+        void save(true);
+    });
+
     const close = () => {
         const pending = items.some(i => i.status === 'review_required' || i.status === 'confirmed' || i.status === 'processing');
         if (pending && !window.confirm('ยังมีรายการที่ยังไม่ได้บันทึก ปิดแล้วจะสูญหาย — ปิดเลย?')) return;
         onClose();
     };
 
-    const zoomUrl = zoom ? items.find(i => i.id === zoom)?.previewUrl : undefined;
+    const zoomItem = zoom ? items.find(i => i.id === zoom) : undefined;
+    const zoomUrl = zoomItem?.previewUrl;
 
     const counts = {
         processing: items.filter(i => i.status === 'processing').length,
@@ -238,7 +300,9 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                             <Zap size={20} /> อ่านมิเตอร์ด้วย AI เป็นชุด
                         </div>
                         <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)', marginTop: 2 }}>
-                            รอบ {monthLabel} · AI เป็นเพียงผู้เสนอค่า — ไม่มีอะไรถูกบันทึกจนกว่าคุณจะยืนยัน
+                            รอบ {monthLabel} · {autoSave
+                                ? 'ค่าที่ไม่มีปัญหาเลยบันทึกอัตโนมัติ — ที่มีธงเตือนรอคุณตรวจ'
+                                : 'AI เป็นเพียงผู้เสนอค่า — ไม่มีอะไรถูกบันทึกจนกว่าคุณจะยืนยัน'}
                         </div>
                     </div>
                     <button className="btn-icon" onClick={close} aria-label="ปิด"><X size={18} /></button>
@@ -256,7 +320,7 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                         <Upload size={26} />
                         <span style={{ fontWeight: 700 }}>เลือกหรือลากรูปมิเตอร์มาวาง</span>
                         <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)' }}>
-                            ไฟและน้ำปนกันได้ สูงสุด {MAX_BATCH_IMAGES} รูปต่อชุด ({items.length}/{MAX_BATCH_IMAGES})
+                            ไฟและน้ำปนกันได้ · ถ่ายทั้งแผงในรูปเดียวได้ สูงสุด {MAX_METERS_PER_PHOTO} มิเตอร์ต่อรูป · สูงสุด {MAX_BATCH_IMAGES} รูปต่อชุด ({new Set(items.map(i => i.photoId ?? i.id)).size}/{MAX_BATCH_IMAGES})
                         </span>
                         <input type="file" accept="image/*" multiple style={{ display: 'none' }}
                             onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
@@ -269,7 +333,10 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                                 <span>รอตรวจ <b>{counts.review}</b></span>·
                                 <span>ยืนยันแล้ว <b>{counts.confirmed}</b></span>·
                                 <span>บันทึกแล้ว <b>{counts.saved}</b></span>
-                                <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setShowSettings(s => !s)}>
+                                <label style={{ marginLeft: 'auto', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                    <input type="checkbox" checked={autoSave} onChange={e => setAutoSave(e.target.checked)} /> บันทึกอัตโนมัติเมื่อไม่มีปัญหา
+                                </label>
+                                <button className="btn btn-outline btn-sm" onClick={() => setShowSettings(s => !s)}>
                                     <Settings2 size={14} /> เกณฑ์ตรวจสอบ
                                 </button>
                             </div>
@@ -296,7 +363,7 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                                 <button className="btn btn-outline btn-sm" disabled={selected.size === 0} onClick={confirmSelected}>
                                     ยืนยันที่เลือก ({selected.size})
                                 </button>
-                                <button className="btn btn-primary btn-sm" disabled={toSave.length === 0 || saving} onClick={() => void save()} style={{ marginLeft: 'auto' }}>
+                                <button className="btn btn-primary btn-sm" disabled={toSave.length === 0 || saving} onClick={() => void save(false)} style={{ marginLeft: 'auto' }}>
                                     {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />} บันทึกลงมิเตอร์ ({toSave.length} ห้อง)
                                 </button>
                             </div>
@@ -316,8 +383,8 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                                                     onChange={e => setSelected(prev => { const n = new Set(prev); if (e.target.checked) n.add(item.id); else n.delete(item.id); return n; })} />
                                             )}
                                             <button type="button" onClick={() => setZoom(item.id)} aria-label="ขยายรูป" style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}>
-                                                <img src={item.previewUrl} alt={item.fileName}
-                                                    style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 10, display: 'block' }} />
+                                                <div role="img" aria-label={item.fileName}
+                                                    style={{ width: 88, height: 88, borderRadius: 10, display: 'block', backgroundColor: 'var(--color-gray-100)', ...cropStyle(item.previewUrl, item.box) }} />
                                             </button>
 
                                             <div style={{ flex: '1 1 320px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -344,7 +411,10 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                                                 {item.status !== 'processing' && item.status !== 'error' && (
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem' }}>
                                                         <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span className="form-label">ห้อง{item.ocrRoom ? ` (AI อ่านได้ "${item.ocrRoom}")` : ''}</span>
+                                                            <span className="form-label">
+                                                                ห้อง{item.ocrRoom ? ` (ป้าย "${item.ocrRoom}")` : ''}
+                                                                {item.matchedBy === 'serial' ? ' · จับคู่จากเลขซีเรียล' : ''}
+                                                            </span>
                                                             <select className="form-input" disabled={locked} value={item.roomId ?? ''}
                                                                 onChange={e => edit(item.id, { roomId: e.target.value || null })}>
                                                                 <option value="">— เลือกห้อง —</option>
@@ -374,6 +444,7 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                                                 )}
 
                                                 {f.length > 0 && !locked && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{f.map(chip)}</div>}
+                                                {item.serial && <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>เลขซีเรียล <span className="mono">{item.serial}</span></div>}
                                                 {item.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>AI: {item.note}</div>}
                                             </div>
 
@@ -406,7 +477,16 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
             {zoomUrl && (
                 <div onClick={e => { e.stopPropagation(); setZoom(null); }}
                     style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-                    <img src={zoomUrl} alt="รูปมิเตอร์ต้นฉบับ" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} />
+                    <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}>
+                        <img src={zoomUrl} alt="รูปมิเตอร์ต้นฉบับ" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, display: 'block' }} />
+                        {zoomItem?.box && (
+                            // the meter this row is about, on the full photo
+                            <div style={{
+                                position: 'absolute', border: '3px solid #F59E0B', borderRadius: 6, boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
+                                left: `${zoomItem.box[0] * 100}%`, top: `${zoomItem.box[1] * 100}%`, width: `${zoomItem.box[2] * 100}%`, height: `${zoomItem.box[3] * 100}%`,
+                            }} />
+                        )}
+                    </div>
                 </div>
             )}
         </div>

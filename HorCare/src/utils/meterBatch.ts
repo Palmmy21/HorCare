@@ -15,17 +15,19 @@ export type MeterFlag =
   | 'room_not_found'      // room number missing or not in this property
   | 'room_ambiguous'      // room number matches more than one room
   | 'duplicate_in_batch'  // another photo in this batch is the same room + meter type
+  | 'room_conflict'       // the meter's serial / label point to different rooms (warning: meters may have been swapped)
   | 'month_locked'        // the room's bill for this month is already closed
   | 'low_confidence'      // AI confidence under threshold
   | 'below_previous'      // reading is lower than last month's
-  | 'abnormal_jump';      // usage far above the room's norm
+  | 'abnormal_jump'       // usage far above the room's norm
+  | 'serial_mismatch';    // the room has a different meter serial on file (meter replaced, or wrong room)
 
 /** Blocking flags: the user must fix these; they cannot be overridden. */
 export const BLOCKING_FLAGS: readonly MeterFlag[] = [
   'no_reading', 'unknown_type', 'room_not_found', 'room_ambiguous', 'duplicate_in_batch', 'month_locked',
 ];
 /** Warning flags: a person may confirm after checking the photo (explicit override). */
-export const WARNING_FLAGS: readonly MeterFlag[] = ['low_confidence', 'below_previous', 'abnormal_jump'];
+export const WARNING_FLAGS: readonly MeterFlag[] = ['low_confidence', 'below_previous', 'abnormal_jump', 'serial_mismatch', 'room_conflict'];
 
 export const FLAG_LABELS_TH: Record<MeterFlag, string> = {
   no_reading: 'อ่านเลขไม่ได้',
@@ -33,6 +35,8 @@ export const FLAG_LABELS_TH: Record<MeterFlag, string> = {
   room_not_found: 'ไม่พบเลขห้อง',
   room_ambiguous: 'เลขห้องตรงหลายห้อง',
   duplicate_in_batch: 'ห้อง/ชนิดซ้ำในชุดนี้',
+  room_conflict: 'เลขซีเรียลเป็นของห้องอื่น',
+  serial_mismatch: 'เลขซีเรียลไม่ตรงกับที่เคยบันทึก',
   month_locked: 'บิลเดือนนี้ปิดแล้ว',
   low_confidence: 'AI ไม่มั่นใจ',
   below_previous: 'ต่ำกว่าเดือนก่อน',
@@ -77,9 +81,71 @@ export interface BatchItem {
   error?: string;
   /** User confirmed despite warning flags. */
   overridden?: boolean;
+  /** Meter serial read by the AI (normalised), used to match the room and remembered per room. */
+  serial?: string | null;
+  /** Several meters can come from one photo (a meter board): the photo they came from and where. */
+  photoId?: string;
+  /** [x, y, w, h] as fractions of the photo. */
+  box?: [number, number, number, number] | null;
+  /** How the room was found automatically. */
+  matchedBy?: 'serial' | 'label';
 }
 
-export interface RoomRef { id: string; room_number: string; is_active?: boolean }
+export interface RoomRef {
+  id: string; room_number: string; is_active?: boolean;
+  /** Meter serials remembered from earlier confirmed readings. */
+  meter_serial_elec?: string | null; meter_serial_water?: string | null;
+}
+
+/** Serials compare on letters and digits only, case-insensitive. */
+export const normalizeSerial = (s: string | null | undefined): string => (s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+const serialOf = (r: RoomRef, type: MeterType) =>
+  normalizeSerial(type === 'electric' ? r.meter_serial_elec : type === 'water' ? r.meter_serial_water : null);
+
+/** Rooms whose remembered serial (of this type, or either type when unknown) is this one. */
+function roomsWithSerial(rooms: RoomRef[], serial: string, type: MeterType): RoomRef[] {
+  const types: MeterType[] = type === 'unknown' ? ['electric', 'water'] : [type];
+  return rooms.filter(r => r.is_active !== false && types.some(t => serialOf(r, t) === serial));
+}
+
+/**
+ * Match one meter: by its serial first (remembered from earlier months — works even when the room label is
+ * missing or unreadable), otherwise by the room label. Never guesses on ties.
+ */
+export function matchMeter(rooms: RoomRef[], ocrRoom: string | null, serial: string | null | undefined, type: MeterType): MatchResult & { by?: 'serial' | 'label' } {
+  const s = normalizeSerial(serial);
+  if (s.length >= 4) {
+    const hits = roomsWithSerial(rooms, s, type);
+    if (hits.length === 1) return { kind: 'matched', roomId: hits[0].id, by: 'serial' };
+    if (hits.length > 1) return { kind: 'ambiguous', roomIds: hits.map(h => h.id) };
+  }
+  const m = matchRoom(rooms, ocrRoom);
+  return m.kind === 'matched' ? { ...m, by: 'label' } : m;
+}
+
+/** Serials to remember after a save: rooms that had none on file for that meter type, or a confirmed replacement. */
+export function serialsToLearn(items: BatchItem[], rooms: RoomRef[]): { roomId: string; field: 'meter_serial_elec' | 'meter_serial_water'; serial: string }[] {
+  const out = new Map<string, { roomId: string; field: 'meter_serial_elec' | 'meter_serial_water'; serial: string }>();
+  for (const i of items) {
+    const serial = normalizeSerial(i.serial);
+    if (i.status !== 'saved' || !i.roomId || i.meterType === 'unknown' || serial.length < 4) continue;
+    const room = rooms.find(r => r.id === i.roomId);
+    if (!room) continue;
+    const known = serialOf(room, i.meterType);
+    // a different serial on file only changes when a person confirmed past the warning (meter replaced)
+    if (known && (known === serial || !i.overridden)) continue;
+    const field = i.meterType === 'electric' ? 'meter_serial_elec' : 'meter_serial_water';
+    out.set(`${i.roomId}|${field}`, { roomId: i.roomId, field, serial });
+    // a person confirmed this meter belongs here: no other room keeps the same serial
+    if (i.overridden) {
+      for (const other of roomsWithSerial(rooms, serial, i.meterType)) {
+        if (other.id !== i.roomId && !out.has(`${other.id}|${field}`)) out.set(`${other.id}|${field}`, { roomId: other.id, field, serial: '' });
+      }
+    }
+  }
+  return [...out.values()];
+}
 
 export interface RoomMeterContext {
   /** Previous month's closing reading for this meter type. */
@@ -139,10 +205,25 @@ export function computeFlags(
     if (item.meterType === 'unknown') flags.push('unknown_type');
 
     if (!item.roomId || !rooms.some(r => r.id === item.roomId)) {
-      const m = matchRoom(rooms, item.ocrRoom);
+      const m = matchMeter(rooms, item.ocrRoom, item.serial, item.meterType);
       flags.push(m.kind === 'ambiguous' ? 'room_ambiguous' : 'room_not_found');
-    } else if (item.meterType !== 'unknown' && (claims.get(claimKey(item)) ?? 0) > 1) {
-      flags.push('duplicate_in_batch');
+    } else {
+      if (item.meterType !== 'unknown' && (claims.get(claimKey(item)) ?? 0) > 1) flags.push('duplicate_in_batch');
+      const serial = normalizeSerial(item.serial);
+      if (serial.length >= 4) {
+        const owners = roomsWithSerial(rooms, serial, item.meterType);
+        if (owners.length > 0 && !owners.some(r => r.id === item.roomId)) flags.push('room_conflict');
+        else {
+          const room = rooms.find(r => r.id === item.roomId)!;
+          const known = item.meterType === 'unknown' ? '' : serialOf(room, item.meterType);
+          if (known && known !== serial) flags.push('serial_mismatch');
+        }
+      }
+      // the label says one room, the remembered serial another: never pick silently
+      if (item.ocrRoom && item.matchedBy === 'serial') {
+        const byLabel = matchRoom(rooms, item.ocrRoom);
+        if (byLabel.kind === 'matched' && byLabel.roomId !== item.roomId && !flags.includes('room_conflict')) flags.push('room_conflict');
+      }
     }
 
     if (item.confidence < settings.minConfidence) flags.push('low_confidence');

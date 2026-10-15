@@ -1,13 +1,17 @@
 /**
  * POST /api/meter-ocr
  *
- * Reads ONE meter photo with the configured AI vision model (see _ai.ts) and returns what it saw: the room
+ * Reads a meter photo with the configured AI vision model (see _ai.ts) and returns what it saw: the room
  * number written near the meter, the dial reading and the meter type.
+ *
+ * With `multi: true` one photo may hold up to MAX_METERS_PER_PHOTO meters (a meter board): every meter is
+ * returned with its serial number and where it is in the photo, so the client can match it to a room
+ * by serial or by the room label (src/utils/meterBatch.ts).
  *
  * It only *reads*. It never touches meter records — the client shows the result
  * next to the photo and a person confirms it (see src/utils/meterBatch.ts).
  *
- * Body: { owner_uid, building_id, imageBase64, mimeType }
+ * Body: { owner_uid, building_id, imageBase64, mimeType, multi? }
  * Needs `meter.record` on that property, and a Plus/Pro plan on the owner account.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -15,7 +19,7 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { AiError, aiErrorHint, aiGenerate, extractJson } from './_ai.js';
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 60 };
 
 export interface MeterOcrResult {
     room_number: string | null;
@@ -24,6 +28,16 @@ export interface MeterOcrResult {
     /** 0..1 */
     confidence: number;
     note: string;
+}
+
+/** A meter board photo is read up to this many meters; more than that and digits get too small to trust. */
+export const MAX_METERS_PER_PHOTO = 12;
+
+export interface MeterOcrItem extends MeterOcrResult {
+    /** Serial / meter number printed on the meter (letters and digits only), or null. */
+    serial: string | null;
+    /** Where the meter is in the photo, as fractions of width / height: [x, y, w, h]; null if not given. */
+    box: [number, number, number, number] | null;
 }
 
 const EMPTY: MeterOcrResult = { room_number: null, reading: null, meter_type: 'unknown', confidence: 0, note: '' };
@@ -57,6 +71,60 @@ export function parseMeterOcr(raw: string): MeterOcrResult {
     };
 }
 
+/** Multi-meter output: { meters: [...] }. Untrusted; never throws; at most MAX_METERS_PER_PHOTO items. */
+export function parseMeterOcrMulti(raw: string): { meters: MeterOcrItem[]; note: string } {
+    const obj = extractJson(raw);
+    const list = obj && typeof obj === 'object' && Array.isArray((obj as { meters?: unknown }).meters)
+        ? (obj as { meters: unknown[] }).meters : null;
+    if (!list) return { meters: [], note: 'อ่านผลจาก AI ไม่สำเร็จ' };
+    const meters: MeterOcrItem[] = [];
+    for (const m of list.slice(0, MAX_METERS_PER_PHOTO)) {
+        if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
+        const r = m as Record<string, unknown>;
+        const base = parseMeterOcr(JSON.stringify(r));
+        const serial = typeof r.serial === 'string' || typeof r.serial === 'number'
+            ? String(r.serial).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 30) : '';
+        const b = Array.isArray(r.box) && r.box.length === 4 && r.box.every(v => typeof v === 'number' && Number.isFinite(v))
+            ? (r.box as number[]).map(v => Math.min(1, Math.max(0, v))) as [number, number, number, number] : null;
+        meters.push({ ...base, serial: serial.length >= 4 ? serial : null, box: b && b[2] > 0 && b[3] > 0 ? b : null });
+    }
+    const note = obj && typeof (obj as { note?: unknown }).note === 'string' ? String((obj as { note: string }).note).slice(0, 200) : '';
+    return { meters, note: list.length > MAX_METERS_PER_PHOTO ? `รูปนี้มีมิเตอร์เกิน ${MAX_METERS_PER_PHOTO} ตัว อ่านเฉพาะ ${MAX_METERS_PER_PHOTO} ตัวแรก` : note };
+}
+
+async function readMeterBoard(imageBase64: string, mimeType: string): Promise<{ meters: MeterOcrItem[]; note: string }> {
+    const prompt = `คุณคือผู้เชี่ยวชาญอ่านมิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา รูปนี้อาจมีมิเตอร์หลายตัว (แผงมิเตอร์) ไม่เกิน ${MAX_METERS_PER_PHOTO} ตัว
+แต่ละตัวมักมีเลขห้องเขียน/ติดสติกเกอร์ไว้ใกล้ๆ และมีเลขซีเรียล (หมายเลขมิเตอร์) พิมพ์อยู่บนตัวมิเตอร์
+
+ตอบเป็น JSON เท่านั้น:
+{
+  "meters": [
+    {
+      "room_number": "<เลขห้องที่ติดกับมิเตอร์ตัวนี้ หรือ null ถ้าไม่เห็นชัด>",
+      "serial": "<เลขซีเรียล/หมายเลขมิเตอร์ที่พิมพ์บนตัวมิเตอร์ หรือ null>",
+      "reading": <เลขบนหน้าปัดหลักเป็นจำนวนเต็ม หรือ null>,
+      "meter_type": "electric" | "water" | "unknown",
+      "confidence": <0 ถึง 1>,
+      "box": [<x ซ้าย>, <y บน>, <กว้าง>, <สูง>],
+      "note": "<หมายเหตุสั้นๆ หรือ ''>"
+    }
+  ],
+  "note": "<หมายเหตุของทั้งรูป หรือ ''>"
+}
+
+กฎ:
+- ใส่ทุกมิเตอร์ที่เห็นในรูป เรียงจากซ้ายไปขวา บนลงล่าง ไม่เกิน ${MAX_METERS_PER_PHOTO} ตัว
+- box เป็นสัดส่วนของรูป (0 ถึง 1) ครอบมิเตอร์ตัวนั้น
+- ห้ามเดาเลขห้องหรือเลขซีเรียล ถ้าไม่ชัดให้เป็น null ห้ามเอาเลขห้องของมิเตอร์ข้างเคียงมาใส่
+- อ่านเฉพาะเลขหน้าปัดหลัก ไม่นับเลขสีแดง/ทศนิยม
+- มิเตอร์ที่เบลอหรือถูกบัง ให้ reading เป็น null และ confidence ต่ำกว่า 0.3
+- ห้ามอธิบายเพิ่มนอก JSON`;
+    const text = await aiGenerate({
+        kind: 'vision', prompt, images: [{ base64: imageBase64, mimeType }], json: true, temperature: 0, maxTokens: 2500,
+    });
+    return parseMeterOcrMulti(text);
+}
+
 async function readMeter(imageBase64: string, mimeType: string): Promise<MeterOcrResult> {
     const prompt = `คุณคือผู้เชี่ยวชาญอ่านมิเตอร์ไฟฟ้าและมิเตอร์น้ำประปา พนักงานถ่ายรูปมิเตอร์ของแต่ละห้อง
 โดยมักมีเลขห้องเขียนหรือติดสติกเกอร์ไว้ใกล้มิเตอร์
@@ -85,7 +153,7 @@ async function readMeter(imageBase64: string, mimeType: string): Promise<MeterOc
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
-    const body = (req.body ?? {}) as { owner_uid?: string; building_id?: string; imageBase64?: string; mimeType?: string };
+    const body = (req.body ?? {}) as { owner_uid?: string; building_id?: string; imageBase64?: string; mimeType?: string; multi?: boolean };
 
     const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId: body.building_id, permission: 'meter.record' });
     if (!ctx) return;
@@ -112,7 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const mime = typeof body.mimeType === 'string' && /^image\/(jpeg|png|webp)$/.test(body.mimeType) ? body.mimeType : 'image/jpeg';
 
     try {
-        res.status(200).json({ data: await readMeter(body.imageBase64, mime) });
+        res.status(200).json({ data: body.multi === true ? await readMeterBoard(body.imageBase64, mime) : await readMeter(body.imageBase64, mime) });
     } catch (err) {
         console.error('[meter-ocr]', (err as Error).message);
         const code = err instanceof AiError ? err.code : 'unexpected';

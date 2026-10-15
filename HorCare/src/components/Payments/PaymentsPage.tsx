@@ -18,6 +18,7 @@ import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, VERIFICATION_LABELS, resolvePay
 import { logActivity } from '../../utils/auditLog';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { doc, getDoc, collection, query, onSnapshot, updateDoc } from 'firebase/firestore';
+import { apiPost } from '../../utils/api';
 import { storage, db, auth } from '../../firebase/config';
 
 interface PaymentsPageProps {
@@ -254,6 +255,8 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                     });
                 }
             }));
+            // post the money into the books right away (best-effort; a daily run catches anything missed)
+            if (uid && buildingId) void apiPost('auto-post', { owner_uid: uid, building_id: buildingId }).catch(() => undefined);
             setSelected(new Set());
             setPayModal(null);
         } finally {

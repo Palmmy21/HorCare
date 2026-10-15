@@ -7,6 +7,7 @@ import type { PaidItem } from './_accounting-data.js';
 import { verifyPortalToken } from './_portal-token.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
+import { autoPostSafe } from './_ledger-auto.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -31,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             const r = await applySlipSplit({ ownerUid: uid, buildingId, kind: itemType, itemId, roomId, slipRef });
             if (r.status !== 'ok') { res.status(r.status === 'not_found' ? 404 : 409).json({ error: r.status }); return; }
+            await autoPostSafe(uid, buildingId);
             res.status(200).json({ success: true, paid: r.paid, total: r.total, outstanding: r.outstanding });
             return;
         }
@@ -151,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
+        if (autoVerified) await autoPostSafe(uid, buildingId);
         res.status(200).json({
             success: true, autoVerified, status: autoVerified ? 'paid' : 'pending',
             outcome: evaluation.outcome, problems: evaluation.problems,

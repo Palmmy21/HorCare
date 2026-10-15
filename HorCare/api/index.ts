@@ -25,6 +25,7 @@ import marketHandler from './_market.js';
 import securityAlertsHandler from './_security-alerts.js';
 import tenantLinkHandler from './_tenant-link.js';
 import portalLinkHandler from './_portal-link.js';
+import autoPostHandler from './_auto-post.js';
 import announcementsHandler from './_announcements.js';
 import remindParcelsHandler from './_remind-parcels.js';
 import qrHandler from './_qr.js';
@@ -63,6 +64,7 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'security-alerts': return securityAlertsHandler(req, res);
         case 'tenant-link': return tenantLinkHandler(req, res);
         case 'portal-link': return portalLinkHandler(req, res);
+        case 'auto-post': return autoPostHandler(req, res);
         // Heavy dependencies (XLSX writer, Supabase client) are loaded only when their route is called,
         // so they never slow the cold start of every other API route.
         case 'accounting': return (await import('./_accounting.js')).default(req, res);

@@ -18,6 +18,7 @@ import {
     type BankTransaction, type ReconItem, type ReconTarget,
 } from '../src/shared/reconciliation.js';
 import type { MonthlyBill, Fine } from '../src/types/index.js';
+import { autoPostSafe } from './_ledger-auto.js';
 
 export const config = { maxDuration: 30 };
 
@@ -250,6 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             await audit('UPDATE', out.tx.id, `ยืนยัน ${out.tx.amount} บาท ↔ ห้อง ${out.item.room_number}`, {
                 after: { item: `${out.item.kind}:${out.item.id}`, verification_status: 'verified' },
             });
+            await autoPostSafe(ctx.ownerUid, buildingId);
             res.status(200).json({ ok: true });
             return;
         }
@@ -269,6 +271,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (e instanceof HttpError) failed++; else throw e;
             }
         }
+        if (confirmed) await autoPostSafe(ctx.ownerUid, buildingId);
         res.status(200).json({ confirmed, failed });
     } catch (e) {
         if (e instanceof HttpError) { res.status(e.status).json({ error: e.code }); return; }
