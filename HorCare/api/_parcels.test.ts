@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).firebaseMock);
+const { aiGenerate } = vi.hoisted(() => ({ aiGenerate: vi.fn() }));
+vi.mock('./_ai.js', async (orig) => ({ ...(await orig<typeof import('./_ai.js')>()), aiGenerate }));
 
 import handler from './_parcels.js';
+import { AiError } from './_ai.js';
+import { parseParcelLabel } from './_parcel-ocr.js';
 import { decideChannels, renderMessage } from './_notify.js';
 import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
-import { MAX_REMINDERS, canTransition, isDueForReminder, type Parcel } from '../src/shared/parcels.js';
+import { MAX_REMINDERS, canTransition, isDueForReminder, matchCarrier, matchLabelRoom, type Parcel } from '../src/shared/parcels.js';
 
 const OWNER = 'owner-1';
 const BLD = 'bld-A';
@@ -19,6 +23,7 @@ function member(uid: string, role: 'front_desk' | 'technician', property_ids = [
 
 beforeEach(() => {
     delete process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    aiGenerate.mockReset();
     resetFake();
     addAuthUser(OWNER, 'o@x.com', 'Owner');
     addAuthUser('desk', 'd@x.com', 'Desk');
@@ -193,6 +198,59 @@ describe('tenant_list (portal view)', () => {
         expect((await call(undefined, { action: 'tenant_list', owner_uid: undefined, room_id: 'r101' })).statusCode).toBe(400);
         expect((await call(undefined, { action: 'tenant_list' })).statusCode).toBe(400);
         expect((await call(undefined, { action: 'tenant_list', room_id: 'ghost' })).statusCode).toBe(404);
+    });
+});
+
+describe('read_label (shipping-label OCR)', () => {
+    const label = (uid: string | undefined, over: Record<string, unknown> = {}) =>
+        call(uid, { action: 'read_label', image_base64: 'AAAA', ...over });
+
+    it('returns parsed suggestions and writes nothing', async () => {
+        seed(`users/${OWNER}`, { uid: OWNER, license: 'monthly_medium' });
+        aiGenerate.mockResolvedValueOnce('```json\n{"carrier":"Flash","tracking_number":"th 0123-4567 89","recipient_name":"สมชาย","room_number":"101","confidence":0.9}\n```');
+        const res = await label(OWNER);
+        expect(res.statusCode).toBe(200);
+        expect((res.body as { data: unknown }).data).toEqual({
+            carrier: 'Flash', tracking_number: 'TH0123456789', recipient_name: 'สมชาย', room_number: '101', confidence: 0.9,
+        });
+        expect(listPaths(`${B}/parcels/`)).toHaveLength(0);
+    });
+
+    it('is Plus/Pro only, needs parcel.create, and validates the image', async () => {
+        expect((await label(OWNER)).statusCode).toBe(403); // free plan
+        seed(`users/${OWNER}`, { uid: OWNER, license: 'monthly_medium' });
+        member('tech', 'technician');
+        expect((await label('tech')).statusCode).toBe(403);
+        expect((await label(OWNER, { image_base64: '<script>' })).statusCode).toBe(400);
+        expect((await label(OWNER, { image_base64: undefined })).statusCode).toBe(400);
+        expect(aiGenerate).not.toHaveBeenCalled();
+    });
+
+    it('reports AI failures as 502 with a readable message', async () => {
+        seed(`users/${OWNER}`, { uid: OWNER, license: 'active' });
+        aiGenerate.mockRejectedValueOnce(new AiError('provider_429', 'busy'));
+        const res = await label(OWNER);
+        expect(res.statusCode).toBe(502);
+        expect(res.body).toMatchObject({ error: 'ocr_failed', detail: 'provider_429' });
+    });
+
+    it('parser drops junk and non-label replies', () => {
+        expect(parseParcelLabel('not json')).toEqual({ carrier: null, tracking_number: null, recipient_name: null, room_number: null, confidence: 0 });
+        expect(parseParcelLabel('{"tracking_number":"12","room_number":null,"carrier":"null","confidence":7}'))
+            .toMatchObject({ tracking_number: null, room_number: null, carrier: null, confidence: 1 });
+    });
+
+    it('matches carriers and rooms from what the label says', () => {
+        expect(matchCarrier('KERRY EXPRESS (THAILAND)')).toBe('Kerry Express');
+        expect(matchCarrier('SPX Express')).toBe('Shopee Express');
+        expect(matchCarrier('J&T')).toBe('J&T Express');
+        expect(matchCarrier('ไปรษณีย์ไทย EMS')).toBe('Thailand Post');
+        expect(matchCarrier('Unknown Cargo')).toBeNull();
+        const rooms = [{ id: 'a', room_number: 'A-2' }, { id: 'b', room_number: '101' }, { id: 'c', room_number: '102', is_active: false }];
+        expect(matchLabelRoom('ห้อง A2', rooms)?.id).toBe('a');
+        expect(matchLabelRoom('Room 101', rooms)?.id).toBe('b');
+        expect(matchLabelRoom('102', rooms)).toBeNull(); // inactive
+        expect(matchLabelRoom('999', rooms)).toBeNull();
     });
 });
 

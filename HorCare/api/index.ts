@@ -35,6 +35,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const routeParam = req.query.route;
     const route = Array.isArray(routeParam) ? routeParam[0] : routeParam;
 
+    try {
+        await dispatch(route, req, res);
+    } catch (err) {
+        // An uncaught throw becomes Vercel's opaque (non-JSON) 500, which the client can only show as
+        // "request_failed"; log it and return the real reason instead.
+        console.error(`[api/${route}] failed:`, err);
+        if (!res.headersSent) res.status(500).json({ error: 'internal_error', message: (err as Error)?.message ?? String(err) });
+    }
+}
+
+async function dispatch(route: string | undefined, req: VercelRequest, res: VercelResponse) {
     switch (route) {
         case 'admin': return adminHandler(req, res);
         case 'create-checkout': return createCheckoutHandler(req, res);

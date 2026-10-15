@@ -31,6 +31,48 @@ export const CARRIERS = [
   'Lazada Express', 'Best Express', 'SCG Express', 'DHL', 'ไปรษณีย์/อื่นๆ',
 ] as const;
 
+/** What the AI read off a shipping label (POST /api/parcels action read_label). Every field is a suggestion for staff to confirm. */
+export interface ParcelLabelOcr {
+  carrier: string | null;
+  tracking_number: string | null;
+  recipient_name: string | null;
+  /** Room / unit number found in the address, as printed. */
+  room_number: string | null;
+  /** 0..1 */
+  confidence: number;
+}
+
+const CARRIER_ALIASES: [RegExp, (typeof CARRIERS)[number]][] = [
+  [/kerry|เคอรี่/i, 'Kerry Express'],
+  [/flash|แฟลช/i, 'Flash Express'],
+  [/j\s*&\s*t|j\s*and\s*t|เจแอนด์ที/i, 'J&T Express'],
+  [/thailand\s*post|thai\s*post|ไปรษณีย์ไทย|\bems\b/i, 'Thailand Post'],
+  [/shopee|spx|ช้อปปี้/i, 'Shopee Express'],
+  [/lazada|\blex\b|ลาซาด้า/i, 'Lazada Express'],
+  [/best\s*express|\bbest\b/i, 'Best Express'],
+  [/scg|nim\s*express|นิ่ม/i, 'SCG Express'],
+  [/\bdhl\b/i, 'DHL'],
+];
+
+/** Map a carrier name read from a label onto CARRIERS; null when it is not one we list. */
+export function matchCarrier(name: string | null | undefined): (typeof CARRIERS)[number] | null {
+  if (!name) return null;
+  return CARRIER_ALIASES.find(([re]) => re.test(name))?.[1] ?? null;
+}
+
+const roomKey = (s: string) => s.toLowerCase().replace(/^(ห้อง|room|rm\.?|unit|#)\s*/i, '').replace(/[\s\-_.]/g, '');
+
+/** Find the active room whose number equals the one read from a label (ignoring "ห้อง", spaces, dashes and case). */
+export function matchLabelRoom<R extends { id: string; room_number: string; is_active?: boolean }>(
+  printed: string | null | undefined, rooms: R[],
+): R | null {
+  if (!printed) return null;
+  const key = roomKey(printed);
+  if (!key) return null;
+  const hits = rooms.filter(r => r.is_active !== false && roomKey(r.room_number) === key);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 export interface Parcel {
   id: string;
   organization_id: string;

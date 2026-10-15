@@ -149,6 +149,17 @@ export async function aiGenerate(req: AiRequest): Promise<string> {
     return provider === 'openrouter' ? viaOpenRouter(req) : viaGemini(req);
 }
 
+/** Thai message for an AiError code, for photo-reading endpoints (meter, parcel label). */
+export function aiErrorHint(code: string): string {
+    return code === 'missing_key' ? 'ยังไม่ได้ตั้งค่า AI บนเซิร์ฟเวอร์ (OPENROUTER_API_KEY หรือ GEMINI_API_KEY)'
+        : code === 'provider_429' ? 'โควต้า AI เต็มชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่'
+        : code === 'provider_401' || code === 'provider_403' ? 'คีย์ AI ใช้ไม่ได้หรือไม่มีสิทธิ์'
+        : code === 'provider_402' ? 'เครดิต AI หมด กรุณาเติมเครดิต'
+        : code === 'provider_400' || code === 'provider_404' ? 'โมเดล AI ที่ตั้งไว้ใช้ไม่ได้ ตรวจสอบชื่อโมเดล'
+        : code === 'timeout' ? 'AI ตอบช้าเกินไป ลองใหม่อีกครั้ง'
+        : 'AI อ่านรูปไม่สำเร็จ กรุณาลองใหม่';
+}
+
 /**
  * Pull a JSON value out of a model reply. Tolerates ```json fences and prose around the
  * object, which some models add even in JSON mode. Returns null if nothing parses.

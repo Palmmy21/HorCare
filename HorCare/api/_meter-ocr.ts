@@ -13,7 +13,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
-import { AiError, aiGenerate, extractJson } from './_ai.js';
+import { AiError, aiErrorHint, aiGenerate, extractJson } from './_ai.js';
 
 export const config = { maxDuration: 30 };
 
@@ -28,7 +28,7 @@ export interface MeterOcrResult {
 
 const EMPTY: MeterOcrResult = { room_number: null, reading: null, meter_type: 'unknown', confidence: 0, note: '' };
 
-function isPlusOrAbove(license: string): boolean {
+export function isPlusOrAbove(license: string): boolean {
     if (license === 'active') return true;
     const m = license.match(/^(monthly|yearly)_(small|medium|large)$/);
     return !!m && (m[2] === 'medium' || m[2] === 'large');
@@ -116,13 +116,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (err) {
         console.error('[meter-ocr]', (err as Error).message);
         const code = err instanceof AiError ? err.code : 'unexpected';
-        const hint = code === 'missing_key' ? 'ยังไม่ได้ตั้งค่า AI บนเซิร์ฟเวอร์ (OPENROUTER_API_KEY หรือ GEMINI_API_KEY)'
-            : code === 'provider_429' ? 'โควต้า AI เต็มชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่'
-            : code === 'provider_401' || code === 'provider_403' ? 'คีย์ AI ใช้ไม่ได้หรือไม่มีสิทธิ์'
-            : code === 'provider_402' ? 'เครดิต AI หมด กรุณาเติมเครดิต'
-            : code === 'provider_400' || code === 'provider_404' ? 'โมเดล AI ที่ตั้งไว้ใช้ไม่ได้ ตรวจสอบชื่อโมเดล'
-            : code === 'timeout' ? 'AI ตอบช้าเกินไป ลองใหม่อีกครั้ง'
-            : 'AI อ่านรูปไม่สำเร็จ กรุณาลองใหม่';
-        res.status(502).json({ error: 'ocr_failed', detail: code, message: `${hint} (${code})` });
+        res.status(502).json({ error: 'ocr_failed', detail: code, message: `${aiErrorHint(code)} (${code})` });
     }
 }

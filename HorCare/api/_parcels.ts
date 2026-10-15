@@ -4,6 +4,9 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { notify } from './_notify.js';
+import { AiError, aiErrorHint } from './_ai.js';
+import { isPlusOrAbove } from './_meter-ocr.js';
+import { readParcelLabel } from './_parcel-ocr.js';
 import {
     canTransition, isParcelStatus,
     type Parcel, type ParcelStatus, type TenantParcelView,
@@ -12,7 +15,7 @@ import {
 export const config = { maxDuration: 20 };
 
 interface Body {
-    action?: 'create' | 'update_status' | 'renotify' | 'tenant_list';
+    action?: 'create' | 'update_status' | 'renotify' | 'tenant_list' | 'read_label';
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -29,6 +32,8 @@ interface Body {
 }
 
 const MAX_IMAGE_CHARS = 450_000;
+/** The label photo sent for OCR is sharper (small print, barcodes) than the one stored. */
+const MAX_OCR_CHARS = 3_000_000;
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 /** Trim and cap an optional free-text field. Returns null for empty, undefined if invalid type. */
@@ -72,6 +77,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ── Staff actions ─────────────────────────────────────────────────────────────
+    if (body.action === 'read_label') {
+        // OCR of the shipping label: returns suggestions only, writes nothing.
+        const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'parcel.create' });
+        if (!ctx) return;
+        if (!(await buildingExists(ctx.ownerUid, buildingId))) { res.status(404).json({ error: 'property_not_found' }); return; }
+        // The plan belongs to the organization (owner), not the staff member calling.
+        const owner = await db.doc(`users/${ctx.ownerUid}`).get();
+        if (!isPlusOrAbove(owner.data()?.license ?? 'free')) {
+            res.status(403).json({ error: 'feature_locked', message: 'อ่านใบปะหน้าอัตโนมัติสำหรับแพ็กเกจ Plus และ Pro เท่านั้น' });
+            return;
+        }
+        if (typeof body.image_base64 !== 'string' || !body.image_base64 || body.image_base64.length > MAX_OCR_CHARS || !BASE64_RE.test(body.image_base64)) {
+            res.status(400).json({ error: 'invalid_image' });
+            return;
+        }
+        try {
+            res.status(200).json({ data: await readParcelLabel(body.image_base64, 'image/jpeg') });
+        } catch (err) {
+            console.error('[parcels] read_label', (err as Error).message);
+            const code = err instanceof AiError ? err.code : 'unexpected';
+            res.status(502).json({ error: 'ocr_failed', detail: code, message: `${aiErrorHint(code)} (${code})` });
+        }
+        return;
+    }
+
     if (body.action === 'create') {
         const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'parcel.create' });
         if (!ctx) return;

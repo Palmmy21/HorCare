@@ -15,7 +15,7 @@ export function useSecurityAlerts(ownerUid: string | null, buildingIds: string[]
     const ids = idsKey.split('|');
     const unsubs = ids.map(bid => onSnapshot(
       collection(db, `users/${ownerUid}/buildings/${bid}/security_alerts`),
-      s => setByBuilding(prev => ({ ...prev, [bid]: s.docs.map(d => d.data() as SecurityAlert) })),
+      s => setByBuilding(prev => ({ ...prev, [bid]: s.docs.map(d => ({ ...(d.data() as SecurityAlert), id: d.id })) })),
       () => setByBuilding(prev => ({ ...prev, [bid]: [] })),
     ));
     return () => unsubs.forEach(u => u());

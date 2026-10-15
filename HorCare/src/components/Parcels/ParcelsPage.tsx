@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-    Package, Plus, Search, Loader2, X, Camera, Bell, CheckCircle2, MapPin, Clock, MessageCircle, AlertTriangle, Image as ImageIcon,
+    Package, Plus, Search, Loader2, X, Camera, Bell, CheckCircle2, MapPin, Clock, MessageCircle, AlertTriangle, Image as ImageIcon, ScanText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { doc, getDoc } from 'firebase/firestore';
@@ -10,7 +10,8 @@ import { useParcels } from '../../hooks/useParcels';
 import { apiPost, ApiError } from '../../utils/api';
 import { compressImage } from '../../utils/imageCompress';
 import {
-    CARRIERS, PARCEL_STATUS_LABELS_TH, REMIND_AFTER_DAYS, type Parcel, type ParcelStatus,
+    CARRIERS, PARCEL_STATUS_LABELS_TH, REMIND_AFTER_DAYS, matchCarrier, matchLabelRoom,
+    type Parcel, type ParcelLabelOcr, type ParcelStatus,
 } from '../../shared/parcels';
 
 interface ParcelsPageProps {
@@ -49,7 +50,8 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
     const [recipient, setRecipient] = useState('');
     const [storage, setStorage] = useState('');
     const [note, setNote] = useState('');
-    const [image, setImage] = useState<{ base64: string; preview: string } | null>(null);
+    const [image, setImage] = useState<{ base64: string; preview: string; file: File } | null>(null);
+    const [ocr, setOcr] = useState<{ state: 'reading' | 'done' | 'error'; text: string } | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
@@ -68,9 +70,45 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
         if (!file.type.startsWith('image/')) { toast.error('กรุณาเลือกไฟล์รูปภาพ'); return; }
         try {
             const { base64 } = await compressImage(file, 900);
-            setImage({ base64, preview: `data:image/jpeg;base64,${base64}` });
+            setImage({ base64, preview: `data:image/jpeg;base64,${base64}`, file });
         } catch {
             toast.error('อ่านรูปไม่ได้');
+            return;
+        }
+        void readLabel(file);
+    };
+
+    // OCR the shipping label and fill in what is still empty. Suggestions only — staff confirm before saving.
+    const readLabel = async (file: File) => {
+        setOcr({ state: 'reading', text: 'กำลังอ่านใบปะหน้า…' });
+        try {
+            const { base64 } = await compressImage(file, 1600); // sharper than the stored photo: small print and barcodes
+            const { data } = await apiPost<{ data: ParcelLabelOcr }>('parcels', {
+                action: 'read_label', owner_uid: ownerUid, building_id: buildingId, image_base64: base64,
+            });
+            const filled: string[] = [];
+            if (data.tracking_number && !tracking.trim()) { setTracking(data.tracking_number); filled.push('เลขพัสดุ'); }
+            if (data.recipient_name && !recipient.trim()) { setRecipient(data.recipient_name); filled.push('ชื่อผู้รับ'); }
+            if (data.carrier) {
+                const known = matchCarrier(data.carrier);
+                if (known) setCarrier(known);
+                else { setCarrier('__other'); setCustomCarrier(data.carrier.slice(0, 40)); }
+                filled.push('ขนส่ง');
+            }
+            let roomNote = '';
+            if (data.room_number) {
+                const hit = matchLabelRoom(data.room_number, active);
+                if (hit && !roomId) { setRoomId(hit.id); setRoomSearch(''); filled.push(unitName); }
+                if (!hit) roomNote = ` · ใบปะหน้าระบุ${unitName} "${data.room_number}" แต่ไม่พบในระบบ — กรุณาเลือกเอง`;
+                else if (roomId && hit.id !== roomId) roomNote = ` · ใบปะหน้าระบุ${unitName} ${hit.room_number} ไม่ตรงกับที่เลือกไว้`;
+            }
+            const low = data.confidence < 0.5 ? ' (ความมั่นใจต่ำ)' : '';
+            setOcr(filled.length || roomNote
+                ? { state: 'done', text: `เติมจากใบปะหน้าแล้ว: ${filled.join(', ') || '—'}${low} — ตรวจสอบก่อนบันทึก${roomNote}` }
+                : { state: 'error', text: 'อ่านข้อมูลจากใบปะหน้าไม่ได้ — กรอกเองได้ หรือถ่ายใหม่ให้เห็นใบปะหน้าชัดๆ' });
+        } catch (e) {
+            const err = e as ApiError;
+            setOcr({ state: 'error', text: err.message || 'อ่านใบปะหน้าไม่สำเร็จ' });
         }
     };
 
@@ -160,16 +198,30 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                     </label>
 
                     <div style={field}>
-                        <span className="form-label">รูปพัสดุ</span>
+                        <span className="form-label">รูปพัสดุ / ใบปะหน้า</span>
                         {image ? (
-                            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                                 <img src={image.preview} alt="รูปพัสดุ" style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 10 }} />
-                                <button className="btn btn-outline btn-sm" onClick={() => setImage(null)}>เอาออก</button>
+                                <button type="button" className="btn btn-outline btn-sm" disabled={ocr?.state === 'reading'} onClick={() => void readLabel(image.file)}>
+                                    <ScanText size={14} /> อ่านใบปะหน้าอีกครั้ง
+                                </button>
+                                <button type="button" className="btn btn-outline btn-sm" onClick={() => { setImage(null); setOcr(null); }}>เอาออก</button>
                             </div>
                         ) : (
-                            <button type="button" className="btn btn-outline btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => fileRef.current?.click()}>
-                                <Camera size={14} /> ถ่ายรูป / เลือกรูป
-                            </button>
+                            <>
+                                <button type="button" className="btn btn-outline btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => fileRef.current?.click()}>
+                                    <Camera size={14} /> ถ่ายรูปใบปะหน้า / เลือกรูป
+                                </button>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>ระบบจะอ่านขนส่ง เลขพัสดุ ชื่อผู้รับ และเลข{unitName}ให้อัตโนมัติ</span>
+                            </>
+                        )}
+                        {ocr && (
+                            <span role="status" style={{
+                                fontSize: '0.75rem', display: 'inline-flex', gap: 4, alignItems: 'center',
+                                color: ocr.state === 'error' ? '#B45309' : ocr.state === 'done' ? '#047857' : 'var(--color-gray-500)',
+                            }}>
+                                {ocr.state === 'reading' && <Loader2 size={12} className="spin" />}{ocr.text}
+                            </span>
                         )}
                         <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
                             onChange={e => { void pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />
