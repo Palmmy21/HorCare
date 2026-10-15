@@ -65,6 +65,26 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.property_ids.hasAny(['*', buildingId]);
     }
 
+    // Granted every property ('*')? Such a member is an organisation-wide administrator.
+    function memberAll(ownerId) {
+      return activeMember(ownerId)
+        && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.property_ids.hasAny(['*']);
+    }
+
+    // True when the member may see every property in `ids` (all of them, or '*'). Used for documents that span
+    // properties (ledgers): a member of building A must never see a ledger that also covers building B.
+    function memberCoversAll(ownerId, ids) {
+      return activeMember(ownerId)
+        && (memberAll(ownerId)
+            || ids.hasOnly(get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.property_ids));
+    }
+
+    // May this member change data of THIS property? Needs the permission, the property grant and the
+    // organisation's licence (the same condition the owner's own writes need).
+    function memberCan(ownerId, buildingId, perm) {
+      return memberHasPermOn(ownerId, buildingId, perm) && licenseActive(ownerId);
+    }
+
     // Fields only the backend (or admin) should write — never the user directly (updates only)
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
@@ -101,30 +121,37 @@ service cloud.firestore {
         allow read: if isOwner(userId) && isNotBanned() || true;
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
 
+        // Staff may change a property's data only with the matching permission ON THAT PROPERTY (memberCan);
+        // creating, renaming or deleting properties stays with the owner.
         match /rooms/{roomId} {
           // Public read — tenant portal shows room number & rent
           allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+          allow create: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'room.create');
+          allow update: if (isOwner(userId) && isNotBanned() && licenseActive(userId))
+                        || memberCan(userId, buildingId, 'room.update') || memberCan(userId, buildingId, 'meter.record');
+          allow delete: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'room.delete');
         }
         match /bills/{billId} {
           // Public read — tenant portal shows bills
           allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+          allow create, update: if (isOwner(userId) && isNotBanned() && licenseActive(userId))
+                        || memberCan(userId, buildingId, 'meter.record') || memberCan(userId, buildingId, 'payment.update') || memberCan(userId, buildingId, 'payment.create');
+          allow delete: if isOwner(userId) && isNotBanned() && licenseActive(userId);
         }
         match /data/{docId} {
           // Public read — tenant portal reads config (promptpay, rates)
           allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+          allow write: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'property.update');
         }
         // Tenant profiles — read by owner OR public (tenant portal shows name/phone)
         match /tenants/{roomId} {
           allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+          allow write: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'tenant.update');
         }
         // Slip images stored as base64 by the LINE webhook (Admin SDK bypasses rules).
         // Owner may read to view slips on the web; clients may not write.
         match /slip_images/{slipId} {
-          allow read: if isOwner(userId) && isNotBanned();
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'finance.read');
           allow write: if false; // backend only via admin SDK
         }
 
@@ -133,7 +160,7 @@ service cloud.firestore {
         match /maintenance/{reqId} {
           // Owner: full access. Public: read (for tenant portal to show request status)
           allow read: if isOwner(userId) && isNotBanned() || true;
-          allow update, delete: if isOwner(userId) && isNotBanned();
+          allow update, delete: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.update');
 
           // Anyone (tenant portal — no sign-in) can create, with field validation
           allow create: if
@@ -164,30 +191,30 @@ service cloud.firestore {
         // ── Housekeepers (แม่บ้าน) ───────────────────────────────────────
         match /housekeepers/{maidId} {
           allow read: if true;
-          allow write: if isOwner(userId) && isNotBanned();
+          allow write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
 
-        // ── Operations collections (owner only) ──────────────────────────
+        // ── Operations collections (the owner, or staff allowed to manage THIS property) ──────────────────────────
         match /vendors/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
         match /stock/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
         match /assets/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
         match /expenses/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
         // ── ค่าปรับ (owner only + public read for portal) ─────────────────────
         match /fines/{docId} {
           allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if isOwner(userId) && isNotBanned();
+          allow write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
         // ── ค่าบริการส่วนกลาง (owner only) ──────────────────────────────
         match /common_fees/{docId} {
-          allow read, write: if isOwner(userId) && isNotBanned();
+          allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
 
         // ── Parcels — written only by /api/parcels (permission checks, audit, notifications).
@@ -263,44 +290,49 @@ service cloud.firestore {
         }
         // In-app notification records produced by the central notification service.
         match /notifications/{notificationId} {
-          allow read: if isOwner(userId) && isNotBanned();
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'room.read');
           allow write: if false;
         }
       }
 
       // ── Members (RBAC) — read-only for clients; managed via /api/members ──
       match /members/{memberId} {
+        // everyone sees their own record; the full list only goes to the owner and organisation-wide administrators
         allow read: if isOwner(userId)
                     || (isSignedIn() && request.auth.uid == memberId)
-                    || memberHasPerm(userId, 'member.read');
+                    || (memberHasPerm(userId, 'member.read') && memberAll(userId));
         allow write: if false;
       }
 
       // ── Activity log — append-only. Nobody (owner included) can edit or delete. ──
       // HorCare's own books: written only by /api/ledger. Entries are never edited or deleted.
       match /ledgers/{ledgerId} {
-        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'ledger.read');
+        // a ledger can cover several properties: staff see it only if they may see every one of them
+        allow read: if (isOwner(userId) && isNotBanned()) || (memberHasPerm(userId, 'ledger.read') && memberCoversAll(userId, resource.data.property_ids));
         allow write: if false;
         match /entries/{entryId} {
-          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'ledger.read');
+          allow read: if (isOwner(userId) && isNotBanned())
+            || (memberHasPerm(userId, 'ledger.read')
+                && memberCoversAll(userId, get(/databases/$(database)/documents/users/$(userId)/ledgers/$(ledgerId)).data.property_ids));
           allow write: if false;
         }
       }
       // Accounting export profiles + batches: written only by /api/accounting.
       match /accounting_profiles/{profileId} {
-        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
+        allow read: if (isOwner(userId) && isNotBanned()) || (memberHasPerm(userId, 'accounting.export') && memberAll(userId));
         allow write: if false;
       }
       match /accounting_batches/{batchId} {
-        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
+        allow read: if (isOwner(userId) && isNotBanned()) || (memberHasPerm(userId, 'accounting.export') && memberAll(userId));
         allow write: if false;
         match /items/{itemId} {
-          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'accounting.export');
+          allow read: if (isOwner(userId) && isNotBanned()) || (memberHasPerm(userId, 'accounting.export') && memberAll(userId));
           allow write: if false;
         }
       }
       match /audit_logs/{eventId} {
-        allow read: if (isOwner(userId) && isNotBanned()) || memberHasPerm(userId, 'audit_log.read');
+        // the activity log spans every property, so only organisation-wide administrators may read it
+        allow read: if (isOwner(userId) && isNotBanned()) || (memberHasPerm(userId, 'audit_log.read') && memberAll(userId));
         allow create: if isNotBanned()
           && request.resource.data.event_id == eventId
           && request.resource.data.organization_id == userId

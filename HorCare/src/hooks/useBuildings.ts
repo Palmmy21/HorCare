@@ -6,7 +6,8 @@ import {
 import { db } from '../firebase/config';
 import type { Building, DormConfig } from '../types';
 
-export function useBuildings(userId: string | null) {
+/** `allowMigration` is true only for the owner: staff must never create or move data in the owner's account. */
+export function useBuildings(userId: string | null, allowMigration: boolean = true) {
     const [buildings, setBuildings] = useState<Building[]>([]);
     const [loading, setLoading] = useState(true);
     const [migrating] = useState(false);
@@ -48,7 +49,7 @@ export function useBuildings(userId: string | null) {
             }
 
             // First load: if no buildings exist, check for legacy data and migrate
-            if (!migratedRef.current && snap.empty) {
+            if (allowMigration && !migratedRef.current && snap.empty) {
                 migratedRef.current = true;
                 try {
                     await migrateLegacyData(userId);
@@ -61,7 +62,7 @@ export function useBuildings(userId: string | null) {
         });
 
         return () => unsub();
-    }, [userId]);
+    }, [userId, allowMigration]);
 
     const addBuilding = useCallback(async (name: string, initialConfig?: Partial<DormConfig>): Promise<Building | undefined> => {
         if (!userId) return;

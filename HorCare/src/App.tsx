@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
@@ -7,6 +7,8 @@ import {
 import { useAuth } from './hooks/useAuth';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
+import { useMembership } from './hooks/useMembership';
+import { canOpenView, firstOpenView } from './shared/viewAccess';
 import { useLineThreads } from './hooks/useLineThreads';
 import { useSecurityAlerts } from './hooks/useSecurityAlerts';
 import { groupNav, groupOfView, isGroupOpen, navGroupDefs, parseSavedState, type NavGroupState, type TransientClose } from './utils/navGroups';
@@ -148,6 +150,16 @@ function App() {
     isPaidExpired, licenseDaysLeft, isBanned, setError
   } = useAuth();
 
+  // An administrator created by an owner works inside that owner's organisation, limited to the buildings and
+  // permissions the owner chose. Everything below that touches data uses `orgUid`, never the person's own uid.
+  const { membership, loading: membershipLoading } = useMembership(user);
+  const isStaff = membership !== null;
+  const orgUid = membership?.owner_uid ?? user?.uid ?? '';
+  // null = the owner, who may do everything
+  const staffPermissions = membership ? membership.permissions : null;
+  // the plan belongs to the owner: staff inherit it (they cannot read the owner's profile)
+  const planProfile = useMemo(() => (profile && membership ? { ...profile, license: membership.license as typeof profile.license, access_until: membership.access_until } : profile), [profile, membership]);
+
   // FCM push notification token — registers silently when permission is already granted
   useFCMToken(user?.uid ?? null);
 
@@ -177,7 +189,7 @@ function App() {
   const buildingStorageKey = user ? `horcare_active_building_${user.uid}` : null;
   const [activeBuildingId, setActiveBuildingId] = useState<string | null>(() => maidSession?.building_id ?? null);
 
-  const effectiveUid = maidSession ? maidSession.owner_uid : (user?.uid ?? null);
+  const effectiveUid = maidSession ? maidSession.owner_uid : (user && !membershipLoading ? orgUid : null);
   const effectiveBuildingId = maidSession ? maidSession.building_id : activeBuildingId;
 
   // Activity log identity. Maid sessions have no Firebase user, so nothing is logged for them.
@@ -187,13 +199,13 @@ function App() {
       return;
     }
     setAuditContext({
-      organizationId: user.uid,
+      organizationId: orgUid,
       userId: user.uid,
       userName: user.displayName || user.email || user.uid,
-      role: 'owner',
+      role: membership ? membership.role : 'owner',
       propertyId: activeBuildingId,
     });
-  }, [user, maidSession, activeBuildingId]);
+  }, [user, maidSession, activeBuildingId, orgUid, membership]);
 
   // One LOGIN event per browser session (page reloads restore the session and are not logins).
   useEffect(() => {
@@ -219,7 +231,12 @@ function App() {
   };
 
   // Buildings (multi-building support — Large plan)
-  const { buildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(effectiveUid);
+  const { buildings: allBuildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(effectiveUid, !isStaff);
+  // Staff only ever see the buildings they were given; the owner (and a member granted '*') sees them all.
+  const buildings = useMemo(
+    () => (membership && !membership.property_ids.includes('*') ? allBuildings.filter(b => membership.property_ids.includes(b.id)) : allBuildings),
+    [allBuildings, membership],
+  );
 
   // A housekeeper session is locked to its own building and to two screens. These are derived from the
   // session, so they are corrected while rendering (React re-renders at once) instead of in an effect.
@@ -282,6 +299,7 @@ function App() {
   };
 
   const handleAddBuildingSubmit = async (name: string, initialConfig: Partial<DormConfig>) => {
+    if (isStaff) return; // only the owner creates buildings
     const b = await addBuilding(name, initialConfig);
     if (b) {
       handleSwitchBuilding(b.id);
@@ -293,6 +311,7 @@ function App() {
   };
 
   const handleRenameBuilding = async (id: string) => {
+    if (isStaff) return;
     if (!renamingName.trim()) return;
     await renameBuilding(id, renamingName);
     setRenamingBuildingId(null);
@@ -300,6 +319,7 @@ function App() {
   };
 
   const handleDeleteBuilding = async (id: string) => {
+    if (isStaff) return;
     if (buildings.length <= 1) return; // ป้องกันลบตึกสุดท้าย
     await deleteBuilding(id);
     // ถ้าตึกที่ลบคือตึกที่กำลังใช้งาน ให้สลับไปตึกแรกที่เหลือ
@@ -377,9 +397,9 @@ function App() {
 
   // LINE inbox — live conversations (shared with the Messages page) and the unread badge
   const { threads: lineThreads, unreadTotal: unreadMessages, loading: threadsLoading, error: threadsError } =
-    useLineThreads(maidSession ? null : (user?.uid ?? null), maidSession ? null : activeBuildingId);
+    useLineThreads(maidSession ? null : (orgUid || null), maidSession ? null : activeBuildingId);
   // Open security alerts (new LINE bindings etc.) — badge on the Security menu item
-  const { openCount: openSecurityAlerts } = useSecurityAlerts(maidSession ? null : (user?.uid ?? null), buildings.map(b => b.id));
+  const { openCount: openSecurityAlerts } = useSecurityAlerts(maidSession ? null : (orgUid || null), buildings.map(b => b.id));
 
   // Stock badge — real-time count of items below minimum quantity
   const { items: _stockItems } = useStockItems(effectiveUid, effectiveBuildingId);
@@ -440,7 +460,12 @@ function App() {
         { id: 'cleaning' as ViewMode, icon: Sparkles, label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
         ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
       ]
-    : navItems.filter(i => !hiddenViews.includes(i.id));
+    : navItems.filter(i => !hiddenViews.includes(i.id) && (!isStaff || canOpenView(i.id, staffPermissions)));
+
+  // A staff account is kept on screens it may open (corrected while rendering, like the housekeeper session above).
+  if (isStaff && !canOpenView(currentView, staffPermissions)) {
+    setCurrentView(firstOpenView(visibleNavItems.map(i => i.id), staffPermissions) as ViewMode);
+  }
 
   // Start+ features (any paid plan: Start / Plus / Pro)
   const START_ONLY_VIEWS: ViewMode[] = ['tenants', 'maintenance', 'cleaning', 'operations', 'payments', 'archives'];
@@ -575,7 +600,7 @@ function App() {
   };
 
   // Loading state
-  if (authLoading || !minSplashDone) {
+  if (authLoading || !minSplashDone || (user && membershipLoading)) {
     return (
       <div style={{
         display: 'flex',
@@ -754,11 +779,11 @@ function App() {
   }
 
   // Plan tier checks
-  const hasPaidSubscription = profile ? isPaidLicense(profile.license) : false;
-  const maxBuildings = profile ? getMaxBuildings(profile.license) : 1;
-  const canAddBuilding = maxBuildings > 1;
-  const lineEnabled = profile?.license ? canSendLine(profile.license) : true;
-  const maxRooms = profile ? getMaxRooms(profile.license) : 5;
+  const hasPaidSubscription = planProfile ? isPaidLicense(planProfile.license) : false;
+  const maxBuildings = planProfile ? getMaxBuildings(planProfile.license) : 1;
+  const canAddBuilding = maxBuildings > 1 && !isStaff; // only the owner creates buildings
+  const lineEnabled = planProfile?.license ? canSendLine(planProfile.license) : true;
+  const maxRooms = planProfile ? getMaxRooms(planProfile.license) : 5;
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
 
   if (!maidSession && hasPaidSubscription && !hasSelectedBranch && buildings.length > 0) {
@@ -938,8 +963,8 @@ function App() {
               </span>
               <ChevronDown size={14} style={{ flexShrink: 0, color: '#BAE6FD', transform: 'rotate(-90deg)' }} />
             </button>
-            {/* Manage branches (rename / delete / add) — the old dropdown, kept reachable. */}
-            <button
+            {/* Manage branches (rename / delete / add) — the old dropdown, kept reachable. Owner only. */}
+            {!isStaff && <button
               type="button"
               onClick={() => setBuildingMenuOpen(v => !v)}
               aria-expanded={buildingMenuOpen}
@@ -951,10 +976,10 @@ function App() {
               }}
             >
               <Pencil size={15} />
-            </button>
+            </button>}
             </div>
 
-            {buildingMenuOpen && (
+            {buildingMenuOpen && !isStaff && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 4px)', left: 'var(--space-3)', right: 'var(--space-3)',
                 background: '#0369A1', border: '1.5px solid rgba(255,255,255,0.3)',
@@ -1166,7 +1191,7 @@ function App() {
               </form>
             ) : (
               <button
-                onClick={() => { setRenamingBuildingId(activeBuilding.id); setRenamingName(activeBuilding.name); }}
+                onClick={() => { if (!isStaff) { setRenamingBuildingId(activeBuilding.id); setRenamingName(activeBuilding.name); } }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
                   background: 'rgba(255, 255, 255, 0.18)', border: '1.5px solid rgba(255, 255, 255, 0.35)',
@@ -1231,7 +1256,7 @@ function App() {
         </nav>
 
         {/* Upgrade nudge for free users */}
-        {profile?.license === 'free' && !hasPaidSubscription && (
+        {planProfile?.license === 'free' && !hasPaidSubscription && (
           <button
             className="sidebar-upgrade-nudge"
             onClick={() => handleNavClick('pricing')}
@@ -1495,11 +1520,11 @@ function App() {
             allBills={bills}
             rooms={rooms}
             onUpdateRoom={updateRoom}
-            uid={user?.uid}
+            uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
             buildingName={activeBuilding?.name}
             onGoToPayments={() => setCurrentView('payments')}
-            license={profile?.license}
+            license={planProfile?.license}
             onUpgrade={() => setCurrentView('pricing')}
           />
         )}
@@ -1515,9 +1540,9 @@ function App() {
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
             maxRooms={maxRooms}
-            isTrial={profile?.license === 'free'}
+            isTrial={planProfile?.license === 'free'}
             onUpgrade={() => setCurrentView('pricing')}
-            uid={user?.uid}
+            uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
             isPaid={hasPaidSubscription}
           />
@@ -1526,7 +1551,7 @@ function App() {
         {currentView === 'tenants' && user && activeBuildingId && (
           <TenantsPage
             rooms={rooms}
-            uid={user.uid}
+            uid={orgUid}
             buildingId={activeBuildingId}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
@@ -1538,7 +1563,7 @@ function App() {
 
         {currentView === 'maintenance' && user && activeBuildingId && (
           <MaintenancePage
-            uid={user.uid}
+            uid={orgUid}
             buildingId={activeBuildingId}
           />
         )}
@@ -1554,7 +1579,7 @@ function App() {
           ) : (
             user && activeBuildingId && hasPaidSubscription && (
               <CleaningPage
-                uid={user.uid}
+                uid={orgUid}
                 buildingId={activeBuildingId}
               />
             )
@@ -1563,7 +1588,7 @@ function App() {
 
         {currentView === 'operations' && user && activeBuildingId && (
           <OperationsPage
-            uid={user.uid}
+            uid={orgUid}
             buildingId={activeBuildingId}
             rooms={rooms}
             lowStockCount={lowStockCount}
@@ -1589,8 +1614,8 @@ function App() {
             getPreviousBill={getPreviousBill}
             onMonthChange={handleMonthChange}
             buildingId={activeBuildingId ?? undefined}
-            canUseMeterPhoto={isPlusOrAbove(profile?.license ?? 'free')}
-            ownerUid={maidSession ? undefined : user?.uid}
+            canUseMeterPhoto={isPlusOrAbove(planProfile?.license ?? 'free')}
+            ownerUid={maidSession ? undefined : orgUid}
           />
         )}
 
@@ -1603,7 +1628,7 @@ function App() {
             stats={stats}
             onCloseMonth={closeMonth}
             onUnlockMonth={unlockMonth}
-            uid={user?.uid}
+            uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
             canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
@@ -1628,7 +1653,7 @@ function App() {
             currentMonth={currentMonth}
             onMonthChange={handleMonthChange}
             onUpdatePayment={updateBillPayment}
-            uid={user?.uid}
+            uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
           />
         )}
@@ -1636,31 +1661,31 @@ function App() {
 
 
         {currentView === 'leasing' && user && activeBuildingId && !maidSession && (
-          <LeasingPage ownerUid={user.uid} buildingId={activeBuildingId} />
+          <LeasingPage ownerUid={orgUid} buildingId={activeBuildingId} />
         )}
         {currentView === 'collections' && user && activeBuildingId && !maidSession && collectionStyle !== 'monthly' && (
-          <CollectionsPage ownerUid={user.uid} buildingId={activeBuildingId} style={collectionStyle} />
+          <CollectionsPage ownerUid={orgUid} buildingId={activeBuildingId} style={collectionStyle} />
         )}
 
         {currentView === 'ledger' && user && !maidSession && (
-          <LedgerPage ownerUid={user.uid} buildings={buildings} />
+          <LedgerPage ownerUid={orgUid} buildings={buildings} />
         )}
 
         {currentView === 'accounting' && user && !maidSession && (
-          <AccountingPage ownerUid={user.uid} buildings={buildings} />
+          <AccountingPage ownerUid={orgUid} buildings={buildings} />
         )}
 
         {currentView === 'market' && user && activeBuildingId && !maidSession && terms.isMarket && (
-          <MarketPage ownerUid={user.uid} buildingId={activeBuildingId} />
+          <MarketPage ownerUid={orgUid} buildingId={activeBuildingId} />
         )}
 
         {currentView === 'announcements' && user && activeBuildingId && !maidSession && (
-          <AnnouncementsPage ownerUid={user.uid} buildingId={activeBuildingId} />
+          <AnnouncementsPage ownerUid={orgUid} buildingId={activeBuildingId} />
         )}
 
         {currentView === 'messages' && user && activeBuildingId && !maidSession && (
           <MessagesPage
-            ownerUid={user.uid}
+            ownerUid={orgUid}
             buildingId={activeBuildingId}
             unitName={terms.unitName}
             threads={lineThreads}
@@ -1671,7 +1696,7 @@ function App() {
 
         {currentView === 'workorders' && user && activeBuildingId && !maidSession && (
           <WorkOrdersPage
-            ownerUid={user.uid}
+            ownerUid={orgUid}
             buildingId={activeBuildingId}
             rooms={rooms}
             unitName={terms.unitName}
@@ -1680,7 +1705,7 @@ function App() {
 
         {currentView === 'parcels' && user && activeBuildingId && !maidSession && (
           <ParcelsPage
-            ownerUid={user.uid}
+            ownerUid={orgUid}
             buildingId={activeBuildingId}
             rooms={rooms}
             unitName={terms.unitName}
@@ -1689,7 +1714,7 @@ function App() {
 
         {currentView === 'security' && user && !maidSession && (
           <SecurityPage
-            ownerUid={user.uid}
+            ownerUid={orgUid}
             buildings={buildings}
             config={config}
             onSaveConfig={saveConfig}
@@ -1710,7 +1735,7 @@ function App() {
             onRefreshEmailVerified={refreshEmailVerified}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
-            uid={user?.uid}
+            uid={orgUid}
           />
         )}
 

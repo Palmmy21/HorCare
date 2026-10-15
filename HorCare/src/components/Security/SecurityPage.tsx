@@ -15,7 +15,8 @@ import {
 import { apiPost, ApiError } from '../../utils/api';
 import { logActivity } from '../../utils/auditLog';
 import LineBindingsTab from './LineBindingsTab';
-import { useSecurityAlerts } from '../../hooks/useSecurityAlerts';
+import { useSecurityAlerts } from '../../hooks/useSecurityAlerts';
+import AdminAccountForm, { ResetPasswordButton, ScopeEditor } from './AdminAccountForm';
 
 interface SecurityPageProps {
     ownerUid: string;
@@ -279,9 +280,11 @@ function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageP
                 </label>
             </div>
 
+            <AdminAccountForm ownerUid={ownerUid} buildings={buildings} onCreated={() => void load()} />
+
             <div className="card" style={{ padding: '1rem' }}>
                 <div style={{ fontWeight: 700, marginBottom: '0.625rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <UserPlus size={16} /> เพิ่มสมาชิกทีม
+                    <UserPlus size={16} /> เพิ่มสมาชิกทีม (ที่มีบัญชี HorCare อยู่แล้ว)
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.625rem' }}>
                     <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -333,9 +336,8 @@ function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageP
                                 >
                                     {ASSIGNABLE_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS_TH[r]}</option>)}
                                 </select>
-                                <span style={{ color: 'var(--color-gray-500)' }}>
-                                    {m.property_ids.includes('*') ? 'ทุกสถานที่' : `${m.property_ids.length} สถานที่`}
-                                </span>
+                                <ScopeEditor ownerUid={ownerUid} memberUid={m.uid} buildings={buildings} current={m.property_ids} onSaved={() => void load()} />
+                                {m.managed && <ResetPasswordButton ownerUid={ownerUid} memberUid={m.uid} name={m.display_name} />}
                                 <button
                                     className="btn btn-outline btn-sm" disabled={busy}
                                     onClick={() => void act({ action: 'update', member_uid: m.uid, status: m.status === 'active' ? 'disabled' : 'active' },

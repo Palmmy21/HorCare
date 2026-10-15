@@ -22,7 +22,7 @@ beforeEach(() => {
 async function call(uid: string | null, body: Record<string, unknown>, fn: typeof members = members) {
     const res = fakeRes();
     await fn(fakeReq({ owner_uid: OWNER, ...body }, uid ?? undefined), res as never);
-    return res as { statusCode: number; body: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return res as { statusCode: number; body: any };
 }
 const create = (over: Record<string, unknown> = {}, uid: string | null = OWNER) =>
     call(uid, { action: 'create_account', email: 'Admin.A@Example.com', password: 'Secret123', display_name: 'ผู้ดูแล ตึก A', role: 'property_manager', property_ids: [A], ...over });

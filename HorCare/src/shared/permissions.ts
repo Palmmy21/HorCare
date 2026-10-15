@@ -137,4 +137,6 @@ export interface MemberDoc {
   status: 'active' | 'disabled';
   created_at: string;
   created_by: string;
+  /** True when the owner created the sign-in account for this person (email + password) — see api/_member-accounts.ts. */
+  managed?: boolean;
 }
