@@ -17,7 +17,8 @@ export type NotificationEvent =
     | 'parcel.overdue'
     | 'work_order.assigned'
     | 'shop.closure_submitted'
-    | 'visitor.arriving';
+    | 'visitor.arriving'
+    | 'staff.registration_pending';
 // Planned: 'invoice.overdue' | 'contract.expiring'
 
 export type Channel = 'line' | 'in_app';
@@ -130,6 +131,11 @@ export function renderMessage(
             return {
                 title: 'ขาจรแจ้งเข้าขาย',
                 body: `🧺 ${dormName}\nขาจร ${data.name ?? ''} แจ้งเข้าขายวันที่ ${data.date ?? ''} (${data.goods ?? ''})`,
+            };
+        case 'staff.registration_pending':
+            return {
+                title: 'มีคนลงทะเบียนเป็นช่าง/แม่บ้าน',
+                body: `🧑‍🔧 ${dormName}\n${data.name ?? ''} (${data.role_label ?? ''}) ขอลงทะเบียนผ่าน LINE — เข้า ระบบจัดการ → ทีมช่าง/แม่บ้าน เพื่ออนุมัติ`,
             };
         case 'work_order.assigned':
             return {

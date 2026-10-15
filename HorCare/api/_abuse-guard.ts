@@ -17,12 +17,17 @@ import { clientIp } from './_audit.js';
 
 export interface LimitResult { ok: boolean; retryAfterSec: number }
 
-/** Allow `limit` calls per `windowSec` for one visitor and one named bucket. Fails open if the counter itself breaks. */
-export async function rateLimit(req: VercelRequest, bucket: string, limit: number, windowSec: number, now: number = Date.now()): Promise<LimitResult> {
+/** Allow `limit` calls per `windowSec` for one visitor (by IP) and one named bucket. Fails open if the counter itself breaks. */
+export function rateLimit(req: VercelRequest, bucket: string, limit: number, windowSec: number, now: number = Date.now()): Promise<LimitResult> {
+    return rateLimitBy(clientIp(req) ?? 'unknown', bucket, limit, windowSec, now);
+}
+
+/** The same counter for any identity (an IP, a LINE user id…). The identity is hashed, never stored. */
+export async function rateLimitBy(identity: string, bucket: string, limit: number, windowSec: number, now: number = Date.now()): Promise<LimitResult> {
     try {
         const windowMs = windowSec * 1000;
         const slot = Math.floor(now / windowMs);
-        const who = createHash('sha256').update(`${clientIp(req) ?? 'unknown'}|${bucket}`).digest('hex').slice(0, 32);
+        const who = createHash('sha256').update(`${identity}|${bucket}`).digest('hex').slice(0, 32);
         const ref = db.doc(`rate_limits/${who}_${slot}`);
         const count = await db.runTransaction(async tx => {
             const snap = await (tx as { get: (r: unknown) => Promise<{ exists: boolean; data: () => { count?: number } | undefined }> }).get(ref);
