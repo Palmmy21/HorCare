@@ -89,8 +89,10 @@ export function chargeToDoc(c: ChargeRow, propertyCode?: string): ReceivableDoc 
 /** Money in (payments and deposits) as payment records. Refunds are not receipts, and a voided charge's money nets to nothing. */
 export function chargePaymentToRec(p: ChargePaymentRow, charge: ChargeRow): PaymentRec | null {
     if (p.kind === 'refund' || p.amount_satang <= 0 || charge.status === 'void') return null;
-    const method: PaymentRec['method'] = p.method === 'cash' ? 'cash' : 'bank_transfer';
-    const channel = channelOf(method, p.bank_account_id);
+    // money that came through a payment gateway is booked to the gateway channel, not to a bank account
+    const gateway = p.method === 'transfer' && !!p.bank_account_id?.startsWith('gateway:');
+    const method: PaymentRec['method'] = p.method === 'cash' ? 'cash' : gateway ? 'qr_gateway' : 'bank_transfer';
+    const channel = channelOf(method, gateway ? null : p.bank_account_id);
     return {
         id: p.id, room_id: roomKey(charge), channel, method, paid_at: p.received_at, gross_satang: p.amount_satang,
         verification: method === 'cash' ? 'n/a' : p.verification, status: 'active',

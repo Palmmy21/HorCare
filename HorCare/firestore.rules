@@ -288,6 +288,11 @@ service cloud.firestore {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'finance.read');
           allow write: if false;
         }
+        // Payment-gateway intents (QR / pay link per bill) — written only by /api/payment-gateway and the provider webhook.
+        match /payment_intents/{intentId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'finance.read');
+          allow write: if false;
+        }
         // In-app notification records produced by the central notification service.
         match /notifications/{notificationId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'room.read');

@@ -50,6 +50,8 @@ export interface PaymentIntent {
   received_satang?: number;
   payment_id?: string;
   failure_reason?: string;
+  /** "kind:id" of the document paid; lets HorCare find the open intent for it. */
+  target_key?: string;
 }
 
 // ── lifecycle ───────────────────────────────────────────────────────────────

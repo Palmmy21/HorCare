@@ -18,7 +18,8 @@ export type NotificationEvent =
     | 'work_order.assigned'
     | 'shop.closure_submitted'
     | 'visitor.arriving'
-    | 'staff.registration_pending';
+    | 'staff.registration_pending'
+    | 'payment.needs_review';
 // Planned: 'invoice.overdue' | 'contract.expiring'
 
 export type Channel = 'line' | 'in_app';
@@ -131,6 +132,11 @@ export function renderMessage(
             return {
                 title: 'ขาจรแจ้งเข้าขาย',
                 body: `🧺 ${dormName}\nขาจร ${data.name ?? ''} แจ้งเข้าขายวันที่ ${data.date ?? ''} (${data.goods ?? ''})`,
+            };
+        case 'payment.needs_review':
+            return {
+                title: 'ยอดจาก Payment Gateway ไม่ตรง — ต้องตรวจสอบ',
+                body: `💳 ${dormName}\nรหัสอ้างอิง ${data.reference ?? ''}: ควรได้ ${data.expected ?? ''} บาท แต่ได้รับ ${data.received ?? ''} บาท (${data.reason ?? ''})\nระบบยังไม่ตัดยอดให้ — ตรวจสอบและคืนเงิน/รับส่วนต่างด้วยตนเอง`,
             };
         case 'staff.registration_pending':
             return {

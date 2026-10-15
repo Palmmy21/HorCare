@@ -36,6 +36,7 @@ export function defaultChart(): Account[] {
   return [
     a('1101', 'เงินสด', 'asset'),
     a('1102', 'เงินฝากธนาคาร', 'asset'),
+    a('1103', 'เงินรอรับจาก Payment Gateway', 'asset'),
     a('1140', 'ลูกหนี้ค่าเช่าและบริการ', 'asset'),
     a('2101', 'เงินรับล่วงหน้า', 'liability'),
     a('2102', 'เงินมัดจำรับ', 'liability'),
@@ -106,7 +107,7 @@ export interface Ledger {
 export function emptyLedger(id: string): Ledger {
   return {
     id, name: '', legal_entity_name: '', property_ids: [], property_codes: {}, accounts: defaultChart(),
-    posting: { ar_account: '1140', revenue_accounts: { rent: '4101', electric: '4102', water: '4103', common_fee: '4104', fine: '4105', stay: '4106', stall: '4107', walk_in: '4108', other_income: '4901' }, channels: { cash: '1101' } },
+    posting: { ar_account: '1140', revenue_accounts: { rent: '4101', electric: '4102', water: '4103', common_fee: '4104', fine: '4105', stay: '4106', stall: '4107', walk_in: '4108', other_income: '4901' }, channels: { cash: '1101', qr_gateway: '1103' } },
     options: { invoice_date_basis: 'issued_at', count_unverified_transfers: false, opening_cutoff_month: null },
     locked_through: null, created_at: '', updated_at: '',
   };

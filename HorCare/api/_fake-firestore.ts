@@ -37,6 +37,11 @@ function docRef(path: string) {
             if (failWritePrefix && path.startsWith(failWritePrefix)) throw new Error('write failed');
             store.set(path, structuredClone(data));
         },
+        /** Like Firestore: fails with ALREADY_EXISTS (code 6) when the document is there. */
+        create: async (data: Data) => {
+            if (store.has(path)) throw Object.assign(new Error(`ALREADY_EXISTS: ${path}`), { code: 6 });
+            store.set(path, structuredClone(data));
+        },
         update: async (patch: Data) => {
             const cur = store.get(path);
             if (!cur) throw new Error(`NOT_FOUND: ${path}`);

@@ -67,6 +67,7 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'ledger': return (await import('./_ledger.js')).default(req, res);
         case 'leasing': return (await import('./_leasing.js')).default(req, res);
         case 'staff-registration': return (await import('./_staff-registration.js')).default(req, res);
+        case 'payment-gateway': return (await import('./_payment-gateway.js')).default(req, res);
         case 'collections': return (await import('./_collections.js')).default(req, res);
         case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
