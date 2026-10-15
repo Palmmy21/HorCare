@@ -7,7 +7,9 @@ import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
 import { latestAnnouncementsText } from './_announcements.js';
-import { evaluateSlip, tenantSlipReply } from './_slip-flow.js';
+import { evaluateSlip } from './_slip-flow.js';
+import { buildSlipResultFlex } from './_slip-flex.js';
+import { formatMonthLabel } from './_translations.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 import type { MonthlyBill } from '../src/types/index.js';
 
@@ -618,7 +620,7 @@ async function handleSlipImage(
         }]);
         return;
     }
-    const { uid, building_id, room_id, room_number } = lineRoomSnap.data()!;
+    const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
 
     // 2. หาบิลล่าสุดของห้อง
     const billDoc = await getLatestSavedBill(uid, building_id, room_id);
@@ -741,7 +743,13 @@ async function handleSlipImage(
         ...evaluation.fields,
         verify_note: evaluation.verifyNote,
     });
-    await lineReply(replyToken, [{ type: 'text', text: tenantSlipReply(room_number, evaluation) }]);
+    await lineReply(replyToken, [buildSlipResultFlex({
+        roomNumber: String(room_number),
+        dormName: dorm_name,
+        itemLabel: isFine ? 'ค่าปรับ' : `บิล ${formatMonthLabel(String(targetData.month ?? ''), 'th')}`,
+        expectedAmount: Number(isFine ? targetData.amount : targetData.total_bill),
+        evaluation,
+    })]);
 
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
     try {
