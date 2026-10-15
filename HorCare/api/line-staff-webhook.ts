@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { lineReply, staffLineToken, verifyLineSignature } from './_line.js';
 import { isStaffLinkCode, redeemStaffLink } from './_work-orders.js';
+import { HELP, handleStaffChat } from './_staff-registration.js';
 
 export const config = {
     api: { bodyParser: false },   // the signature is computed over the raw body
@@ -20,10 +21,6 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
     for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
     return Buffer.concat(chunks);
 }
-
-const HELP =
-    'สวัสดีค่ะ 👋 นี่คือ LINE สำหรับรับงานช่าง/แม่บ้านของ HorCare\n\n' +
-    'หากยังไม่ได้เชื่อมบัญชี ให้ขอ "รหัสเชื่อม LINE" (ขึ้นต้น HCS-) จากผู้จัดการ แล้วพิมพ์ส่งมาในแชทนี้ได้เลยค่ะ';
 
 const FAILURES: Record<string, string> = {
     not_found: '❌ ไม่พบรหัสนี้ กรุณาตรวจสอบ หรือขอรหัสใหม่จากผู้จัดการ',
@@ -76,7 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }], token);
                 return;
             }
-            await lineReply(replyToken, [{ type: 'text', text: HELP }], token);
+            // everything else: the registration conversation (HCR- code, role, name, phone) or a status / help answer
+            await lineReply(replyToken, await handleStaffChat(lineUserId, text), token);
         } catch (err) {
             // One bad event must not make LINE retry the whole batch.
             console.error('[line-staff-webhook] event failed:', (err as Error).message);

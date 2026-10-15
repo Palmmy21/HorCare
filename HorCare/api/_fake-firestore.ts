@@ -6,7 +6,8 @@ const DELETE_FIELD = Symbol('delete-field');
 
 type Data = Record<string, unknown>;
 const store = new Map<string, Data>();
-const authUsers = new Map<string, { uid: string; email: string; displayName?: string }>();
+const authUsers = new Map<string, { uid: string; email: string; displayName?: string; password?: string; emailVerified?: boolean; disabled?: boolean }>();
+export const revoked: string[] = [];
 let failWritePrefix: string | null = null;
 
 function snap(path: string) {
@@ -85,6 +86,19 @@ export const admin = {
             if (!u) throw new Error('auth/user-not-found');
             return u;
         },
+        createUser: async (u: { email: string; password: string; displayName?: string; emailVerified?: boolean }) => {
+            if ([...authUsers.values()].some(x => x.email === u.email)) throw new Error('auth/email-already-exists');
+            const uid = `new-${authUsers.size + 1}-${u.email.split('@')[0]}`;
+            authUsers.set(uid, { uid, email: u.email, displayName: u.displayName, password: u.password, emailVerified: u.emailVerified === true, disabled: false });
+            return authUsers.get(uid)!;
+        },
+        updateUser: async (uid: string, patch: { password?: string; disabled?: boolean }) => {
+            const u = authUsers.get(uid);
+            if (!u) throw new Error('auth/user-not-found');
+            Object.assign(u, patch);
+            return u;
+        },
+        revokeRefreshTokens: async (uid: string) => { revoked.push(uid); },
         getUserByEmail: async (email: string) => {
             const u = [...authUsers.values()].find(x => x.email === email);
             if (!u) throw new Error('auth/user-not-found');
@@ -99,7 +113,7 @@ export const admin = {
 export const firebaseMock = { db, admin };
 
 // ── test helpers ─────────────────────────────────────────────────────────────
-export function resetFake() { store.clear(); authUsers.clear(); failWritePrefix = null; }
+export function resetFake() { store.clear(); authUsers.clear(); revoked.length = 0; failWritePrefix = null; }
 /** Make every set() under this path prefix throw (null to stop). */
 export function failWritesTo(prefix: string | null) { failWritePrefix = prefix; }
 export function seed(path: string, data: object) { store.set(path, structuredClone(data) as Data); }

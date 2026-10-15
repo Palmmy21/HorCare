@@ -3,6 +3,7 @@ import { admin, db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { cleanPhone } from '../src/shared/leasing.js';
+import { AccountError, createManagedAccount, indexMember, myMemberships, resetManagedPassword, unindexMember, type ManagedMember } from './_member-accounts.js';
 import {
     ASSIGNABLE_ROLES, isRole, permissionsForRole, type MemberDoc, type Role,
 } from '../src/shared/permissions.js';
@@ -10,7 +11,9 @@ import {
 export const config = { maxDuration: 15 };
 
 interface Body {
-    action?: 'list' | 'add' | 'update' | 'remove';
+    action?: 'list' | 'add' | 'update' | 'remove' | 'create_account' | 'reset_password' | 'my_memberships';
+    display_name?: string;
+    password?: string;
     owner_uid?: string;
     email?: string;
     /** Alternative to email: the phone number the person registered with. */
@@ -47,17 +50,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = (req.body ?? {}) as Body;
     const action = body.action;
 
+    // Any signed-in person may ask which organisations they work for (that is how the app knows to open in staff mode).
+    if (action === 'my_memberships') {
+        const header = req.headers.authorization;
+        if (!header?.startsWith('Bearer ')) { res.status(401).json({ error: 'unauthenticated' }); return; }
+        let uid: string;
+        try { uid = (await admin.auth().verifyIdToken(header.slice('Bearer '.length))).uid; } catch { res.status(401).json({ error: 'unauthenticated' }); return; }
+        res.status(200).json({ memberships: await myMemberships(uid) });
+        return;
+    }
+
     if (action === 'list') {
         const ctx = await authorize(req, res, { ownerUid: body.owner_uid, permission: 'member.read' });
         if (!ctx) return;
-        const snap = await db.collection(`users/${ctx.ownerUid}/members`).get();
-        res.status(200).json({ members: snap.docs.map(d => d.data()) });
+        const all = (await db.collection(`users/${ctx.ownerUid}/members`).get()).docs.map(d => d.data() as ManagedMember);
+        // accounts created before the sign-in index existed are indexed the first time the owner opens the list
+        if (ctx.isOwner) await Promise.all(all.filter(m => m.status === 'active').map(m => indexMember(m.uid, ctx.ownerUid)));
+        // someone who is not the owner (and not granted every property) sees only people who share a building with them
+        const mine = all.find(m => m.uid === ctx.uid);
+        const wide = ctx.isOwner || !mine || mine.property_ids.includes('*');
+        const visible = wide ? all : all.filter(m => m.uid === ctx.uid || m.property_ids.includes('*') === false && m.property_ids.some(p => mine.property_ids.includes(p)));
+        res.status(200).json({ members: visible });
         return;
     }
 
     const ctx = await authorize(req, res, { ownerUid: body.owner_uid, permission: 'member.manage' });
     if (!ctx) return;
     const ownerUid = ctx.ownerUid;
+
+    if (action === 'create_account' || action === 'reset_password') {
+        try {
+            if (action === 'create_account') {
+                const member = await createManagedAccount(ownerUid, ctx.uid, { email: body.email, password: body.password, display_name: body.display_name, role: body.role, property_ids: body.property_ids });
+                await writeAudit({
+                    ownerUid, userId: ctx.uid, userName: ctx.displayName, role: ctx.role, action: 'PERMISSION_CHANGE', resourceType: 'member', resourceId: member.uid,
+                    resourceLabel: member.email, after: { role: member.role, property_ids: member.property_ids }, note: 'create administrator account', req,
+                });
+                res.status(200).json({ member });
+                return;
+            }
+            if (typeof body.member_uid !== 'string' || !body.member_uid) { res.status(400).json({ error: 'member_uid is required' }); return; }
+            await resetManagedPassword(ownerUid, body.member_uid, body.password);
+            await writeAudit({
+                ownerUid, userId: ctx.uid, userName: ctx.displayName, role: ctx.role, action: 'PERMISSION_CHANGE', resourceType: 'member', resourceId: body.member_uid,
+                note: 'administrator password reset', req,
+            });
+            res.status(200).json({ ok: true });
+            return;
+        } catch (e) {
+            if (e instanceof AccountError) { res.status(e.status).json({ error: e.code }); return; }
+            console.error('member account error', e);
+            res.status(500).json({ error: 'internal_error' });
+            return;
+        }
+    }
 
     if (action === 'add') {
         const email = (body.email ?? '').trim().toLowerCase();
@@ -106,6 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             created_by: ctx.uid,
         };
         await db.doc(`users/${ownerUid}/members/${target.uid}`).set(member);
+        await indexMember(target.uid, ownerUid);
         await writeAudit({
             ownerUid, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
             action: 'PERMISSION_CHANGE', resourceType: 'member', resourceId: target.uid,
@@ -144,6 +191,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         if (Object.keys(updates).length === 0) { res.status(400).json({ error: 'nothing_to_update' }); return; }
         await ref.update(updates);
+        // a disabled account is signed out everywhere at once (the rules and the API already refuse it)
+        if (updates.status === 'disabled' && (before as ManagedMember).managed === true) await admin.auth().revokeRefreshTokens(memberUid);
         await writeAudit({
             ownerUid, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
             action: 'PERMISSION_CHANGE', resourceType: 'member', resourceId: memberUid, resourceLabel: before.email,
@@ -156,6 +205,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'remove') {
         await ref.delete();
+        await unindexMember(memberUid, ownerUid);
+        // an account made for this organisation has no other use: lock the sign-in too (reversible by the owner re-adding it)
+        if ((before as ManagedMember).managed === true) {
+            await admin.auth().updateUser(memberUid, { disabled: true });
+            await admin.auth().revokeRefreshTokens(memberUid);
+        }
         await writeAudit({
             ownerUid, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
             action: 'PERMISSION_CHANGE', resourceType: 'member', resourceId: memberUid, resourceLabel: before.email,
