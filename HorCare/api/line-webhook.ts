@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent } from './_line.js';
+import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
@@ -132,9 +132,11 @@ async function handleEvent(event: LineEvent) {
 }
 
 async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: string) {
-    // ── "แบ่งจ่าย" button on a slip card ─────────────
+    // ── "แบ่งจ่าย" buttons: on an invoice (split mode) or on a slip card ─────────────
     if (event.type === 'postback') {
-        await handleSplitPostback(lineUserId, replyToken, event.postback?.data);
+        const modeReq = parseSplitModePostback(event.postback?.data);
+        if (modeReq) await handleSplitMode(lineUserId, replyToken, modeReq);
+        else await handleSplitPostback(lineUserId, replyToken, event.postback?.data);
         return;
     }
 
@@ -670,7 +672,21 @@ async function handleSlipImage(
     let targetData = bill;
     let isFine = false;
 
-    if (bill.payment_status === 'paid') {
+    // "แบ่งจ่าย" pressed on an invoice in the last 30 minutes: this slip pays part of that bill / fine.
+    const mode = lineRoomSnap.data()!.split_mode as { kind?: string; item_id?: string; until?: string } | undefined;
+    let splitMode = false;
+    if (mode?.item_id && (mode.kind === 'bill' || mode.kind === 'fine') && Date.parse(mode.until ?? '') > Date.now()) {
+        const snap = await db.doc(`users/${uid}/buildings/${building_id}/${mode.kind === 'bill' ? 'bills' : 'fines'}/${mode.item_id}`).get();
+        const d = snap.data();
+        if (d && d.room_id === room_id && outstandingSatang(mode.kind, d as PaidItem) > 0) {
+            targetDoc = snap as unknown as typeof targetDoc;
+            targetData = d as typeof targetData;
+            isFine = mode.kind === 'fine';
+            splitMode = true;
+        }
+    }
+
+    if (!splitMode && bill.payment_status === 'paid') {
         const fineDoc = await getOldestUnpaidFine(uid, building_id, room_id);
         if (!fineDoc) {
             await lineReply(replyToken, [{
@@ -790,14 +806,29 @@ async function handleSlipImage(
             note: 'ชำระส่วนที่เหลือจากสลิป',
         });
     }
-    await lineReply(replyToken, [buildSlipResultFlex({
-        roomNumber: String(room_number),
-        dormName: dorm_name,
-        itemLabel: slipItemLabel(isFine, targetData),
-        expectedAmount: owed,
-        evaluation,
-        splitPostback: slipRef ? splitPostbackData(kind, targetDoc.id, slipRef) : null,
-    })]);
+
+    // In split mode a genuine part payment is recorded straight away — the tenant already chose to split.
+    const split = splitMode && evaluation.splitAmount != null && slipRef
+        ? await applySlipSplit({ ownerUid: uid, buildingId: building_id, kind, itemId: targetDoc.id, roomId: room_id, slipRef })
+        : null;
+    if (splitMode && (split?.status === 'ok' || autoVerified)) {
+        await lineRoomSnap.ref.update({ split_mode: admin.firestore.FieldValue.delete() });
+    }
+    if (split?.status === 'ok') {
+        await lineReply(replyToken, [buildSplitPaidFlex({
+            roomNumber: String(room_number), dormName: dorm_name, itemLabel: slipItemLabel(isFine, targetData),
+            paid: split.paid, total: split.total, outstanding: split.outstanding,
+        })]);
+    } else {
+        await lineReply(replyToken, [buildSlipResultFlex({
+            roomNumber: String(room_number),
+            dormName: dorm_name,
+            itemLabel: slipItemLabel(isFine, targetData),
+            expectedAmount: owed,
+            evaluation,
+            splitPostback: slipRef ? splitPostbackData(kind, targetDoc.id, slipRef) : null,
+        })]);
+    }
 
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
     try {
@@ -826,6 +857,31 @@ const slipItemLabel = (isFine: boolean, item: object) =>
  * Tenant pressed "แบ่งจ่าย" on a slip card: record that slip's amount as a part payment. Only the slip
  * the button was made for (same fingerprint still on the bill, AI-read amount, matched account) counts.
  */
+const SPLIT_MODE_MS = 30 * 60_000;
+
+/** Tenant pressed "แบ่งจ่าย" on an invoice: the next slip (within 30 minutes) is taken as a part payment of it. */
+async function handleSplitMode(lineUserId: string, replyToken: string, req: { kind: 'bill' | 'fine'; itemId: string }) {
+    const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
+    if (!lineRoomSnap.exists) return;
+    const { uid, building_id, room_id } = lineRoomSnap.data()!;
+    const snap = await db.doc(`users/${uid}/buildings/${building_id}/${req.kind === 'bill' ? 'bills' : 'fines'}/${req.itemId}`).get();
+    const item = snap.data();
+    if (!item || item.room_id !== room_id) { await lineReply(replyToken, [{ type: 'text', text: 'ไม่พบรายการนี้ค่ะ' }]); return; }
+    const owed = outstandingSatang(req.kind, item as PaidItem) / 100;
+    if (owed <= 0) { await lineReply(replyToken, [{ type: 'text', text: '✅ รายการนี้ชำระครบแล้วค่ะ ขอบคุณค่ะ 🙏' }]); return; }
+
+    await lineRoomSnap.ref.update({
+        split_mode: { kind: req.kind, item_id: req.itemId, until: new Date(Date.now() + SPLIT_MODE_MS).toISOString() },
+    });
+    const paidSoFar = (item.allocated_satang ?? 0) / 100;
+    await lineReply(replyToken, [{
+        type: 'text',
+        text: `💸 แบ่งจ่าย ${slipItemLabel(req.kind === 'fine', item)}\n\n`
+            + `ยอดคงเหลือ ฿${owed.toLocaleString()}${paidSoFar > 0 ? ` (ชำระแล้ว ฿${paidSoFar.toLocaleString()})` : ''}\n\n`
+            + 'โอนยอดที่สะดวกแล้วส่งสลิปมาในแชทนี้ภายใน 30 นาทีได้เลยค่ะ ระบบจะตัดยอดให้อัตโนมัติ',
+    }]);
+}
+
 async function handleSplitPostback(lineUserId: string, replyToken: string, data: string | undefined) {
     const req = parseSplitPostback(data);
     if (!req) return;
