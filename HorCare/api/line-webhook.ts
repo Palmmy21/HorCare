@@ -7,7 +7,8 @@ import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
 import { latestAnnouncementsText } from './_announcements.js';
-import { evaluateSlip } from './_slip-flow.js';
+import { evaluateSlip, loadReceiverCandidates } from './_slip-flow.js';
+import { billLabel, buildSlipFlex } from './_slip-reply.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 import type { MonthlyBill } from '../src/types/index.js';
 
@@ -688,11 +689,18 @@ async function handleSlipImage(
         }
     }
 
+    // Everything the tenant is told about this slip is one Flex card (api/_slip-reply.ts)
+    const dormName: string = (await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get()).data()?.bill_customization?.dorm_name || 'หอพัก';
+    const targetLabel = billLabel(targetData.month, isFine);
+    const expectedAmount: number = isFine ? targetData.amount : targetData.total_bill;
+
     if (duplicate) {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `⚠️ สลิปนี้ถูกใช้ไปแล้วค่ะ\n\nหากเพิ่งโอนสำหรับห้อง ${room_number} กรุณาส่ง "สลิปจริงของรอบนี้" นะคะ`,
-        }]);
+        const used = (await db.doc(`users/${uid}/buildings/${building_id}/slip_refs/${fingerprint}`).get()).data() as { room_id?: string; created_at?: { toDate?: () => Date } } | undefined;
+        const usedAt = used?.created_at?.toDate?.().toISOString() ?? null;
+        await lineReply(replyToken, [buildSlipFlex({
+            roomNumber: room_number, dormName, targetLabel, expectedAmount, evaluation: null, qrPresent: true,
+            duplicate: { sameRoom: used?.room_id === room_id, usedAt },
+        })]);
         return;
     }
 
@@ -742,19 +750,13 @@ async function handleSlipImage(
         ...evaluation.fields,
         verify_note: evaluation.verifyNote,
     });
-    if (autoVerified) {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `[ระบบอัตโนมัติ] ได้รับยอดชำระ ${geminiAmount} บาท เรียบร้อยแล้วค่ะ\n\nรายการของห้อง ${room_number} ถูกอัปเดตสถานะเป็น "จ่ายแล้ว" โดยอัตโนมัติ ขอบคุณค่ะ`,
-        }]);
-    } else {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: qrPassed
-                ? `[ระบบ] รับสลิปห้อง ${room_number} แล้วค่ะ\n\n- ตรวจ QR ผ่าน (ไม่ซ้ำ)\nเจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ`
-                : `[ระบบ] รับสลิปห้อง ${room_number} แล้วค่ะ\n\n- ระบบอ่าน QR ไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`,
-        }]);
-    }
+    // paid / wrong amount / wrong account / old slip / needs a look — said right away, in one card
+    const { candidates } = await loadReceiverCandidates(uid, building_id);
+    await lineReply(replyToken, [buildSlipFlex({
+        roomNumber: room_number, dormName, targetLabel, expectedAmount, evaluation, duplicate: null, qrPresent: qrPassed,
+        receiverHint: candidates[0] ? `${candidates[0].label}${candidates[0].name ? ` · ${candidates[0].name}` : ''}` : null,
+    })]);
+    void geminiAmount;
 
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
     try {
