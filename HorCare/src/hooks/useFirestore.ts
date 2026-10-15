@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, orderBy, serverTimestamp, writeBatch
+    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, writeBatch
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logActivity, diffFields } from '../utils/auditLog';
@@ -95,18 +95,15 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 if (dc && userId && buildingId && syncedDormCodeRef.current !== dc) {
                     syncedDormCodeRef.current = dc;
                     try {
-                        const codeDoc = await getDoc(doc(db, 'dorm_codes', dc));
-                        if (!codeDoc.exists()) {
-                            // ยังไม่มีใน dorm_codes → sync ให้เลย
-                            await setDoc(doc(db, 'dorm_codes', dc), {
-                                uid: userId,
-                                building_id: buildingId,
-                                dorm_name: merged.bill_customization?.dorm_name || '',
-                                due_day: merged.bill_customization?.due_day || 5,
-                                updated_at: serverTimestamp(),
-                            });
-                            console.info('[HorCare] Self-healed dorm_code:', dc);
-                        }
+                        // dorm_codes is write-only for clients (rules: read false), so upsert without reading first.
+                        // Rules allow it only when the code is new or already ours.
+                        await setDoc(doc(db, 'dorm_codes', dc), {
+                            uid: userId,
+                            building_id: buildingId,
+                            dorm_name: merged.bill_customization?.dorm_name || '',
+                            due_day: merged.bill_customization?.due_day || 5,
+                            updated_at: serverTimestamp(),
+                        }, { merge: true });
                     } catch (e) {
                         // ไม่ block การโหลดแอป — log เพื่อ debug เท่านั้น
                         console.warn('[HorCare] dorm_code self-heal failed:', e);

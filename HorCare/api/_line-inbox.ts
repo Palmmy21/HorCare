@@ -118,6 +118,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     if (!ctx) return;
 
+    try {
+        await handleAuthorized(req, res, body as Body & { line_user_id: string }, buildingId, ctx);
+    } catch (err) {
+        // An uncaught throw becomes Vercel's opaque 500; log it and tell the (already authorized) caller why.
+        console.error(`[line-inbox] ${body.action} failed:`, err);
+        if (!res.headersSent) res.status(500).json({ error: 'internal_error', message: (err as Error)?.message ?? String(err) });
+    }
+}
+
+async function handleAuthorized(
+    req: VercelRequest, res: VercelResponse, body: Body & { line_user_id: string }, buildingId: string,
+    ctx: NonNullable<Awaited<ReturnType<typeof authorize>>>,
+) {
     // The thread lives under this property's path, so another property's thread can't be reached.
     const ref = db.doc(threadPath(ctx.ownerUid, buildingId, body.line_user_id));
     const snap = await ref.get();
