@@ -7,7 +7,7 @@ import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
 import { latestAnnouncementsText } from './_announcements.js';
-import { evaluateSlip } from './_slip-flow.js';
+import { evaluateSlip, tenantSlipReply } from './_slip-flow.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 import type { MonthlyBill } from '../src/types/index.js';
 
@@ -730,7 +730,6 @@ async function handleSlipImage(
 
     // 8. Pending for the owner to confirm, or "paid" when the slip checks all passed
     const now = new Date().toISOString();
-    const qrPassed = !!qr.payload;
     const statusField = isFine ? 'status' : 'payment_status';
 
     await targetDoc.ref.update({
@@ -742,19 +741,7 @@ async function handleSlipImage(
         ...evaluation.fields,
         verify_note: evaluation.verifyNote,
     });
-    if (autoVerified) {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `[ระบบอัตโนมัติ] ได้รับยอดชำระ ${geminiAmount} บาท เรียบร้อยแล้วค่ะ\n\nรายการของห้อง ${room_number} ถูกอัปเดตสถานะเป็น "จ่ายแล้ว" โดยอัตโนมัติ ขอบคุณค่ะ`,
-        }]);
-    } else {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: qrPassed
-                ? `[ระบบ] รับสลิปห้อง ${room_number} แล้วค่ะ\n\n- ตรวจ QR ผ่าน (ไม่ซ้ำ)\nเจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ`
-                : `[ระบบ] รับสลิปห้อง ${room_number} แล้วค่ะ\n\n- ระบบอ่าน QR ไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`,
-        }]);
-    }
+    await lineReply(replyToken, [{ type: 'text', text: tenantSlipReply(room_number, evaluation) }]);
 
     // แจ้งเจ้าของหอผ่าน FCM (best-effort)
     try {
@@ -766,7 +753,9 @@ async function handleSlipImage(
                 tokens,
                 notification: {
                     title: `💳 สลิปใหม่ ห้อง ${room_number}`,
-                    body: qrPassed ? 'ตรวจ QR ผ่านแล้ว — กรุณายืนยันยอด' : 'รอตรวจสอบ — กรุณาดูสลิป',
+                    body: evaluation.outcome === 'approved' ? `รับยอดอัตโนมัติแล้ว ฿${geminiAmount ?? ''}`
+                        : evaluation.outcome === 'mismatch' ? `สลิปไม่ตรง: ${evaluation.problems.join(' · ')}`
+                        : 'AI ตรวจไม่ได้ — กรุณาดูสลิปและยืนยันยอด',
                 },
                 webpush: { notification: { icon: '/logo-icon.png', badge: '/logo-icon.png', lang: 'th' }, fcmOptions: { link: '/' } },
             });

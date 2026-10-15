@@ -216,9 +216,9 @@ export function verifySlip(input: {
         qr: input.qrPresent ? 'pass' : 'unknown',
     };
 
-    // With no receiving account on file there is nothing to compare names against (older setups):
-    // fall back to amount + QR + not-duplicate as before.
-    const receiverOk = candidates.length === 0 || !!best;
+    // The receiver's name / account must match one of the property's accounts: with none on file there is
+    // nothing to check the name against, so the slip waits for the owner instead of being approved.
+    const receiverOk = !!best;
     const auto_approve = amount === 'pass' && input.qrPresent && !input.duplicate && receiverOk && datetime !== 'fail';
     return { checks, matched_candidate_id: best?.c.id ?? null, auto_approve };
 }

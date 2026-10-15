@@ -110,7 +110,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             verify_note: evaluation.verifyNote,
         });
 
-        res.status(200).json({ success: true, autoVerified, status: autoVerified ? 'paid' : 'pending' });
+        res.status(200).json({
+            success: true, autoVerified, status: autoVerified ? 'paid' : 'pending',
+            outcome: evaluation.outcome, problems: evaluation.problems,
+        });
 
     } catch (error) {
         console.error('Upload slip error:', error);

@@ -366,7 +366,13 @@ function SlipUploader({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
 
-      toast.success(data.autoVerified ? t.slip_success_auto : t.slip_success_wait);
+      if (data.outcome === 'mismatch') {
+        // problems are Thai sentences from the server; the heading follows the portal language
+        const problems: string[] = Array.isArray(data.problems) ? data.problems : [];
+        toast.error([t.slip_mismatch, ...problems.map(p => `• ${p}`)].join('\n'), { duration: 10000, style: { whiteSpace: 'pre-line' } });
+      } else {
+        toast.success(data.autoVerified ? t.slip_success_auto : t.slip_success_wait);
+      }
     } catch (errRaw) {
         const err = errorInfo(errRaw);
       toast.error(`${t.slip_fail}: ${err.message}`);

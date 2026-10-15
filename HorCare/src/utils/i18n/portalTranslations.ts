@@ -66,6 +66,7 @@ export interface PortalTranslations {
   uploading_slip: string;
   slip_success_auto: string;
   slip_success_wait: string;
+  slip_mismatch: string;
   slip_fail: string;
 
   // Fines
@@ -170,6 +171,7 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'กำลังส่งสลิป...',
     slip_success_auto: 'ชำระเงินเรียบร้อยแล้ว (ตรวจสอบอัตโนมัติ)',
     slip_success_wait: 'ส่งสลิปเรียบร้อย รอเจ้าของหอตรวจสอบ',
+    slip_mismatch: 'สลิปไม่ตรงกับบิล — ยังไม่ได้รับยอด',
     slip_fail: 'อัปโหลดไม่สำเร็จ',
 
     fine_reason: 'ค่าปรับ',
@@ -269,6 +271,7 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'Uploading slip...',
     slip_success_auto: 'Payment verified automatically',
     slip_success_wait: 'Slip uploaded. Waiting for owner verification.',
+    slip_mismatch: 'Slip does not match the bill — payment not accepted',
     slip_fail: 'Upload failed',
 
     fine_reason: 'Fine',
@@ -368,6 +371,7 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: '正在上传凭证...',
     slip_success_auto: '已完成缴费（自动识别通过）',
     slip_success_wait: '凭证已上传，等待房东确认',
+    slip_mismatch: '凭证与账单不符 — 未确认收款',
     slip_fail: '上传失败',
 
     fine_reason: '罚款项目',
@@ -467,6 +471,7 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'စလစ်တင်နေသည်...',
     slip_success_auto: 'ငွေပေးချေမှုအောင်မြင်ပါသည် (အလိုအလျောက်စစ်ဆေးပြီး)',
     slip_success_wait: 'စလစ်တင်ပြီးပါပြီ အဆောင်မှစစ်ဆေးနေပါသည်',
+    slip_mismatch: 'စလစ်သည် ငွေတောင်းခံလွှာနှင့် မကိုက်ညီပါ — ငွေလက်မခံရသေးပါ',
     slip_fail: 'မအောင်မြင်ပါ',
 
     fine_reason: 'ဒဏ်ကြေးအကြောင်းအရာ',
@@ -566,6 +571,7 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'ກຳລັງສົ່ງສະລິບ...',
     slip_success_auto: 'ຊຳລະເງິນຮຽບຮ້ອຍແລ້ວ (ກວດສອບອັດຕະໂນມັດ)',
     slip_success_wait: 'ສົ່ງສະລິບຮຽບຮ້ອຍ ລໍຖ້າເຈົ້າຂອງຫໍກວດສອບ',
+    slip_mismatch: 'ສະລິບບໍ່ກົງກັບບິນ — ຍັງບໍ່ໄດ້ຮັບຍອດ',
     slip_fail: 'ອັບໂຫຼດບໍ່ສຳເລັດ',
 
     fine_reason: 'ຄ່າປັບ',
@@ -665,6 +671,7 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'Đang tải hóa đơn...',
     slip_success_auto: 'Thanh toán thành công (Xác minh tự động)',
     slip_success_wait: 'Đã gửi biên lai, chờ chủ trọ xác nhận',
+    slip_mismatch: 'Biên lai không khớp hóa đơn — chưa ghi nhận thanh toán',
     slip_fail: 'Tải lên thất bại',
 
     fine_reason: 'Khoản phạt',

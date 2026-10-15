@@ -182,10 +182,10 @@ describe('verifySlip', () => {
         expect(v.matched_candidate_id).toBe('promptpay');
         expect(v.auto_approve).toBe(true);
     });
-    it('with no account on file it keeps the old rule: amount + QR + not duplicate', () => {
+    it('with no account on file the receiver name cannot be checked, so nothing is approved', () => {
         const v = run({ candidates: [] });
         expect(v.checks.receiver_name).toBe('unknown');
-        expect(v.auto_approve).toBe(true);
+        expect(v.auto_approve).toBe(false);
         expect(run({ candidates: [] }, { amount: 100 }).auto_approve).toBe(false);
     });
     it('without any readable details nothing is approved', () => {
