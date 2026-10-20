@@ -50,10 +50,13 @@ export default function TenantGateway() {
           return;
         }
 
-        const profile = await window.liff.getProfile();
-        const lineUserId: string = profile.userId;
-
-        const res = await fetch(`/api/line-webhook?lid=${encodeURIComponent(lineUserId)}`);
+        // The server checks this LINE access token with LINE itself, so a LINE user id typed into the browser
+        // is never enough to open someone's portal.
+        const res = await fetch('/api/portal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'liff', access_token: window.liff.getAccessToken() }),
+        });
 
         if (res.status === 404) {
           setState({ status: 'not_registered' });
@@ -64,11 +67,9 @@ export default function TenantGateway() {
           return;
         }
 
-        const { uid, building_id, room_id, room_number, dorm_name } = await res.json();
-        setState({ status: 'redirecting', roomNumber: room_number, dormName: dorm_name ?? '' });
-        window.location.replace(
-          `/?uid=${encodeURIComponent(uid)}&bid=${encodeURIComponent(building_id)}&rid=${encodeURIComponent(room_id)}`
-        );
+        const { portal, room_number, dorm_name } = await res.json() as { portal: string; room_number?: string; dorm_name?: string };
+        setState({ status: 'redirecting', roomNumber: room_number ?? '', dormName: dorm_name ?? '' });
+        window.location.replace(`/?p=${encodeURIComponent(portal)}`);
       } catch (err) {
         console.error('[TenantGateway]', err);
         setState({ status: 'error', message: 'เกิดข้อผิดพลาด กรุณาปิดแล้วเปิด LINE ใหม่' });

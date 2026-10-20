@@ -3,14 +3,13 @@ import {
   FileText, ShieldCheck, PenTool, CheckCircle2, Clock, Eye, Download,
   X, ArrowRight, Check, Sparkles,
 } from 'lucide-react';
-import { doc, updateDoc, collection, addDoc } from 'firebase/firestore';
 import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from 'react-hot-toast';
 
-import { db } from '../../firebase/config';
-import type { TenantProfile, Room, DormConfig, SignedContractData, BillLanguage } from '../../types';
+import { portalCall } from './portalApi';
+import type { TenantProfile, Room, DormConfig, BillLanguage } from '../../types';
 import SignaturePad from '../ESignature/SignaturePad';
 import horcareLogo from '../../assets/horcare_logo.png';
 import { errorInfo } from '../../shared/errorInfo';
@@ -19,18 +18,15 @@ interface TenantContractSectionProps {
   profile: TenantProfile | null;
   room?: Room;
   config: DormConfig | null;
-  uid: string;
-  buildingId: string;
-  roomId: string;
   lang?: BillLanguage;
+  /** Called after the tenant signed, so the page reloads the contract. */
+  onSigned: () => void;
 }
 
 export default function TenantContractSection({
   profile,
   config,
-  uid,
-  buildingId,
-  roomId,
+  onSigned,
 }: TenantContractSectionProps) {
   const contract = profile?.signed_contract;
 
@@ -85,29 +81,9 @@ export default function TenantContractSection({
     const toastId = toast.loading('กำลังบันทึกลายมือชื่อและออกเอกสารรับรอง...');
 
     try {
-      const nowIso = new Date().toISOString();
-      const updatedContract: SignedContractData = {
-        ...contract,
-        lessee_signature: lesseeSignature,
-        lessee_signed_at: nowIso,
-        status: 'signed',
-      };
-
-      // 1. Update tenant profile
-      const tenantRef = doc(db, `users/${uid}/buildings/${buildingId}/tenants`, roomId);
-      await updateDoc(tenantRef, {
-        signed_contract: updatedContract,
-        updated_at: nowIso,
-      });
-
-      // 2. Add audit event
-      const eventsRef = collection(db, `users/${uid}/buildings/${buildingId}/tenants/${roomId}/events`);
-      await addDoc(eventsRef, {
-        type: 'contract_signed_lessee',
-        date: nowIso.slice(0, 10),
-        note: `ผู้เช่า (${contract.lessee_name}) ได้ลงนามสัญญาดิจิทัลเรียบร้อยแล้วผ่าน Tenant Portal (เลขที่สัญญา: ${contract.contract_number})`,
-        created_at: nowIso,
-      });
+      // The server signs the contract of THIS link's room and records the event; the page then reloads it.
+      await portalCall('contract_sign', { signature: lesseeSignature });
+      onSigned();
 
       toast.success('ลงนามสัญญาดิจิทัลสำเร็จเรียบร้อยแล้ว! 🎉', { id: toastId });
       setShowSignModal(false);
@@ -1118,7 +1094,8 @@ export default function TenantContractSection({
                   </div>
                   <div>
                     <QRCodeCanvas
-                      value={`${window.location.origin}/?uid=${uid}&bid=${buildingId}&rid=${roomId}`}
+                      // the contract number and audit code only: a printed contract must not carry the tenant's portal link
+                      value={`HorCare ${contract.contract_number} ${contract.verification_code || ''}`.trim()}
                       size={36}
                     />
                   </div>

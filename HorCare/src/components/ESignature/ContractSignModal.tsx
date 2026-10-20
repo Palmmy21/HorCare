@@ -13,6 +13,7 @@ import { db } from '../../firebase/config';
 
 import type { Room, DormConfig, TenantProfile, SignedContractData, ContractTemplate } from '../../types';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
+import { fetchPortalUrl } from '../../utils/portalLinks';
 import type { ContractFormState } from '../../utils/contractTemplates';
 import {
   buildInitialContractForm,
@@ -358,12 +359,16 @@ export default function ContractSignModal({
 
   // Copy signing link
   const handleCopyLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?uid=${uid || ''}&bid=${buildingId || ''}&rid=${room.id}&action=sign`;
-    navigator.clipboard.writeText(url).then(() => {
-      setLinkCopied(true);
-      toast.success('คัดลอกลิงก์สำหรับส่งให้ผู้ค้า/ผู้เช่าเซ็นแล้ว!');
-      setTimeout(() => setLinkCopied(false), 2500);
-    });
+    if (!uid || !buildingId) return;
+    // the room's portal link carries a server-side secret, so it is fetched rather than built here
+    fetchPortalUrl(uid, buildingId, room.id, { sign: true })
+      .then(url => navigator.clipboard.writeText(url))
+      .then(() => {
+        setLinkCopied(true);
+        toast.success('คัดลอกลิงก์สำหรับส่งให้ผู้ค้า/ผู้เช่าเซ็นแล้ว!');
+        setTimeout(() => setLinkCopied(false), 2500);
+      })
+      .catch(() => toast.error('คัดลอกลิงก์ไม่สำเร็จ กรุณาลองใหม่'));
   };
 
   // Helper date format

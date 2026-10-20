@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db, admin } from './_firebase.js';
+import { db } from './_firebase.js';
 import { errorInfo } from '../src/shared/errorInfo.js';
 
 export const config = { maxDuration: 60 };
@@ -34,22 +34,12 @@ async function lineSupportPush(to: string, text: string): Promise<void> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Security check: only allow cron requests
+    // Vercel Cron only. This job reads every account and messages them, so a user's sign-in token is not enough;
+    // fail closed when CRON_SECRET is not configured.
     const secret = process.env.CRON_SECRET;
     if (!secret || req.headers['authorization'] !== `Bearer ${secret}`) {
-        // Also allow manual trigger for testing if authenticated with Firebase admin token
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-            res.status(401).send('Unauthorized');
-            return;
-        }
-        try {
-            const idToken = authHeader.split('Bearer ')[1];
-            await admin.auth().verifyIdToken(idToken);
-        } catch {
-            res.status(401).send('Unauthorized');
-            return;
-        }
+        res.status(401).send('Unauthorized');
+        return;
     }
 
     try {
@@ -84,6 +74,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             if (message) {
+                // One notice per account, expiry date and stage: a re-run (retry, manual trigger) sends nothing twice.
+                // The two "expired" days share a stage so the user gets that notice once.
+                const stage = roundedDays <= 0 ? 'expired' : `d${roundedDays}`;
+                const noticeRef = db.collection('expiry_notices').doc(`${doc.id}_${accessUntil}_${stage}`);
+                try {
+                    await noticeRef.create({ uid: doc.id, access_until: accessUntil, stage, sent_at: new Date(now).toISOString() });
+                } catch {
+                    skippedCount++;
+                    continue; // already sent
+                }
                 try {
                     await lineSupportPush(lineSupportId, message);
                     notifiedCount++;
@@ -91,6 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 } catch (errRaw) {
                     const err = errorInfo(errRaw);
                     console.error(`Failed to notify user ${doc.id}:`, err.message);
+                    await noticeRef.delete().catch(() => undefined); // let the next run try again
                     skippedCount++;
                 }
             }

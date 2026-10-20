@@ -37,6 +37,8 @@ export function useTenantProfile(
 ) {
   const [profile, setProfile] = useState<TenantProfile | null>(null);
   const [events, setEvents] = useState<TenantEvent[]>([]);
+  // set when the history could not be loaded, so the page does not present a failure as "no history"
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Real-time listener — profile document
@@ -71,9 +73,12 @@ export function useTenantProfile(
       q,
       snap => {
         setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() } as TenantEvent)));
+        setEventsError(null);
       },
-      () => {
+      err => {
+        console.error('tenant events listener failed:', err);
         setEvents([]);
+        setEventsError(err.code === 'permission-denied' ? 'permission-denied' : 'unavailable');
       },
     );
     return unsub;
@@ -128,5 +133,5 @@ export function useTenantProfile(
     await deleteDoc(doc(eventsColRef(uid, buildingId, roomId), eventId));
   }, [uid, buildingId, roomId]);
 
-  return { profile, events, loading, saveProfile, addEvent, deleteEvent };
+  return { profile, events, eventsError, loading, saveProfile, addEvent, deleteEvent };
 }

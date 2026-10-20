@@ -61,6 +61,8 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'market': return marketHandler(req, res);
         case 'security-alerts': return securityAlertsHandler(req, res);
         case 'tenant-link': return tenantLinkHandler(req, res);
+        case 'portal': return (await import('./_portal.js')).default(req, res);
+        case 'housekeepers': return (await import('./_housekeepers.js')).default(req, res);
         // Heavy dependencies (XLSX writer, Supabase client) are loaded only when their route is called,
         // so they never slow the cold start of every other API route.
         case 'accounting': return (await import('./_accounting.js')).default(req, res);

@@ -5,8 +5,10 @@ import {
   UserCheck, UserX, Link2, CheckCheck, Store, Tag,
   PenTool, ShieldCheck, Clock,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type { Room, DormConfig } from '../../types';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
+import { fetchPortalUrl } from '../../utils/portalLinks';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 import InvitationModal from './InvitationModal';
@@ -56,11 +58,13 @@ function TenantCard({
 
   const copyTenantLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}${window.location.pathname}?uid=${uid}&bid=${buildingId}&rid=${room.id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    fetchPortalUrl(uid, buildingId, room.id)
+      .then(url => navigator.clipboard.writeText(url))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => toast.error('คัดลอกลิงก์ไม่สำเร็จ กรุณาลองใหม่'));
   };
 
   const moveOutDays = daysUntil(profile?.expected_move_out);

@@ -5,7 +5,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 import chatbot, { findFaqAnswer } from './_chatbot.js';
 import announcements, { latestAnnouncementsText } from './_announcements.js';
 import { recordBotReply } from './_line-inbox.js';
-import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed, seedPortalLink } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
 
 const OWNER = 'owner-1';
@@ -140,7 +140,7 @@ describe('announcements', () => {
     it('update edits, pins and archives; archived notices disappear for tenants', async () => {
         const id = (await create()).body.announcement.id;
         expect((await ann(OWNER, { action: 'update', announcement_id: id, pinned: true, title: 'ปิดน้ำ (แก้ไข)' })).statusCode).toBe(200);
-        const list = () => ann(null, { action: 'tenant_list', room_id: 'r1' });
+        const list = () => ann(null, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'r1') });
         expect((await list()).body.announcements[0]).toMatchObject({ id, title: 'ปิดน้ำ (แก้ไข)', pinned: true });
         await ann(OWNER, { action: 'update', announcement_id: id, status: 'archived' });
         expect((await list()).body.announcements).toEqual([]);
@@ -150,16 +150,15 @@ describe('announcements', () => {
         expect((await ann('fin', { action: 'update', announcement_id: id, pinned: false })).statusCode).toBe(403);
     });
 
-    it('tenant_list shows no author or counts, hides expired, and rejects unknown rooms / other properties', async () => {
+    it('tenant_list shows no author or counts, hides expired, and needs a valid portal link', async () => {
         const pastId = 'old';
         seed(`${B}/announcements/${pastId}`, { id: pastId, title: 'เก่า', body: 'x', pinned: false, status: 'published', expires_at: '2020-01-01T00:00:00Z', created_at: '2019-01-01T00:00:00Z', created_by: 'o', line_sent: 1, line_failed: 0 });
         await create();
-        const ok = await ann(null, { action: 'tenant_list', room_id: 'r1' });
+        const ok = await ann(null, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'r1') });
         expect(ok.body.announcements).toHaveLength(1);
         expect(Object.keys(ok.body.announcements[0]).sort()).toEqual(['body', 'created_at', 'id', 'pinned', 'title']);
-        expect((await ann(null, { action: 'tenant_list', room_id: 'nope' })).statusCode).toBe(404);
-        expect((await ann(null, { action: 'tenant_list', room_id: 'r1', building_id: 'bld-B' })).statusCode).toBe(404);
-        expect((await ann(null, { action: 'tenant_list' })).statusCode).toBe(400);
+        expect((await ann(null, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'nope') })).statusCode).toBe(401);
+        expect((await ann(null, { action: 'tenant_list', room_id: 'r1' })).statusCode).toBe(401);
     });
 
     it('latestAnnouncementsText lists the newest notices or null', async () => {

@@ -3,7 +3,12 @@ import { db, admin } from './_firebase.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { decodeSlipQR, slipFingerprint } from './_slip.js';
 
+import { rateLimit } from './_abuse-guard.js';
+import { resolvePortalLink } from './_portal-link.js';
 import { errorInfo } from '../src/shared/errorInfo.js';
+
+/** A compressed slip (900px JPEG) is a few hundred KB as a data URL. */
+const MAX_SLIP_CHARS = 1_500_000;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -12,18 +17,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { uid, buildingId, roomId, itemId, itemType, base64 } = req.body;
-        if (!uid || !buildingId || !roomId || !itemId || !itemType || !base64) {
+        const { portal: portalLink, itemId, itemType, base64 } = req.body ?? {};
+        if (!portalLink || typeof itemId !== 'string' || !itemId || (itemType !== 'bill' && itemType !== 'fine')
+            || typeof base64 !== 'string' || !base64) {
             res.status(400).json({ error: 'Missing parameters' });
             return;
         }
+        if (base64.length > MAX_SLIP_CHARS) { res.status(400).json({ error: 'Image too large' }); return; }
+
+        const limited = await rateLimit(req, 'portal:slip', 20, 3600);
+        if (!limited.ok) { res.status(429).json({ error: 'too_many_requests' }); return; }
+
+        // The portal link proves the room; a slip can only be sent for that room's own bill or fine.
+        const portal = await resolvePortalLink(portalLink);
+        if (!portal) { res.status(401).json({ error: 'invalid_link' }); return; }
+        const { ownerUid: uid, buildingId, roomId } = portal;
 
         const isFine = itemType === 'fine';
         const colPath = isFine ? 'fines' : 'bills';
         const targetDocRef = db.doc(`users/${uid}/buildings/${buildingId}/${colPath}/${itemId}`);
         const targetDoc = await targetDocRef.get();
 
-        if (!targetDoc.exists) {
+        if (!targetDoc.exists || targetDoc.data()?.room_id !== roomId) {
             res.status(404).json({ error: 'Item not found' });
             return;
         }

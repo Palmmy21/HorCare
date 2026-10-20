@@ -5,7 +5,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 vi.mock('./_abuse-guard.js', async () => ({ ...(await vi.importActual<typeof import('./_abuse-guard.js')>('./_abuse-guard.js')), rateLimit: async () => ({ ok: true, retryAfterSec: 0 }) }));
 
 import handler from './_market.js';
-import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed, seedPortalLink } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
 import { addDays, todayTh } from '../src/shared/market.js';
 
@@ -36,7 +36,14 @@ async function call(uid: string | null, body: Record<string, unknown>) {
     await handler(fakeReq({ owner_uid: OWNER, building_id: BLD, ...body }, uid ?? undefined), res as never);
     return res as { statusCode: number; body: any };
 }
-const closure = (over: Record<string, unknown> = {}) => call(null, { action: 'closure_submit', room_id: 's1', from_date: d(1), to_date: d(2), reason: 'sick', ...over });
+/** A stall's public call: the stall is named by its portal link (room_id here only picks which link to send). */
+function stall(action: string, over: Record<string, unknown> = {}) {
+    const { room_id, ...rest } = over;
+    const room = 'room_id' in over ? room_id : 's1';
+    const bld = typeof over.building_id === 'string' ? over.building_id : BLD;
+    return call(null, { action, ...rest, portal: typeof room === 'string' ? seedPortalLink(OWNER, bld, room) : undefined });
+}
+const closure = (over: Record<string, unknown> = {}) => stall('closure_submit', { from_date: d(1), to_date: d(2), reason: 'sick', ...over });
 const walkin = (over: Record<string, unknown> = {}) => call(null, { action: 'walkin_submit', date: d(1), name: 'สมชาย', phone: '081-234-5678', goods: 'ผลไม้', ...over });
 const notes = () => listPaths(`${B}/notifications/`).map(p => read(p)!);
 
@@ -53,10 +60,11 @@ describe('closures (public)', () => {
     it('rejects bad dates, reasons and notes, unknown stalls, and dormitories', async () => {
         for (const bad of [{ from_date: d(-1) }, { to_date: d(0) }, { to_date: d(90) }, { reason: 'x' }, { note: 'x'.repeat(201) }, { from_date: 'tomorrow' }])
             expect((await closure(bad)).statusCode).toBe(400);
-        expect((await closure({ room_id: 'ghost' })).statusCode).toBe(404);
-        expect((await closure({ room_id: undefined })).statusCode).toBe(400);
+        expect((await closure({ room_id: 'ghost' })).statusCode).toBe(401);
+        expect((await closure({ room_id: undefined })).statusCode).toBe(401);
+        expect((await call(null, { action: 'closure_submit', room_id: 's1', from_date: d(1), to_date: d(2), reason: 'sick' })).statusCode).toBe(401);
         expect((await closure({ building_id: 'dorm' })).statusCode).toBe(404);
-        expect((await closure({ building_id: 'nope' })).statusCode).toBe(404);
+        expect((await closure({ building_id: 'nope' })).statusCode).toBe(401);
         expect(listPaths(`${B}/shop_closures/`)).toHaveLength(0);
     });
 
@@ -70,11 +78,11 @@ describe('closures (public)', () => {
     it('lists only that stall\'s upcoming closures, and a stall can only cancel its own', async () => {
         const mine = (await closure()).body.closure;
         await closure({ room_id: 's2' });
-        const list = await call(null, { action: 'closure_list', room_id: 's1' });
+        const list = await stall('closure_list', { room_id: 's1' });
         expect(list.body.closures.map((c: any) => c.id)).toEqual([mine.id]);
-        expect((await call(null, { action: 'closure_cancel', room_id: 's2', closure_id: mine.id })).statusCode).toBe(404);
-        expect((await call(null, { action: 'closure_cancel', room_id: 's1', closure_id: mine.id })).statusCode).toBe(200);
-        expect((await call(null, { action: 'closure_list', room_id: 's1' })).body.closures).toEqual([]);
+        expect((await stall('closure_cancel', { room_id: 's2', closure_id: mine.id })).statusCode).toBe(404);
+        expect((await stall('closure_cancel', { room_id: 's1', closure_id: mine.id })).statusCode).toBe(200);
+        expect((await stall('closure_list', { room_id: 's1' })).body.closures).toEqual([]);
     });
 });
 
@@ -101,7 +109,7 @@ describe('closure_add (staff)', () => {
         expect(listPaths(`users/${OWNER}/audit_logs/`)).toHaveLength(1);
         expect(notes()).toHaveLength(0);
         // the stall sees it in its portal list
-        expect((await call(null, { action: 'closure_list', room_id: 's1' })).body.closures).toHaveLength(1);
+        expect((await stall('closure_list', { room_id: 's1' })).body.closures).toHaveLength(1);
     });
 
     it('needs shop.update and keeps the same date and overlap rules', async () => {

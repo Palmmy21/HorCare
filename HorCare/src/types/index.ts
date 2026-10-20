@@ -566,9 +566,13 @@ export interface Housekeeper {
   id: string;
   name: string;
   phone: string;
-  passcode: string;                 // รหัสเข้าสู่ระบบ (4-8 หลัก)
+  // The passcode is never stored here: /api/housekeepers keeps only a hash, server-side.
   status?: 'active' | 'busy' | 'off';
   is_active: boolean;
+  /** Raised whenever the passcode changes or the account is switched off; older sessions stop working. */
+  session_version?: number;
+  /** True after an old plain-text passcode was removed: the owner must set a new one. */
+  needs_passcode?: boolean;
   notes?: string;
   created_at: string;
   updated_at?: string;

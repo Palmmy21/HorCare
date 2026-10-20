@@ -33,9 +33,10 @@ function docRef(path: string) {
         path,
         id: path.split('/').pop() as string,
         get: async () => snap(path),
-        set: async (data: Data) => {
+        set: async (data: Data, opts?: { merge?: boolean }) => {
             if (failWritePrefix && path.startsWith(failWritePrefix)) throw new Error('write failed');
-            store.set(path, structuredClone(data));
+            // structuredClone cannot copy the delete sentinel (a Symbol), so apply the patch before cloning
+            store.set(path, structuredClone(applyPatch(opts?.merge ? store.get(path) ?? {} : {}, data)));
         },
         /** Like Firestore: fails with ALREADY_EXISTS (code 6) when the document is there. */
         create: async (data: Data) => {
@@ -71,7 +72,7 @@ export const db = {
     collection: (path: string) => collectionRef(path),
     runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => fn({
         get: (ref: { get: () => Promise<unknown> }) => ref.get(),
-        set: (ref: { set: (d: Data) => Promise<void> }, d: Data) => { void ref.set(d); },
+        set: (ref: { set: (d: Data, o?: { merge?: boolean }) => Promise<void> }, d: Data, o?: { merge?: boolean }) => { void ref.set(d, o); },
         update: (ref: { update: (d: Data) => Promise<void> }, d: Data) => { void ref.update(d); },
         delete: (ref: { delete: () => Promise<void> }) => { void ref.delete(); },
     }),
@@ -104,6 +105,8 @@ export const admin = {
             return u;
         },
         revokeRefreshTokens: async (uid: string) => { revoked.push(uid); },
+        /** test custom tokens are the JSON of what would be signed */
+        createCustomToken: async (uid: string, claims?: object) => JSON.stringify({ uid, claims }),
         getUserByEmail: async (email: string) => {
             const u = [...authUsers.values()].find(x => x.email === email);
             if (!u) throw new Error('auth/user-not-found');
@@ -123,6 +126,11 @@ export function resetFake() { store.clear(); authUsers.clear(); revoked.length =
 export function failWritesTo(prefix: string | null) { failWritePrefix = prefix; }
 export function seed(path: string, data: object) { store.set(path, structuredClone(data) as Data); }
 export function read(path: string) { return store.get(path); }
+/** A tenant portal link for a room (see _portal-link.ts); returns the packed value the portal sends as `portal`. */
+export function seedPortalLink(ownerUid: string, buildingId: string, roomId: string, secret = 'SECRETsecretSECRETsecret12345678') {
+    store.set(`portal_links/${ownerUid}__${buildingId}__${roomId}`, { owner_uid: ownerUid, building_id: buildingId, room_id: roomId, secret });
+    return [ownerUid, buildingId, roomId, secret].join('~');
+}
 export function listPaths(prefix: string) { return [...store.keys()].filter(p => p.startsWith(prefix)); }
 export function addAuthUser(uid: string, email: string, displayName?: string) {
     authUsers.set(uid, { uid, email, displayName });

@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
+import { resolvePortalLink } from './_portal-link.js';
 import { bankByCode, digitsOnly, isValidAccountNumber, type BankAccount } from '../src/shared/banks.js';
 import { cleanPromptPayId } from '../src/shared/thaiQr.js';
 
@@ -30,6 +31,8 @@ interface Body {
     /** PromptPay mobile number or 13-digit national/tax ID of this account's owner; empty/null clears it. */
     promptpay_id?: unknown;
     status?: string;
+    /** tenant_list: the tenant's portal link */
+    portal?: unknown;
 }
 
 /** undefined = malformed, null = empty/cleared, string = digits of a valid PromptPay id. */
@@ -54,12 +57,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const buildingId = body.building_id;
     if (!buildingId || typeof buildingId !== 'string') { res.status(400).json({ error: 'building_id is required' }); return; }
     // Tenant portal: the active accounts a tenant can transfer to. No login (like parcels
-    // `tenant_list`), so it proves the room exists and returns only what a bill already shows.
+    // `tenant_list`): the portal link proves the room, and only what a bill already shows is returned.
     if (body.action === 'tenant_list') {
-        const owner = body.owner_uid;
-        if (typeof owner !== 'string' || !owner || typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'invalid_input' }); return; }
-        const base = `users/${owner}/buildings/${buildingId}`;
-        if (!(await db.doc(`${base}/rooms/${body.room_id}`).get()).exists) { res.status(404).json({ error: 'not_found' }); return; }
+        const portal = await resolvePortalLink(body.portal);
+        if (!portal) { res.status(401).json({ error: 'invalid_link' }); return; }
+        const base = `users/${portal.ownerUid}/buildings/${portal.buildingId}`;
         const snap = await db.collection(`${base}/bank_accounts`).get();
         const accounts = snap.docs.map(d => d.data() as BankAccount)
             .filter(a => a.status === 'active')

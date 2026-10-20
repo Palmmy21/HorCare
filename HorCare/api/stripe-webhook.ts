@@ -55,53 +55,105 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         switch (event.type) {
-            case 'checkout.session.completed': {
+            // PromptPay can confirm after the session completes: the grant happens on whichever event sees it paid.
+            case 'checkout.session.completed':
+            case 'checkout.session.async_payment_succeeded': {
                 const session = event.data.object as Stripe.Checkout.Session;
-                await handleCheckoutCompleted(session);
+                await handleCheckoutPaid(session, event.id);
                 break;
             }
             default:
                 console.log(`Unhandled event type: ${event.type}`);
         }
-    } catch(err) {
-        console.error('Error handling event', err);
+    } catch (err) {
+        // Not granted yet: answer with an error so Stripe retries the event (the grant is idempotent per session).
+        console.error('Error handling event', event.id, err);
+        res.status(500).json({ received: false });
+        return;
     }
 
     res.json({ received: true });
 }
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+/** Adds one billing cycle to `fromMs`, keeping the day of month where it exists (Jan 31 → Feb 28/29, never Mar 3). */
+export function addCycle(fromMs: number, cycle: string): number {
+    const d = new Date(fromMs);
+    const day = d.getUTCDate();
+    const months = cycle === 'yearly' ? 12 : 1;
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + months);
+    const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    d.setUTCDate(Math.min(day, lastDay));
+    return d.getTime();
+}
+
+/**
+ * New expiry after paying for one cycle: renewing early keeps the days already paid for, so the cycle is added to
+ * whichever is later — now or the current expiry.
+ */
+export function nextAccessUntil(currentAccessUntil: unknown, now: number, cycle: string): number {
+    const current = typeof currentAccessUntil === 'number' && Number.isFinite(currentAccessUntil) ? currentAccessUntil : 0;
+    return addCycle(Math.max(now, current), cycle);
+}
+
+export async function handleCheckoutPaid(session: Stripe.Checkout.Session, eventId: string, now = Date.now()) {
     const uid   = session.metadata?.uid;
     const plan  = session.metadata?.plan;
     const cycle = session.metadata?.cycle;
 
     if (!uid || !plan || !cycle) {
+        // retrying can't fix missing metadata — log it and acknowledge
         console.error('Missing metadata in checkout session', session.id);
+        return;
+    }
+    if (session.payment_status !== 'paid') {
+        console.log(`Checkout ${session.id} not paid yet (${session.payment_status}); waiting for async_payment_succeeded`);
         return;
     }
 
     const licenseType = `${cycle}_${plan}`;
-
-    // จ่ายแบบ one-time (PromptPay/บัตร) — คำนวณวันหมดอายุจากรอบบิลเอง
-    const periodEnd = new Date();
-    if (cycle === 'yearly') {
-        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-    } else {
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-    }
-
     const paymentIntentId = typeof session.payment_intent === 'string'
         ? session.payment_intent
         : session.payment_intent?.id ?? '';
 
-    await db.collection('users').doc(uid).update({
-        license: licenseType,
-        plan_name: plan,
-        billing_cycle: cycle,
-        subscription_status: 'active',
-        current_period_end: periodEnd.toISOString(),
-        access_until: periodEnd.getTime(), // server-enforced expiry (Firestore rules)
-        last_payment_intent: paymentIntentId,
+    const userRef = db.collection('users').doc(uid);
+    // One record per checkout session: a redelivered or second event for the same payment never extends access again.
+    const grantRef = db.collection('stripe_checkouts').doc(session.id);
+
+    await db.runTransaction(async tx => {
+        const grantSnap = await tx.get(grantRef);
+        if (grantSnap.exists) {
+            console.log(`Checkout ${session.id} already granted; ignoring event ${eventId}`);
+            return;
+        }
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists) throw new Error(`user ${uid} not found for checkout ${session.id}`);
+        const user = userSnap.data() ?? {};
+
+        const record = {
+            uid, plan, cycle, event_id: eventId, payment_intent: paymentIntentId,
+            amount_total: session.amount_total ?? null, currency: session.currency ?? null,
+            access_until_before: user.access_until ?? null,
+            processed_at: new Date(now).toISOString(),
+        };
+
+        // A lifetime licence is never downgraded by a later one-time purchase; the payment is still recorded.
+        if (user.license === 'active') {
+            tx.set(grantRef, { ...record, access_until_after: null, note: 'lifetime licence kept' });
+            return;
+        }
+
+        const accessUntil = nextAccessUntil(user.access_until, now, cycle);
+        tx.update(userRef, {
+            license: licenseType,
+            plan_name: plan,
+            billing_cycle: cycle,
+            subscription_status: 'active',
+            current_period_end: new Date(accessUntil).toISOString(),
+            access_until: accessUntil, // server-enforced expiry (Firestore rules)
+            last_payment_intent: paymentIntentId,
+        });
+        tx.set(grantRef, { ...record, access_until_after: accessUntil });
     });
 }
 

@@ -16,6 +16,7 @@ import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { notify } from './_notify.js';
 import { honeypotTripped, rateLimit, verifyCaptcha } from './_abuse-guard.js';
+import { resolvePortalLink } from './_portal-link.js';
 import {
     CLOSURE_REASON_LABELS_TH, MAX_ACTIVE_CLOSURES_PER_ROOM, WALKIN_MAX_PER_DAY,
     cleanClosureInput, cleanWalkInInput, todayTh, upcomingClosures,
@@ -38,6 +39,8 @@ interface Body {
     website?: unknown;
     /** Cloudflare Turnstile token (only checked when TURNSTILE_SECRET is set). */
     captcha_token?: unknown;
+    /** closure_submit / closure_cancel / closure_list: the stall's portal link (proves which stall this is). */
+    portal?: unknown;
 }
 
 const PUBLIC = new Set(['closure_submit', 'closure_cancel', 'closure_list', 'walkin_submit']);
@@ -57,11 +60,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let owner: string;
     let staff: Awaited<ReturnType<typeof authorize>> = null;
+    // the stall a closure is for: from the portal link for the public actions, from the request for staff
+    let roomId = typeof body.room_id === 'string' ? body.room_id : '';
     if (PUBLIC.has(action)) {
-        if (typeof body.owner_uid !== 'string' || !body.owner_uid) { res.status(400).json({ error: 'invalid_input' }); return; }
-        owner = body.owner_uid;
+        // counted first, so guessing links costs the same as any other public call
         const limited = await rateLimit(req, `market:${action}:${buildingId}`, PUBLIC_LIMITS[action], 3600);
         if (!limited.ok) { res.setHeader?.('Retry-After', String(limited.retryAfterSec)); res.status(429).json({ error: 'too_many_requests', retry_after_sec: limited.retryAfterSec }); return; }
+        if (action.startsWith('closure_')) {
+            const portal = await resolvePortalLink(body.portal);
+            if (!portal || portal.buildingId !== buildingId) { res.status(401).json({ error: 'invalid_link' }); return; }
+            owner = portal.ownerUid;
+            roomId = portal.roomId;
+        } else {
+            if (typeof body.owner_uid !== 'string' || !body.owner_uid) { res.status(400).json({ error: 'invalid_input' }); return; }
+            owner = body.owner_uid;
+        }
         if (WRITES.has(action)) {
             // bots that fill the hidden field get a normal-looking answer and nothing is stored
             if (honeypotTripped(body.website)) { res.status(200).json({ ok: true, status: 'pending' }); return; }
@@ -88,12 +101,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── stall closures ──────────────────────────────────────────────────────
     // closure_add: staff records a closure on a stall's behalf (already acknowledged)
     if (action === 'closure_submit' || action === 'closure_add' || action === 'closure_cancel' || action === 'closure_list') {
-        if (typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'invalid_input' }); return; }
-        const room = await db.doc(`${base}/rooms/${body.room_id}`).get();
+        if (!roomId) { res.status(400).json({ error: 'invalid_input' }); return; }
+        const room = await db.doc(`${base}/rooms/${roomId}`).get();
         if (!room.exists) { res.status(404).json({ error: 'not_found' }); return; }
-        const roomNumber = String((room.data() as { room_number?: string }).room_number ?? body.room_id);
+        const roomNumber = String((room.data() as { room_number?: string }).room_number ?? roomId);
         const col = `${base}/shop_closures`;
-        const mine = async () => (await db.collection(col).where('room_id', '==', body.room_id).get()).docs.map(d => d.data() as ShopClosure);
+        const mine = async () => (await db.collection(col).where('room_id', '==', roomId).get()).docs.map(d => d.data() as ShopClosure);
 
         if (action === 'closure_list') {
             res.status(200).json({ closures: upcomingClosures(await mine(), todayTh(now)) });
@@ -104,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const ref = db.doc(`${col}/${body.closure_id}`);
             const snap = await ref.get();
             // a stall can only cancel its own closure
-            if (!snap.exists || (snap.data() as ShopClosure).room_id !== body.room_id) { res.status(404).json({ error: 'not_found' }); return; }
+            if (!snap.exists || (snap.data() as ShopClosure).room_id !== roomId) { res.status(404).json({ error: 'not_found' }); return; }
             await ref.update({ status: 'cancelled' });
             res.status(200).json({ ok: true });
             return;
@@ -115,7 +128,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (existing.length >= MAX_ACTIVE_CLOSURES_PER_ROOM) { res.status(409).json({ error: 'limit_reached' }); return; }
         if (existing.some(c => c.from_date <= input.to_date && input.from_date <= c.to_date)) { res.status(409).json({ error: 'overlaps_existing' }); return; }
         const closure: ShopClosure = {
-            id: randomUUID(), room_id: body.room_id, room_number: roomNumber, ...input, status: 'active', created_at: nowIso,
+            id: randomUUID(), room_id: roomId, room_number: roomNumber, ...input, status: 'active', created_at: nowIso,
             ...(staff ? { ack_at: nowIso, ack_by: staff.displayName } : {}),
         };
         await db.doc(`${col}/${closure.id}`).set(closure);

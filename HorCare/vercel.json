@@ -19,6 +19,8 @@
     { "source": "/api/line-webhook", "destination": "/api/line-webhook" },
     { "source": "/api/line-staff-webhook", "destination": "/api/line-staff-webhook" },
     { "source": "/api/payment-webhook", "destination": "/api/payment-webhook" },
+    { "source": "/api/cron-check-expiry", "destination": "/api/cron-check-expiry" },
+    { "source": "/api/remind-manual", "destination": "/api/remind-manual" },
     { "source": "/api/(.*)", "destination": "/api/index?route=$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

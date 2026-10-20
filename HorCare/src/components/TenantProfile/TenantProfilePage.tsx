@@ -13,7 +13,7 @@ import {
   User, Calendar, Banknote,
   Plus, Trash2, Edit2, Check, X, CheckCircle2,
   Clock, LogIn, LogOut, RefreshCw, FileText, Lock, Zap,
-  Heart, GraduationCap, ClipboardList, AlertTriangle, Users,
+  Heart, GraduationCap, ClipboardList, AlertTriangle, AlertCircle, Users,
   PenTool, ShieldCheck, Copy, CheckCheck, Send,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -75,7 +75,7 @@ function emptyForm(): Omit<TenantProfile, 'id' | 'room_id' | 'building_id' | 'cr
 export default function TenantProfilePage({
   room, uid, buildingId, isPaid, onUpgrade, onClose, config,
 }: TenantProfilePageProps) {
-  const { profile, events, loading, saveProfile, addEvent, deleteEvent } =
+  const { profile, events, eventsError, loading, saveProfile, addEvent, deleteEvent } =
     useTenantProfile(uid, buildingId, room.id);
 
   // Tenant PII (ID card, birthdate, contract) lives here — record who opened it.
@@ -1110,7 +1110,13 @@ export default function TenantProfilePage({
                   )}
 
                   {/* Timeline */}
-                  {events.length === 0 ? (
+                  {eventsError ? (
+                    <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
+                      <AlertCircle size={36} />
+                      <h3>โหลดประวัติไม่สำเร็จ</h3>
+                      <p>{eventsError === 'permission-denied' ? 'บัญชีนี้ไม่มีสิทธิ์ดูประวัติผู้เช่าของอาคารนี้' : 'กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่'}</p>
+                    </div>
+                  ) : events.length === 0 ? (
                     <div className="empty-state" style={{ padding: '2.5rem 1rem' }}>
                       <Clock size={36} />
                       <h3>ยังไม่มีประวัติ</h3>

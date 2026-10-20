@@ -2,13 +2,23 @@ import { useState } from 'react';
 import {
   Sparkles, Clock, CheckCircle2, XCircle, Trash2,
   Calendar, Phone, UserCheck, Plus, Search,
-  KeyRound, ShieldCheck, Eye, EyeOff, Edit2
+  KeyRound, ShieldCheck, Edit2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useCleaningRequests } from '../../hooks/useCleaningRequests';
 import { useHousekeepers } from '../../hooks/useHousekeepers';
+import { ApiError } from '../../utils/api';
 import type { CleaningRequest, CleaningServiceType, Housekeeper } from '../../types';
+
+const MAID_SAVE_ERRORS: Record<string, string> = {
+  phone_in_use: 'เบอร์นี้ถูกใช้เป็นบัญชีแม่บ้านอยู่แล้ว (อาจเป็นของหออื่น)',
+  weak_passcode: 'รหัสผ่านต้องเป็นตัวเลข 6–8 หลัก',
+  passcode_required: 'กรุณาตั้งรหัสผ่าน',
+  invalid_input: 'กรุณาตรวจสอบชื่อและเบอร์โทร (เบอร์ 9–10 หลัก ขึ้นต้นด้วย 0)',
+  forbidden: 'บัญชีนี้ไม่มีสิทธิ์จัดการแม่บ้านของอาคารนี้',
+};
 
 // ── Lazy Photo Component ───────────────────────────────────────────────────────
 function CleaningPhoto({ uid, buildingId, req }: { uid: string; buildingId: string; req: CleaningRequest }) {
@@ -131,7 +141,6 @@ export default function CleaningPage({ uid, buildingId }: Props) {
   const [completingReq, setCompletingReq] = useState<CleaningRequest | null>(null);
   const [completeNote, setCompleteNote] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [showPasscodes, setShowPasscodes] = useState<Record<string, boolean>>({});
 
   // Manual Add Request Form
   const [reqRoom, setReqRoom] = useState('');
@@ -235,7 +244,13 @@ export default function CleaningPage({ uid, buildingId }: Props) {
 
   const handleSaveMaid = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!maidName.trim() || !maidPhone.trim() || !maidPasscode.trim()) return;
+    // A new account (or one whose old plain-text passcode was removed) needs a passcode; otherwise blank keeps it.
+    const passcodeRequired = !editingMaid || !!editingMaid.needs_passcode;
+    if (!maidName.trim() || !maidPhone.trim() || (passcodeRequired && !maidPasscode.trim())) return;
+    if (maidPasscode.trim() && !/^\d{6,8}$/.test(maidPasscode.trim())) {
+      toast.error('รหัสผ่านต้องเป็นตัวเลข 6–8 หลัก');
+      return;
+    }
     setSavingId('maid_save');
     try {
       if (editingMaid) {
@@ -259,6 +274,9 @@ export default function CleaningPage({ uid, buildingId }: Props) {
       setMaidPhone('');
       setMaidPasscode('');
       setMaidIsActive(true);
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : '';
+      toast.error(MAID_SAVE_ERRORS[code] ?? 'บันทึกไม่สำเร็จ กรุณาลองใหม่');
     } finally {
       setSavingId(null);
     }
@@ -268,7 +286,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
     setEditingMaid(m);
     setMaidName(m.name);
     setMaidPhone(m.phone);
-    setMaidPasscode(m.passcode);
+    setMaidPasscode(''); // passcodes are never readable; blank keeps the current one
     setMaidIsActive(m.is_active !== false);
     setShowMaidModal(true);
   };
@@ -704,7 +722,6 @@ export default function CleaningPage({ uid, buildingId }: Props) {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
               {housekeepers.map(m => {
-                const showPin = !!showPasscodes[m.id];
                 return (
                   <div
                     key={m.id}
@@ -755,16 +772,11 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                         </div>
                         <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#334155' }}>
                           <span>เบอร์โทร: <strong>{m.phone}</strong></span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <span>รหัส: <strong>{showPin ? m.passcode : '••••••'}</strong></span>
-                            <button
-                              type="button"
-                              onClick={() => setShowPasscodes(p => ({ ...p, [m.id]: !showPin }))}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-gray-400)', padding: 0 }}
-                            >
-                              {showPin ? <EyeOff size={14} /> : <Eye size={14} />}
-                            </button>
-                          </div>
+                          {m.needs_passcode ? (
+                            <span style={{ color: '#B45309', fontWeight: 700 }}>ต้องตั้งรหัสใหม่ (กด "แก้ไข")</span>
+                          ) : (
+                            <span>รหัส: <strong>ตั้งไว้แล้ว</strong></span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -783,7 +795,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                       <button
                         onClick={() => {
                           if (window.confirm(`ต้องการลบแม่บ้าน "${m.name}" ออกจากระบบหรือไม่?`)) {
-                            deleteHousekeeper(m.id, m.phone);
+                            deleteHousekeeper(m.id).catch(() => toast.error('ลบไม่สำเร็จ กรุณาลองใหม่'));
                           }
                         }}
                         type="button"
@@ -958,17 +970,22 @@ export default function CleaningPage({ uid, buildingId }: Props) {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '0.35rem' }}>รหัสผ่าน Login (Passcode / PIN) *</label>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  รหัสผ่าน Login (ตัวเลข 6–8 หลัก){!editingMaid || editingMaid.needs_passcode ? ' *' : ''}
+                </label>
                 <input
                   type="text"
-                  required
-                  placeholder="เช่น 123456 หรือ ตัวเลข 4-6 หลัก"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  required={!editingMaid || !!editingMaid.needs_passcode}
+                  pattern="\d{6,8}"
+                  placeholder={editingMaid && !editingMaid.needs_passcode ? 'เว้นว่างเพื่อใช้รหัสเดิม' : 'เช่น 482915'}
                   value={maidPasscode}
-                  onChange={e => setMaidPasscode(e.target.value)}
+                  onChange={e => setMaidPasscode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                   style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8, border: '1px solid var(--color-gray-300)', fontSize: '0.9rem' }}
                 />
                 <div style={{ fontSize: '0.725rem', color: 'var(--color-gray-500)', marginTop: '0.25rem' }}>
-                  เจ้าของหอสามารถกำหนดรหัสนี้และส่งให้แม่บ้านใช้ Login ที่หน้าแรก
+                  ระบบเก็บรหัสแบบเข้ารหัส จึงดูย้อนหลังไม่ได้ — จดไว้แล้วส่งให้แม่บ้าน การเปลี่ยนรหัสหรือปิดบัญชีจะทำให้เครื่องที่ล็อกอินอยู่ออกจากระบบทันที
                 </div>
               </div>
 

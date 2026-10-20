@@ -1,0 +1,53 @@
+# Quality gate (NFR-12): frontend + backend types, lint, unit tests, Firestore rules against the emulator, build.
+# Runs on every push to main and every pull request. It never deploys and needs no secrets.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: HorCare
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: HorCare/package-lock.json
+
+      # the Firestore emulator is a Java program
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install (lockfile only)
+        run: npm ci
+
+      - name: Typecheck (app + api)
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Firestore rules (emulator)
+        run: npm run test:rules
+
+      - name: Build
+        run: npx vite build

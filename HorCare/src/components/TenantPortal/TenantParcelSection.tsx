@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Package, MapPin } from 'lucide-react';
 import { PARCEL_STATUS_LABELS_TH, type TenantParcelView } from '../../shared/parcels';
+import { portalPost } from './portalApi';
 
 interface Props {
   uid: string;
@@ -23,13 +24,9 @@ export default function TenantParcelSection({ uid, buildingId, roomId, Label }: 
   useEffect(() => {
     if (!uid || !buildingId || !roomId) return;
     let cancelled = false;
-    fetch('/api/parcels', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'tenant_list', owner_uid: uid, building_id: buildingId, room_id: roomId }),
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: { parcels?: TenantParcelView[] } | null) => { if (!cancelled && data?.parcels) setParcels(data.parcels); })
+    // the portal link proves the room; the ids only say which property's API to ask
+    portalPost<{ parcels?: TenantParcelView[] }>('parcels', { action: 'tenant_list', building_id: buildingId })
+      .then(data => { if (!cancelled && data.parcels) setParcels(data.parcels); })
       .catch(() => { /* optional section — fail silently */ });
     return () => { cancelled = true; };
   }, [uid, buildingId, roomId]);

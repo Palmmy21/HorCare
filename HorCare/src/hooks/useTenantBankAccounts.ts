@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PayAccount } from '../shared/banks';
+import { portalPost } from '../components/TenantPortal/portalApi';
 
 export interface TenantAccount extends PayAccount {
   id: string;
@@ -8,23 +9,18 @@ export interface TenantAccount extends PayAccount {
 }
 
 /**
- * The property's active receiving accounts for a tenant (default first), via the public portal action.
- * An empty list while loading, on error, or when the property has none.
+ * The property's active receiving accounts for a tenant (default first), via the portal action (the page's
+ * portal link proves the room). An empty list while loading, on error, or when the property has none.
  */
-export function useTenantBankAccounts(uid: string, buildingId: string, roomId: string): TenantAccount[] {
+export function useTenantBankAccounts(buildingId: string): TenantAccount[] {
   const [accounts, setAccounts] = useState<TenantAccount[]>([]);
   useEffect(() => {
-    if (!uid || !buildingId || !roomId) return;
+    if (!buildingId) return;
     let cancelled = false;
-    fetch('/api/bank-accounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'tenant_list', owner_uid: uid, building_id: buildingId, room_id: roomId }),
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: { accounts?: TenantAccount[] } | null) => { if (!cancelled && data?.accounts) setAccounts(data.accounts); })
+    portalPost<{ accounts?: TenantAccount[] }>('bank-accounts', { action: 'tenant_list', building_id: buildingId })
+      .then(data => { if (!cancelled && data.accounts) setAccounts(data.accounts); })
       .catch(() => { /* optional: no accounts means no QR, never an error screen */ });
     return () => { cancelled = true; };
-  }, [uid, buildingId, roomId]);
+  }, [buildingId]);
   return accounts;
 }

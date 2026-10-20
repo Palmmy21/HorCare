@@ -1,10 +1,15 @@
-import { useEffect, useState, useCallback } from 'react';
-import {
-  collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, getDoc
-} from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { auth, db } from '../firebase/config';
+import { apiPost } from '../utils/api';
 import type { Housekeeper, HousekeeperSession } from '../types';
 
+/**
+ * Housekeeper accounts of one building. Reading is straight from Firestore (the records hold no passcode);
+ * every change goes through /api/housekeepers, which hashes passcodes server-side and ends open sessions when
+ * a passcode changes or an account is switched off.
+ */
 export function useHousekeepers(
   uid: string | null,
   buildingId: string | null,
@@ -13,6 +18,7 @@ export function useHousekeepers(
   const [loaded, setLoaded] = useState(false);
   /** Loading only while there is something to load; with no property selected there is nothing to wait for. */
   const loading = !!(uid && buildingId) && !loaded;
+  const migratedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!uid || !buildingId) return;
@@ -21,9 +27,21 @@ export function useHousekeepers(
     const unsub = onSnapshot(
       col,
       snap => {
-        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Housekeeper));
-        docs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setHousekeepers(docs);
+        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Housekeeper & { passcode?: string }));
+        // Records from older versions still hold a readable passcode: have the server strip it (once per building).
+        // Those housekeepers then need a new passcode, which the list shows.
+        if (docs.some(d => d.passcode !== undefined) && migratedRef.current !== `${uid}/${buildingId}`) {
+          migratedRef.current = `${uid}/${buildingId}`;
+          apiPost('housekeepers', { action: 'migrate', owner_uid: uid, building_id: buildingId })
+            .catch(err => console.warn('housekeeper passcode migration failed:', err));
+        }
+        const list: Housekeeper[] = docs.map(d => {
+          const rest: Housekeeper & { passcode?: string } = { ...d };
+          delete rest.passcode;
+          return rest;
+        });
+        list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setHousekeepers(list);
         setLoaded(true);
       },
       err => {
@@ -35,7 +53,10 @@ export function useHousekeepers(
     return unsub;
   }, [uid, buildingId]);
 
-  const buildingPath = uid && buildingId ? `users/${uid}/buildings/${buildingId}` : null;
+  const call = useCallback((body: Record<string, unknown>) => {
+    if (!uid || !buildingId) return Promise.reject(new Error('no_property'));
+    return apiPost<{ ok: boolean; id?: string }>('housekeepers', { ...body, owner_uid: uid, building_id: buildingId });
+  }, [uid, buildingId]);
 
   const addHousekeeper = useCallback(async (data: {
     name: string;
@@ -45,86 +66,29 @@ export function useHousekeepers(
     is_active?: boolean;
     buildingName?: string;
   }) => {
-    if (!buildingPath || !uid || !buildingId) return;
-    const cleanPhone = data.phone.replace(/\D/g, '');
-    const id = `maid_${cleanPhone || Date.now()}`;
-    const now = new Date().toISOString();
+    const res = await call({
+      action: 'upsert', name: data.name.trim(), phone: data.phone, passcode: data.passcode.trim(),
+      notes: data.notes?.trim() || '', is_active: data.is_active !== false, building_name: data.buildingName || '',
+    });
+    return res.id;
+  }, [call]);
 
-    const newMaid: Housekeeper = {
-      id,
-      name: data.name.trim(),
-      phone: cleanPhone,
-      passcode: data.passcode.trim(),
-      status: data.is_active !== false ? 'active' : 'off',
-      is_active: data.is_active !== false,
-      notes: data.notes?.trim() || '',
-      created_at: now,
-      updated_at: now,
-    };
-
-    // 1. Save in building's housekeepers subcollection
-    await setDoc(doc(db, buildingPath, 'housekeepers', id), newMaid);
-
-    // 2. Save in root housekeepers_auth mapping for simple Phone + Passcode login
-    if (cleanPhone) {
-      await setDoc(doc(db, 'housekeepers_auth', cleanPhone), {
-        owner_uid: uid,
-        building_id: buildingId,
-        building_name: data.buildingName || '',
-        maid_id: id,
-        name: data.name.trim(),
-        phone: cleanPhone,
-        passcode: data.passcode.trim(),
-        status: data.is_active !== false ? 'active' : 'off',
-        updated_at: now,
-      });
-    }
-
-    return newMaid;
-  }, [buildingPath, uid, buildingId]);
-
+  /** `passcode` empty or absent keeps the current one. */
   const updateHousekeeper = useCallback(async (
     maidId: string,
-    updates: Partial<Housekeeper>,
+    updates: { name: string; phone: string; passcode?: string; notes?: string; is_active?: boolean },
     buildingName?: string
   ) => {
-    if (!buildingPath || !uid || !buildingId) return;
-    const now = new Date().toISOString();
-    const finalUpdates: Record<string, unknown> = {
-      ...updates,
-      updated_at: now,
-    };
-    if (updates.is_active !== undefined) {
-      finalUpdates.status = updates.is_active ? 'active' : 'off';
-    }
-    await updateDoc(doc(db, buildingPath, 'housekeepers', maidId), finalUpdates);
+    await call({
+      action: 'upsert', maid_id: maidId, name: updates.name.trim(), phone: updates.phone,
+      passcode: updates.passcode?.trim() || '', notes: updates.notes?.trim() || '',
+      is_active: updates.is_active !== false, building_name: buildingName || '',
+    });
+  }, [call]);
 
-    const cleanPhone = (updates.phone || '').replace(/\D/g, '');
-    if (cleanPhone && uid && buildingId) {
-      await setDoc(doc(db, 'housekeepers_auth', cleanPhone), {
-        owner_uid: uid,
-        building_id: buildingId,
-        building_name: buildingName || '',
-        maid_id: maidId,
-        ...(updates.name && { name: updates.name }),
-        phone: cleanPhone,
-        ...(updates.passcode && { passcode: updates.passcode }),
-        status: updates.is_active !== false ? 'active' : 'off',
-        updated_at: now,
-      }, { merge: true });
-    }
-  }, [buildingPath, uid, buildingId]);
-
-  const deleteHousekeeper = useCallback(async (maidId: string, phone?: string) => {
-    if (!buildingPath) return;
-    await deleteDoc(doc(db, buildingPath, 'housekeepers', maidId));
-    if (phone) {
-      const cleanPhone = phone.replace(/\D/g, '');
-      if (cleanPhone) {
-        await deleteDoc(doc(db, 'housekeepers_auth', cleanPhone));
-      }
-    }
-  }, [buildingPath]);
+  const deleteHousekeeper = useCallback(async (maidId: string) => {
+    await call({ action: 'delete', maid_id: maidId });
+  }, [call]);
 
   return {
     housekeepers,
@@ -135,8 +99,16 @@ export function useHousekeepers(
   };
 }
 
+const LOGIN_ERRORS: Record<string, string> = {
+  invalid_credentials: 'เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง',
+  passcode_reset_required: 'ระบบเปลี่ยนวิธีเก็บรหัสผ่านแล้ว กรุณาขอรหัสใหม่จากเจ้าของหอพัก',
+  account_disabled: 'บัญชีแม่บ้านนี้ถูกปิดใช้งานชั่วคราว',
+  too_many_attempts: 'ลองรหัสผิดหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่',
+};
+
 /**
- * Authenticate housekeeper using Phone + Passcode (Login page helper)
+ * Housekeeper sign-in (login page). The server checks the passcode and returns a Firebase custom token limited to
+ * one building; Firestore rules then allow only that building's housekeeping data.
  */
 export async function authenticateHousekeeper(phone: string, passcode: string): Promise<HousekeeperSession> {
   const cleanPhone = phone.replace(/\D/g, '');
@@ -144,30 +116,28 @@ export async function authenticateHousekeeper(phone: string, passcode: string): 
     throw new Error('กรุณากรอกเบอร์โทรศัพท์และรหัสผ่าน');
   }
 
-  const snap = await getDoc(doc(db, 'housekeepers_auth', cleanPhone));
-  if (!snap.exists()) {
-    throw new Error('ไม่พบข้อมูลเบอร์โทรศัพท์นี้ในระบบแม่บ้าน กรุณาติดต่อเจ้าของหอพัก');
+  const res = await fetch('/api/housekeepers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'login', phone: cleanPhone, passcode: passcode.trim() }),
+  });
+  const data = await res.json().catch(() => ({})) as { error?: string; token?: string; session?: HousekeeperSession };
+  if (!res.ok || !data.token || !data.session) {
+    throw new Error(LOGIN_ERRORS[data.error ?? ''] ?? 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่');
   }
 
-  const data = snap.data();
-  if (data.passcode !== passcode.trim()) {
-    throw new Error('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบรหัสผ่านที่ได้รับจากเจ้าของหอพัก');
-  }
+  await signInWithCustomToken(auth, data.token);
+  localStorage.setItem('horcare_maid_session', JSON.stringify(data.session));
+  return data.session;
+}
 
-  if (data.status === 'off') {
-    throw new Error('บัญชีแม่บ้านนี้ถูกปิดใช้งานชั่วคราว');
-  }
+/** End a housekeeper session (also signs the custom-token user out of Firebase). */
+export async function signOutHousekeeper() {
+  localStorage.removeItem('horcare_maid_session');
+  if (auth.currentUser && isHousekeeperUid(auth.currentUser.uid)) await signOut(auth);
+}
 
-  const session: HousekeeperSession = {
-    owner_uid: data.owner_uid,
-    building_id: data.building_id,
-    building_name: data.building_name || 'หอพัก',
-    maid_id: data.maid_id,
-    name: data.name,
-    maid_name: data.name,
-    phone: cleanPhone,
-  };
-
-  localStorage.setItem('horcare_maid_session', JSON.stringify(session));
-  return session;
+/** Housekeepers sign in as `hk_…` users (see api/_housekeepers.ts); they are never owners or staff. */
+export function isHousekeeperUid(uid: string | null | undefined): boolean {
+  return !!uid && uid.startsWith('hk_');
 }

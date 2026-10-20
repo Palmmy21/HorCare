@@ -14,6 +14,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import type { UserProfile, Building, DormConfig, InitialBuildingConfig } from '../types';
+import { isHousekeeperUid } from './useHousekeepers';
 
 
 export function useAuth() {
@@ -29,7 +30,10 @@ export function useAuth() {
     useEffect(() => {
         let profileUnsubscribe: (() => void) | null = null;
 
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        const unsubscribe = onAuthStateChanged(auth, async (rawUser) => {
+            // A housekeeper's sign-in (custom token, `hk_…`) is not an owner account: no profile is created or read
+            // for it, and the app runs it as a housekeeper session (App.tsx), never as an owner or staff member.
+            const firebaseUser = rawUser && isHousekeeperUid(rawUser.uid) ? null : rawUser;
             setUser(firebaseUser);
             setEmailVerified(firebaseUser?.emailVerified ?? false);
             // Always unsubscribe old profile listener first to prevent leaks

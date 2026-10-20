@@ -3,6 +3,7 @@ import { db, admin } from './_firebase.js';
 import { buildFineFlex, linePush } from './_line.js';
 import { loadPayAccount, paymentQrMessages } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
+import { portalLinkFor } from './_portal-link.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { Fine } from '../src/types/index.js';
@@ -79,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const portalUrl = appUrl
-            ? `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${fine.room_id}`
+            ? `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: fine.room_id }))}`
             : undefined;
 
         const messages: object[] = [buildFineFlex(fine as Fine, dormName, { portalUrl })];

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   X, Copy, Check, Share2, Send, QrCode,
   ShieldCheck, Clock, FileText, Smartphone,
@@ -6,6 +6,7 @@ import {
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'react-hot-toast';
 import type { SignedContractData, Room } from '../../types';
+import { fetchPortalUrl } from '../../utils/portalLinks';
 
 interface ShareContractModalProps {
   isOpen: boolean;
@@ -30,12 +31,19 @@ export default function ShareContractModal({
 }: ShareContractModalProps) {
   const [copied, setCopied] = useState(false);
   const [copiedMsg, setCopiedMsg] = useState(false);
+  // The room's portal link carries a secret only the server knows, so it is fetched when the modal opens.
+  const [signUrl, setSignUrl] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    fetchPortalUrl(uid, buildingId, room.id, { sign: true })
+      .then(url => { if (!cancelled) setSignUrl(url); })
+      .catch(() => { if (!cancelled) toast.error('ดึงลิงก์ลงนามไม่สำเร็จ กรุณาลองใหม่'); });
+    return () => { cancelled = true; };
+  }, [isOpen, uid, buildingId, room.id]);
 
   if (!isOpen) return null;
-
-  // Construct direct tenant signing portal URL
-  const origin = window.location.origin;
-  const signUrl = `${origin}/?uid=${encodeURIComponent(uid)}&bid=${encodeURIComponent(buildingId)}&rid=${encodeURIComponent(room.id)}&action=sign`;
 
   const isMarket = contract.contract_type === 'market_stall';
   const unitLabel = isMarket ? 'แผงค้า' : 'ห้อง';
@@ -44,6 +52,7 @@ export default function ShareContractModal({
   const shareMessage = `เรียน คุณ${contract.lessee_name || 'ผู้เช่า'}\n\nทางโครงการ ${dormName} ได้ออกร่าง ${contract.title || 'สัญญาเช่า'} (เลขที่: ${contract.contract_number})\nสำหรับ ${unitLabel} ${contract.unit_number}\n\nท่านสามารถตรวจสอบรายละเอียดข้อตกลงและลงนามสัญญาดิจิทัลออนไลน์ผ่านสมาร์ตโฟนได้ที่ลิงก์นี้:\n${signUrl}\n\nเมื่อลงนามเรียบร้อยแล้ว ระบบจะออกเอกสารฉบับสมบูรณ์พร้อมรหัสยืนยันอิเล็กทรอนิกส์ให้ทันที ขอบคุณครับ/ค่ะ 🙏`;
 
   const handleCopyLink = async () => {
+    if (!signUrl) return;
     try {
       await navigator.clipboard.writeText(signUrl);
       setCopied(true);
@@ -60,6 +69,7 @@ export default function ShareContractModal({
   };
 
   const handleCopyMessage = async () => {
+    if (!signUrl) return;
     try {
       await navigator.clipboard.writeText(shareMessage);
       setCopiedMsg(true);
@@ -75,6 +85,7 @@ export default function ShareContractModal({
   };
 
   const handleOpenLineShare = () => {
+    if (!signUrl) return;
     if (contract.status === 'draft' && onUpdateContractStatus) {
       onUpdateContractStatus('pending_lessee');
     }
@@ -83,6 +94,7 @@ export default function ShareContractModal({
   };
 
   const handleNativeShare = async () => {
+    if (!signUrl) return;
     if (navigator.share) {
       try {
         if (contract.status === 'draft' && onUpdateContractStatus) {

@@ -4,7 +4,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 
 import handler from './_market.js';
 import { honeypotTripped, rateLimit, verifyCaptcha } from './_abuse-guard.js';
-import { fakeReq, fakeRes, listPaths, resetFake, seed } from './_fake-firestore.js';
+import { fakeReq, fakeRes, listPaths, resetFake, seed, seedPortalLink } from './_fake-firestore.js';
 import { addDays, todayTh } from '../src/shared/market.js';
 
 const OWNER = 'owner-1';
@@ -78,9 +78,10 @@ describe('the public market forms', () => {
     });
 
     it('reading is looser than writing, and a closure request is limited too', async () => {
-        for (let i = 0; i < 20; i++) expect((await call({ action: 'closure_list', room_id: 's1' })).statusCode).toBe(200);
+        const portal = seedPortalLink(OWNER, BLD, 's1');
+        for (let i = 0; i < 20; i++) expect((await call({ action: 'closure_list', portal })).statusCode).toBe(200);
         let last = 200;
-        for (let i = 0; i < 11; i++) last = (await call({ action: 'closure_submit', room_id: 's1', from_date: d(1), to_date: d(1), reason: 'sick' })).statusCode;
+        for (let i = 0; i < 11; i++) last = (await call({ action: 'closure_submit', portal, from_date: d(1), to_date: d(1), reason: 'sick' })).statusCode;
         expect(last).toBe(429); // the 11th write within the hour (earlier ones were refused for other reasons, but all counted)
     });
 

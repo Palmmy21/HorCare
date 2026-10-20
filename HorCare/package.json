@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && tsc -p api/tsconfig.json && vite build",
+    "typecheck": "tsc -b && tsc -p api/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
+    "emulators": "npx --yes firebase-tools@15 emulators:start --only auth,firestore --project demo-horcare",
+    "test:rules": "npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-horcare \"npx vitest run api/_firestore-rules.emulator.test.ts\"",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -33,6 +36,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^9.39.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^24.10.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.5",

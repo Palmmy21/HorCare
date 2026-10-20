@@ -33,13 +33,14 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // Route: /portal            → TenantGateway (LIFF auto-identify → redirect to portal)
-// Route: ?uid=&bid=&rid=    → TenantPortalPage (direct portal link)
+// Route: ?p=<link>           → TenantPortalPage (the room's portal link, checked by /api/portal)
+//        ?uid=&bid=&rid=    → TenantPortalPage, which explains that old links no longer open a portal
 // Route: ?w=<link>           → StaffWorkPage (technician / housekeeper job, opened from LINE)
 // Route: ?walkin=1&uid=&bid= → WalkInPage (public form for walk-in market vendors)
 // Route: everything else    → Owner App
 const params = new URLSearchParams(window.location.search);
 const isTenantGateway = window.location.pathname === '/portal';
-const isTenantPortal = params.has('uid') && params.has('bid') && params.has('rid');
+const isTenantPortal = params.has('p') || (params.has('uid') && params.has('bid') && params.has('rid'));
 const isStaffWork = params.has('w');
 const isWalkIn = params.has('walkin') && params.has('uid') && params.has('bid');
 

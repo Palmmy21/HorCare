@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Megaphone, Pin } from 'lucide-react';
 import type { TenantAnnouncementView } from '../../shared/chatbot';
+import { portalPost } from './portalApi';
 
 interface Props {
   uid: string;
@@ -18,13 +19,8 @@ export default function TenantAnnouncementSection({ uid, buildingId, roomId, Lab
   useEffect(() => {
     if (!uid || !buildingId || !roomId) return;
     let cancelled = false;
-    fetch('/api/announcements', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'tenant_list', owner_uid: uid, building_id: buildingId, room_id: roomId }),
-    })
-      .then(r => (r.ok ? r.json() : null))
-      .then((data: { announcements?: TenantAnnouncementView[] } | null) => { if (!cancelled && data?.announcements) setItems(data.announcements); })
+    portalPost<{ announcements?: TenantAnnouncementView[] }>('announcements', { action: 'tenant_list', building_id: buildingId })
+      .then(data => { if (!cancelled && data.announcements) setItems(data.announcements); })
       .catch(() => { /* optional section */ });
     return () => { cancelled = true; };
   }, [uid, buildingId, roomId]);

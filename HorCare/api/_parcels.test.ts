@@ -8,7 +8,7 @@ import handler from './_parcels.js';
 import { AiError } from './_ai.js';
 import { parseParcelLabel } from './_parcel-ocr.js';
 import { decideChannels, renderMessage } from './_notify.js';
-import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed, seedPortalLink } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
 import { MAX_REMINDERS, canTransition, isDueForReminder, matchCarrier, matchLabelRoom, type Parcel } from '../src/shared/parcels.js';
 
@@ -186,7 +186,8 @@ describe('tenant_list (portal view)', () => {
     it('returns only that room\'s parcels with non-sensitive fields', async () => {
         await create(OWNER, { room_id: 'r101', tracking_number: 'SECRET1', recipient_name: 'Label Name', image_base64: 'AAAA', note: 'private' });
         await create(OWNER, { room_id: 'r102', tracking_number: 'OTHER' });
-        const res = await call(undefined, { action: 'tenant_list', room_id: 'r101' });
+        // the room comes from the link: asking for another room beside it changes nothing
+        const res = await call(undefined, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'r101'), room_id: 'r102' });
         expect(res.statusCode).toBe(200);
         const { parcels } = res.body as { parcels: Record<string, unknown>[] };
         expect(parcels).toHaveLength(1);
@@ -194,10 +195,11 @@ describe('tenant_list (portal view)', () => {
         expect(JSON.stringify(res.body)).not.toMatch(/SECRET1|Label Name|AAAA|private|OTHER/);
     });
 
-    it('validates input and unknown rooms', async () => {
-        expect((await call(undefined, { action: 'tenant_list', owner_uid: undefined, room_id: 'r101' })).statusCode).toBe(400);
-        expect((await call(undefined, { action: 'tenant_list' })).statusCode).toBe(400);
-        expect((await call(undefined, { action: 'tenant_list', room_id: 'ghost' })).statusCode).toBe(404);
+    it('needs a valid portal link: room ids alone, a wrong secret or a deleted room are refused', async () => {
+        const link = seedPortalLink(OWNER, BLD, 'r101');
+        expect((await call(undefined, { action: 'tenant_list', room_id: 'r101' })).statusCode).toBe(401);
+        expect((await call(undefined, { action: 'tenant_list', portal: link.replace(/~[^~]+$/, '~guess') })).statusCode).toBe(401);
+        expect((await call(undefined, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'ghost') })).statusCode).toBe(401);
     });
 });
 

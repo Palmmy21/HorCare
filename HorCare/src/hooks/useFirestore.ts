@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, writeBatch
+    collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, writeBatch, runTransaction
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logActivity, diffFields } from '../utils/auditLog';
@@ -14,6 +14,43 @@ import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, ge
 // the single most important change for supporting many dorms. Older months load
 // automatically when the user navigates to them (the window re-anchors).
 const BILLS_WINDOW_MONTHS = 6;
+
+/** Next month's bill recalculated from `bill`'s closing readings as its opening readings (its own closing readings unchanged). */
+export function nextBillPatch(
+    bill: MonthlyBill, nextMonthBill: MonthlyBill, room: Room, nextMonth: string, config: DormConfig, commonFees: CommonFee[],
+): Partial<MonthlyBill> {
+    const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+    const { electricityRate, waterConfig } = getEffectiveRates(room, config);
+
+    const calculation = calculateFullBill(
+        bill.curr_elec, // New prev for next month
+        nextMonthBill.curr_elec,
+        bill.curr_water, // New prev for next month
+        nextMonthBill.curr_water,
+        config,
+        effectiveRent,
+        room.tenant_count,
+        electricityRate,
+        waterConfig,
+        commonFees,
+        room.common_fee_overrides,
+        nextMonth
+    );
+
+    return {
+        prev_elec: bill.curr_elec,
+        prev_water: bill.curr_water,
+        elec_units: calculation.elec_units,
+        elec_bill: calculation.elec_bill,
+        water_units: calculation.water_units,
+        water_bill: calculation.water_bill,
+        water_flat_amount: calculation.water_flat_amount,
+        water_excess_units: calculation.water_excess_units,
+        water_excess_amount: calculation.water_excess_amount,
+        total_bill: calculation.total_bill,
+        updated_at: new Date().toISOString()
+    };
+}
 
 const DEFAULT_CONFIG: DormConfig = {
     building_type: 'dormitory',
@@ -443,8 +480,35 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
     // Bill operations
     const saveBill = useCallback(async (bill: MonthlyBill) => {
         if (!userPath) return bill;
-        const previous = bills.find(b => b.id === bill.id);
-        await setDoc(doc(db, userPath, 'bills', bill.id), bill);
+        const billRef = doc(db, userPath, 'bills', bill.id);
+        const nextMonth = getNextMonth(bill.month);
+        const nextMonthBill = bills.find(b => b.room_id === bill.room_id && b.month === nextMonth);
+        const nextRef = nextMonthBill ? doc(db, userPath, 'bills', nextMonthBill.id) : null;
+        const room = rooms.find(r => r.id === bill.room_id);
+
+        // One transaction for the bill, the room's meters and next month's opening readings, re-reading the lock
+        // flags from the server: a closed month is never changed, even from a screen that has not refreshed yet.
+        const previous = await runTransaction(db, async tx => {
+            const curSnap = await tx.get(billRef);
+            const nextSnap = nextRef ? await tx.get(nextRef) : null;
+            const cur = curSnap.exists() ? (curSnap.data() as MonthlyBill) : undefined;
+            if (cur?.is_locked) throw new Error('bill_locked');
+
+            // merge keeps what the meter screen does not own (payment, slip, reminder fields) and the creation time
+            tx.set(billRef, cur ? { ...bill, created_at: cur.created_at ?? bill.created_at } : bill, { merge: true });
+            tx.update(doc(db, userPath, 'rooms', bill.room_id), {
+                current_meter_elec: bill.curr_elec,
+                current_meter_water: bill.curr_water
+            });
+
+            // Next month's bill starts from these readings — unless that month is already closed: its total
+            // has gone out to the tenant and into the books, so it stays as issued.
+            const next = nextSnap?.exists() ? ({ ...nextSnap.data(), id: nextSnap.id } as MonthlyBill) : null;
+            if (next && !next.is_locked && room) {
+                tx.update(nextRef!, nextBillPatch(bill, next, room, nextMonth, config, commonFees));
+            }
+            return cur;
+        });
 
         // Meter readings: log only when a reading actually changed (e.g. "Room 305 Meter 1,245 → 1,285").
         if (!previous || previous.curr_elec !== bill.curr_elec || previous.curr_water !== bill.curr_water) {
@@ -456,58 +520,9 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             });
         }
 
-        // Also update room meters
-        await updateDoc(doc(db, userPath, 'rooms', bill.room_id), {
-            current_meter_elec: bill.curr_elec,
-            current_meter_water: bill.curr_water
-        });
-
-        // Check for next month's bill to update recursively
-        const nextMonth = getNextMonth(bill.month);
-        const nextMonthBill = bills.find(b => b.room_id === bill.room_id && b.month === nextMonth);
-
-        if (nextMonthBill) {
-            // Recalculate next month's bill with new previous readings
-            const room = rooms.find(r => r.id === bill.room_id);
-            if (room) {
-                const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
-                const { electricityRate, waterConfig } = getEffectiveRates(room, config);
-
-                const calculation = calculateFullBill(
-                    bill.curr_elec, // New prev for next month
-                    nextMonthBill.curr_elec,
-                    bill.curr_water, // New prev for next month
-                    nextMonthBill.curr_water,
-                    config,
-                    effectiveRent,
-                    room.tenant_count,
-                    electricityRate,
-                    waterConfig,
-                    commonFees,
-                    room.common_fee_overrides,
-                    nextMonth
-                );
-
-                const updatedNextBill: Partial<MonthlyBill> = {
-                    prev_elec: bill.curr_elec,
-                    prev_water: bill.curr_water,
-                    elec_units: calculation.elec_units,
-                    elec_bill: calculation.elec_bill,
-                    water_units: calculation.water_units,
-                    water_bill: calculation.water_bill,
-                    water_flat_amount: calculation.water_flat_amount,
-                    water_excess_units: calculation.water_excess_units,
-                    water_excess_amount: calculation.water_excess_amount,
-                    total_bill: calculation.total_bill,
-                    updated_at: new Date().toISOString()
-                };
-
-                await updateDoc(doc(db, userPath, 'bills', nextMonthBill.id), updatedNextBill);
-            }
-        }
-
         return bill;
     }, [userPath, bills, rooms, config, commonFees]);
+
 
     const getBillForRoom = useCallback((roomId: string, month: string): MonthlyBill | undefined => {
         return bills.find(b => b.room_id === roomId && b.month === month);

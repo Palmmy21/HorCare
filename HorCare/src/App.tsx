@@ -5,6 +5,9 @@ import {
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase/config';
+import { isHousekeeperUid, signOutHousekeeper } from './hooks/useHousekeepers';
 import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
 import { useMembership } from './hooks/useMembership';
@@ -180,10 +183,22 @@ function App() {
   });
 
   const handleMaidLogout = () => {
-    localStorage.removeItem('horcare_maid_session');
+    void signOutHousekeeper();
     setMaidSession(null);
     setCurrentView('dashboard');
   };
+
+  // A housekeeper session is only as good as its Firebase sign-in (a custom token bound to the building). If that is
+  // gone — signed out elsewhere, or a session saved by an older version that had no sign-in — end the session.
+  useEffect(() => {
+    if (!maidSession) return;
+    return onAuthStateChanged(auth, u => {
+      if (!u || !isHousekeeperUid(u.uid)) {
+        localStorage.removeItem('horcare_maid_session');
+        setMaidSession(null);
+      }
+    });
+  }, [maidSession]);
 
   // Active building — persisted per user in localStorage
   const buildingStorageKey = user ? `horcare_active_building_${user.uid}` : null;
@@ -231,7 +246,8 @@ function App() {
   };
 
   // Buildings (multi-building support — Large plan)
-  const { buildings: allBuildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(effectiveUid, !isStaff);
+  // A housekeeper may read only their own building, never the owner's list of buildings.
+  const { buildings: allBuildings, loading: buildingsLoading, addBuilding, renameBuilding, deleteBuilding } = useBuildings(maidSession ? null : effectiveUid, !isStaff);
   // Staff only ever see the buildings they were given; the owner (and a member granted '*') sees them all.
   const buildings = useMemo(
     () => (membership && !membership.property_ids.includes('*') ? allBuildings.filter(b => membership.property_ids.includes(b.id)) : allBuildings),
@@ -377,8 +393,9 @@ function App() {
   }, [bills, rooms, dataLoading, user, deleteBill]);
 
   // Maintenance badge — real-time count of open/in-progress requests
+  // (housekeepers see only cleaning and meter recording; they may not read repairs or stock)
   const { requests: _maintenanceReqs } = useMaintenanceRequests(
-    effectiveUid,
+    maidSession ? null : effectiveUid,
     effectiveBuildingId,
   );
   const pendingMaintenanceCount = _maintenanceReqs.filter(
@@ -402,7 +419,7 @@ function App() {
   const { openCount: openSecurityAlerts } = useSecurityAlerts(maidSession ? null : (orgUid || null), buildings.map(b => b.id));
 
   // Stock badge — real-time count of items below minimum quantity
-  const { items: _stockItems } = useStockItems(effectiveUid, effectiveBuildingId);
+  const { items: _stockItems } = useStockItems(maidSession ? null : effectiveUid, effectiveBuildingId);
   const lowStockCount = _stockItems.filter(
     i => i.min_quantity > 0 && i.quantity <= i.min_quantity
   ).length;
@@ -1572,7 +1589,7 @@ function App() {
           maidSession ? (
             <MaidPortalView
               session={maidSession}
-              buildingName={activeBuilding?.name}
+              buildingName={activeBuilding?.name ?? maidSession.building_name}
               onGoToRecording={() => setCurrentView('recording')}
               onLogout={handleMaidLogout}
             />

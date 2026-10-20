@@ -1,8 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-  collection, doc, onSnapshot, query, where, addDoc, setDoc, updateDoc,
-} from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { portalCall, portalPost, isLegacyPortalUrl, portalLink, setPortalPin, PortalError } from './portalApi';
 import type { Room, DormConfig, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory, Fine, BillLanguage, CleaningRequest, CleaningServiceType } from '../../types';
 import {
   PORTAL_TRANSLATIONS,
@@ -88,116 +85,67 @@ function getStatusCfg(status: string, lang: BillLanguage) {
   };
 }
 
-// ── Maintenance hook (room-scoped) ────────────────────────────────────────────
-function useRoomMaintenance(uid: string, buildingId: string, roomId: string) {
-  const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, `users/${uid}/buildings/${buildingId}/maintenance`),
-      where('room_id', '==', roomId),
-    );
-    const unsub = onSnapshot(q,
-      snap => {
-        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as MaintenanceRequest));
-        docs.sort((a, b) => b.created_at.localeCompare(a.created_at));
-        setRequests(docs);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return unsub;
-  }, [uid, buildingId, roomId]);
-
-  return { requests, loading };
-}
-
-// ── Cleaning hook (room-scoped) ───────────────────────────────────────────────
-function useRoomCleaning(uid: string, buildingId: string, roomId: string) {
-  const [requests, setRequests] = useState<CleaningRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, `users/${uid}/buildings/${buildingId}/cleaning`),
-      where('room_id', '==', roomId),
-    );
-    const unsub = onSnapshot(q,
-      snap => {
-        const docs = snap.docs.map(d => ({ ...d.data(), id: d.id } as CleaningRequest));
-        docs.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-        setRequests(docs);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return unsub;
-  }, [uid, buildingId, roomId]);
-
-  return { requests, loading };
-}
-
-// ── Load tenant data ──────────────────────────────────────────────────────────
+// ── Load tenant data (through /api/portal — the link is the credential) ────────
 interface PortalData {
+  uid: string;
+  buildingId: string;
+  roomId: string;
   room: Room | null;
   config: DormConfig | null;
   profile: TenantProfile | null;
   bills: MonthlyBill[];
   fines: Fine[];
+  maintenance: MaintenanceRequest[];
+  cleaning: CleaningRequest[];
   buildingName: string;
 }
 
-function useTenantData(uid: string, buildingId: string, roomId: string) {
-  const [data, setData] = useState<PortalData>({ room: null, config: null, profile: null, bills: [], fines: [], buildingName: '' });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface PortalView {
+  owner_uid: string; building_id: string; room_id: string; building_name: string;
+  room: Room; config: DormConfig; profile: TenantProfile | null;
+  bills: MonthlyBill[]; fines: Fine[]; maintenance: MaintenanceRequest[]; cleaning: CleaningRequest[];
+}
 
-  const basePath = `users/${uid}/buildings/${buildingId}`;
+const EMPTY_PORTAL: PortalData = {
+  uid: '', buildingId: '', roomId: '', room: null, config: null, profile: null,
+  bills: [], fines: [], maintenance: [], cleaning: [], buildingName: '',
+};
+
+/** How often the portal re-reads while open (the tenant sees a slip being confirmed without reloading). */
+const PORTAL_REFRESH_MS = 60_000;
+
+function useTenantData(enabled: boolean) {
+  const [data, setData] = useState<PortalData>(EMPTY_PORTAL);
+  const [loading, setLoading] = useState(enabled);
+  /** null | 'invalid_link' | 'pin_required' | 'pin_incorrect' | 'too_many_requests' | other API/network errors */
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion(v => v + 1), []);
 
   useEffect(() => {
-    const done = { room: false, config: false, bills: false, profile: false };
-    const trySettle = () => { if (Object.values(done).every(Boolean)) setLoading(false); };
+    if (!enabled) return;
+    let cancelled = false;
+    const load = () => portalCall<PortalView>('view')
+      .then(v => {
+        if (cancelled) return;
+        setData({
+          uid: v.owner_uid, buildingId: v.building_id, roomId: v.room_id, buildingName: v.building_name,
+          room: v.room, config: v.config, profile: v.profile,
+          bills: [...v.bills].sort((a, b) => b.month.localeCompare(a.month)),
+          fines: [...v.fines].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
+          maintenance: [...v.maintenance].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
+          cleaning: [...v.cleaning].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')),
+        });
+        setError(null);
+      })
+      .catch(e => { if (!cancelled) setError(e instanceof PortalError ? e.code : 'network_error'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    void load();
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, PORTAL_REFRESH_MS);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [enabled, version]);
 
-    const u1 = onSnapshot(doc(db, basePath, 'rooms', roomId),
-      s => { done.room = true; setData(d => ({ ...d, room: s.exists() ? { ...s.data(), id: s.id } as Room : null })); trySettle(); },
-      () => { done.room = true; setError('room_error'); trySettle(); });
-
-    const u2 = onSnapshot(doc(db, basePath, 'data', 'config'),
-      s => { done.config = true; setData(d => ({ ...d, config: s.exists() ? s.data() as DormConfig : null })); trySettle(); },
-      () => { done.config = true; trySettle(); });
-
-    const u3 = onSnapshot(doc(db, basePath, 'tenants', roomId),
-      s => { done.profile = true; setData(d => ({ ...d, profile: s.exists() ? s.data() as TenantProfile : null })); trySettle(); },
-      () => { done.profile = true; trySettle(); });
-
-    const u4 = onSnapshot(
-      query(collection(db, basePath, 'bills'), where('room_id', '==', roomId)),
-      s => {
-        const all = s.docs.map(b => ({ ...b.data(), id: b.id } as MonthlyBill));
-        all.sort((a, b) => b.month.localeCompare(a.month));
-        done.bills = true;
-        setData(d => ({ ...d, bills: all }));
-        trySettle();
-      },
-      () => { done.bills = true; trySettle(); });
-
-    const u5 = onSnapshot(doc(db, `users/${uid}/buildings`, buildingId),
-      s => { if (s.exists()) setData(d => ({ ...d, buildingName: s.data().name ?? '' })); });
-
-    const u6 = onSnapshot(
-      query(collection(db, basePath, 'fines'), where('room_id', '==', roomId)),
-      s => {
-        const allFines = s.docs.map(d => ({ ...d.data(), id: d.id } as Fine));
-        allFines.sort((a, b) => b.date.localeCompare(a.date));
-        setData(d => ({ ...d, fines: allFines }));
-      }
-    );
-
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
-  }, [uid, buildingId, roomId, basePath]);
-
-  return { data, loading, error };
+  return { data, loading, error, refresh };
 }
 
 // ── Language Selector Component ───────────────────────────────────────────────
@@ -343,9 +291,9 @@ function PaymentStatus({ status, lang }: { status?: string; lang: BillLanguage }
 
 // ── Slip Uploader ─────────────────────────────────────────────────────────────
 function SlipUploader({
-  uid, buildingId, roomId, itemId, itemType, lang,
+  itemId, itemType, lang, onUploaded,
 }: {
-  uid: string; buildingId: string; roomId: string; itemId: string; itemType: 'bill' | 'fine'; lang: BillLanguage;
+  itemId: string; itemType: 'bill' | 'fine'; lang: BillLanguage; onUploaded: () => void;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [loading, setLoading] = useState(false);
@@ -358,15 +306,9 @@ function SlipUploader({
     setLoading(true);
     try {
       const base64 = await compressImageToBase64(file);
-      const res = await fetch('/api/upload-slip?route=upload-slip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, buildingId, roomId, itemId, itemType, base64 })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-
+      const data = await portalPost<{ autoVerified?: boolean }>('upload-slip', { itemId, itemType, base64 });
       toast.success(data.autoVerified ? t.slip_success_auto : t.slip_success_wait);
+      onUploaded();
     } catch (errRaw) {
         const err = errorInfo(errRaw);
       toast.error(`${t.slip_fail}: ${err.message}`);
@@ -400,10 +342,10 @@ function SlipUploader({
 }
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
-function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
+function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
   bill: MonthlyBill;
   defaultOpen: boolean; payTo: TenantAccount | null;
-  portalIds: { uid: string, buildingId: string, roomId: string };
+  onChanged: () => void;
   lang: BillLanguage;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
@@ -506,10 +448,7 @@ function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
           {isUnpaid && payTo && (
             <div style={{ marginTop: '1rem' }}>
               <BankQrCard account={payTo} amount={bill.total_bill} title={t.scan_qr} formatAmount={fmtCurrency} />
-              <SlipUploader
-                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId}
-                itemId={bill.id} itemType="bill" lang={lang}
-              />
+              <SlipUploader itemId={bill.id} itemType="bill" lang={lang} onUploaded={onChanged} />
             </div>
           )}
 
@@ -538,7 +477,7 @@ function BillCard({ bill, defaultOpen, payTo, portalIds, lang }: {
 }
 
 // ── Fine Card ─────────────────────────────────────────────────────────────────
-function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantAccount | null; portalIds: { uid: string, buildingId: string, roomId: string }; lang: BillLanguage }) {
+function FineCard({ fine, payTo, onChanged, lang }: { fine: Fine; payTo: TenantAccount | null; onChanged: () => void; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [open, setOpen] = useState(fine.status !== 'paid');
   const isUnpaid = !fine.status || fine.status === 'unpaid';
@@ -592,10 +531,7 @@ function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantA
           {isUnpaid && payTo && (
             <div style={{ marginTop: '1rem' }}>
               <BankQrCard account={payTo} amount={fine.amount} title={t.scan_qr_fine} formatAmount={fmtCurrency} />
-              <SlipUploader
-                uid={portalIds.uid} buildingId={portalIds.buildingId} roomId={portalIds.roomId}
-                itemId={fine.id} itemType="fine" lang={lang}
-              />
+              <SlipUploader itemId={fine.id} itemType="fine" lang={lang} onUploaded={onChanged} />
             </div>
           )}
 
@@ -624,8 +560,8 @@ function FineCard({ fine, payTo, portalIds, lang }: { fine: Fine; payTo: TenantA
 }
 
 // ── Tenant Profile Section ────────────────────────────────────────────────────
-function TenantProfileSection({ uid, buildingId, roomId, profile, lang }: {
-  uid: string; buildingId: string; roomId: string; profile: TenantProfile | null; lang: BillLanguage;
+function TenantProfileSection({ profile, lang, onSaved }: {
+  profile: TenantProfile | null; lang: BillLanguage; onSaved: () => void;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [editing, setEditing] = useState(false);
@@ -653,9 +589,7 @@ function TenantProfileSection({ uid, buildingId, roomId, profile, lang }: {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const ref = doc(db, `users/${uid}/buildings/${buildingId}/tenants`, roomId);
-      const now = new Date().toISOString();
-      const payload = {
+      await portalCall('profile_update', {
         full_name: form.full_name.trim(),
         nickname: form.nickname.trim(),
         phone: form.phone.trim(),
@@ -663,21 +597,10 @@ function TenantProfileSection({ uid, buildingId, roomId, profile, lang }: {
         emergency_name: form.emergency_name.trim(),
         emergency_phone: form.emergency_phone.trim(),
         emergency_relation: form.emergency_relation.trim(),
-        updated_at: now,
-      };
-      if (profile) {
-        await updateDoc(ref, payload);
-      } else {
-        await setDoc(ref, {
-          ...payload,
-          id: roomId,
-          room_id: roomId,
-          building_id: buildingId,
-          created_at: now,
-        });
-      }
+      });
       toast.success(t.profile_saved_toast);
       setEditing(false);
+      onSaved();
     } catch {
       toast.error(t.profile_error_toast);
     } finally {
@@ -867,12 +790,10 @@ function TenantProfileSection({ uid, buildingId, roomId, profile, lang }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function TenantPortalPage() {
   const params = new URLSearchParams(window.location.search);
-  const uid = params.get('uid') ?? '';
-  const buildingId = params.get('bid') ?? '';
-  const roomId = params.get('rid') ?? '';
+  const hasLink = !!portalLink();
 
-  const { data, loading, error } = useTenantData(uid, buildingId, roomId);
-  const { room, config, profile, bills, buildingName } = data;
+  const { data, loading, error, refresh } = useTenantData(hasLink);
+  const { uid, buildingId, roomId, room, config, profile, bills, buildingName } = data;
 
   // Language state management
   // The language the visitor chose (link parameter or saved choice). Until they choose, the room's own preference or the dorm default applies.
@@ -894,8 +815,6 @@ export default function TenantPortalPage() {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
 
   const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState(false);
-  const [pinUnlocked, setPinUnlocked] = useState(false);
 
   const currentMonth = getCurrentMonth();
   const currentBill = bills.find(b => b.month === currentMonth);
@@ -904,11 +823,11 @@ export default function TenantPortalPage() {
   const paidFines = data.fines.filter(f => f.status === 'paid');
 
   // Where the QR pays: the property's default active account (the list arrives default-first).
-  const tenantAccounts = useTenantBankAccounts(uid, buildingId, roomId);
+  const tenantAccounts = useTenantBankAccounts(buildingId);
   const payTo = tenantAccounts[0] ?? null;
 
-  // ── Invalid link ──
-  if (!uid || !buildingId || !roomId) {
+  // ── Invalid link: none, an old ?uid=&bid=&rid= link (no longer accepted), or one that was reset ──
+  if (!hasLink || isLegacyPortalUrl() || error === 'invalid_link') {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#F8FAFC', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
@@ -940,7 +859,8 @@ export default function TenantPortalPage() {
   }
 
   // ── Error ──
-  if (error || !room) {
+  const pinGate = error === 'pin_required' || error === 'pin_incorrect';
+  if (!pinGate && (error || !room)) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', color: '#0F172A', fontFamily: 'var(--font-sans)', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
@@ -956,17 +876,13 @@ export default function TenantPortalPage() {
     );
   }
 
-  // ── PIN Gate ──
-  const requiredPin = config?.portal_pin;
-  if (requiredPin && !pinUnlocked) {
+  // ── PIN Gate (the PIN is checked by the server on every call; it is never sent to the browser) ──
+  if (pinGate || !room) {
+    const pinError = error === 'pin_incorrect';
     const handlePinSubmit = () => {
-      if (pinInput === requiredPin) {
-        setPinUnlocked(true);
-        setPinError(false);
-      } else {
-        setPinError(true);
-        setPinInput('');
-      }
+      setPortalPin(pinInput);
+      setPinInput('');
+      refresh();
     };
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', fontFamily: 'var(--font-sans)', position: 'relative' }}>
@@ -992,7 +908,7 @@ export default function TenantPortalPage() {
             maxLength={4}
             placeholder="• • • •"
             value={pinInput}
-            onChange={e => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setPinError(false); }}
+            onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
             onKeyDown={e => e.key === 'Enter' && handlePinSubmit()}
             style={{
               width: '100%', textAlign: 'center', fontSize: '2rem', letterSpacing: '0.5em',
@@ -1166,10 +1082,8 @@ export default function TenantPortalPage() {
                 profile={profile}
                 room={room}
                 config={config}
-                uid={uid}
-                buildingId={buildingId}
-                roomId={roomId}
                 lang={lang}
+                onSigned={refresh}
               />
             </section>
           )}
@@ -1177,14 +1091,14 @@ export default function TenantPortalPage() {
           {/* Personal info */}
           <section>
             <SectionLabel icon={<User size={14} />} label={t.personal_info} />
-            <TenantProfileSection uid={uid} buildingId={buildingId} roomId={roomId} profile={profile} lang={lang} />
+            <TenantProfileSection profile={profile} lang={lang} onSaved={refresh} />
           </section>
 
           {/* Current month */}
           <section>
             <SectionLabel icon={<Receipt size={14} />} label={`${t.monthly_bill} ${formatPortalMonth(currentMonth, lang)}`} />
             {currentBill ? (
-              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} onChanged={refresh} lang={lang} />
             ) : (
               <div style={{
                 background: 'var(--color-white)', borderRadius: '16px', padding: '1.5rem',
@@ -1213,7 +1127,7 @@ export default function TenantPortalPage() {
               <SectionLabel icon={<AlertTriangle size={14} />} label={`${t.unpaid_fines} (${pendingFines.length})`} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {pendingFines.map(f => (
-                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <FineCard key={f.id} fine={f} payTo={payTo} onChanged={refresh} lang={lang} />
                 ))}
               </div>
             </section>
@@ -1225,10 +1139,10 @@ export default function TenantPortalPage() {
               <SectionLabel icon={<CalendarDays size={14} />} label={t.history} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {paidFines.map(f => (
-                  <FineCard key={f.id} fine={f} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <FineCard key={f.id} fine={f} payTo={payTo} onChanged={refresh} lang={lang} />
                 ))}
                 {prevBills.map(b => (
-                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} portalIds={{uid, buildingId, roomId}} lang={lang} />
+                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} onChanged={refresh} lang={lang} />
                 ))}
               </div>
             </section>
@@ -1261,10 +1175,8 @@ export default function TenantPortalPage() {
           <section>
             <SectionLabel icon={<Wrench size={14} />} label={t.maintenance} />
             <MaintenanceSection
-              uid={uid}
-              buildingId={buildingId}
-              roomId={roomId}
-              roomNumber={room.room_number}
+              requests={data.maintenance}
+              onChanged={refresh}
               lang={lang}
             />
           </section>
@@ -1273,11 +1185,8 @@ export default function TenantPortalPage() {
           <section>
             <SectionLabel icon={<Sparkles size={14} />} label={t.cleaning} />
             <CleaningSection
-              uid={uid}
-              buildingId={buildingId}
-              roomId={roomId}
-              roomNumber={room.room_number}
-              tenantName={profile?.full_name || ''}
+              requests={data.cleaning}
+              onChanged={refresh}
               lang={lang}
             />
           </section>
@@ -1307,11 +1216,11 @@ export default function TenantPortalPage() {
 }
 
 // ── Maintenance section (shown in tenant portal) ──────────────────────────────
-function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
-  uid: string; buildingId: string; roomId: string; roomNumber: string; lang: BillLanguage;
+function MaintenanceSection({ requests, onChanged, lang }: {
+  requests: MaintenanceRequest[]; onChanged: () => void; lang: BillLanguage;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
-  const { requests, loading } = useRoomMaintenance(uid, buildingId, roomId);
+  const loading = false;
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -1339,35 +1248,14 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
     if (!form.description.trim()) return;
     setSubmitting(true);
     try {
-      const catLabel = translateCategory(form.category, 'th');
-      await addDoc(collection(db, `users/${uid}/buildings/${buildingId}/maintenance`), {
-        room_id: roomId,
-        room_number: roomNumber,
+      // the server files it under this link's room and notifies the owner
+      await portalCall('maintenance_create', {
         category: form.category,
         description: form.description.trim(),
         urgency: form.urgency,
-        status: 'open',
-        photo_url: photo ?? null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        photo: photo ?? null,
       });
-
-      // Notification to admin
-      try {
-        await fetch('/api/notify-push?route=notify-push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid,
-            buildingId,
-            title: `แจ้งซ่อมใหม่ ห้อง ${roomNumber}`,
-            body: `[${catLabel}${form.urgency === 'urgent' ? ' (ด่วน)' : ''}] ${form.description.trim().slice(0, 80)}`,
-            data: { type: 'maintenance', roomId, roomNumber },
-          }),
-        });
-      } catch {
-        // Push notification error shouldn't block repair submission
-      }
+      onChanged();
 
       setForm({ category: 'other', description: '', urgency: 'normal' });
       setPhoto(null);
@@ -1658,11 +1546,11 @@ function MaintenanceSection({ uid, buildingId, roomId, roomNumber, lang }: {
 }
 
 // ── Cleaning section (shown in tenant portal) ────────────────────────────────
-function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang }: {
-  uid: string; buildingId: string; roomId: string; roomNumber: string; tenantName?: string; lang: BillLanguage;
+function CleaningSection({ requests, onChanged, lang }: {
+  requests: CleaningRequest[]; onChanged: () => void; lang: BillLanguage;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
-  const { requests, loading } = useRoomCleaning(uid, buildingId, roomId);
+  const loading = false;
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -1706,38 +1594,15 @@ function CleaningSection({ uid, buildingId, roomId, roomNumber, tenantName, lang
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const now = new Date().toISOString();
-      await addDoc(collection(db, `users/${uid}/buildings/${buildingId}/cleaning`), {
-        room_id: roomId,
-        room_number: roomNumber,
-        tenant_name: tenantName || '',
+      // the server files it under this link's room and notifies the owner
+      await portalCall('cleaning_create', {
         service_type: form.service_type,
         preferred_date: form.preferred_date || null,
         preferred_time_slot: form.preferred_time_slot,
         description: form.description.trim(),
-        status: 'pending',
-        image_url: photo ?? null,
-        has_photo: !!photo,
-        created_at: now,
-        updated_at: now,
+        photo: photo ?? null,
       });
-
-      // Notification to admin
-      try {
-        await fetch('/api/notify-push?route=notify-push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            uid,
-            buildingId,
-            title: `แจ้งทำความสะอาดใหม่ ห้อง ${roomNumber}`,
-            body: `${form.service_type} - ${form.description.trim().slice(0, 80) || 'ไม่มีบันทึกเพิ่มเติม'}`,
-            data: { type: 'cleaning', roomId, roomNumber },
-          }),
-        });
-      } catch {
-        /* push error ignored */
-      }
+      onChanged();
 
       setForm({ service_type: 'general', preferred_date: '', preferred_time_slot: 'เช้า (09:00 - 12:00)', description: '' });
       setPhoto(null);

@@ -11,6 +11,7 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { linePush, staffLineToken } from './_line.js';
+import { portalUrlFor } from './_portal-link.js';
 
 export type NotificationEvent =
     | 'parcel.received'
@@ -152,13 +153,7 @@ export function renderMessage(
     }
 }
 
-export function appBaseUrl(): string {
-    return (process.env.PUBLIC_APP_URL || 'https://hor-care.vercel.app').replace(/\/$/, '');
-}
-
-export function portalUrlFor(ownerUid: string, buildingId: string, roomId: string): string {
-    return `${appBaseUrl()}/?uid=${encodeURIComponent(ownerUid)}&bid=${encodeURIComponent(buildingId)}&rid=${encodeURIComponent(roomId)}`;
-}
+export { appBaseUrl } from './_app-url.js';
 
 export async function notify(input: NotifyInput): Promise<NotifyResult> {
     const channels: Record<Channel, ChannelResult> = { line: 'skipped', in_app: 'skipped' };
@@ -177,7 +172,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
             const room = roomSnap.data() as { line_user_id?: string; room_number?: string } | undefined;
             recipient = room;
             data = { room_number: room?.room_number, ...input.data };
-            url = url || portalUrlFor(input.ownerUid, input.buildingId, input.roomId);
+            url = url || await portalUrlFor(input.ownerUid, input.buildingId, input.roomId);
         }
         const msg = renderMessage(input.event, data, dormName, url);
 

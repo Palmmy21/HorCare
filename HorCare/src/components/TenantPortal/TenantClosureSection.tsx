@@ -6,6 +6,7 @@ import {
   CLOSURE_REASONS, CLOSURE_REASON_LABELS_TH, MAX_CLOSURE_DAYS, addDays, todayTh,
   type ClosureReason, type ShopClosure,
 } from '../../shared/market';
+import { portalPost } from './portalApi';
 
 interface Props {
   uid: string;
@@ -23,12 +24,8 @@ const ERR: Record<string, string> = {
 };
 const day = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
 
-async function post(body: Record<string, unknown>) {
-  const res = await fetch('/api/market', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await res.json().catch(() => ({})) as { error?: string; closures?: ShopClosure[] };
-  if (!res.ok) throw new Error(data.error ?? 'failed');
-  return data;
-}
+/** The stall is identified by the page's portal link, not by ids sent from here. */
+const post = (body: Record<string, unknown>) => portalPost<{ closures?: ShopClosure[] }>('market', body);
 
 /** Market stalls tell the market which days they will be closed. Shown only for market workspaces. */
 export default function TenantClosureSection({ uid, buildingId, roomId, Label }: Props) {

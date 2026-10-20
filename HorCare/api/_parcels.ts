@@ -7,6 +7,7 @@ import { notify } from './_notify.js';
 import { AiError, aiErrorHint } from './_ai.js';
 import { isPlusOrAbove } from './_meter-ocr.js';
 import { readParcelLabel } from './_parcel-ocr.js';
+import { resolvePortalLink } from './_portal-link.js';
 import {
     canTransition, isParcelStatus,
     type Parcel, type ParcelStatus, type TenantParcelView,
@@ -29,6 +30,8 @@ interface Body {
     /** Base64 JPEG (no data-URL header), already compressed by the client. */
     image_base64?: string;
     picked_up_by_name?: string;
+    /** tenant_list: the tenant's portal link */
+    portal?: unknown;
 }
 
 const MAX_IMAGE_CHARS = 450_000;
@@ -55,15 +58,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── Tenant portal: minimal, read-only view of one room's parcels ─────────────
     if (body.action === 'tenant_list') {
-        const ownerUid = body.owner_uid;
-        const roomId = body.room_id;
-        if (typeof ownerUid !== 'string' || typeof roomId !== 'string' || !ownerUid || !roomId) {
-            res.status(400).json({ error: 'invalid_input' });
-            return;
-        }
-        const room = await db.doc(`${base(ownerUid, buildingId)}/rooms/${roomId}`).get();
-        if (!room.exists) { res.status(404).json({ error: 'not_found' }); return; }
-        const snap = await db.collection(`${base(ownerUid, buildingId)}/parcels`).where('room_id', '==', roomId).get();
+        // the portal link proves which room this is; ids sent beside it are ignored
+        const portal = await resolvePortalLink(body.portal);
+        if (!portal) { res.status(401).json({ error: 'invalid_link' }); return; }
+        const snap = await db.collection(`${base(portal.ownerUid, portal.buildingId)}/parcels`).where('room_id', '==', portal.roomId).get();
         const parcels: TenantParcelView[] = snap.docs
             .map(d => d.data() as Parcel)
             .sort((a, b) => b.received_at.localeCompare(a.received_at))

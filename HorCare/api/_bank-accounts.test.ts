@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).firebaseMock);
 
 import handler from './_bank-accounts.js';
-import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed, seedPortalLink } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
 
 const OWNER = 'owner-1';
@@ -169,7 +169,7 @@ describe('update and default', () => {
 
 describe('tenant_list', () => {
     beforeEach(() => { seed(`users/${OWNER}/buildings/${BLD}/rooms/r1`, { id: 'r1' }); });
-    const list = (over: Record<string, unknown> = {}) => call(undefined, { action: 'tenant_list', room_id: 'r1', ...over });
+    const list = (over: Record<string, unknown> = {}) => call(undefined, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'r1'), ...over });
 
     it('returns only active accounts, default first, without login', async () => {
         await create(OWNER);
@@ -185,10 +185,10 @@ describe('tenant_list', () => {
         expect(Object.keys(res.body.accounts[0]).sort()).toEqual(['account_name', 'account_number', 'bank_code', 'bank_short', 'id', 'is_default', 'nickname', 'promptpay_id']);
     });
 
-    it('rejects unknown rooms and other properties', async () => {
-        expect((await list({ room_id: 'nope' })).statusCode).toBe(404);
-        expect((await list({ building_id: 'bld-B' })).statusCode).toBe(404);
-        expect((await list({ room_id: undefined })).statusCode).toBe(400);
+    it('needs the portal link of an existing room', async () => {
+        expect((await list({ portal: seedPortalLink(OWNER, BLD, 'nope') })).statusCode).toBe(401);
+        expect((await list({ portal: undefined, owner_uid: OWNER, room_id: 'r1' })).statusCode).toBe(401);
+        expect((await list({ portal: `${OWNER}~${BLD}~r1~wrong` })).statusCode).toBe(401);
     });
 });
 
@@ -201,7 +201,7 @@ describe('PromptPay id on an account', () => {
         const none = await create(OWNER, { bank_code: '002', account_number: '1111111111' });
         expect(none.body.account.promptpay_id).toBeNull();
         seed(`users/${OWNER}/buildings/${BLD}/rooms/r1`, { id: 'r1' });
-        const list = await call(undefined, { action: 'tenant_list', room_id: 'r1' });
+        const list = await call(undefined, { action: 'tenant_list', portal: seedPortalLink(OWNER, BLD, 'r1') });
         expect(list.body.accounts.map((a: any) => a.promptpay_id).sort()).toEqual(['0812345678', '1234567890123', null].sort());
     });
 

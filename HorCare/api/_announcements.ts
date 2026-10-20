@@ -3,7 +3,7 @@
  *
  * create   – publishes (and, if asked, pushes to every tenant linked to LINE in THIS property)
  * update   – edit, pin/unpin, archive
- * tenant_list – portal read: published, unexpired notices; no login, like parcels/bank-accounts
+ * tenant_list – portal read: published, unexpired notices; needs the tenant's portal link, like parcels/bank-accounts
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
@@ -11,6 +11,7 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { linePush, runPooled } from './_line.js';
+import { resolvePortalLink } from './_portal-link.js';
 import {
     announcementLineText, cleanAnnouncementInput, visibleAnnouncements,
     type Announcement, type TenantAnnouncementView,
@@ -32,6 +33,8 @@ interface Body {
     expires_at?: unknown;
     send_line?: unknown;
     status?: unknown;
+    /** tenant_list: the tenant's portal link */
+    portal?: unknown;
 }
 
 const colOf = (owner: string, bld: string) => `users/${owner}/buildings/${bld}/announcements`;
@@ -54,11 +57,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.action !== 'create' && body.action !== 'update' && body.action !== 'tenant_list') { res.status(400).json({ error: 'unknown_action' }); return; }
 
     if (body.action === 'tenant_list') {
-        const owner = body.owner_uid;
-        if (typeof owner !== 'string' || !owner || typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'invalid_input' }); return; }
-        const base = `users/${owner}/buildings/${buildingId}`;
-        if (!(await db.doc(`${base}/rooms/${body.room_id}`).get()).exists) { res.status(404).json({ error: 'not_found' }); return; }
-        const snap = await db.collection(colOf(owner, buildingId)).get();
+        // the portal link proves which property this is; ids sent beside it are ignored
+        const portal = await resolvePortalLink(body.portal);
+        if (!portal) { res.status(401).json({ error: 'invalid_link' }); return; }
+        const snap = await db.collection(colOf(portal.ownerUid, portal.buildingId)).get();
         res.status(200).json({ announcements: visibleAnnouncements(snap.docs.map(d => d.data() as Announcement)).slice(0, 20).map(toView) });
         return;
     }

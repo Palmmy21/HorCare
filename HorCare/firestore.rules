@@ -85,6 +85,61 @@ service cloud.firestore {
       return memberHasPermOn(ownerId, buildingId, perm) && licenseActive(ownerId);
     }
 
+    // An active member who was granted THIS property (or every property). Used for reading a property's
+    // everyday data; anything sensitive (tenant profiles, finance, messages …) needs its own permission.
+    function memberOn(ownerId, buildingId) {
+      return activeMember(ownerId)
+        && get(/databases/$(database)/documents/users/$(ownerId)/members/$(request.auth.uid)).data.property_ids.hasAny(['*', buildingId]);
+    }
+
+    // The owner changing their own data (same condition everywhere).
+    function ownerWrites(userId) {
+      return isOwner(userId) && isNotBanned() && licenseActive(userId);
+    }
+
+    // ── Housekeepers (แม่บ้าน) ────────────────────────────────────────────
+    // They sign in through /api/housekeepers, which checks the passcode server-side and issues a custom token with
+    // claims hk_owner / hk_building / hk_maid / hk_ver. The token counts only while that housekeeper record is active
+    // and its session_version is still hk_ver: changing the passcode or switching the account off ends every session.
+    function isHousekeeper(ownerId, buildingId) {
+      return isSignedIn()
+        && request.auth.token.get('hk_owner', '') == ownerId
+        && request.auth.token.get('hk_building', '') == buildingId
+        && request.auth.token.get('hk_maid', '') != ''
+        && exists(/databases/$(database)/documents/users/$(ownerId)/buildings/$(buildingId)/housekeepers/$(request.auth.token.hk_maid))
+        && get(/databases/$(database)/documents/users/$(ownerId)/buildings/$(buildingId)/housekeepers/$(request.auth.token.hk_maid)).data.get('is_active', true) != false
+        && get(/databases/$(database)/documents/users/$(ownerId)/buildings/$(buildingId)/housekeepers/$(request.auth.token.hk_maid)).data.get('session_version', 0) == request.auth.token.get('hk_ver', -1);
+    }
+
+    function housekeeperWrites(ownerId, buildingId) {
+      return isHousekeeper(ownerId, buildingId) && licenseActive(ownerId);
+    }
+
+    // ── Field-level limits for updates ───────────────────────────────────
+    function changesOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // A bill's readings and the amounts computed from them (meter recording).
+    function billMeterFields() {
+      return ['id', 'room_id', 'room_number', 'month', 'prev_elec', 'curr_elec', 'elec_units', 'elec_bill',
+              'prev_water', 'curr_water', 'water_units', 'water_bill', 'water_flat_amount', 'water_excess_units',
+              'water_excess_amount', 'common_fee', 'applied_common_fees', 'room_rent', 'total_bill', 'tenant_count',
+              'is_saved', 'is_notified', 'created_at', 'updated_at'];
+    }
+
+    // How a bill was paid (payment recording).
+    function billPaymentFields() {
+      return ['payment_status', 'payment_method', 'paid_at', 'paid_method', 'paid_amount', 'received_by',
+              'bank_account', 'bank_account_id', 'transaction_ref', 'verification_status', 'payment_note',
+              'payment_date', 'updated_at'];
+    }
+
+    // A closed month's bill: its amounts are what went to the tenant and into the books.
+    function billLocked() {
+      return resource.data.get('is_locked', false) == true;
+    }
+
     // Fields only the backend (or admin) should write — never the user directly (updates only)
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
@@ -116,37 +171,65 @@ service cloud.firestore {
 
       // ── Buildings ───────────────────────────────────────────────────────
       // read: any non-banned owner. write: also requires a non-expired license.
+      // Nothing below is public. Tenants reach their own room only through /api/portal (the portal link is checked
+      // server-side); housekeepers through a custom token limited to their building (isHousekeeper).
       match /buildings/{buildingId} {
-        // Owner: full access. Public: read building doc (tenant portal needs building name)
-        allow read: if isOwner(userId) && isNotBanned() || true;
+        // Any active member may list the organisation's buildings (names only — the app's building picker); a
+        // housekeeper may read their own building.
+        allow read: if (isOwner(userId) && isNotBanned()) || activeMember(userId) || isHousekeeper(userId, buildingId);
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId);
 
         // Staff may change a property's data only with the matching permission ON THAT PROPERTY (memberCan);
         // creating, renaming or deleting properties stays with the owner.
         match /rooms/{roomId} {
-          // Public read — tenant portal shows room number & rent
-          allow read: if isOwner(userId) && isNotBanned() || true;
-          allow create: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'room.create');
-          allow update: if (isOwner(userId) && isNotBanned() && licenseActive(userId))
-                        || memberCan(userId, buildingId, 'room.update') || memberCan(userId, buildingId, 'meter.record');
-          allow delete: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'room.delete');
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
+          allow create: if ownerWrites(userId) || memberCan(userId, buildingId, 'room.create');
+          // meter recording may only move the room's current readings
+          allow update: if ownerWrites(userId) || memberCan(userId, buildingId, 'room.update')
+                        || ((memberCan(userId, buildingId, 'meter.record') || housekeeperWrites(userId, buildingId))
+                            && changesOnly(['current_meter_elec', 'current_meter_water']));
+          allow delete: if ownerWrites(userId) || memberCan(userId, buildingId, 'room.delete');
         }
         match /bills/{billId} {
-          // Public read — tenant portal shows bills
-          allow read: if isOwner(userId) && isNotBanned() || true;
-          allow create, update: if (isOwner(userId) && isNotBanned() && licenseActive(userId))
-                        || memberCan(userId, buildingId, 'meter.record') || memberCan(userId, buildingId, 'payment.update') || memberCan(userId, buildingId, 'payment.create');
-          allow delete: if isOwner(userId) && isNotBanned() && licenseActive(userId);
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
+          // Meter recording opens the month's bill: readings and amounts only, not locked, no payment.
+          allow create: if ownerWrites(userId)
+                        || ((memberCan(userId, buildingId, 'meter.record') || housekeeperWrites(userId, buildingId))
+                            && request.resource.data.keys().hasOnly(billMeterFields().concat(['is_locked']))
+                            && request.resource.data.get('is_locked', false) == false);
+          allow update: if
+            // the owner — but a closed bill keeps its amounts: it can still take a payment, be reminded or be reopened
+            (ownerWrites(userId)
+              && (!billLocked() || changesOnly(billPaymentFields().concat(['is_locked', 'is_notified', 'last_reminded_at', 'reminder_count']))))
+            // meter recording: readings and the amounts computed from them, on an open bill only
+            || ((memberCan(userId, buildingId, 'meter.record') || housekeeperWrites(userId, buildingId))
+                && !billLocked() && changesOnly(billMeterFields()))
+            // payment.update may change how a bill was paid (including undoing it)
+            || (memberCan(userId, buildingId, 'payment.update') && changesOnly(billPaymentFields()))
+            // payment.create may only record a payment on a bill that is not paid yet
+            || (memberCan(userId, buildingId, 'payment.create') && changesOnly(billPaymentFields())
+                && resource.data.get('payment_status', 'unpaid') != 'paid')
+            // closing / reopening a month
+            || (memberCan(userId, buildingId, 'property.update') && changesOnly(['is_locked', 'updated_at']));
+          allow delete: if ownerWrites(userId) && !billLocked();
         }
         match /data/{docId} {
-          // Public read — tenant portal reads config (promptpay, rates)
-          allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'property.update');
+          // the property's settings (rates, bill layout) — needed by everyone who records meters or bills
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
+          allow write: if ownerWrites(userId) || memberCan(userId, buildingId, 'property.update');
         }
-        // Tenant profiles — read by owner OR public (tenant portal shows name/phone)
+        // Tenant profiles hold personal data (phone, ID-card number, emergency contact): tenant.read only.
         match /tenants/{roomId} {
-          allow read: if isOwner(userId) && isNotBanned() || true;
-          allow write: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'tenant.update');
+          allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'tenant.read');
+          allow write: if ownerWrites(userId) || memberCan(userId, buildingId, 'tenant.update');
+
+          // Tenancy history (move in/out, contract signed …). Entries are never edited; only the owner may remove one.
+          match /events/{eventId} {
+            allow read: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'tenant.read');
+            allow create: if (isOwner(userId) && isNotBanned() && licenseActive(userId)) || memberCan(userId, buildingId, 'tenant.update');
+            allow update: if false;
+            allow delete: if isOwner(userId) && isNotBanned();
+          }
         }
         // Slip images stored as base64 by the LINE webhook (Admin SDK bypasses rules).
         // Owner may read to view slips on the web; clients may not write.
@@ -156,42 +239,42 @@ service cloud.firestore {
         }
 
         // ── Maintenance requests (แจ้งซ่อม) ─────────────────────────────
-        // Tenants submit via public portal (no auth). Owner can read/update/delete.
+        // Tenants report through /api/portal (validated, filed under their own room); staff handle them here.
         match /maintenance/{reqId} {
-          // Owner: full access. Public: read (for tenant portal to show request status)
-          allow read: if isOwner(userId) && isNotBanned() || true;
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId);
           allow update, delete: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.update');
-
-          // Anyone (tenant portal — no sign-in) can create, with field validation
-          allow create: if
-            request.resource.data.keys().hasAll(['room_id','room_number','category','description','urgency','status','created_at']) &&
-            request.resource.data.status == 'open' &&
-            request.resource.data.urgency in ['urgent', 'normal'] &&
-            request.resource.data.category in ['electric','plumbing','appliance','door_window','bathroom','ac','furniture','other'] &&
-            request.resource.data.description is string &&
-            request.resource.data.description.size() > 0 &&
-            request.resource.data.description.size() <= 1000;
+          allow create: if false;
         }
 
         // ── Cleaning requests (งานทำความสะอาด/แม่บ้าน) ────────────────────
-        // Tenants submit via public portal (no auth). Owner/maid can read/update/delete.
+        // Tenants request through /api/portal. The owner and staff manage them; a housekeeper may only accept and
+        // complete jobs that are open or assigned to them.
         match /cleaning/{reqId} {
-          allow read: if true;
-          allow create: if true;
-          allow update: if true;
-          allow delete: if isOwner(userId) && isNotBanned();
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
+          allow create: if ownerWrites(userId) || memberCan(userId, buildingId, 'work_order.update') || memberCan(userId, buildingId, 'property.update');
+          allow update: if ownerWrites(userId) || memberCan(userId, buildingId, 'work_order.update') || memberCan(userId, buildingId, 'property.update')
+                        || (housekeeperWrites(userId, buildingId)
+                            && changesOnly(['status', 'accepted_at', 'assigned_maid_id', 'assigned_maid_name', 'assigned_maid_phone',
+                                            'completed_at', 'completed_by', 'completion_notes', 'completed_note', 'updated_at'])
+                            && request.resource.data.status in ['in_progress', 'completed']
+                            && resource.data.get('assigned_maid_id', request.auth.token.hk_maid) == request.auth.token.hk_maid
+                            && request.resource.data.get('assigned_maid_id', request.auth.token.hk_maid) == request.auth.token.hk_maid
+                            && request.resource.data.get('completed_by', 'maid') == 'maid');
+          allow delete: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
 
-        // ── Cleaning photos ──────────────────────────────────────────────
+        // ── Cleaning photos (older requests kept the photo here) ─────────
         match /cleaning_images/{reqId} {
-          allow read: if true;
-          allow write: if true;
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
+          allow write: if ownerWrites(userId) || memberCan(userId, buildingId, 'property.update');
         }
 
         // ── Housekeepers (แม่บ้าน) ───────────────────────────────────────
+        // Written only by /api/housekeepers (passcodes are hashed there and never stored on these records).
         match /housekeepers/{maidId} {
-          allow read: if true;
-          allow write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId)
+                      || (isHousekeeper(userId, buildingId) && request.auth.token.hk_maid == maidId);
+          allow write: if false;
         }
 
         // ── Operations collections (the owner, or staff allowed to manage THIS property) ──────────────────────────
@@ -207,14 +290,15 @@ service cloud.firestore {
         match /expenses/{docId} {
           allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
-        // ── ค่าปรับ (owner only + public read for portal) ─────────────────────
+        // ── ค่าปรับ (tenants see their own through /api/portal) ─────────────
         match /fines/{docId} {
-          allow read: if isOwner(userId) && isNotBanned() || true;
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId);
           allow write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
-        // ── ค่าบริการส่วนกลาง (owner only) ──────────────────────────────
+        // ── ค่าบริการส่วนกลาง — read by whoever computes bills (meter recording) ──
         match /common_fees/{docId} {
-          allow read, write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
+          allow write: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'property.update');
         }
 
         // ── Parcels — written only by /api/parcels (permission checks, audit, notifications).
@@ -396,10 +480,10 @@ service cloud.firestore {
             && (!exists(/databases/$(database)/documents/dorm_codes/$(code)) || get(/databases/$(database)/documents/dorm_codes/$(code)).data.uid == request.auth.uid));
     }
 
-    // ── Housekeeper Auth table (lookup by phone for maid login) ─────────
+    // ── Housekeeper sign-in records (phone → building + passcode hash) ──
+    // Server-only: /api/housekeepers checks passcodes and manages these. No client may read or write them.
     match /housekeepers_auth/{phone} {
-      allow read: if true;
-      allow write: if isSignedIn() && isNotBanned();
+      allow read, write: if false;
     }
 
     // ── Deny all other paths ─────────────────────────────────────────────

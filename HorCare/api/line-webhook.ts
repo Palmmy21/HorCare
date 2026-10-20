@@ -10,6 +10,7 @@ import { latestAnnouncementsText } from './_announcements.js';
 import { evaluateSlip, loadReceiverCandidates } from './_slip-flow.js';
 import { billLabel, buildSlipFlex } from './_slip-reply.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
+import { portalLinkFor } from './_portal-link.js';
 import type { MonthlyBill } from '../src/types/index.js';
 
 export const config = {
@@ -33,21 +34,8 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 const DORM_CODE_RE = /^HC-[A-Z0-9]{6}$/;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // GET /api/line-webhook?lid=... — tenant portal lookup (used by TenantGateway)
-    if (req.method === 'GET') {
-        const lid = String(req.query.lid ?? '').trim();
-        // LINE user IDs are always "U" followed by 32 hex characters
-        if (!lid || !/^U[0-9a-f]{32}$/.test(lid)) {
-            return res.status(400).json({ error: 'bad_request' });
-        }
-        const snap = await db.collection('line_rooms').doc(lid).get();
-        if (!snap.exists) {
-            return res.status(404).json({ error: 'not_found' });
-        }
-        const { uid, building_id, room_id, room_number, dorm_name } = snap.data()!;
-        return res.status(200).json({ uid, building_id, room_id, room_number, dorm_name });
-    }
-
+    // (The old GET ?lid= lookup is gone: it trusted a LINE user id sent by the browser. The LIFF gateway now proves
+    // the LINE account with an access token through /api/portal `liff`.)
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
@@ -473,7 +461,7 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
 
     const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
     const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
-    const portalUrl = `${appUrl}/?uid=${uid}&bid=${building_id}&rid=${room_id}`;
+    const portalUrl = `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: room_id }))}`;
 
     await lineReply(replyToken, [{
         type: 'flex',
