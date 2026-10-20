@@ -177,19 +177,18 @@ describe('receipts post against posted invoices', () => {
         await save({ posting: { ...goodLedger().posting, channels: { cash: '1101', 'bank:acc1': '1102' } } });
         seed(`${b1}/bank_accounts/acc1`, { id: 'acc1', status: 'active', bank_short: 'KBANK' });
     });
-    // record_payment lives in /api/accounting; it only writes data the ledger then reads
-    it('a recorded payment posts as Dr cash / Cr receivable once its invoice is in the books', async () => {
+    // record_payment lives in /api/accounting; the ledger picks the money up automatically (api/_ledger-auto.ts)
+    it('a recorded payment is posted straight away as Dr cash / Cr receivable, with its invoice first', async () => {
         const acct = (await import('./_accounting.js')).default;
         const res = fakeRes();
         await acct(fakeReq({ owner_uid: OWNER, action: 'record_payment', building_id: B1, room_id: 'r1', method: 'cash', paid_at: '2026-10-07T03:00:00Z', allocations: [{ kind: 'bill', id: 'b1', amount: 1500 }] }, OWNER), res as never);
         expect(res.statusCode).toBe(200);
-        const early = await run('post', { kind: 'receipt' });
-        expect(early.body.detail.problems.map((p: any) => p.code)).toContain('invoice_not_in_mango');
-        await run('post');
-        const r = await run('post', { kind: 'receipt' });
-        expect(r.body.posted).toBe(1);
         const e = entries().find(x => x.kind === 'receipt')!;
+        expect(e.posted_by).toBe('system');
         expect(e.lines.map(l => [l.account, l.dr_satang, l.cr_satang, l.party_id])).toEqual([['1101', 150000, 0, null], ['1140', 0, 150000, 'r1']]);
+        expect(entries().filter(x => x.kind === 'invoice').length).toBeGreaterThan(0);
+        // a manual post afterwards finds nothing new — same entries, never twice
+        expect((await run('post', { kind: 'receipt' })).body.error).toBe('nothing_to_post');
         const t = trialBalance(entries(), goodLedger().accounts);
         expect(t.find(x => x.account.code === '1140')!.balance_satang).toBe(700000 - 150000);
     });

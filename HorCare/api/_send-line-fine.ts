@@ -7,6 +7,7 @@ import { portalLinkFor } from './_portal-link.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { Fine } from '../src/types/index.js';
+import { autoPostSafe } from './_ledger-auto.js';
 
 export const config = { maxDuration: 60 };
 
@@ -91,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Optional: Update fine doc to mark it as notified
         await fineSnap.ref.update({ is_notified: true });
 
+        await autoPostSafe(uid, building_id);
         res.status(200).json({ success: true, message: 'Line notification sent' });
 
     } catch (errorRaw) {

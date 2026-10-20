@@ -128,6 +128,9 @@ export interface Room {
   line_user_id?: string;
   current_meter_elec: number;
   current_meter_water: number;
+  /** Meter serials remembered from AI meter reading, used to match a meter photo to this room. */
+  meter_serial_elec?: string | null;
+  meter_serial_water?: string | null;
   is_active: boolean;
   rent_amount: number;
   rent_type: 'monthly' | 'semester' | 'yearly' | 'daily' | 'weekly';

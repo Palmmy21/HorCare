@@ -150,7 +150,9 @@ export function compareAccount(slipAccount: string | null, number: string | null
 }
 
 // ── Date / time ───────────────────────────────────────────────────────────────
-export const SLIP_MAX_AGE_MS = 30 * 86400_000;
+// Late payment is normal, so a slip is never "too old" by age alone. The only date rule is against
+// reusing an old slip: one dated before the bill was issued (beyond a few days' early payment)
+// cannot be for this bill. A slip dated in the future cannot be genuine.
 export const SLIP_FUTURE_TOLERANCE_MS = 10 * 60_000;
 const BILL_EARLY_TOLERANCE_MS = 3 * 86400_000;
 
@@ -159,10 +161,9 @@ export function checkDatetime(iso: string | null, billCreatedAt: string | null |
     const t = Date.parse(iso);
     if (!Number.isFinite(t)) return 'unknown';
     if (t > now + SLIP_FUTURE_TOLERANCE_MS) return 'fail';        // from the future
-    if (now - t > SLIP_MAX_AGE_MS) return 'fail';                 // stale — likely an old slip
     if (billCreatedAt) {
         const b = Date.parse(billCreatedAt);
-        if (Number.isFinite(b) && t < b - BILL_EARLY_TOLERANCE_MS) return 'fail'; // paid long before the bill existed
+        if (Number.isFinite(b) && t < b - BILL_EARLY_TOLERANCE_MS) return 'fail'; // paid before the bill existed — an old slip
     }
     return 'pass';
 }
@@ -216,9 +217,9 @@ export function verifySlip(input: {
         qr: input.qrPresent ? 'pass' : 'unknown',
     };
 
-    // With no receiving account on file there is nothing to compare names against (older setups):
-    // fall back to amount + QR + not-duplicate as before.
-    const receiverOk = candidates.length === 0 || !!best;
+    // The receiver's name / account must match one of the property's accounts: with none on file there is
+    // nothing to check the name against, so the slip waits for the owner instead of being approved.
+    const receiverOk = !!best;
     const auto_approve = amount === 'pass' && input.qrPresent && !input.duplicate && receiverOk && datetime !== 'fail';
     return { checks, matched_candidate_id: best?.c.id ?? null, auto_approve };
 }

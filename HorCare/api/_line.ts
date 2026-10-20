@@ -93,6 +93,21 @@ interface BillFlexOptions {
     secLang?: BillLanguage;
 }
 
+/** LINE postback data for "แบ่งจ่าย" on a bill / fine; parsed by parseSplitModePostback. */
+export const splitModePostbackData = (kind: 'bill' | 'fine', itemId: string) => `splitmode|${kind}|${itemId}`;
+
+export function parseSplitModePostback(data: string | undefined): { kind: 'bill' | 'fine'; itemId: string } | null {
+    const [tag, kind, itemId] = (data ?? '').split('|');
+    if (tag !== 'splitmode' || (kind !== 'bill' && kind !== 'fine') || !itemId) return null;
+    return { kind, itemId };
+}
+
+/** "แบ่งจ่าย" on an invoice: the tenant says the next slip pays only part of it. */
+const splitPayButton = (kind: 'bill' | 'fine', itemId: string, label: string) => ({
+    type: 'button', style: 'secondary', height: 'sm', margin: 'sm',
+    action: { type: 'postback', label: label.slice(0, 40), data: splitModePostbackData(kind, itemId), displayText: label.replace(/^\S+\s/, '') },
+});
+
 export function buildBillFlex(
     bill: MonthlyBill,
     dormName: string,
@@ -108,13 +123,14 @@ export function buildBillFlex(
     const dueDate   = `${dueDay} ${monthFormatted}`;
     const total     = bill.total_bill as number;
 
-    const footerContents: object[] = opts.portalUrl ? [
-        {
+    const footerContents: object[] = [
+        ...(opts.portalUrl ? [{
             type: 'button',
             action: { type: 'uri', label: tBilingual('flex_open_portal', lang, isBilingual, secLang), uri: opts.portalUrl },
             style: 'primary', color: '#2563EB', height: 'sm',
-        },
-    ] : [];
+        }] : []),
+        ...(bill.id && bill.payment_status !== 'paid' ? [splitPayButton('bill', bill.id, t('flex_split_pay', lang))] : []),
+    ];
 
     const serviceTitle = tBilingual('flex_service_bill', lang, isBilingual, secLang);
     const roomLabel = tBilingual('room', lang, isBilingual, secLang);
@@ -295,13 +311,14 @@ export function buildFineFlex(
         }
     } catch { /* malformed date: keep the fallback text */ }
 
-    const footerContents: object[] = opts.portalUrl ? [
-        {
+    const footerContents: object[] = [
+        ...(opts.portalUrl ? [{
             type: 'button',
             action: { type: 'uri', label: '🔗 เปิดพอร์ทัล', uri: opts.portalUrl },
             style: 'primary', color: '#DC2626', height: 'sm',
-        },
-    ] : [];
+        }] : []),
+        ...(fine.id && fine.status !== 'paid' ? [splitPayButton('fine', fine.id, t('flex_split_pay', opts.lang || 'th'))] : []),
+    ];
 
     return {
         type: 'flex',

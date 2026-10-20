@@ -56,7 +56,7 @@ function TenantCard({
   const { profile, loading } = useTenantProfile(uid, buildingId, room.id);
   const [copied, setCopied] = useState(false);
 
-  const copyTenantLink = (e: React.MouseEvent) => {
+  const copyTenantLink = async (e: React.MouseEvent) => {
     e.stopPropagation();
     fetchPortalUrl(uid, buildingId, room.id)
       .then(url => navigator.clipboard.writeText(url))

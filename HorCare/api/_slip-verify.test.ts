@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-    SLIP_FUTURE_TOLERANCE_MS, SLIP_MAX_AGE_MS, checkDatetime, compareAccount, compareNames, describeChecks, normalizeName,
+    SLIP_FUTURE_TOLERANCE_MS, checkDatetime, compareAccount, compareNames, describeChecks, normalizeName,
     parseSlipQr, senderBankFromQr, verifySlip, type ReceiverCandidate, type SlipDetails,
 } from './_slip-verify.js';
 
@@ -102,9 +102,8 @@ describe('checkDatetime', () => {
         expect(checkDatetime(new Date(now + SLIP_FUTURE_TOLERANCE_MS - 1000).toISOString(), null, now)).toBe('pass');
         expect(checkDatetime(new Date(now + SLIP_FUTURE_TOLERANCE_MS + 60_000).toISOString(), null, now)).toBe('fail');
     });
-    it('fails stale slips', () => {
-        expect(checkDatetime(new Date(now - SLIP_MAX_AGE_MS + 3600_000).toISOString(), null, now)).toBe('pass');
-        expect(checkDatetime(new Date(now - SLIP_MAX_AGE_MS - 3600_000).toISOString(), null, now)).toBe('fail');
+    it('never fails a slip for its age alone — late payment is normal', () => {
+        expect(checkDatetime(new Date(now - 90 * 86400_000).toISOString(), null, now)).toBe('pass');
     });
     it('fails a slip that predates the bill by more than a few days', () => {
         const bill = '2026-10-05T00:00:00+07:00';
@@ -164,9 +163,10 @@ describe('verifySlip', () => {
         expect(dup.checks.duplicate).toBe('fail');
         expect(dup.auto_approve).toBe(false);
     });
-    it('rejects future-dated and stale slips; an unreadable time does not block', () => {
+    it('rejects future-dated slips and old slips from before the bill; late ones and an unreadable time do not block', () => {
         expect(run({}, { datetime_iso: '2026-10-11T12:00:00+07:00' }).auto_approve).toBe(false);
-        expect(run({}, { datetime_iso: '2026-08-01T12:00:00+07:00' }).auto_approve).toBe(false);
+        expect(run({ billCreatedAt: '2026-09-01T00:00:00+07:00' }, { datetime_iso: '2026-08-01T12:00:00+07:00' }).auto_approve).toBe(false);
+        expect(run({ billCreatedAt: '2026-07-01T00:00:00+07:00' }, { datetime_iso: '2026-08-01T12:00:00+07:00' }).auto_approve).toBe(true);
         expect(run({}, { datetime_iso: null }).auto_approve).toBe(true);
     });
     it('accepts a payment to ANY registered account and reports which one', () => {
@@ -182,10 +182,10 @@ describe('verifySlip', () => {
         expect(v.matched_candidate_id).toBe('promptpay');
         expect(v.auto_approve).toBe(true);
     });
-    it('with no account on file it keeps the old rule: amount + QR + not duplicate', () => {
+    it('with no account on file the receiver name cannot be checked, so nothing is approved', () => {
         const v = run({ candidates: [] });
         expect(v.checks.receiver_name).toBe('unknown');
-        expect(v.auto_approve).toBe(true);
+        expect(v.auto_approve).toBe(false);
         expect(run({ candidates: [] }, { amount: 100 }).auto_approve).toBe(false);
     });
     it('without any readable details nothing is approved', () => {

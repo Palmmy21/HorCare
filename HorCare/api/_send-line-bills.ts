@@ -7,6 +7,7 @@ import { portalLinkFor } from './_portal-link.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
+import { autoPostSafe } from './_ledger-auto.js';
 
 async function fcmPushToOwner(uid: string, title: string, body: string) {
     try {
@@ -138,6 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             );
         }
 
+        await autoPostSafe(uid, building_id); // the bills just issued become receivables in the books
         res.status(200).json({ data: { sent, skipped, results } });
 
     } catch (errorRaw) {

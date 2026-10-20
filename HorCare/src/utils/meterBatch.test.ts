@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-    DEFAULT_METER_SETTINGS, canBulkConfirm, canConfirm, computeFlags, groupConfirmed, matchRoom, parseReading,
+    DEFAULT_METER_SETTINGS, canBulkConfirm, canConfirm, computeFlags, groupConfirmed, matchMeter, matchRoom, normalizeSerial, parseReading, serialsToLearn,
     type BatchItem, type RoomMeterContext,
 } from './meterBatch';
 
@@ -148,5 +148,47 @@ describe('groupConfirmed', () => {
         expect(groupConfirmed([item({ status: 'confirmed', roomId: null })])).toEqual([]);
         expect(groupConfirmed([item({ status: 'confirmed', meterType: 'unknown' })])).toEqual([]);
         expect(groupConfirmed([item({ status: 'confirmed', reading: 'abc' })])).toEqual([]);
+    });
+});
+
+describe('meter serials — matching and learning', () => {
+    const withSerials = [
+        { id: 'r101', room_number: '101', meter_serial_elec: 'EA-1001' },
+        { id: 'r102', room_number: '102', meter_serial_elec: 'EA1002', meter_serial_water: 'W2002' },
+        { id: 'r103', room_number: '103' },
+    ];
+
+    it('matches by remembered serial even without a readable label, and by label otherwise', () => {
+        expect(matchMeter(withSerials, null, 'ea 1002', 'electric')).toEqual({ kind: 'matched', roomId: 'r102', by: 'serial' });
+        expect(matchMeter(withSerials, null, 'W2002', 'unknown')).toEqual({ kind: 'matched', roomId: 'r102', by: 'serial' });
+        expect(matchMeter(withSerials, '103', 'NEW9999', 'electric')).toEqual({ kind: 'matched', roomId: 'r103', by: 'label' });
+        expect(matchMeter(withSerials, null, null, 'electric')).toEqual({ kind: 'not_found' });
+        expect(normalizeSerial(' ea-1001 ')).toBe('EA1001');
+    });
+
+    it('warns when the serial and the room disagree, never silently picking one', () => {
+        const f = computeFlags([item({ roomId: 'r101', ocrRoom: '101', serial: 'EA1002' })], withSerials, () => undefined);
+        expect(f.i1).toContain('room_conflict');
+        const label = computeFlags([item({ roomId: 'r102', ocrRoom: '101', serial: 'EA1002', matchedBy: 'serial' })], withSerials, () => undefined);
+        expect(label.i1).toContain('room_conflict');
+        const replaced = computeFlags([item({ roomId: 'r101', ocrRoom: '101', serial: 'NEW1234' })], withSerials, () => undefined);
+        expect(replaced.i1).toContain('serial_mismatch');
+        expect(canConfirm(replaced.i1)).toBe(true);        // a warning: a person may confirm (meter replaced)
+        expect(canBulkConfirm(replaced.i1)).toBe(false);   // but it is never saved automatically
+        const ok = computeFlags([item({ roomId: 'r101', ocrRoom: '101', serial: 'EA1001' })], withSerials, () => undefined);
+        expect(ok.i1).toEqual([]);
+    });
+
+    it('learns serials for rooms without one; a different one only after a person confirmed it, moving it off the old room', () => {
+        const saved = (over: Partial<BatchItem>) => item({ status: 'saved', ...over });
+        expect(serialsToLearn([saved({ roomId: 'r103', serial: 'NEW1234' })], withSerials))
+            .toEqual([{ roomId: 'r103', field: 'meter_serial_elec', serial: 'NEW1234' }]);
+        expect(serialsToLearn([saved({ roomId: 'r101', serial: 'NEW1234' })], withSerials)).toEqual([]);
+        expect(serialsToLearn([saved({ roomId: 'r101', serial: 'EA1001' })], withSerials)).toEqual([]);
+        expect(serialsToLearn([saved({ roomId: 'r101', serial: 'EA1002', overridden: true })], withSerials)).toEqual([
+            { roomId: 'r101', field: 'meter_serial_elec', serial: 'EA1002' },
+            { roomId: 'r102', field: 'meter_serial_elec', serial: '' },
+        ]);
+        expect(serialsToLearn([item({ roomId: 'r103', serial: 'NEW1234' })], withSerials)).toEqual([]); // not saved yet
     });
 });

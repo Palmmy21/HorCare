@@ -297,7 +297,28 @@ function SlipUploader({
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [loading, setLoading] = useState(false);
+  // a genuine slip for less than what is owed: the tenant may record it as a split payment
+  const [splitOffer, setSplitOffer] = useState<{ amount: number; owed: number; slipRef: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const money = (n: number) => `฿${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const fill = (tpl: string, v: Record<string, string>) => tpl.replace(/\{(\w+)\}/g, (_, k: string) => v[k] ?? '');
+
+  const confirmSplit = async () => {
+    if (!splitOffer) return;
+    setLoading(true);
+    try {
+      const data = await portalPost<{ paid: number; outstanding: number }>('upload-slip', { action: 'split', itemId, itemType, slipRef: splitOffer.slipRef });
+      toast.success(data.outstanding > 0
+        ? fill(t.split_done, { paid: money(data.paid), left: money(data.outstanding) })
+        : t.split_full, { duration: 6000 });
+      setSplitOffer(null);
+      onUploaded();
+    } catch (errRaw) {
+      toast.error(`${t.slip_fail}: ${errorInfo(errRaw).message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -306,8 +327,19 @@ function SlipUploader({
     setLoading(true);
     try {
       const base64 = await compressImageToBase64(file);
-      const data = await portalPost<{ autoVerified?: boolean }>('upload-slip', { itemId, itemType, base64 });
-      toast.success(data.autoVerified ? t.slip_success_auto : t.slip_success_wait);
+      const data = await portalPost<{ autoVerified?: boolean; outcome?: string; problems?: unknown; split?: { amount: number; owed: number; slipRef: string } | null }>(
+        'upload-slip', { itemId, itemType, base64 });
+
+      setSplitOffer(data.split ?? null);
+      if (data.split) {
+        // the offer below explains it; no error toast for a slip the tenant may have meant as a part payment
+      } else if (data.outcome === 'mismatch') {
+        // problems are Thai sentences from the server; the heading follows the portal language
+        const problems: string[] = Array.isArray(data.problems) ? data.problems : [];
+        toast.error([t.slip_mismatch, ...problems.map(p => `• ${p}`)].join('\n'), { duration: 10000, style: { whiteSpace: 'pre-line' } });
+      } else {
+        toast.success(data.autoVerified ? t.slip_success_auto : t.slip_success_wait);
+      }
       onUploaded();
     } catch (errRaw) {
         const err = errorInfo(errRaw);
@@ -337,6 +369,18 @@ function SlipUploader({
         {loading ? <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> : <Camera size={16} />}
         {loading ? t.uploading_slip : t.attach_slip}
       </button>
+      {splitOffer && (
+        <div style={{ marginTop: '0.6rem', padding: '0.75rem', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: '0.8125rem', color: '#166534' }}>
+          <p style={{ margin: '0 0 0.5rem' }}>{fill(t.split_offer, { amount: money(splitOffer.amount), owed: money(splitOffer.owed) })}</p>
+          <button
+            disabled={loading}
+            onClick={confirmSplit}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: '#16A34A', color: '#fff', border: 'none', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+          >
+            {fill(t.split_button, { amount: money(splitOffer.amount) })}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

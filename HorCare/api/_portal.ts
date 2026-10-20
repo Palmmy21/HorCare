@@ -257,7 +257,7 @@ async function staffAction(req: VercelRequest, res: VercelResponse, body: Body, 
 
 /** The LINE Login channel the LIFF app belongs to (a LIFF id is "<channelId>-<suffix>"). */
 function liffChannelId(): string {
-    return process.env.LINE_LOGIN_CHANNEL_ID || (process.env.VITE_LIFF_ID ?? process.env.LIFF_ID ?? '').split('-')[0];
+    return process.env.LINE_LOGIN_CHANNEL_ID || process.env.LIFF_CHANNEL_ID || (process.env.VITE_LIFF_ID ?? process.env.LIFF_ID ?? '').split('-')[0];
 }
 
 /** The LINE user behind an access token issued to OUR LIFF channel, or null. */

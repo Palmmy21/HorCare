@@ -4,15 +4,22 @@
 
 const PIN_KEY = 'horcare_portal_pin';
 
-/** The portal link of this page (the value after ?p=), or '' when the page was opened without one. */
+/**
+ * The portal link of this page: the value after ?p=, or — transitional — a signed older link
+ * (?uid=&bid=&rid=&t=, see api/_portal-token.ts) packed the way the server accepts it. '' when there is neither.
+ */
 export function portalLink(): string {
-  return new URLSearchParams(window.location.search).get('p') ?? '';
+  const p = new URLSearchParams(window.location.search);
+  const packed = p.get('p');
+  if (packed) return packed;
+  const [uid, bid, rid, t] = ['uid', 'bid', 'rid', 't'].map(k => p.get(k) ?? '');
+  return uid && bid && rid && t ? [uid, bid, rid, `h.${t}`].join('~') : '';
 }
 
-/** True for the old `?uid=&bid=&rid=` links, which no longer open a portal. */
+/** True for unsigned old `?uid=&bid=&rid=` links, which no longer open a portal. */
 export function isLegacyPortalUrl(): boolean {
   const p = new URLSearchParams(window.location.search);
-  return !p.has('p') && p.has('uid') && p.has('bid') && p.has('rid');
+  return !p.has('p') && !p.has('t') && p.has('uid') && p.has('bid') && p.has('rid');
 }
 
 export function portalPin(): string {

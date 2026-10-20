@@ -95,6 +95,8 @@ export interface Ledger {
   options: {
     invoice_date_basis: 'issued_at' | 'month_end';
     count_unverified_transfers: boolean;
+    /** Post invoices and receipts automatically as they happen (api/_ledger-auto.ts). Absent = on. */
+    auto_post?: boolean;
     /** Bills before this month ('YYYY-MM') are opening balances, not posted again. */
     opening_cutoff_month: string | null;
   };

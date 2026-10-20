@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).firebaseMock);
 
-import { evaluateSlip, loadReceiverCandidates } from './_slip-flow.js';
+import { evaluateSlip, loadReceiverCandidates, tenantSlipReply } from './_slip-flow.js';
 import { read, resetFake, seed } from './_fake-firestore.js';
 
 const OWNER = 'owner-1';
@@ -78,7 +78,9 @@ describe('evaluateSlip', () => {
         expect(e.aiAmount).toBe(3000);
     });
 
-    it('rejects an old slip and one dated before the bill existed', async () => {
+    it('accepts a late payment, but rejects an old slip dated before the bill existed', async () => {
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), datetime: bangkok(Date.now() - 45 * 86400_000) }));
+        expect((await run({ billCreatedAt: new Date(Date.now() - 60 * 86400_000).toISOString() })).autoApprove).toBe(true);
         fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), datetime: bangkok(Date.now() - 60 * 86400_000) }));
         expect((await run()).autoApprove).toBe(false);
         fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), datetime: bangkok(Date.now() - 20 * 86400_000) }));
@@ -90,13 +92,13 @@ describe('evaluateSlip', () => {
             const e = await run(over);
             expect(e.autoApprove).toBe(false);
             expect(e.fields).toEqual({});
-            expect(e.verifyNote).toMatch(/QR/);
+            expect(e.verifyNote).toMatch(/ตรวจสลิปด้วยตา/);
         }
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('legacy note differs by whether the QR was readable', async () => {
-        expect((await run({ isPro: false })).verifyNote).toBe('ตรวจ QR ผ่าน (ไม่ซ้ำ) — รอเจ้าของยืนยันยอด');
+        expect((await run({ isPro: false })).verifyNote).toBe('AI ยังไม่ได้ตรวจยอด/ชื่อ — โปรดตรวจสลิปด้วยตา');
         expect((await run({ isPro: false, qrPayload: null })).verifyNote).toBe('อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา');
     });
 
@@ -111,8 +113,9 @@ describe('evaluateSlip', () => {
         seed(`${B}/bank_accounts/acc1`, { ...read(`${B}/bank_accounts/acc1`)!, status: 'inactive' });
         fetchMock.mockResolvedValue(aiReply(goodSlip()));
         const e = await run();
-        // no active account and no PromptPay on file → legacy rule (amount + QR), no account recorded
-        expect(e.autoApprove).toBe(true);
+        // no active account → the receiver name cannot be checked, so the owner decides
+        expect(e.autoApprove).toBe(false);
+        expect(e.outcome).toBe('review');
         expect(e.fields.bank_account_id).toBeUndefined();
     });
 
@@ -134,6 +137,50 @@ describe('evaluateSlip', () => {
         const e = await run();
         expect(e.fields.bank_account).toBeUndefined();
         expect(e.fields.bank_account_id).toBeUndefined();
+    });
+});
+
+describe('outcome and tenant reply', () => {
+    it('a genuine slip for less than what is owed can be a part payment; a wrong receiver or old slip cannot', async () => {
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 2000 }));
+        const e = await run();
+        expect(e.outcome).toBe('mismatch');
+        expect(e.splitAmount).toBe(2000);
+        expect(e.fields.slip_split_amount).toBe(2000);
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 2000, receiver_name: 'นาย อื่น คนอื่น', receiver_account: 'xxx-x-x9999-x' }));
+        expect((await run()).splitAmount).toBeNull();
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 4000 }));
+        expect((await run()).splitAmount).toBeNull();
+        fetchMock.mockResolvedValue(aiReply(goodSlip()));
+        expect((await run()).splitAmount).toBeNull();
+    });
+
+    it('a matching slip is approved and the tenant is told it was received', async () => {
+        fetchMock.mockResolvedValue(aiReply(goodSlip()));
+        const e = await run();
+        expect(e.outcome).toBe('approved');
+        const text = tenantSlipReply('101', e);
+        expect(text).toContain('ได้รับยอดชำระ ฿3,500');
+        expect(text).toContain('จ่ายแล้ว');
+    });
+
+    it('a wrong amount or receiver is a mismatch, and the tenant is told exactly what', async () => {
+        fetchMock.mockResolvedValue(aiReply({ ...goodSlip(), amount: 3000, receiver_name: 'นาย สมศักดิ์ ใจดี', receiver_account: 'xxx-x-x9999-x' }));
+        const e = await run();
+        expect(e.outcome).toBe('mismatch');
+        expect(e.problems).toEqual(['ยอดในสลิป ฿3,000 ไม่ตรงกับยอดที่ต้องชำระ ฿3,500', 'ชื่อ/บัญชีผู้รับในสลิปไม่ใช่บัญชีของหอพัก']);
+        const text = tenantSlipReply('101', e);
+        expect(text).toContain('ไม่ตรงกับบิล');
+        expect(text).toContain('ยังไม่ได้รับยอด');
+    });
+
+    it('a slip that could not be checked waits for the owner and never claims to have passed', async () => {
+        for (const e of [await run({ isPro: false }), await run({ qrPayload: null })]) {
+            expect(e.outcome).toBe('review');
+            const text = tenantSlipReply('101', e);
+            expect(text).toContain('เจ้าของหอจะตรวจสอบ');
+            expect(text).not.toMatch(/ผ่าน|ไม่ซ้ำ/);
+        }
     });
 });
 

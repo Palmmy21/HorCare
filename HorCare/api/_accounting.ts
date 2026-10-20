@@ -24,6 +24,7 @@ import {
 } from '../src/shared/accounting.js';
 import type { Fine, MonthlyBill } from '../src/types/index.js';
 import type { Permission } from '../src/shared/permissions.js';
+import { autoPostSafe } from './_ledger-auto.js';
 
 export const config = { maxDuration: 60 };
 
@@ -387,6 +388,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await audit('CREATE', 'payment', paymentId, `Room ${(roomSnap.data() as { room_number?: string }).room_number} ${gross / 100} THB`, {
             note: `${method}, ${cleaned.length} allocation(s), date ${thDate(result.paid_at)}`,
         });
+        await autoPostSafe(owner, bld);
         res.status(200).json({ payment: result });
     }
 
@@ -410,6 +412,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await payRef.update({ verification: 'verified', bank_transaction_id: body.bank_transaction_id, verified_at: now, verified_by: who.uid });
         await txRef.update({ status: 'reconciled', payment_id: pay.id, matched: null, reconciled_at: now, reconciled_by: who.uid });
         await audit('UPDATE', 'payment', pay.id, `verified ${pay.gross_satang / 100} THB`, { note: `bank transaction ${body.bank_transaction_id}` });
+        await autoPostSafe(owner, properties[0]);
         res.status(200).json({ ok: true });
     }
 }

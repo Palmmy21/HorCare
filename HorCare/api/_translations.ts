@@ -32,6 +32,7 @@ export type TranslationKey =
     | 'due_notice_suffix'
     | 'flex_service_bill'
     | 'flex_open_portal'
+    | 'flex_split_pay'
     | 'flex_send_slip';
 
 export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> = {
@@ -67,6 +68,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         due_notice_suffix: 'ของทุกเดือน',
         flex_service_bill: '📋 ใบแจ้งค่าบริการ',
         flex_open_portal: '🔗 เปิดพอร์ทัล / ดูบิล',
+        flex_split_pay: '💸 แบ่งจ่าย',
         flex_send_slip: '📎 กรุณาส่งสลิปยืนยันการโอนเงินมาในแชทนี้ด้วยนะคะ 🙏',
     },
     en: {
@@ -101,6 +103,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         due_notice_suffix: 'of each month',
         flex_service_bill: '📋 Service Invoice',
         flex_open_portal: '🔗 View Bill / Portal',
+        flex_split_pay: '💸 Pay in parts',
         flex_send_slip: '📎 Please attach transfer slip in this chat. Thank you! 🙏',
     },
     my: {
@@ -135,6 +138,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         due_notice_suffix: 'ရက်မတိုင်မီ ငွေပေးချေပါရန်',
         flex_service_bill: '📋 ဝန်ဆောင်ခတောင်းခံလွှာ',
         flex_open_portal: '🔗 ဘေလ်ကြည့်ရန် / ပေါ်တယ်',
+        flex_split_pay: '💸 အရစ်ကျပေးမည်',
         flex_send_slip: '📎 ငွေလွှဲစလစ်ကို ဤချက်ထဲသို့ ပို့ပေးပါ ကျေးဇူးတင်ပါသည် 🙏',
     },
     zh: {
@@ -169,6 +173,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         due_notice_suffix: '日前完成缴费',
         flex_service_bill: '📋 账单服务通知',
         flex_open_portal: '🔗 查看账单详情',
+        flex_split_pay: '💸 分期付款',
         flex_send_slip: '📎 转账后请在此聊天发送付款水单凭证，谢谢！🙏',
     },
     lo: {
@@ -203,6 +208,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         due_notice_suffix: 'ຂອງທຸກເດືອນ',
         flex_service_bill: '📋 ໃບແຈ້ງຄ່າບໍລິການ',
         flex_open_portal: '🔗 ເປີດພໍທັລ / ເບິ່ງບິນ',
+        flex_split_pay: '💸 ແບ່ງຈ່າຍ',
         flex_send_slip: '📎 ກະລຸນາສົ່ງສະລິບຢືນຢັນການໂອນເງິນມາໃນແຊັດນີ້ດ້ວຍ ຂອບໃຈ 🙏',
     },
     vi: {
@@ -237,6 +243,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         due_notice_suffix: 'hàng tháng',
         flex_service_bill: '📋 Thông báo hoá đơn dịch vụ',
         flex_open_portal: '🔗 Xem hoá đơn / Cổng thông tin',
+        flex_split_pay: '💸 Trả một phần',
         flex_send_slip: '📎 Vui lòng gửi ảnh biên lai chuyển khoản vào đoạn chat này 🙏',
     },
 };

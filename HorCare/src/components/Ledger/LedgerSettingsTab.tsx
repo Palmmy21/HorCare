@@ -56,6 +56,8 @@ export default function LedgerSettingsTab({ ownerUid, buildings, ledgers, select
     const setAccount = (i: number, patch: Partial<Account>) => upd({ accounts: d.accounts.map((a, k) => (k === i ? { ...a, ...patch } : a)) });
     const active = (type: Account['type'][]) => d.accounts.filter(a => a.active && type.includes(a.type));
     const isNew = !ledgers.some(l => l.id === d.id);
+    // written by the server after each automatic posting run (api/_ledger-auto.ts)
+    const lastAuto = (ledgers.find(l => l.id === d.id) as { auto_post?: { at: string; posted: number; problems: number; first_problem: string | null } } | undefined)?.auto_post;
 
     const call = async (body: Record<string, unknown>, ok: string): Promise<boolean> => {
         setBusy(true);
@@ -168,6 +170,15 @@ export default function LedgerSettingsTab({ ownerUid, buildings, ledgers, select
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem' }}>
                     <input type="checkbox" checked={d.options.count_unverified_transfers} onChange={e => upd({ options: { ...d.options, count_unverified_transfers: e.target.checked } })} /> นับเงินโอนที่ยังไม่ยืนยันกับบัญชีธนาคารเป็นเงินรับ (ไม่แนะนำ)
                 </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem' }}>
+                    <input type="checkbox" checked={d.options.auto_post !== false} onChange={e => upd({ options: { ...d.options, auto_post: e.target.checked } })} /> ลงบัญชีอัตโนมัติทันที (ตั้งลูกหนี้เมื่อออกบิล · รับชำระเมื่อได้รับเงิน)
+                </label>
+                {lastAuto && (
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: lastAuto.problems ? '#B45309' : 'var(--color-gray-500)' }}>
+                        ลงอัตโนมัติล่าสุด {new Date(lastAuto.at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })} · ลงใหม่ {lastAuto.posted} รายการ
+                        {lastAuto.problems ? ` · ข้าม ${lastAuto.problems} รายการ: ${lastAuto.first_problem ?? ''}` : ''}
+                    </p>
+                )}
             </Section>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

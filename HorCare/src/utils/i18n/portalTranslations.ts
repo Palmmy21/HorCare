@@ -66,6 +66,12 @@ export interface PortalTranslations {
   uploading_slip: string;
   slip_success_auto: string;
   slip_success_wait: string;
+  slip_mismatch: string;
+  split_offer: string;
+  split_button: string;
+  split_done: string;
+  split_full: string;
+  slip_need_link: string;
   slip_fail: string;
 
   // Fines
@@ -170,6 +176,12 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'กำลังส่งสลิป...',
     slip_success_auto: 'ชำระเงินเรียบร้อยแล้ว (ตรวจสอบอัตโนมัติ)',
     slip_success_wait: 'ส่งสลิปเรียบร้อย รอเจ้าของหอตรวจสอบ',
+    slip_mismatch: 'สลิปไม่ตรงกับบิล — ยังไม่ได้รับยอด',
+    split_offer: 'ยอดในสลิป {amount} น้อยกว่ายอดที่ต้องชำระ {owed} ถ้าตั้งใจแบ่งจ่าย กดปุ่มด้านล่างเพื่อบันทึกเป็นยอดชำระบางส่วน',
+    split_button: 'แบ่งจ่าย {amount}',
+    split_done: 'รับยอดแบ่งจ่าย {paid} แล้ว คงเหลือ {left}',
+    split_full: 'ชำระครบแล้ว ขอบคุณค่ะ',
+    slip_need_link: 'ส่งสลิปได้ทางแชท LINE ของหอ หรือเปิดลิงก์ล่าสุดที่หอส่งให้ทาง LINE ค่ะ',
     slip_fail: 'อัปโหลดไม่สำเร็จ',
 
     fine_reason: 'ค่าปรับ',
@@ -269,6 +281,12 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'Uploading slip...',
     slip_success_auto: 'Payment verified automatically',
     slip_success_wait: 'Slip uploaded. Waiting for owner verification.',
+    slip_mismatch: 'Slip does not match the bill — payment not accepted',
+    split_offer: 'The slip shows {amount}, less than the {owed} due. If you are paying in parts, tap below to record it as a partial payment.',
+    split_button: 'Pay in parts: {amount}',
+    split_done: 'Partial payment of {paid} recorded. {left} left to pay.',
+    split_full: 'Fully paid. Thank you!',
+    slip_need_link: "Send your slip in the dorm's LINE chat, or open the latest link the dorm sent you on LINE.",
     slip_fail: 'Upload failed',
 
     fine_reason: 'Fine',
@@ -368,6 +386,12 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: '正在上传凭证...',
     slip_success_auto: '已完成缴费（自动识别通过）',
     slip_success_wait: '凭证已上传，等待房东确认',
+    slip_mismatch: '凭证与账单不符 — 未确认收款',
+    split_offer: '凭证金额 {amount} 少于应付 {owed}。如需分期付款，请点击下方按钮记为部分付款。',
+    split_button: '分期付款 {amount}',
+    split_done: '已记录部分付款 {paid}，剩余 {left}',
+    split_full: '已全部付清，谢谢！',
+    slip_need_link: '请在宿舍的 LINE 聊天中发送凭证，或打开宿舍通过 LINE 发送的最新链接。',
     slip_fail: '上传失败',
 
     fine_reason: '罚款项目',
@@ -467,6 +491,12 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'စလစ်တင်နေသည်...',
     slip_success_auto: 'ငွေပေးချေမှုအောင်မြင်ပါသည် (အလိုအလျောက်စစ်ဆေးပြီး)',
     slip_success_wait: 'စလစ်တင်ပြီးပါပြီ အဆောင်မှစစ်ဆေးနေပါသည်',
+    slip_mismatch: 'စလစ်သည် ငွေတောင်းခံလွှာနှင့် မကိုက်ညီပါ — ငွေလက်မခံရသေးပါ',
+    split_offer: 'စလစ်ပါငွေ {amount} သည် ပေးရန် {owed} ထက်နည်းသည်။ အရစ်ကျပေးလိုပါက အောက်ပါခလုတ်ကိုနှိပ်ပါ။',
+    split_button: 'အရစ်ကျပေးမည် {amount}',
+    split_done: 'အရစ်ကျငွေ {paid} လက်ခံပြီး၊ ကျန် {left}',
+    split_full: 'အပြည့်ပေးချေပြီးပါပြီ၊ ကျေးဇူးတင်ပါသည်',
+    slip_need_link: 'စလစ်ကို အဆောင်၏ LINE chat တွင် ပို့ပါ၊ သို့မဟုတ် LINE မှ ပို့ထားသော နောက်ဆုံးလင့်ခ်ကို ဖွင့်ပါ။',
     slip_fail: 'မအောင်မြင်ပါ',
 
     fine_reason: 'ဒဏ်ကြေးအကြောင်းအရာ',
@@ -566,6 +596,12 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'ກຳລັງສົ່ງສະລິບ...',
     slip_success_auto: 'ຊຳລະເງິນຮຽບຮ້ອຍແລ້ວ (ກວດສອບອັດຕະໂນມັດ)',
     slip_success_wait: 'ສົ່ງສະລິບຮຽບຮ້ອຍ ລໍຖ້າເຈົ້າຂອງຫໍກວດສອບ',
+    slip_mismatch: 'ສະລິບບໍ່ກົງກັບບິນ — ຍັງບໍ່ໄດ້ຮັບຍອດ',
+    split_offer: 'ຍອດໃນສະລິບ {amount} ໜ້ອຍກວ່າຍອດທີ່ຕ້ອງຊຳລະ {owed} ຖ້າຕັ້ງໃຈແບ່ງຈ່າຍ ກົດປຸ່ມລຸ່ມນີ້',
+    split_button: 'ແບ່ງຈ່າຍ {amount}',
+    split_done: 'ຮັບຍອດແບ່ງຈ່າຍ {paid} ແລ້ວ ຍັງເຫຼືອ {left}',
+    split_full: 'ຊຳລະຄົບແລ້ວ ຂອບໃຈ',
+    slip_need_link: 'ສົ່ງສະລິບທາງແຊັດ LINE ຂອງຫໍ ຫຼື ເປີດລິ້ງລ່າສຸດທີ່ຫໍສົ່ງໃຫ້ທາງ LINE',
     slip_fail: 'ອັບໂຫຼດບໍ່ສຳເລັດ',
 
     fine_reason: 'ຄ່າປັບ',
@@ -665,6 +701,12 @@ export const PORTAL_TRANSLATIONS: Record<BillLanguage, PortalTranslations> = {
     uploading_slip: 'Đang tải hóa đơn...',
     slip_success_auto: 'Thanh toán thành công (Xác minh tự động)',
     slip_success_wait: 'Đã gửi biên lai, chờ chủ trọ xác nhận',
+    slip_mismatch: 'Biên lai không khớp hóa đơn — chưa ghi nhận thanh toán',
+    split_offer: 'Biên lai {amount} ít hơn số phải trả {owed}. Nếu bạn trả góp, bấm nút bên dưới để ghi nhận thanh toán một phần.',
+    split_button: 'Trả một phần {amount}',
+    split_done: 'Đã ghi nhận {paid}, còn lại {left}',
+    split_full: 'Đã thanh toán đủ. Cảm ơn!',
+    slip_need_link: 'Gửi biên lai qua LINE của nhà trọ, hoặc mở liên kết mới nhất nhà trọ gửi qua LINE.',
     slip_fail: 'Tải lên thất bại',
 
     fine_reason: 'Khoản phạt',

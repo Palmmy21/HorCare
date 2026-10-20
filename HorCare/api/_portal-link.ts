@@ -11,6 +11,10 @@
 import { randomInt, timingSafeEqual } from 'node:crypto';
 import { db } from './_firebase.js';
 import { appBaseUrl } from './_app-url.js';
+import { verifyPortalToken } from './_portal-token.js';
+
+/** Packed form of a signed legacy link: `<owner>~<building>~<room>~h.<t>` (built by the portal page from ?uid&bid&rid&t). */
+const LEGACY_PREFIX = 'h.';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const SECRET_LEN = 32;
@@ -91,8 +95,14 @@ export async function resolvePortalLink(packed: unknown): Promise<(PortalRoom & 
     const parsed = parsePortalLink(packed);
     if (!parsed) return null;
     const snap = await linkDoc(parsed).get();
-    const stored = snap.exists ? (snap.data() as { secret?: string }).secret : undefined;
-    if (!stored || !sameSecret(stored, parsed.secret)) return null;
+    const link = snap.exists ? (snap.data() as { secret?: string; rotated_at?: string }) : undefined;
+    if (parsed.secret.startsWith(LEGACY_PREFIX)) {
+        // Transitional: HMAC-signed `?uid=&bid=&rid=&t=` links already sent to tenants (see _portal-token.ts). They
+        // cannot be revoked one room at a time, so they stop working for a room once its link has been reset.
+        if (link?.rotated_at || !verifyPortalToken(parsed.ownerUid, parsed.buildingId, parsed.roomId, parsed.secret.slice(LEGACY_PREFIX.length))) return null;
+    } else if (!link?.secret || !sameSecret(link.secret, parsed.secret)) {
+        return null;
+    }
     const room = await db.doc(`users/${parsed.ownerUid}/buildings/${parsed.buildingId}/rooms/${parsed.roomId}`).get();
     if (!room.exists) return null;
     return { ownerUid: parsed.ownerUid, buildingId: parsed.buildingId, roomId: parsed.roomId, room: room.data() as Record<string, unknown> };

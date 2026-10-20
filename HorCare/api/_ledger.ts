@@ -92,7 +92,7 @@ export function cleanLedger(raw: unknown, id: string): Ledger | null {
     return {
         id, name, legal_entity_name: entity, property_ids: [...new Set<string>(r.property_ids)], property_codes, accounts,
         posting: { ar_account: ar, revenue_accounts: rev, channels },
-        options: { invoice_date_basis: o.invoice_date_basis, count_unverified_transfers: o.count_unverified_transfers, opening_cutoff_month: cutoff },
+        options: { invoice_date_basis: o.invoice_date_basis, count_unverified_transfers: o.count_unverified_transfers, opening_cutoff_month: cutoff, auto_post: o.auto_post !== false },
         locked_through: null, created_at: '', updated_at: '',
     };
 }
