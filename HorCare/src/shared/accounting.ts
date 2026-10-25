@@ -1,5 +1,7 @@
-// Accounting export core: turns bills, fines and payments into balanced journal vouchers for a
-// bookkeeping package (Mango). Pure functions only, so the rules can be tested without a database.
+// Posting core: turns bills, fines and payments into balanced journal vouchers for HorCare's own ledger
+// (api/_ledger.ts, api/_ledger-auto.ts). Pure functions only, so the rules can be tested without a database.
+// It was first written for a Mango export (since removed); the profile type keeps that name, but here it is only
+// the posting setup (accounts, channels, dimensions) the ledger posts with.
 //
 // Principles (from the requirements): never invent codes or amounts — a missing mapping or an
 // unsupported case BLOCKS the document with a reason instead of being guessed; money is integer
@@ -391,30 +393,3 @@ export function buildVouchers(input: PostingInput): PostingResult {
 
 export const sumDr = (vs: Voucher[]) => vs.reduce((s, v) => s + v.total_dr_satang, 0);
 export const sumCr = (vs: Voucher[]) => vs.reduce((s, v) => s + v.total_cr_satang, 0);
-
-// ── Export batches (as stored by the API) ────────────────────────────────────
-
-export interface ExportBatch {
-  id: string;
-  profile_id: string;
-  kind: VoucherKind;
-  from: string;
-  to: string;
-  template_version: string;
-  file_name: string;
-  status: 'ready';
-  import_outcome: 'unknown' | 'confirmed' | 'failed' | 'partial';
-  import_note: string | null;
-  import_by?: string;
-  import_at?: string;
-  vouchers_count: number;
-  lines_count: number;
-  dr_satang: number;
-  cr_satang: number;
-  created_at: string;
-  created_by_name: string;
-}
-
-export const IMPORT_OUTCOME_LABELS_TH: Record<ExportBatch['import_outcome'], string> = {
-  unknown: 'ยังไม่ทราบผลนำเข้า', confirmed: 'นำเข้า Mango สำเร็จ', failed: 'นำเข้าล้มเหลว', partial: 'นำเข้าบางส่วน',
-};

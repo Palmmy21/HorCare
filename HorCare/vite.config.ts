@@ -51,7 +51,7 @@ export default defineConfig(({ mode, command }) => {
         name: 'HorCare - ระบบจัดการหอพัก',
         short_name: 'HorCare',
         description: 'ระบบจัดการหอพักอัจฉริยะ จดมิเตอร์ คำนวณค่าเช่า ออกบิลอัตโนมัติ',
-        theme_color: '#0284C7',
+        theme_color: '#0A5DAA',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',

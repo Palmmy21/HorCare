@@ -38,9 +38,9 @@ export const PERMISSIONS = [
   'chatbot.manage',
   /** Publish / edit / archive announcements to tenants. */
   'announcement.manage',
-  /** Accounting export: set up the profile / code mappings (the accountant's approval). */
+  /** Was: set up the Mango export profile (export removed). Kept so stored memberships stay valid; grants nothing now. */
   'accounting.manage',
-  /** Accounting export: preview, create, download and confirm the import of export files. */
+  /** Open the finance overview (charts across bills, payments, overdue). Named for the removed Mango export. */
   'accounting.export',
   /** HorCare's own books: view the journal and reports. */
   'ledger.read',

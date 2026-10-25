@@ -37,3 +37,7 @@ functions/.env.*
 
 # Customer sample/template files contain real customer data — never commit or serve them
 public/mango-*.xlsx
+
+# Design-tool session artifacts (screenshots, decision pages); DESIGN.md, design.json and surface briefs are kept
+.impeccable/review/
+.impeccable/questions/

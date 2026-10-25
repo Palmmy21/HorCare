@@ -110,7 +110,7 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
           <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '0.2rem' }}>
             ค่าบริการส่วนกลาง (ที่เปิดใช้งาน)
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '-0.5px' }}>
             ฿{fmtBaht(activeTotal)}
           </div>
           <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.125rem' }}>
@@ -344,7 +344,7 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                       <div style={{
                         fontSize: '1.25rem', fontWeight: 800,
                         color: fee.is_active ? '#4F46E5' : '#9CA3AF',
-                        fontFamily: 'monospace',
+                        fontFamily: 'var(--font-mono)',
                       }}>
                         ฿{fmtBaht(fee.amount)}
                       </div>
@@ -395,7 +395,7 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
               <span style={{ fontSize: '0.8125rem', color: '#4F46E5', fontWeight: 600 }}>
                 รวมค่าส่วนกลางที่เรียกเก็บต่อห้อง
               </span>
-              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#4F46E5', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#4F46E5', fontFamily: 'var(--font-mono)' }}>
                 ฿{fmtBaht(activeTotal)} / เดือน
               </span>
             </div>

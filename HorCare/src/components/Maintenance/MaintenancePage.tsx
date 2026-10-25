@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   Wrench, AlertTriangle, Clock, CheckCircle2, XCircle,
   Edit3, Check, Zap, Droplets, Wind, DoorOpen,
@@ -316,7 +316,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                     display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                     padding: '0.2rem 0.6rem', borderRadius: '7px',
                     background: 'var(--color-gray-100, #F3F4F6)', color: 'var(--color-gray-800, #1F2937)',
-                    fontSize: '0.8125rem', fontWeight: 800, fontFamily: 'monospace',
+                    fontSize: '0.8125rem', fontWeight: 800, fontFamily: 'var(--font-mono)',
                   }}>
                     ห้อง {req.room_number}
                   </span>

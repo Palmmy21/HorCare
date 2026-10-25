@@ -1262,7 +1262,7 @@ export default function ContractSignModal({
                   boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
                   border: '1px solid var(--color-gray-200)',
                   color: '#111827',
-                  fontFamily: "'Sarabun', 'Inter', sans-serif",
+                  fontFamily: 'var(--font-sans)',
                   lineHeight: 1.75,
                 }}
               >

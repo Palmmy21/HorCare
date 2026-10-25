@@ -1,4 +1,5 @@
 // HorCare - Type Definitions
+import type { StatusOverride } from '../shared/roomOccupancy.js';
 
 export type PlanName = 'small' | 'medium' | 'large';
 export type BillingCycle = 'monthly' | 'yearly';
@@ -143,9 +144,12 @@ export interface Room {
   custom_water_config?: WaterConfig | null;
   // Common fee overrides (maps fee.id to room-specific settings)
   common_fee_overrides?: Record<string, { amount?: number; is_active?: boolean }>;
-  // Room occupancy status — set manually by owner
+  // Room occupancy is derived from contracts (src/shared/roomOccupancy.ts).
+  // room_status is the old hand-set value, used only for rooms with no contract information at all.
   // 'occupied' = มีผู้เช่า, 'vacant' = ว่าง, 'reserved' = ติดจอง
   room_status?: 'occupied' | 'vacant' | 'reserved';
+  /** An admin's deliberate correction of the contract-derived status (with a reason); lapses when the contract changes. */
+  status_override?: StatusOverride | null;
   // Bulk-creation / amenity data
   building_name?: string;      // ตึก / อาคาร (free text, e.g. 'A')
   floor?: string;              // ชั้น

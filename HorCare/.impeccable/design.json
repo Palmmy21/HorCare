@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-25T12:00:00Z",
+  "title": "Design System: HorCare",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Ledger Blue", "canonical": "#0A6CC2", "dark": "#4C9BE6", "cssVar": "--color-primary", "tonalRamp": ["#031F38", "#06355F", "#08589F", "#0A6CC2", "#3D8FD6", "#74B2EC", "#B9D7F4", "#E6F0FA"] },
+      "primary-deep": { "role": "primary", "displayName": "Deep Ledger Blue", "canonical": "#08589F", "dark": "#3584D0", "cssVar": "--color-primary-dark" },
+      "primary-light": { "role": "primary", "displayName": "Light Ledger Blue", "canonical": "#3D8FD6", "dark": "#74B2EC", "cssVar": "--color-primary-light" },
+      "primary-wash": { "role": "primary", "displayName": "Blue Wash", "canonical": "rgba(10, 108, 194, 0.08)", "dark": "rgba(76, 155, 230, 0.15)", "cssVar": "--color-primary-ultra-light" },
+      "shell-blue": { "role": "primary", "displayName": "Shell Blue", "canonical": "#0A5DAA", "dark": "#0D2E52", "cssVar": "--sidebar-bg", "tonalRamp": ["#071E37", "#0D2E52", "#0A4A88", "#0A5DAA", "#0A6CC2", "#3D8FD6", "#9CC4EA", "#E6F0FA"] },
+      "shell-active-orange": { "role": "secondary", "displayName": "Active Orange", "canonical": "#FFB36B", "dark": "#FFB36B", "cssVar": "--sidebar-active-icon" },
+      "accent-orange": { "role": "secondary", "displayName": "Signal Orange", "canonical": "#E8740C", "dark": "#F5A54A", "cssVar": "--color-accent", "tonalRamp": ["#431407", "#7C2D12", "#9A3412", "#C2410C", "#E8740C", "#F59E2E", "#FFB36B", "#FFF1E3"] },
+      "cool-paper": { "role": "neutral", "displayName": "Cool Paper", "canonical": "#F4F7FB", "dark": "#0B1A2C", "cssVar": "--color-gray-50", "tonalRamp": ["#102A43", "#1A3350", "#29435E", "#3E5872", "#557089", "#8FA3B8", "#C3D0DE", "#F4F7FB"] },
+      "panel-white": { "role": "neutral", "displayName": "Panel White", "canonical": "#FFFFFF", "dark": "#11243A", "cssVar": "--color-white" },
+      "mist": { "role": "neutral", "displayName": "Mist", "canonical": "#EBF1F7", "dark": "#17304B", "cssVar": "--color-gray-100" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#DCE5EF", "dark": "#22405F", "cssVar": "--color-gray-200" },
+      "hairline-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "#C3D0DE", "dark": "#2E5074", "cssVar": "--color-gray-300" },
+      "steel-faint": { "role": "neutral", "displayName": "Faint Steel", "canonical": "#8FA3B8", "dark": "#6E88A6", "cssVar": "--color-gray-400" },
+      "steel-muted": { "role": "neutral", "displayName": "Muted Steel", "canonical": "#557089", "dark": "#96ADC6", "cssVar": "--color-gray-500" },
+      "steel-secondary": { "role": "neutral", "displayName": "Secondary Steel", "canonical": "#3E5872", "dark": "#B9CADC", "cssVar": "--color-gray-600" },
+      "steel-body": { "role": "neutral", "displayName": "Body Steel", "canonical": "#29435E", "dark": "#D6E2EF", "cssVar": "--color-gray-700" },
+      "steel-heading": { "role": "neutral", "displayName": "Heading Steel", "canonical": "#1A3350", "dark": "#EAF1F8", "cssVar": "--color-gray-800" },
+      "navy-ink": { "role": "neutral", "displayName": "Navy Ink", "canonical": "#102A43", "dark": "#F7FAFD", "cssVar": "--color-gray-900 / --color-navy" },
+      "success": { "role": "status", "displayName": "Ledger Green", "canonical": "#15803D", "dark": "#3DBE78", "cssVar": "--color-success", "tonalRamp": ["#0A3A1C", "#11532A", "#166534", "#15803D", "#22A35A", "#5BD08F", "#A8E6C2", "#E7F6EC"] },
+      "success-deep": { "role": "status", "displayName": "Deep Green", "canonical": "#166534", "dark": "#2EA163", "cssVar": "--color-success-dark" },
+      "success-wash": { "role": "status", "displayName": "Green Wash", "canonical": "rgba(21, 128, 61, 0.09)", "dark": "rgba(61, 190, 120, 0.14)", "cssVar": "--color-success-ultra-light" },
+      "warning": { "role": "status", "displayName": "Burnt Orange", "canonical": "#C2410C", "dark": "#F5A54A", "cssVar": "--color-warning", "tonalRamp": ["#431407", "#7C2D12", "#9A3412", "#C2410C", "#E8740C", "#F59E2E", "#FFB36B", "#FFF1E3"] },
+      "warning-fill": { "role": "status", "displayName": "Waiting Orange", "canonical": "#F59E2E", "dark": "#F7B86C", "cssVar": "--color-warning-light" },
+      "warning-wash": { "role": "status", "displayName": "Orange Wash", "canonical": "rgba(245, 158, 46, 0.14)", "dark": "rgba(245, 165, 74, 0.15)", "cssVar": "--color-warning-ultra-light" },
+      "danger": { "role": "status", "displayName": "Ledger Red", "canonical": "#C62828", "dark": "#F06A6A", "cssVar": "--color-danger", "tonalRamp": ["#4D0F0F", "#7A1818", "#A51F1F", "#C62828", "#E35D5D", "#F48B8B", "#F8C2C2", "#FDECEC"] },
+      "danger-wash": { "role": "status", "displayName": "Red Wash", "canonical": "rgba(198, 40, 40, 0.08)", "dark": "rgba(240, 106, 106, 0.14)", "cssVar": "--color-danger-ultra-light" },
+      "status-paid": { "role": "status", "displayName": "Paid / Done", "canonical": "#147A43", "dark": "#1A8C4F", "cssVar": "--status-paid" },
+      "status-pending": { "role": "status", "displayName": "Pending / Waiting", "canonical": "#F59E2E", "dark": "#EE9432", "cssVar": "--status-pending" },
+      "status-unpaid": { "role": "status", "displayName": "Unpaid", "canonical": "#D64545", "dark": "#D94C4C", "cssVar": "--status-unpaid" },
+      "status-vacant": { "role": "status", "displayName": "Vacant", "canonical": "#A9B8C8", "dark": "#5F7894", "cssVar": "--status-vacant" },
+      "series-1": { "role": "chart", "displayName": "Series Blue", "canonical": "#2A78D6", "dark": "#3987E5", "cssVar": "--series-1" },
+      "series-1-soft": { "role": "chart", "displayName": "Series Blue Soft", "canonical": "#9EC5F4", "dark": "#1E4E86", "cssVar": "--series-1-soft" },
+      "series-2": { "role": "chart", "displayName": "Series Orange", "canonical": "#EB6834", "dark": "#D95926", "cssVar": "--series-2" },
+      "series-muted": { "role": "chart", "displayName": "Series Muted", "canonical": "#D3DEEA", "dark": "#2E5074", "cssVar": "--series-muted" },
+      "cat-1": { "role": "chart", "displayName": "Categorical 1 Blue", "canonical": "#2A78D6", "dark": "#3987E5", "cssVar": "--cat-1" },
+      "cat-2": { "role": "chart", "displayName": "Categorical 2 Orange", "canonical": "#EB6834", "dark": "#D95926", "cssVar": "--cat-2" },
+      "cat-3": { "role": "chart", "displayName": "Categorical 3 Teal Green", "canonical": "#1BAF7A", "dark": "#199E70", "cssVar": "--cat-3" },
+      "cat-4": { "role": "chart", "displayName": "Categorical 4 Gold", "canonical": "#EDA100", "dark": "#C98500", "cssVar": "--cat-4" },
+      "cat-5": { "role": "chart", "displayName": "Categorical 5 Pink", "canonical": "#E87BA4", "dark": "#D55181", "cssVar": "--cat-5" },
+      "cat-6": { "role": "chart", "displayName": "Categorical 6 Green", "canonical": "#008300", "dark": "#008300", "cssVar": "--cat-6" },
+      "cat-7": { "role": "chart", "displayName": "Categorical 7 Violet", "canonical": "#6250D6", "dark": "#9085E9", "cssVar": "--cat-7" },
+      "cat-8": { "role": "chart", "displayName": "Categorical 8 Red", "canonical": "#E34948", "dark": "#E66767", "cssVar": "--cat-8" },
+      "chart-grid": { "role": "chart", "displayName": "Chart Grid", "canonical": "#E6EDF4", "dark": "#1B3552", "cssVar": "--chart-grid" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The single hero money figure per screen (collected this cycle)." },
+      "headline": { "displayName": "Headline", "purpose": "Page H1; the building name on the Dashboard. 1.375rem below 768px." },
+      "figure": { "displayName": "Figure", "purpose": "Key-figure values in the hairline-split figures panel. 1.25rem on phones." },
+      "title": { "displayName": "Title", "purpose": "Panel titles and the room-map title." },
+      "body": { "displayName": "Body", "purpose": "Rows, lists, buttons, tabs. Line-height 1.6 leaves room for Thai tone marks." },
+      "label": { "displayName": "Label", "purpose": "Figure labels, panel meta, chart legend and tooltip text; table headers at 500." },
+      "caption": { "displayName": "Caption", "purpose": "Room lists, remaining-work notes, hints, badges at 500." }
+    },
+    "fontAliases": [
+      { "name": "--font-sans", "value": "'Anuphan', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Thai', Roboto, sans-serif", "purpose": "Every role." },
+      { "name": "--font-mono", "value": "'Anuphan', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Thai', Roboto, sans-serif", "purpose": "Alias of the Anuphan stack for reference/account-number fields; pair with tabular-nums. No monospace face is loaded." }
+    ],
+    "shadows": [
+      { "name": "shadow-sm", "value": "0 1px 2px 0 rgba(16, 42, 67, 0.05)", "dark": "0 1px 2px 0 rgba(0, 0, 0, 0.4)", "purpose": "Rest state of base cards; optional, the hairline separates." },
+      { "name": "shadow-md", "value": "0 2px 8px -2px rgba(16, 42, 67, 0.09), 0 1px 2px rgba(16, 42, 67, 0.04)", "dark": "0 2px 10px -2px rgba(0, 0, 0, 0.5)", "purpose": "Small menus and popovers." },
+      { "name": "shadow-lg", "value": "0 10px 24px -8px rgba(16, 42, 67, 0.16), 0 2px 4px rgba(16, 42, 67, 0.05)", "dark": "0 12px 28px -8px rgba(0, 0, 0, 0.6)", "purpose": "Chart tooltips and dropdowns." },
+      { "name": "shadow-xl", "value": "0 24px 48px -12px rgba(16, 42, 67, 0.24)", "dark": "0 24px 48px -12px rgba(0, 0, 0, 0.7)", "purpose": "Modals and sheets." },
+      { "name": "shadow-glow-primary", "value": "0 0 0 3px rgba(10, 108, 194, 0.18)", "dark": "0 0 0 3px rgba(67, 147, 221, 0.25)", "purpose": "Focus halo on inputs." },
+      { "name": "seg-active", "value": "0 1px 2px rgba(16, 24, 40, 0.08), 0 0 0 1px var(--color-gray-200)", "purpose": "Active segmented tab lift." },
+      { "name": "focus-ring", "value": "outline: 2px solid var(--color-primary); outline-offset: 2px", "purpose": "Global :focus-visible ring." }
+    ],
+    "motion": [
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "Default easing for hover and state colour changes." },
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Cycle-bar segments and bar fills growing in (0.6s)." },
+      { "name": "duration-fast", "value": "120ms", "purpose": "Hover/background/colour transitions." },
+      { "name": "duration-normal", "value": "200ms", "purpose": "Chevron rotation, disclosure." },
+      { "name": "duration-slow", "value": "300ms", "purpose": "Sidebar collapse and larger layout changes." },
+      { "name": "press", "value": "transform: scale(0.98)", "purpose": "Button :active feedback; no hover lift." }
+    ],
+    "breakpoints": [
+      { "name": "xs", "value": "400px" },
+      { "name": "sm", "value": "480px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one blue action on a surface: save, send, confirm.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">บันทึกบิล</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border: none; border-radius: var(--radius-md, 8px); font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 120ms cubic-bezier(0.25, 1, 0.5, 1), color 120ms cubic-bezier(0.25, 1, 0.5, 1), transform 120ms cubic-bezier(0.25, 1, 0.5, 1); } .ds-btn-primary { background: var(--color-primary, #0A6CC2); color: #FFFFFF; } .ds-btn-primary:hover { background: var(--color-primary-dark, #08589F); } .ds-btn:active { transform: scale(0.98); } .ds-btn:focus-visible { outline: 2px solid var(--color-primary, #0A6CC2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Quiet header control, e.g. Dashboard customize.",
+      "html": "<button class=\"ds-btn-ghost\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"21\" x2=\"14\" y1=\"4\" y2=\"4\"/><line x1=\"10\" x2=\"3\" y1=\"4\" y2=\"4\"/><line x1=\"21\" x2=\"12\" y1=\"12\" y2=\"12\"/><line x1=\"8\" x2=\"3\" y1=\"12\" y2=\"12\"/><line x1=\"21\" x2=\"16\" y1=\"20\" y2=\"20\"/><line x1=\"12\" x2=\"3\" y1=\"20\" y2=\"20\"/><line x1=\"14\" x2=\"14\" y1=\"2\" y2=\"6\"/><line x1=\"8\" x2=\"8\" y1=\"10\" y2=\"14\"/><line x1=\"16\" x2=\"16\" y1=\"18\" y2=\"22\"/></svg>ปรับแต่ง</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; color: var(--color-gray-600, #3E5872); border: none; border-radius: var(--radius-md, 8px); font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 120ms ease, color 120ms ease; } .ds-btn-ghost:hover { background: var(--color-gray-100, #EBF1F7); color: var(--color-gray-900, #102A43); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--color-primary, #0A6CC2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Link Action",
+      "kind": "button",
+      "refersTo": "link-action",
+      "description": "A panel's single next step, at the panel head.",
+      "html": "<button class=\"ds-link-btn\">จัดการสลิป<svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m9 18 6-6-6-6\"/></svg></button>",
+      "css": ".ds-link-btn { display: inline-flex; align-items: center; gap: 2px; background: none; border: none; cursor: pointer; color: var(--color-primary, #0A6CC2); font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.875rem; font-weight: 500; padding: 0.3rem 0.5rem; min-height: 32px; border-radius: var(--radius-md, 8px); transition: background-color 120ms ease; } .ds-link-btn:hover { background: var(--color-primary-ultra-light, rgba(10,108,194,0.08)); } .ds-link-btn:focus-visible { outline: 2px solid var(--color-primary, #0A6CC2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Hairline field; focus turns the border blue with a soft halo.",
+      "html": "<label class=\"ds-label\">ค่าน้ำต่อหน่วย<input class=\"ds-input\" placeholder=\"18\" /></label>",
+      "css": ".ds-label { display: flex; flex-direction: column; gap: 8px; font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.875rem; font-weight: 500; color: var(--color-gray-600, #3E5872); } .ds-input { width: 100%; padding: 12px 16px; border: 1px solid var(--color-gray-200, #DCE5EF); border-radius: var(--radius-md, 8px); background: var(--color-white, #FFFFFF); color: var(--color-gray-800, #1A3350); font-family: inherit; font-size: 0.9375rem; font-variant-numeric: tabular-nums; outline: none; transition: border-color 120ms ease, box-shadow 120ms ease; } .ds-input::placeholder { color: var(--color-gray-400, #8FA3B8); } .ds-input:focus { border-color: var(--color-primary, #0A6CC2); box-shadow: 0 0 0 3px rgba(10, 108, 194, 0.18); }"
+    },
+    {
+      "name": "Segmented Tabs",
+      "kind": "nav",
+      "refersTo": "segmented-tabs",
+      "description": "View switch (overview / AI); full width on phones.",
+      "html": "<div class=\"ds-seg\" role=\"tablist\"><button class=\"ds-seg-item ds-active\" role=\"tab\" aria-selected=\"true\">ภาพรวม</button><button class=\"ds-seg-item\" role=\"tab\" aria-selected=\"false\">น้องแคร์ AI</button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--color-gray-100, #EBF1F7); border: 1px solid var(--color-gray-200, #DCE5EF); border-radius: var(--radius-lg, 10px); } .ds-seg-item { border: none; background: transparent; color: var(--color-gray-600, #3E5872); font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.875rem; font-weight: 500; padding: 0.4rem 0.9rem; min-height: 34px; border-radius: 7px; cursor: pointer; transition: background-color 120ms ease, color 120ms ease; } .ds-seg-item:hover { color: var(--color-gray-900, #102A43); } .ds-seg-item.ds-active { background: var(--color-white, #FFFFFF); color: var(--color-gray-900, #102A43); font-weight: 600; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08), 0 0 0 1px var(--color-gray-200, #DCE5EF); } .ds-seg-item:focus-visible { outline: 2px solid var(--color-primary, #0A6CC2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Brand-blue shell nav; the active item is a white-tint ground with an orange icon.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-active\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg>ภาพรวม</a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z\"/><path d=\"m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9\"/></svg>จดมิเตอร์</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 6px; width: 240px; padding: 20px; background: var(--sidebar-bg, #0A5DAA); } .ds-nav-item { display: flex; align-items: center; gap: 12px; padding: 0.625rem 0.875rem; border-radius: var(--radius-md, 8px); color: rgba(255,255,255,0.82); text-decoration: none; font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.875rem; font-weight: 500; transition: background-color 120ms ease, color 120ms ease; } .ds-nav-item svg { color: rgba(255,255,255,0.7); transition: color 120ms ease; } .ds-nav-item:hover { color: #FFFFFF; background: rgba(255,255,255,0.06); } .ds-nav-item:hover svg { color: rgba(255,255,255,0.9); } .ds-nav-item.ds-active { color: #FFFFFF; background: rgba(255,255,255,0.16); font-weight: 600; } .ds-nav-item.ds-active:hover { background: rgba(255,255,255,0.19); } .ds-nav-item.ds-active svg { color: var(--sidebar-active-icon, #FFB36B); } .ds-nav-item:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-success",
+      "description": "Washed state chip for table rows: done (green), waiting (orange), owed (red).",
+      "html": "<span class=\"ds-badge ds-badge-success\">จ่ายแล้ว</span> <span class=\"ds-badge ds-badge-warning\">รอตรวจ</span> <span class=\"ds-badge ds-badge-danger\">ค้างชำระ</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-sm, 6px); font-family: var(--font-sans, 'Anuphan', sans-serif); font-size: 0.75rem; font-weight: 500; white-space: nowrap; } .ds-badge-success { background: var(--color-success-ultra-light, rgba(21,128,61,0.09)); color: var(--color-success, #15803D); } .ds-badge-warning { background: var(--color-warning-ultra-light, rgba(245,158,46,0.14)); color: var(--color-warning, #C2410C); } .ds-badge-danger { background: var(--color-danger-ultra-light, rgba(198,40,40,0.08)); color: var(--color-danger, #C62828); }"
+    },
+    {
+      "name": "Money Panel with Cycle Bar",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Signature: one hero figure, one segmented cycle bar (green paid, orange pending, red unpaid), one ledger row per status.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-head\"><h2 class=\"ds-panel-title\">การเก็บเงินรอบนี้</h2><span class=\"ds-panel-link\">จัดการสลิป</span></div><div class=\"ds-hero\"><span class=\"ds-hero-label\">เก็บแล้ว</span><span class=\"ds-hero-value\">฿58,754</span><span class=\"ds-hero-sub\">จากยอดที่ต้องเก็บ ฿77,760 · <strong>76%</strong></span></div><div class=\"ds-cycle\"><span style=\"flex-grow:58754\" class=\"ds-seg-paid\"></span><span style=\"flex-grow:9772\" class=\"ds-seg-pending\"></span><span style=\"flex-grow:9234\" class=\"ds-seg-unpaid\"></span></div><ul class=\"ds-rows\"><li><i class=\"ds-dot ds-seg-paid\"></i><span>จ่ายแล้ว</span><span class=\"ds-count\">13 ห้อง</span><b>฿58,754</b></li><li><i class=\"ds-dot ds-seg-pending\"></i><span>รอตรวจสลิป</span><span class=\"ds-count\">2 ห้อง</span><b>฿9,772</b></li><li><i class=\"ds-dot ds-seg-unpaid\"></i><span>ยังไม่จ่าย</span><span class=\"ds-count\">2 ห้อง</span><b>฿9,234</b></li></ul></section>",
+      "css": ".ds-panel { max-width: 420px; background: var(--color-white, #FFFFFF); border: 1px solid var(--color-gray-200, #DCE5EF); border-radius: var(--radius-xl, 12px); padding: 20px; font-family: var(--font-sans, 'Anuphan', sans-serif); color: var(--color-gray-700, #29435E); } .ds-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; min-height: 28px; } .ds-panel-title { font-size: 0.9375rem; font-weight: 600; color: var(--color-gray-800, #1A3350); margin: 0; } .ds-panel-link { color: var(--color-primary, #0A6CC2); font-size: 0.875rem; font-weight: 500; } .ds-hero { display: flex; flex-direction: column; margin-bottom: 16px; } .ds-hero-label { font-size: 0.875rem; color: var(--color-gray-500, #557089); } .ds-hero-value { font-size: clamp(2.5rem, 1.8rem + 2vw, 3rem); font-weight: 600; line-height: 1.15; letter-spacing: -0.02em; color: var(--color-gray-900, #102A43); font-variant-numeric: tabular-nums; } .ds-hero-sub { font-size: 0.875rem; color: var(--color-gray-600, #3E5872); } .ds-hero-sub strong { color: var(--color-gray-900, #102A43); font-weight: 600; } .ds-cycle { display: flex; gap: 2px; height: 10px; border-radius: 9999px; overflow: hidden; background: var(--color-gray-100, #EBF1F7); } .ds-cycle > span { flex-basis: 0; min-width: 4px; transition: flex-grow 0.6s cubic-bezier(0.16, 1, 0.3, 1); } .ds-seg-paid { background: var(--status-paid, #147A43); } .ds-seg-pending { background: var(--status-pending, #F59E2E); } .ds-seg-unpaid { background: var(--status-unpaid, #D64545); } .ds-rows { list-style: none; margin: 12px 0 0; padding: 0; } .ds-rows li { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 0.6rem 0; font-size: 0.875rem; border-bottom: 1px solid var(--color-gray-100, #EBF1F7); } .ds-rows li:last-child { border-bottom: none; } .ds-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; } .ds-count { color: var(--color-gray-500, #557089); font-variant-numeric: tabular-nums; } .ds-rows b { font-weight: 600; color: var(--color-gray-900, #102A43); font-variant-numeric: tabular-nums; min-width: 6.5em; text-align: right; }"
+    },
+    {
+      "name": "Room Status Tiles",
+      "kind": "custom",
+      "refersTo": "room-tile",
+      "description": "Compact room grid: occupied tiles unmarked (number only), dashed vacant, orange-washed reserved; only exceptions carry a status dot.",
+      "html": "<div class=\"ds-tiles\"><button class=\"ds-tile\"><span class=\"ds-num\">101</span><span class=\"ds-st\"><i class=\"ds-tdot\" style=\"background:var(--status-paid,#147A43)\"></i>มีผู้เช่า</span></button><button class=\"ds-tile ds-vacant\"><span class=\"ds-num\">105</span><span class=\"ds-st\"><i class=\"ds-tdot\" style=\"background:var(--status-vacant,#A9B8C8)\"></i>ว่าง</span></button><button class=\"ds-tile ds-reserved\"><span class=\"ds-num\">108</span><span class=\"ds-st\"><i class=\"ds-tdot\" style=\"background:var(--status-pending,#F59E2E)\"></i>ติดจอง</span></button><button class=\"ds-tile\"><span class=\"ds-num\">201</span><span class=\"ds-st\"><i class=\"ds-tdot\" style=\"background:var(--status-paid,#147A43)\"></i>มีผู้เช่า</span></button></div>",
+      "css": ".ds-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; max-width: 380px; font-family: var(--font-sans, 'Anuphan', sans-serif); } .ds-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 52px; padding: 0.45rem 0.6rem; border-radius: var(--radius-md, 8px); border: 1px solid var(--color-gray-200, #DCE5EF); background: var(--color-white, #FFFFFF); cursor: pointer; text-align: left; font: inherit; transition: border-color 120ms ease, background-color 120ms ease; } .ds-tile:hover { border-color: var(--color-gray-400, #8FA3B8); } .ds-tile:focus-visible { outline: 2px solid var(--color-primary, #0A6CC2); outline-offset: 2px; } .ds-vacant { background: var(--color-gray-50, #F4F7FB); border-style: dashed; border-color: var(--color-gray-300, #C3D0DE); } .ds-reserved { background: var(--color-warning-ultra-light, rgba(245,158,46,0.14)); } .ds-num { font-size: 0.9375rem; font-weight: 600; color: var(--color-gray-900, #102A43); font-variant-numeric: tabular-nums; line-height: 1.3; } .ds-vacant .ds-num { color: var(--color-gray-500, #557089); } .ds-st { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.6875rem; color: var(--color-gray-500, #557089); line-height: 1.3; } .ds-tdot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Ledger",
+    "overview": "HorCare reads like a well-kept bank statement for a small rental business, printed in three colours: blue, orange and green. The ground is a blue-tinted paper, panels are white sheets separated by 1px blue-grey hairlines, and text is a deep navy ink rather than black. The brand-blue shell frames the work and carries the HorCare logo; inside it, blue means \"you can act here\", orange means \"this still needs you\", and green means \"this is done\". Everything else stays quiet so that the numbers are the loudest thing on the page.\n\nDensity is moderate and phone-first: panels stack to one column below 768px, figures stay legible at 375px, and every money column uses tabular numerals so amounts line up like a ledger. Colour is spent on meaning. Green, orange and red appear only where a payment, task or room is in that state, always beside a text label; chart hues come from a validated categorical set and never stand in for state.\n\nThe world explicitly rejects black and near-black: no black shell, no black ink, no near-black dark mode. It also rejects the KPI-tile grid with tinted icon squares, gradient accents, glow dots and progress rings that the earlier cyan look used. Depth comes from tone and hairlines, not shadows.\n\nDark mode is a first-class twin and stays blue: a deep-blue ground (`#0B1A2C`), panels raised by lightness (`#11243A`), hairlines at `#22405F`, a deep-blue shell (`#0D2E52`), and every role stepped brighter for the dark surface (brand blue `#4C9BE6`, success `#3DBE78`, warning `#F5A54A`, danger `#F06A6A`; status fills paid `#1A8C4F`, pending `#EE9432`, unpaid `#D94C4C`). The same token names resolve in both themes via `html.dark`.",
+    "keyCharacteristics": [
+      "Blue-tinted paper ground, white hairline panels, brand-blue shell, deep-navy ink. No black anywhere.",
+      "Blue acts, orange waits, green is done.",
+      "Status colours only where state is meant, and always with a label.",
+      "Anuphan for every role, including figures, print views and emails; tabular numerals in every figure and column.",
+      "12px panel radii, 1px hairlines, shadows almost absent.",
+      "The cycle bar: one segmented bar reused for collection and progress."
+    ],
+    "rules": [
+      { "name": "The Three Voices Rule", "body": "Blue acts, orange waits, green is done. If something is blue it is clickable or selected; if it is orange it still needs the owner; if it is green it is finished or paid. Red is reserved for owed and failed.", "section": "colors" },
+      { "name": "The No-Black Rule", "body": "The darkest ink is Navy Ink, the shell is Shell Blue, and dark mode is deep blue. No surface, text or shell is black or near-black.", "section": "colors" },
+      { "name": "The Labelled-State Rule", "body": "Status green, orange and red never carry meaning alone; every dot, segment or tile in a status colour sits beside its text label, count or legend.", "section": "colors" },
+      { "name": "The Two Palettes Rule", "body": "Status tokens encode state, while series and categorical tokens encode magnitude and category. A chart of income is series-1 blue, never paid-green, and series-2 orange in a chart means expense, not \"waiting\".", "section": "colors" },
+      { "name": "The One Face Rule", "body": "Anuphan is the only face loaded and the only face named, in the app, print views, the contract modal, the monthly report, the tenant portal and transactional email. No mono, no second display face, no fallback to Sarabun, Inter or IBM Plex Mono.", "section": "typography" },
+      { "name": "The Tabular Figures Rule", "body": "Every number that can sit above or beside another number (money, counts, room numbers, account numbers, chart ticks) is set with `font-variant-numeric: tabular-nums`.", "section": "typography" },
+      { "name": "The No-Uppercase Rule", "body": "Table headers and labels are sentence case at 500 weight. Thai has no case, and Latin labels match it.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "Surfaces are separated by 1px lines, not by shadow or tinted fills. To divide one panel into parts, as the key figures do, split it with hairlines rather than floating four cards.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do put the single most important number on the screen in Display (up to 3rem, weight 600, tabular), and let everything else defer to it.",
+      "Do separate content with 1px Hairline (`#DCE5EF`) borders and Mist row dividers rather than shadows or tinted boxes.",
+      "Do use the cycle bar for any \"how much of this cycle is done\" reading, with status colours for payment state and Paid green for completed work.",
+      "Do use orange for anything still waiting on the owner: Burnt Orange for text on Orange Wash, Waiting Orange for fills and dots.",
+      "Do pair every status colour with a text label, count or legend.",
+      "Do set every amount, count and room number in tabular numerals and right-align money columns.",
+      "Do reference tokens (`var(--color-*)`, `var(--status-*)`, `var(--series-*)`, `var(--cat-*)`, `var(--sidebar-*)`) so dark mode follows automatically.",
+      "Do keep the HorCare logo on the Shell Blue shell."
+    ],
+    "donts": [
+      "Don't use black or near-black for a shell, ground, panel or text in either theme; the darkest ink is Navy Ink (`#102A43`) and dark mode stays deep blue.",
+      "Don't build KPI-tile grids with tinted icon squares, glow dots or progress rings; use one hairline-split figures panel and the cycle bar.",
+      "Don't use the legacy `--gradient-*` or `--shadow-glow-success` / `--shadow-glow-orange` tokens on new surfaces; they survive only so unconverted screens still render.",
+      "Don't use status green, orange or red tokens to decorate a category tag, an icon or a chart series; categories and series take the series and categorical tokens.",
+      "Don't set body text in Waiting Orange (`#F59E2E`); it is a fill step, and Burnt Orange is the text step.",
+      "Don't hard-code hex colours in components; inline literals do not switch with `html.dark`.",
+      "Don't lift elements on hover with `translateY`; hover changes border, ground or text colour only.",
+      "Don't load or name a second typeface (Sarabun, Inter, IBM Plex Mono or any mono) in the app, print views, portal or email; Anuphan carries every role."
+    ]
+  },
+  "drift": [
+    "Inline hex literals remain in 82 component files (1,345 occurrences; heaviest: TenantPortalPage, AdminDashboard, Settings, TenantContractSection, ContractSignModal, TenantProfilePage, CleaningPage). They do not follow html.dark or the new palette.",
+    "MaintenancePage marks in-progress with the old amber literal '#D97706' instead of var(--color-warning).",
+    "The verification email ground is '#F1F5F9' (slate) rather than the blue-tinted Cool Paper; email requires inline values, but the value predates the palette change.",
+    "Legacy --gradient-* and --shadow-glow-success / --shadow-glow-orange tokens still exist in index.css for unconverted screens.",
+    "index.css comment above .mobile-header still calls the shell 'ink-navy'; the rule itself uses var(--sidebar-bg)."
+  ]
+}

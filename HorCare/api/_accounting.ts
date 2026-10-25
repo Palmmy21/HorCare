@@ -1,47 +1,34 @@
 /**
- * /api/accounting — Mango export: profile + mappings, preview, batches, file download, import outcome,
- * and recording payments that need allocations (partial / several bills).
+ * /api/accounting — recording payments that need allocations (partial / several bills), and confirming a
+ * recorded transfer against a real bank transaction. Both post to HorCare's own books (api/_ledger-auto.ts).
  *
- * Reading (profiles, batches, payments) is straight from Firestore under rules that need
- * `accounting.export`; every write and the file itself go through here, permission-checked on every
- * property the profile covers. The posting rules are src/shared/accounting.ts (pure, tested).
+ * (The Mango export that used to live here was removed: the books are HorCare's own ledger.)
  *
- * Actions: profile_save | preview | create_batch | download | confirm_import | record_payment | verify_payment
+ * Actions: record_payment | verify_payment
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
-import { authorize, buildingExists, type AuthContext } from './_rbac.js';
+import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { buildMangoWorkbook } from './_mango-xlsx.js';
-import { billToDoc, fineToDoc, legacyPayment, loadBuilding, type PaidItem } from './_accounting-data.js';
+import { billToDoc, fineToDoc, legacyPayment, type PaidItem } from './_accounting-data.js';
 
-// the data helpers live in _accounting-data.ts (no XLSX dependency); re-exported for existing importers
+// the data helpers live in _accounting-data.ts; re-exported for existing importers
 export { billToDoc, fineToDoc, legacyPayment, loadBuilding, docRevision } from './_accounting-data.js';
-import {
-    buildVouchers, channelOf, profileGaps, sumCr, sumDr, thDate, toSatang,
-    type MangoProfile, type PaymentRec, type PostingResult, type Voucher, type VoucherKind,
-} from '../src/shared/accounting.js';
+import { channelOf, thDate, toSatang, type PaymentRec } from '../src/shared/accounting.js';
 import type { Fine, MonthlyBill } from '../src/types/index.js';
 import type { Permission } from '../src/shared/permissions.js';
 import { autoPostSafe } from './_ledger-auto.js';
 
 export const config = { maxDuration: 60 };
 
-type Action = 'profile_save' | 'preview' | 'create_batch' | 'download' | 'confirm_import' | 'record_payment' | 'verify_payment';
-const ACTIONS: Action[] = ['profile_save', 'preview', 'create_batch', 'download', 'confirm_import', 'record_payment', 'verify_payment'];
+type Action = 'record_payment' | 'verify_payment';
+const ACTIONS: Action[] = ['record_payment', 'verify_payment'];
 
 interface Body {
     action?: Action;
     owner_uid?: string;
     building_id?: string;
-    profile?: unknown;
-    profile_id?: string;
-    kind?: string;
-    from?: string;
-    to?: string;
-    batch_id?: string;
-    outcome?: string;
     note?: unknown;
     room_id?: string;
     method?: string;
@@ -57,87 +44,11 @@ class HttpError extends Error {
     constructor(public status: number, public code: string, public detail?: unknown) { super(code); }
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_MONEY_BAHT = 10_000_000;
-const ownerBase = (o: string) => `users/${o}`;
 const bldBase = (o: string, b: string) => `users/${o}/buildings/${b}`;
-
-/** `${kind}:...` keys of what earlier (non-failed) batches of this profile already contain. */
-async function loadExported(owner: string, profileId: string): Promise<Map<string, string>> {
-    const out = new Map<string, string>();
-    const batches = await db.collection(`${ownerBase(owner)}/accounting_batches`).where('profile_id', '==', profileId).get();
-    for (const b of batches.docs) {
-        const batch = b.data() as { id: string; kind: VoucherKind; import_outcome: string; vouchers_count: number };
-        if (batch.import_outcome === 'failed') continue;
-        const items = await db.collection(`${ownerBase(owner)}/accounting_batches/${batch.id}/items`).get();
-        for (const it of items.docs) {
-            for (const s of (it.data() as Voucher).sources) out.set(s.kind === 'payment' ? `receipt:payment:${s.id}` : `invoice:${s.kind}:${s.id}`, s.revision);
-        }
-    }
-    return out;
-}
-
-// ── profile ──────────────────────────────────────────────────────────────────
 
 const str = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim().length <= max ? v.trim() : null);
 const optStr = (v: unknown, max: number): string | null | undefined => (v === undefined || v === null || v === '' ? null : str(v, max) ?? undefined);
-
-/** Validate untrusted profile JSON field by field; returns a clean MangoProfile or null. */
-export function cleanProfile(raw: unknown, id: string): MangoProfile | null {
-    if (!raw || typeof raw !== 'object') return null;
-    const r = raw as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-    const name = str(r.name, 80);
-    const entity = str(r.legal_entity_name, 120);
-    const tmpl = str(r.template_version, 60);
-    if (name === null || entity === null || tmpl === null) return null;
-    if (!Array.isArray(r.property_ids) || r.property_ids.length > 50 || r.property_ids.some((p: unknown) => typeof p !== 'string' || !p || p.length > 128)) return null;
-    const o = r.options ?? {}, c = r.codes ?? {}, rm = r.remarks ?? {};
-    const cutoff = o.opening_cutoff_month === null || o.opening_cutoff_month === undefined || o.opening_cutoff_month === '' ? null : String(o.opening_cutoff_month);
-    if (cutoff !== null && !/^\d{4}-(0[1-9]|1[0-2])$/.test(cutoff)) return null;
-    if (!['issued_at', 'month_end'].includes(o.invoice_date_basis)) return null;
-    if (!['template', 'dd/mm/yyyy', 'yyyy-mm-dd'].includes(o.date_format)) return null;
-    for (const k of ['count_unverified_transfers', 'customer_code_all_lines', 'voucher_no_from_horcare', 'header_on_every_line', 'fill_reference_columns', 'fill_customer_block']) if (typeof o[k] !== 'boolean') return null;
-
-    const code = (v: unknown) => optStr(v, 40);
-    const codes = {
-        ar_account: str(c.ar_account, 40), project: code(c.project), job: code(c.job), department: code(c.department), cost_code: code(c.cost_code),
-        book: code(c.book), pu_cost_yn: code(c.pu_cost_yn), ac_type: code(c.ac_type), data_type: code(c.data_type),
-    };
-    if (Object.values(codes).some(v => v === undefined) || codes.ar_account === null) return null;
-    const invoice = str(rm.invoice, 100), receipt = str(rm.receipt, 100);
-    if (invoice === null || receipt === null) return null;
-
-    const rev: MangoProfile['revenue_accounts'] = {};
-    for (const [k, v] of Object.entries(r.revenue_accounts ?? {})) {
-        if (!['rent', 'electric', 'water', 'common_fee', 'fine'].includes(k)) return null;
-        const a = str(v, 40); if (a === null) return null; if (a) rev[k as keyof typeof rev] = a;
-    }
-    const channels: MangoProfile['channels'] = {};
-    for (const [k, v] of Object.entries(r.channels ?? {})) {
-        const ch = v as { account?: unknown; option_code?: unknown };
-        const account = str(ch?.account, 40), option = optStr(ch?.option_code, 40);
-        if (!k || k.length > 80 || account === null || option === undefined) return null;
-        if (account) channels[k] = { account, option_code: option };
-    }
-    const customers: MangoProfile['customers'] = {};
-    for (const [k, v] of Object.entries(r.customers ?? {})) {
-        const cc = str((v as { code?: unknown })?.code, 40);
-        if (!k || k.length > 128 || cc === null) return null;
-        if (cc) customers[k] = { code: cc };
-    }
-    const property_codes: Record<string, string> = {};
-    for (const [k, v] of Object.entries(r.property_codes ?? {})) { const pc = str(v, 12); if (pc === null) return null; if (pc) property_codes[k] = pc; }
-
-    return {
-        id, name, legal_entity_name: entity, template_version: tmpl, property_ids: [...new Set<string>(r.property_ids)], property_codes,
-        status: r.status === 'approved' ? 'approved' : 'draft',
-        options: { invoice_date_basis: o.invoice_date_basis, count_unverified_transfers: o.count_unverified_transfers, opening_cutoff_month: cutoff,
-            customer_code_all_lines: o.customer_code_all_lines, voucher_no_from_horcare: o.voucher_no_from_horcare, date_format: o.date_format, header_on_every_line: o.header_on_every_line,
-            fill_reference_columns: o.fill_reference_columns, fill_customer_block: o.fill_customer_block },
-        codes: { ...codes, ar_account: codes.ar_account! } as MangoProfile['codes'],
-        remarks: { invoice, receipt }, revenue_accounts: rev, channels, customers,
-    };
-}
 
 // ── handler ──────────────────────────────────────────────────────────────────
 
@@ -147,171 +58,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = body.action;
     if (!action || !ACTIONS.includes(action)) { res.status(400).json({ error: 'unknown_action' }); return; }
     if (typeof body.owner_uid !== 'string' || !body.owner_uid) { res.status(400).json({ error: 'invalid_input' }); return; }
+    if (typeof body.building_id !== 'string' || !body.building_id) { res.status(400).json({ error: 'invalid_input' }); return; }
     const owner = body.owner_uid;
+    const properties = [body.building_id];
 
-    // Which properties does this call touch? Every one must be authorised.
-    let profile: MangoProfile | null = null;
-    let properties: string[] = [];
-    const payAction = action === 'record_payment' || action === 'verify_payment';
-    try {
-        if (payAction) {
-            if (typeof body.building_id !== 'string' || !body.building_id) throw new HttpError(400, 'invalid_input');
-            properties = [body.building_id];
-        } else if (action === 'profile_save') {
-            const id = typeof body.profile_id === 'string' && body.profile_id ? body.profile_id : randomUUID();
-            const clean = cleanProfile(body.profile, id);
-            if (!clean) throw new HttpError(400, 'invalid_input');
-            profile = clean;
-            properties = clean.property_ids;
-            if (properties.length === 0) throw new HttpError(400, 'invalid_input');
-        } else {
-            const key = action === 'download' || action === 'confirm_import' ? 'batch' : 'profile';
-            let profileId = body.profile_id;
-            if (key === 'batch') {
-                if (typeof body.batch_id !== 'string' || !body.batch_id) throw new HttpError(400, 'invalid_input');
-                const b = await db.doc(`${ownerBase(owner)}/accounting_batches/${body.batch_id}`).get();
-                if (!b.exists) throw new HttpError(404, 'not_found');
-                profileId = (b.data() as { profile_id: string }).profile_id;
-            }
-            if (typeof profileId !== 'string' || !profileId) throw new HttpError(400, 'invalid_input');
-            const snap = await db.doc(`${ownerBase(owner)}/accounting_profiles/${profileId}`).get();
-            if (!snap.exists) throw new HttpError(404, 'not_found');
-            profile = snap.data() as MangoProfile;
-            properties = profile.property_ids;
-        }
-    } catch (e) {
-        if (e instanceof HttpError) { res.status(e.status).json({ error: e.code }); return; }
-        throw e;
-    }
-
-    const permission: Permission = action === 'profile_save' ? 'accounting.manage'
-        : action === 'record_payment' ? 'payment.create' : action === 'verify_payment' ? 'payment.reconcile' : 'accounting.export';
-    let ctx: AuthContext | null = null;
-    for (const bld of properties) {
-        ctx = await authorize(req, res, { ownerUid: owner, buildingId: bld, permission });
-        if (!ctx) return;
-        if (!(await buildingExists(owner, bld))) { res.status(404).json({ error: 'property_not_found' }); return; }
-    }
-    if (!ctx) { res.status(400).json({ error: 'invalid_input' }); return; }
-    const who = ctx;
-    const audit = (act: 'CREATE' | 'UPDATE' | 'DOWNLOAD', type: 'accounting_profile' | 'accounting_export' | 'payment', id: string, label: string, extra: object = {}) =>
+    const permission: Permission = action === 'record_payment' ? 'payment.create' : 'payment.reconcile';
+    const ctx = await authorize(req, res, { ownerUid: owner, buildingId: body.building_id, permission });
+    if (!ctx) return;
+    const who = ctx; // non-null for the nested handlers below
+    if (!(await buildingExists(owner, body.building_id))) { res.status(404).json({ error: 'property_not_found' }); return; }
+    const audit = (act: 'CREATE' | 'UPDATE', type: 'payment', id: string, label: string, extra: object = {}) =>
         writeAudit({
             ownerUid: owner, propertyId: properties[0], userId: who.uid, userName: who.displayName, role: who.role,
             action: act, resourceType: type, resourceId: id, resourceLabel: label, req, ...extra,
         });
 
     try {
-        if (action === 'profile_save') return await saveProfile();
         if (action === 'record_payment') return await recordPayment();
-        if (action === 'verify_payment') return await verifyPayment();
-        return await exportActions();
+        return await verifyPayment();
     } catch (e) {
         if (e instanceof HttpError) { res.status(e.status).json({ error: e.code, ...(e.detail ? { detail: e.detail } : {}) }); return; }
         throw e;
-    }
-
-    // ── profile_save ─────────────────────────────────────────────────────────
-    async function saveProfile() {
-        const p = profile!;
-        const col = `${ownerBase(owner)}/accounting_profiles`;
-        // one legal entity per property: a property cannot be exported by two profiles
-        const others = (await db.collection(col).get()).docs.map(d => d.data() as MangoProfile).filter(o => o.id !== p.id);
-        const clash = others.find(o => o.property_ids.some(x => p.property_ids.includes(x)));
-        if (clash) throw new HttpError(409, 'property_in_other_profile', clash.name);
-        const gaps = profileGaps(p);
-        if (p.status === 'approved' && gaps.length) throw new HttpError(409, 'profile_incomplete', gaps);
-        const prev = await db.doc(`${col}/${p.id}`).get();
-        await db.doc(`${col}/${p.id}`).set({ ...p, updated_at: new Date().toISOString(), updated_by: who.uid });
-        await audit(prev.exists ? 'UPDATE' : 'CREATE', 'accounting_profile', p.id, p.name, {
-            note: `status ${p.status}; ${Object.keys(p.customers).length} customers`,
-        });
-        res.status(200).json({ profile: p, gaps });
-    }
-
-    // ── preview / create_batch / download / confirm_import ────────────────────
-    async function build(kind: VoucherKind, from: string, to: string): Promise<PostingResult> {
-        const p = profile!;
-        const all = await Promise.all(p.property_ids.map(b => loadBuilding(owner, b, p.property_codes[b])));
-        const docs = all.flatMap(a => a.docs);
-        const payments = all.flatMap(a => a.payments);
-        const exported = await loadExported(owner, p.id);
-        return buildVouchers({ profile: p, kind, from, to, docs, payments, exported });
-    }
-    function summary(r: PostingResult) {
-        return {
-            documents: r.vouchers.length, lines: r.vouchers.reduce((n, v) => n + v.lines.length, 0),
-            dr_satang: sumDr(r.vouchers), cr_satang: sumCr(r.vouchers), problems: r.problems.length, excluded: r.excluded.length,
-        };
-    }
-
-    async function exportActions() {
-        const p = profile!;
-        if (action === 'download' || action === 'confirm_import') {
-            const ref = db.doc(`${ownerBase(owner)}/accounting_batches/${body.batch_id}`);
-            const batch = (await ref.get()).data() as { id: string; kind: VoucherKind; from: string; to: string; profile_snapshot: MangoProfile; file_name: string; checksum: string };
-            if (action === 'confirm_import') {
-                if (body.outcome !== 'confirmed' && body.outcome !== 'failed' && body.outcome !== 'partial') throw new HttpError(400, 'invalid_input');
-                const note = optStr(body.note, 500);
-                if (note === undefined) throw new HttpError(400, 'invalid_input');
-                if ((body.outcome === 'failed' || body.outcome === 'partial') && !note) throw new HttpError(400, 'note_required');
-                await ref.update({ import_outcome: body.outcome, import_note: note, import_by: who.displayName, import_at: new Date().toISOString() });
-                await audit('UPDATE', 'accounting_export', batch.id, batch.file_name, { note: `import ${body.outcome}` });
-                res.status(200).json({ ok: true });
-                return;
-            }
-            const items = (await db.collection(`${ownerBase(owner)}/accounting_batches/${batch.id}/items`).get()).docs.map(d => d.data() as Voucher & { seq: number });
-            items.sort((a, b) => a.seq - b.seq);
-            const buf = await buildMangoWorkbook(batch.profile_snapshot, items);
-            // the stored checksum covers the vouchers, so a tampered batch is caught
-            if (checksum(items) !== batch.checksum) throw new HttpError(500, 'batch_corrupted');
-            await audit('DOWNLOAD', 'accounting_export', batch.id, batch.file_name);
-            res.status(200).json({ file_name: batch.file_name, base64: buf.toString('base64') });
-            return;
-        }
-
-        const kind = body.kind;
-        if ((kind !== 'invoice' && kind !== 'receipt') || typeof body.from !== 'string' || typeof body.to !== 'string'
-            || !DATE_RE.test(body.from) || !DATE_RE.test(body.to) || body.from > body.to) throw new HttpError(400, 'invalid_input');
-        const gaps = profileGaps(p);
-        // a preview helps while setting up (it lists what is missing); a file needs an approved, complete profile
-        const r = await build(kind, body.from, body.to);
-        if (action === 'preview') {
-            res.status(200).json({ ...r, summary: summary(r), gaps, approved: p.status === 'approved' });
-            return;
-        }
-        if (p.status !== 'approved') throw new HttpError(409, 'profile_not_approved');
-        if (gaps.length) throw new HttpError(409, 'profile_incomplete', gaps);
-
-        // create_batch: nothing is exported if anything in the run is blocked
-        if (r.problems.length) throw new HttpError(409, 'blocked', { problems: r.problems, summary: summary(r) });
-        if (r.vouchers.length === 0) {
-            // everything in this period is already in a batch: a repeated click gets that batch back instead of an error
-            if (r.excluded.some(e => e.reason === 'already_exported')) {
-                const same = (await db.collection(`${ownerBase(owner)}/accounting_batches`).where('profile_id', '==', p.id).get()).docs
-                    .map(d => d.data() as { kind: string; from: string; to: string })
-                    .find(b => b.kind === kind && b.from === body.from && b.to === body.to);
-                if (same) { res.status(200).json({ batch: same, reused: true }); return; }
-            }
-            throw new HttpError(409, 'nothing_to_export');
-        }
-        const sum = checksum(r.vouchers);
-        const id = createHash('sha1').update(`${p.id}|${kind}|${sum}`).digest('hex').slice(0, 24);
-        const ref = db.doc(`${ownerBase(owner)}/accounting_batches/${id}`);
-        const existing = await ref.get();
-        if (existing.exists) { res.status(200).json({ batch: existing.data(), reused: true }); return; } // double click / retry
-        const fileName = `mango-${kind === 'invoice' ? 'invoice' : 'receipt'}-${body.from.replaceAll('-', '')}-${body.to.replaceAll('-', '')}.xlsx`;
-        const s = summary(r);
-        const batch = {
-            id, profile_id: p.id, profile_snapshot: p, kind, from: body.from, to: body.to, template_version: p.template_version,
-            file_name: fileName, checksum: sum, status: 'ready', import_outcome: 'unknown', import_note: null,
-            vouchers_count: s.documents, lines_count: s.lines, dr_satang: s.dr_satang, cr_satang: s.cr_satang,
-            created_at: new Date().toISOString(), created_by: who.uid, created_by_name: who.displayName,
-        };
-        await ref.set(batch);
-        let seq = 0;
-        for (const v of r.vouchers) await db.doc(`${ownerBase(owner)}/accounting_batches/${id}/items/${String(seq).padStart(6, '0')}`).set({ ...v, seq: seq++ });
-        await audit('CREATE', 'accounting_export', id, fileName, { note: `${s.documents} vouchers, ${s.lines} lines` });
-        res.status(200).json({ batch, reused: false });
     }
 
     // ── record_payment ───────────────────────────────────────────────────────
@@ -415,13 +182,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await autoPostSafe(owner, properties[0]);
         res.status(200).json({ ok: true });
     }
-}
-
-/** Order-independent digest of vouchers (their keys and amounts). */
-export function checksum(vs: Pick<Voucher, 'key' | 'total_dr_satang' | 'total_cr_satang' | 'lines'>[]): string {
-    const h = createHash('sha256');
-    for (const v of [...vs].sort((a, b) => a.key.localeCompare(b.key))) {
-        h.update(`${v.key}|${v.total_dr_satang}|${v.total_cr_satang}|${v.lines.map(l => `${l.account}:${l.dr_satang}:${l.cr_satang}:${l.customer_code ?? ''}`).join(';')}\n`);
-    }
-    return h.digest('hex');
 }

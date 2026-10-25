@@ -320,7 +320,7 @@ export default function TenantContractSection({
                   </span>
                 </div>
                 <div style={{ fontSize: '0.775rem', color: '#64748B', marginTop: '0.15rem' }}>
-                  เลขที่: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{contract.contract_number}</span> • ตรวจสอบได้
+                  เลขที่: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{contract.contract_number}</span> • ตรวจสอบได้
                 </div>
               </div>
             </div>
@@ -328,7 +328,7 @@ export default function TenantContractSection({
             <span
               style={{
                 fontSize: '0.72rem',
-                fontFamily: 'monospace',
+                fontFamily: 'var(--font-mono)',
                 background: '#F1F5F9',
                 padding: '0.25rem 0.6rem',
                 borderRadius: '8px',
@@ -950,7 +950,7 @@ export default function TenantContractSection({
                     {contract.title}
                   </h2>
                   <div style={{ fontSize: '0.825rem', color: '#64748B', marginTop: '0.2rem' }}>
-                    เลขที่สัญญา: <strong style={{ fontFamily: 'monospace' }}>{contract.contract_number}</strong>
+                    เลขที่สัญญา: <strong style={{ fontFamily: 'var(--font-mono)' }}>{contract.contract_number}</strong>
                   </div>
                 </div>
 
@@ -1087,7 +1087,7 @@ export default function TenantContractSection({
                     <ShieldCheck size={14} color="#16A34A" />
                     <span>
                       เอกสารนี้ลงนามอิเล็กทรอนิกส์ผ่านระบบ HorCare • Audit Code:{' '}
-                      <strong style={{ fontFamily: 'monospace', color: '#0F172A' }}>
+                      <strong style={{ fontFamily: 'var(--font-mono)', color: '#0F172A' }}>
                         {contract.verification_code || 'VERIFIED'}
                       </strong>
                     </span>

@@ -11,9 +11,10 @@ import { REVENUE_CATEGORIES, REVENUE_CATEGORY_LABELS_TH, thDate, type RevenueCat
 import { BarChart, Legend, RateChart } from './charts';
 import { compactBaht } from './chartMath';
 
-const COLORS = { billed: '#93C5FD', collected: '#16A34A', lastYear: '#F59E0B', cash: '#0EA5E9', transfer: '#8B5CF6', other: '#9CA3AF' };
+// Chart tokens from index.css: validated for colour-blind separation in light and dark, assigned in fixed order.
+const COLORS = { billed: 'var(--series-1-soft)', collected: 'var(--series-1)', lastYear: 'var(--series-2)', cash: 'var(--cat-1)', transfer: 'var(--cat-3)', other: 'var(--status-vacant)' };
 const CATEGORY_COLORS: Record<RevenueCategory, string> = {
-  rent: '#3B82F6', electric: '#F59E0B', water: '#06B6D4', common_fee: '#8B5CF6', fine: '#EF4444', stay: '#10B981', stall: '#F97316', walk_in: '#EC4899', other_income: '#9CA3AF',
+  rent: 'var(--cat-1)', electric: 'var(--cat-2)', water: 'var(--cat-3)', common_fee: 'var(--cat-4)', fine: 'var(--cat-8)', stay: 'var(--cat-6)', stall: 'var(--cat-7)', walk_in: 'var(--cat-5)', other_income: 'var(--status-vacant)',
 };
 const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.9rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 };
 const baht = (s: number) => `฿${(s / 100).toLocaleString('th-TH', { maximumFractionDigits: 0 })}`;
@@ -154,7 +155,7 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
             <div style={card}>
               <strong>อัตราเก็บเงินได้รายเดือน</strong>
               <RateChart title="อัตราเก็บเงินได้รายเดือน" labels={labels} values={rows.map(r => r.collection_rate)} color={COLORS.collected} target={1} />
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>เส้นประสีเขียว = เก็บครบ 100%</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>เส้นประสีเขียว = เก็บครบ 100% · แตะกราฟเพื่อดูตัวเลข</span>
             </div>
 
             <div style={card}>
@@ -176,7 +177,7 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
           <div style={card}>
             <strong>ยอดค้างชำระ แยกตามอายุหนี้</strong>
             <BarChart title="ยอดค้างชำระแยกตามอายุหนี้" labels={view.aging.buckets.map(b => b.label)} mode="grouped" height={200}
-              series={[{ key: 'owed', label: 'ค้างชำระ', color: '#F59E0B' }]} values={[view.aging.buckets.map(b => b.satang)]} />
+              series={[{ key: 'owed', label: 'ค้างชำระ', color: 'var(--series-2)' }]} values={[view.aging.buckets.map(b => b.satang)]} />
             {view.debtors.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>ลูกหนี้เลยกำหนดสูงสุด</span>

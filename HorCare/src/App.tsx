@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
@@ -99,6 +99,9 @@ function App() {
   }, []);
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+  // a room tapped on the Dashboard's room map: the Tenants page opens its profile on arrival
+  const [tenantRoomToOpen, setTenantRoomToOpen] = useState<string | null>(null);
+  const clearTenantRoomToOpen = useCallback(() => setTenantRoomToOpen(null), []);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Sidebar categories: which groups the user left expanded (saved), plus a one-off collapse
   // of the group that holds the page they are on (only valid for that page).
@@ -450,7 +453,7 @@ function App() {
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
     { id: 'ledger' as ViewMode, icon: BookOpen, label: 'สมุดบัญชี' },
     { id: 'leasing' as ViewMode, icon: KeyRound, label: 'ปล่อยเช่า' },
-    { id: 'accounting' as ViewMode, icon: BookOpenCheck, label: 'บัญชี · Export Mango' },
+    { id: 'accounting' as ViewMode, icon: BookOpenCheck, label: 'ภาพรวมการเงิน' },
     { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
@@ -876,7 +879,7 @@ function App() {
             }} />
           )}
         </button>
-        <span style={{ fontWeight: 700 }}>HorCare</span>
+        <span className="mobile-header-brand"><img src={horcareLogo} alt="" />HorCare</span>
         <div style={{ width: 44 }}></div>
       </div>
 
@@ -1536,7 +1539,10 @@ function App() {
             recentBills={monthBills}
             allBills={bills}
             rooms={rooms}
-            onUpdateRoom={updateRoom}
+            onOpenRoom={visibleNavItems.some(i => i.id === 'tenants')
+              ? room => { setTenantRoomToOpen(room.id); handleNavClick('tenants'); }
+              : undefined}
+            permissions={staffPermissions}
             uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
             buildingName={activeBuilding?.name}
@@ -1575,6 +1581,10 @@ function App() {
             onUpdateRoom={updateRoom}
             buildingType={config?.building_type}
             config={config}
+            permissions={staffPermissions}
+            actorName={profile?.display_name || user.email || undefined}
+            openRoomId={tenantRoomToOpen}
+            onOpenRoomHandled={clearTenantRoomToOpen}
           />
         )}
 

@@ -148,7 +148,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
           boxShadow: '0 4px 12px rgba(220,38,38,0.2)'
         }}>
           <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.375rem' }}>ค้างชำระ</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '-0.5px' }}>
             ฿{fmtBaht(totalUnpaid)}
           </div>
           <div style={{ fontSize: '0.8125rem', opacity: 0.8, marginTop: '0.25rem' }}>
@@ -161,7 +161,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
           boxShadow: '0 4px 12px rgba(245,158,11,0.2)'
         }}>
           <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.375rem' }}>รอตรวจสอบ</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '-0.5px' }}>
             ฿{fmtBaht(totalPending)}
           </div>
           <div style={{ fontSize: '0.8125rem', opacity: 0.8, marginTop: '0.25rem' }}>
@@ -174,7 +174,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
           boxShadow: '0 4px 12px rgba(16,185,129,0.2)'
         }}>
           <div style={{ fontSize: '0.875rem', opacity: 0.9, marginBottom: '0.375rem' }}>ชำระแล้ว</div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-mono)', letterSpacing: '-0.5px' }}>
             ฿{fmtBaht(totalPaid)}
           </div>
           <div style={{ fontSize: '0.8125rem', opacity: 0.8, marginTop: '0.25rem' }}>
@@ -391,7 +391,7 @@ export default function FinesTab({ uid, buildingId, rooms, fines, onAdd, onUpdat
                       <div style={{
                         fontSize: '1.25rem', fontWeight: 800,
                         color: fine.status === 'unpaid' ? '#DC2626' : fine.status === 'pending' ? '#D97706' : '#059669',
-                        fontFamily: 'monospace',
+                        fontFamily: 'var(--font-mono)',
                       }}>
                         ฿{fmtBaht(fine.amount)}
                       </div>

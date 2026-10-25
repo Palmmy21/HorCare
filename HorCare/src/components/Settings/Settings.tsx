@@ -1841,7 +1841,7 @@ export default function Settings(props: SettingsProps) {
 
                                                     {/* Hidden Print Area */}
                                                     <div className="qr-print-wrapper">
-                                                        <div style={{ textAlign: 'center', fontFamily: 'Sarabun, "TH Sarabun New", sans-serif' }}>
+                                                        <div style={{ textAlign: 'center', fontFamily: 'var(--font-sans)' }}>
                                                             <h1 style={{ fontSize: '2.5rem', marginBottom: '0.25rem', color: '#111' }}>{billForm.dorm_name || 'หอพัก'}</h1>
                                                             <h2 style={{ fontSize: '1.5rem', fontWeight: 'normal', color: '#444' }}>
                                                                 สแกน QR Code แล้วพิมพ์รหัสเพื่อลงทะเบียน
@@ -2111,7 +2111,7 @@ export default function Settings(props: SettingsProps) {
                                     <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>
                                         {swatch.name}
                                     </div>
-                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-gray-500)', fontFamily: 'monospace' }}>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--color-gray-500)', fontFamily: 'var(--font-mono)' }}>
                                         {swatch.code}
                                     </div>
                                 </div>

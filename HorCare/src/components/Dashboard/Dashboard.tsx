@@ -1,10 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
-    Home, Zap, Droplets,
-    TrendingUp, TrendingDown, CheckCircle, Clock,
-    BarChart3, CheckSquare, FileText, LineChart, Settings, ClipboardList,
-    SlidersHorizontal, X, Wallet, CircleDollarSign, AlertCircle, ChevronRight,
-    Receipt, ArrowUpRight, ArrowDownRight, Building2, Store,
+    Zap, Droplets, Home, CheckCircle2, Clock, Gauge, Send,
+    SlidersHorizontal, X, ChevronRight, Bot,
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -14,7 +11,11 @@ import { useDashboardPrefs, WIDGET_LABELS, type WidgetId } from '../../hooks/use
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import NongCarePanel from '../NongCare/NongCarePanel';
 import RoomStatusDashboard from '../RoomManagement/RoomStatusDashboard';
-import { Bot } from 'lucide-react';
+import { BarChart, DonutChart, Legend } from '../Accounting/charts';
+import { useCountUp } from '../../hooks/useCountUp';
+import { useRoomOccupancy } from '../../hooks/useRoomOccupancy';
+import { canOpenView } from '../../shared/viewAccess';
+import type { Permission } from '../../shared/permissions';
 
 interface DashboardProps {
     config: DormConfig;
@@ -29,7 +30,10 @@ interface DashboardProps {
     recentBills: MonthlyBill[];
     allBills?: MonthlyBill[];
     rooms?: Room[];
-    onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
+    /** Opens a room's tenant profile (Tenants page). Omitted when the account cannot open that page. */
+    onOpenRoom?: (room: Room) => void;
+    /** Staff permissions; null for the owner. */
+    permissions?: readonly Permission[] | null;
     uid?: string;
     buildingId?: string;
     buildingName?: string;
@@ -47,9 +51,18 @@ function expenseMonth(dateStr: string): string {
     return dateStr.slice(0, 7);
 }
 
+const waterOf = (b: MonthlyBill) => (b.water_bill ?? 0) + (b.water_flat_amount ?? 0) + (b.water_excess_amount ?? 0);
+
+/** Axis labels for the trend chart: values arrive in satang (chart convention), shown as compact baht. */
+const axisBaht = (satang: number) => {
+    const b = satang / 100;
+    return b >= 1000 ? `${(b / 1000).toFixed(b >= 10_000 ? 0 : 1)}k` : String(Math.round(b));
+};
+const tipBaht = (satang: number) => formatCurrency(satang / 100);
+
 export default function Dashboard({
     config, stats, currentMonth, recentBills, allBills = [],
-    rooms, onUpdateRoom,
+    rooms, onOpenRoom, permissions = null,
     uid, buildingId, buildingName, onGoToPayments, license, onUpgrade
 }: DashboardProps) {
     const [showCustomize, setShowCustomize] = useState(false);
@@ -57,6 +70,11 @@ export default function Dashboard({
     const { allWidgets, toggle, isEnabled } = useDashboardPrefs(uid);
     const dormLogo = config?.bill_customization?.dorm_logo;
     const terms = getWorkspaceTerms(config?.building_type);
+    const showRoomMap = isEnabled('room_status') && !!rooms && rooms.length > 0;
+    const { byRoom: occupancy } = useRoomOccupancy(uid, buildingId, showRoomMap ? rooms! : [], {
+        leasing: showRoomMap && canOpenView('leasing', permissions),
+        tenants: showRoomMap && canOpenView('tenants', permissions),
+    });
 
     // ── Fetch expenses (last 6+ months) ──────────────────────────────────────
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -70,10 +88,6 @@ export default function Dashboard({
         return unsub;
     }, [uid, buildingId]);
 
-    const totalElecUnits = recentBills.reduce((sum, b) => sum + b.elec_units, 0);
-    const totalWaterUnits = recentBills.reduce((sum, b) => sum + b.water_units, 0);
-    const totalElecBill = recentBills.reduce((sum, b) => sum + b.elec_bill, 0);
-    const totalWaterBill = recentBills.reduce((sum, b) => sum + (b.water_bill ?? 0) + (b.water_flat_amount ?? 0) + (b.water_excess_amount ?? 0), 0);
 
     // ── Expense stats for current month ──────────────────────────────────────
     const currentMonthExpenses = useMemo(
@@ -94,17 +108,22 @@ export default function Dashboard({
     // ── Collection stats ──────────────────────────────────────────────────────
     const collection_ = useMemo(() => {
         const saved = recentBills.filter(b => b.is_saved);
-        let projected = 0, collected = 0, paid = 0, pending = 0, unpaid = 0;
+        let projected = 0, collected = 0, pendingAmt = 0, unpaidAmt = 0, paid = 0, pending = 0, unpaid = 0, notified = 0;
+        const pendingRooms: string[] = [], unpaidRooms: string[] = [];
         for (const b of saved) {
             projected += b.total_bill;
+            if (b.is_notified) notified++;
             const s = statusOf(b);
             if (s === 'paid') { collected += b.total_bill; paid++; }
-            else if (s === 'pending') pending++;
-            else unpaid++;
+            else if (s === 'pending') { pendingAmt += b.total_bill; pending++; pendingRooms.push(b.room_number); }
+            else { unpaidAmt += b.total_bill; unpaid++; unpaidRooms.push(b.room_number); }
         }
+        const byRoom = (a: string, b: string) => a.localeCompare(b, 'th', { numeric: true });
+        pendingRooms.sort(byRoom);
+        unpaidRooms.sort(byRoom);
         const outstanding = projected - collected;
         const rate = projected > 0 ? Math.round((collected / projected) * 100) : 0;
-        return { projected, collected, outstanding, paid, pending, unpaid, rate, total: saved.length };
+        return { projected, collected, outstanding, pendingAmt, unpaidAmt, paid, pending, unpaid, notified, pendingRooms, unpaidRooms, rate, total: saved.length, saved };
     }, [recentBills]);
 
     const netProfit = collection_.collected - totalExpense;
@@ -114,20 +133,19 @@ export default function Dashboard({
         const months: string[] = [];
         let m = currentMonth;
         for (let i = 0; i < 6; i++) { months.unshift(m); m = getPreviousMonth(m); }
-        const rows = months.map(month => {
+        return months.map(month => {
             const saved = allBills.filter(b => b.month === month && b.is_saved);
             const projected = saved.reduce((s, b) => s + b.total_bill, 0);
             const collected = saved.filter(b => statusOf(b) === 'paid').reduce((s, b) => s + b.total_bill, 0);
             const expense = expenses
                 .filter(e => expenseMonth(e.date) === month)
                 .reduce((s, e) => s + e.amount, 0);
-            return { month, projected, collected, expense, net: collected - expense };
+            return { month, projected, collected, expense };
         });
-        const peak = Math.max(1, ...rows.map(r => Math.max(r.projected, r.expense)));
-        return { rows, peak };
     }, [allBills, expenses, currentMonth]);
 
-    const hasTrend = trend.rows.some(r => r.projected > 0 || r.expense > 0);
+    const hasTrend = trend.some(r => r.projected > 0 || r.expense > 0);
+    const hasExpenseHistory = trend.some(r => r.expense > 0);
 
     // Prepare context for AI
     const aiContext = useMemo(() => ({
@@ -147,528 +165,367 @@ export default function Dashboard({
         netProfit: netProfit
     }), [currentMonth, buildingName, stats, collection_, currentMonthExpenses, netProfit]);
 
+    const showMoney = isEnabled('collection');
+    const showTodo = isEnabled('progress');
+    const unit = terms.unitName;
+
+    // Collection bar: the month's billed money split by where it stands
+    const moneySegs = [
+        { key: 'paid', label: 'จ่ายแล้ว', count: collection_.paid, amount: collection_.collected, rooms: [] as string[] },
+        { key: 'pending', label: 'รอตรวจสลิป', count: collection_.pending, amount: collection_.pendingAmt, rooms: collection_.pendingRooms },
+        { key: 'unpaid', label: 'ยังไม่จ่าย', count: collection_.unpaid, amount: collection_.unpaidAmt, rooms: collection_.unpaidRooms },
+    ] as const;
+    const roomList = (list: string[]) =>
+        list.length <= 4 ? list.join(', ') : `${list.slice(0, 4).join(', ')} +${list.length - 4}`;
+
+    // The billing cycle as steps: record meters → save bills → send via LINE. Each draws the same cycle bar.
+    const cycleSteps = [
+        ...(terms.usesMeters ? [{ key: 'meter', label: terms.meterRecordingLabel, done: stats.savedCount, of: stats.totalRooms }] : []),
+        { key: 'sent', label: 'ส่งบิลทาง LINE แล้ว', done: collection_.notified, of: collection_.total },
+    ].filter(s => s.of > 0);
+
+    // Income mix of this cycle's saved bills, so it adds up to the expected total in the money panel
+    const savedBills = collection_.saved;
+    const mixRent = savedBills.reduce((s, b) => s + b.room_rent, 0);
+    const mixElec = savedBills.reduce((s, b) => s + b.elec_bill, 0);
+    const mixWater = savedBills.reduce((s, b) => s + waterOf(b), 0);
+    const mixOther = Math.max(0, collection_.projected - mixRent - mixElec - mixWater);
+    // Units for the key figures come from the same saved bills, so the strip and the mix agree
+    const totalElecUnits = savedBills.reduce((sum, b) => sum + b.elec_units, 0);
+    const totalWaterUnits = savedBills.reduce((sum, b) => sum + b.water_units, 0);
+    // categorical slots in fixed order (validated for colour-blind separation as neighbours)
+    const incomeParts = [
+        { key: 'rent', label: 'ค่าห้อง', value: mixRent, color: 'var(--cat-1)' },
+        { key: 'elec', label: 'ค่าไฟฟ้า', value: mixElec, color: 'var(--cat-2)' },
+        { key: 'water', label: 'ค่าน้ำ', value: mixWater, color: 'var(--cat-3)' },
+        ...(mixOther > 0 ? [{ key: 'other', label: 'ค่าส่วนกลาง/อื่น ๆ', value: mixOther, color: 'var(--cat-4)' }] : []),
+    ];
+    const incomeTotal = collection_.projected;
+    const heroCollected = useCountUp(collection_.collected);
+
     return (
-        <div>
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-                <div>
-                    {/* ชื่อหอพัก — สไตล์ Gen-Z Hi-Tech Cyber Badge */}
-                    {buildingName && (
-                        <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.45rem',
-                            background: terms.isMarket ? 'rgba(217, 119, 6, 0.1)' : 'rgba(14, 165, 233, 0.08)',
-                            border: terms.isMarket ? '1px solid rgba(217, 119, 6, 0.3)' : '1px solid rgba(14, 165, 233, 0.25)',
-                            borderRadius: '9999px',
-                            padding: '0.25rem 0.85rem',
-                            marginBottom: '0.5rem',
-                            fontSize: '0.8125rem',
-                            fontWeight: 700,
-                            color: terms.isMarket ? '#B45309' : '#0284C7',
-                            letterSpacing: '0.02em',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
-                            backdropFilter: 'blur(8px)',
-                        }}>
-                            <span style={{
-                                width: '6px', height: '6px', borderRadius: '50%',
-                                background: '#10B981', boxShadow: '0 0 8px #10B981', flexShrink: 0,
-                            }} />
-                            {dormLogo ? (
-                                <img
-                                    src={dormLogo}
-                                    alt={buildingName}
-                                    style={{ width: 16, height: 16, borderRadius: '4px', objectFit: 'contain', flexShrink: 0 }}
-                                />
-                            ) : terms.isMarket ? (
-                                <Store size={13} style={{ color: '#D97706', flexShrink: 0 }} />
-                            ) : (
-                                <Building2 size={13} style={{ color: '#0EA5E9', flexShrink: 0 }} />
-                            )}
-                            <span>{buildingName}</span>
-                            {terms.isMarket && (
-                                <span style={{
-                                    fontSize: '0.65rem',
-                                    fontWeight: 800,
-                                    background: '#FEF3C7',
-                                    color: '#B45309',
-                                    padding: '0.1rem 0.45rem',
-                                    borderRadius: '6px',
-                                    marginLeft: '0.2rem',
-                                    border: '1px solid #FDE68A',
-                                }}>
-                                    ตลาด / แผงค้า
-                                </span>
-                            )}
-                        </div>
-                    )}
-                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <BarChart3 size={28} /> Dashboard
+        <div className="dash">
+            <header className="dash-head">
+                <div className="dash-head-text">
+                    <h1 className="dash-title">
+                        {buildingName || config?.bill_customization?.dorm_name || `ภาพรวม${terms.facilityType}`}
                     </h1>
-                    <p className="page-subtitle">
-                        ภาพรวม{terms.facilityType} — รอบเดือน {formatMonthThai(currentMonth)}
+                    <p className="dash-subtitle">
+                        ภาพรวม · รอบบิล {formatMonthThai(currentMonth)}
+                        {terms.isMarket && <span className="dash-tag">ตลาด / แผงค้า</span>}
                     </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    {/* Dorm Logo Badge at Top-Right (as requested) */}
+                <div className="dash-head-side">
+                    {/* Dorm logo at top-right (as requested); the name is already the page title */}
                     {dormLogo && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            background: 'var(--color-white)',
-                            border: '1.5px solid var(--color-gray-200)',
-                            borderRadius: '16px',
-                            padding: '0.35rem 0.85rem 0.35rem 0.45rem',
-                            boxShadow: 'var(--shadow-sm)',
-                        }}>
-                            <img
-                                src={dormLogo}
-                                alt={buildingName || 'โลโก้'}
-                                style={{
-                                    width: 46,
-                                    height: 46,
-                                    objectFit: 'contain',
-                                    borderRadius: '12px',
-                                    background: '#F8FAFC',
-                                    padding: '3px',
-                                    border: '1px solid var(--color-gray-100)',
-                                }}
-                            />
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                    สาขาปัจจุบัน
-                                </span>
-                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--color-gray-800)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {buildingName || config?.bill_customization?.dorm_name || terms.facilityType}
-                                </span>
-                            </div>
-                        </div>
+                        <img className="dash-logo" src={dormLogo} alt={`โลโก้ ${buildingName || ''}`.trim()} />
                     )}
-
-                    <button className="btn btn-outline btn-sm" onClick={() => setShowCustomize(true)} style={{ visibility: activeTab === 'overview' ? 'visible' : 'hidden' }}>
-                        <SlidersHorizontal size={15} /> ปรับแต่ง
-                    </button>
+                    {activeTab === 'overview' && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowCustomize(true)} aria-label="ปรับแต่ง Dashboard">
+                            <SlidersHorizontal size={16} /> <span className="dash-hide-xs">ปรับแต่ง</span>
+                        </button>
+                    )}
                 </div>
-            </div>
+            </header>
 
             {/* ── Tabs ── */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-gray-200)', paddingBottom: '0.5rem' }}>
-                <button 
-                    onClick={() => setActiveTab('overview')}
-                    style={{ 
-                        background: activeTab === 'overview' ? 'var(--color-primary)' : 'transparent', 
-                        color: activeTab === 'overview' ? '#fff' : 'var(--color-gray-600)',
-                        border: 'none', padding: '0.5rem 1rem', borderRadius: '999px', fontWeight: 600, cursor: 'pointer',
-                        transition: 'var(--transition-fast)'
-                    }}
-                >
-                    ภาพรวม{terms.facilityType}
+            <div className="seg" role="tablist" aria-label="มุมมอง Dashboard">
+                <button role="tab" aria-selected={activeTab === 'overview'} className={`seg-item ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
+                    ภาพรวม
                 </button>
-                <button 
-                    onClick={() => setActiveTab('ai')}
-                    style={{ 
-                        background: activeTab === 'ai' ? 'var(--color-primary)' : 'transparent', 
-                        color: activeTab === 'ai' ? '#fff' : 'var(--color-gray-600)',
-                        border: 'none', padding: '0.5rem 1rem', borderRadius: '999px', fontWeight: 600, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '0.375rem',
-                        transition: 'var(--transition-fast)'
-                    }}
-                >
-                    <Bot size={16} /> น้องแคร์ AI
+                <button role="tab" aria-selected={activeTab === 'ai'} className={`seg-item ${activeTab === 'ai' ? 'active' : ''}`} onClick={() => setActiveTab('ai')}>
+                    <Bot size={15} /> น้องแคร์ AI
                 </button>
             </div>
 
             {activeTab === 'ai' ? (
-                <NongCarePanel 
-                    contextData={aiContext} 
-                    isPro={license === 'active' || (license || '').includes('large')} 
-                    onUpgrade={onUpgrade || (() => {})} 
+                <NongCarePanel
+                    contextData={aiContext}
+                    isPro={license === 'active' || (license || '').includes('large')}
+                    onUpgrade={onUpgrade || (() => {})}
                 />
             ) : (
-                <>
-            {/* ── Room status overview ── */}
-            {isEnabled('room_status') && rooms && rooms.length > 0 && (
-                <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} buildingType={config?.building_type} />
-            )}
-
-            {/* ── Collection overview ── */}
-            {isEnabled('collection') && (
-                <div className="collection-panel card mb-6">
-                    <div className="collection-head">
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <CircleDollarSign size={18} /> การเก็บเงินรอบนี้
-                        </span>
-                        {onGoToPayments && (
-                            <button className="collection-link" onClick={onGoToPayments}>
-                                จัดการสลิป <ChevronRight size={14} />
-                            </button>
-                        )}
-                    </div>
-                    <div className="collection-body">
-                        <div className="collection-ring-wrap">
-                            <div className="collection-ring" style={{ ['--rate' as string]: `${collection_.rate}` }}>
-                                <div className="collection-ring-center">
-                                    <span className="collection-ring-pct">{collection_.rate}%</span>
-                                    <span className="collection-ring-cap">เก็บได้</span>
-                                </div>
-                            </div>
+            <div className="dash-grid">
+                {/* ── Money: how much is in, who still owes ── */}
+                {showMoney && (
+                    <section className={`panel money ${showTodo ? 'span-8' : 'span-12'}`} aria-labelledby="dash-money-title">
+                        <div className="panel-head">
+                            <h2 id="dash-money-title" className="panel-title">การเก็บเงินรอบนี้</h2>
+                            {onGoToPayments && (
+                                <button className="link-btn" onClick={onGoToPayments}>
+                                    จัดการสลิป <ChevronRight size={15} />
+                                </button>
+                            )}
                         </div>
-                        <div className="collection-figures">
-                            <div className="collection-fig">
-                                <span className="collection-fig-label"><TrendingUp size={14} /> รายได้คาดการณ์</span>
-                                <span className="collection-fig-value">{formatCurrency(collection_.projected)}</span>
-                            </div>
-                            <div className="collection-fig">
-                                <span className="collection-fig-label" style={{ color: 'var(--color-success)' }}><CheckCircle size={14} /> รายได้จริง (เก็บแล้ว)</span>
-                                <span className="collection-fig-value" style={{ color: 'var(--color-success)' }}>{formatCurrency(collection_.collected)}</span>
-                            </div>
-                            <div className="collection-fig">
-                                <span className="collection-fig-label" style={{ color: 'var(--color-danger)' }}><AlertCircle size={14} /> ค้างชำระ</span>
-                                <span className="collection-fig-value" style={{ color: 'var(--color-danger)' }}>{formatCurrency(collection_.outstanding)}</span>
-                            </div>
-                            <div className="collection-statusbar">
+
+                        <div className="money-hero">
+                            <span className="money-label">เก็บแล้ว</span>
+                            <span className="money-value" aria-label={formatCurrency(collection_.collected)}>{formatCurrency(Math.round(heroCollected))}</span>
+                            <span className="money-sub">
                                 {collection_.total > 0 ? (
-                                    <>
-                                        <div className="collection-seg paid" style={{ flex: collection_.paid || 0.0001 }} />
-                                        <div className="collection-seg pending" style={{ flex: collection_.pending || 0.0001 }} />
-                                        <div className="collection-seg unpaid" style={{ flex: collection_.unpaid || 0.0001 }} />
-                                    </>
-                                ) : <div className="collection-seg empty" style={{ flex: 1 }} />}
-                            </div>
-                            <div className="collection-legend">
-                                <span><i className="dot paid" /> จ่ายแล้ว {collection_.paid}</span>
-                                <span><i className="dot pending" /> รอตรวจสอบ {collection_.pending}</span>
-                                <span><i className="dot unpaid" /> ยังไม่จ่าย {collection_.unpaid}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Progress Bar ── */}
-            {isEnabled('progress') && terms.usesMeters && (
-                <div className="card mb-6">
-                    <div className="progress-container">
-                        <div className="progress-header">
-                            <span className="progress-label">
-                                {stats.isAllSaved ? (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <CheckSquare size={16} color="#10B981" /> จดครบทุก{terms.unitName}แล้ว!
-                                    </span>
+                                    <>จากยอดที่ต้องเก็บ {formatCurrency(collection_.projected)} · <strong>{collection_.rate}%</strong></>
                                 ) : (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <FileText size={16} /> สถานะ{terms.meterRecordingLabel}
-                                    </span>
+                                    <>ยังไม่มีบิลที่บันทึกในรอบนี้</>
                                 )}
                             </span>
-                            <span className="progress-value">{stats.savedCount}/{stats.totalRooms} {terms.unitName}</span>
                         </div>
-                        <div className="progress-bar">
-                            <div className="progress-fill" style={{ transform: `scaleX(${stats.progress / 100})` }} />
-                        </div>
-                    </div>
-                </div>
-            )}
 
-            {/* ── Stats Grid ── */}
-            {isEnabled('stats') && (
-                <div className="stats-grid">
-                    <div className="stat-card primary">
-                        <div className="stat-icon primary">
-                            {terms.isMarket ? <Store size={24} /> : <Home size={24} />}
+                        <div className="cycle-bar" role="img"
+                            aria-label={moneySegs.map(s => `${s.label} ${s.count} ${unit} ${formatCurrency(s.amount)}`).join(', ')}>
+                            {collection_.projected > 0
+                                ? moneySegs.map(s => s.amount > 0 && (
+                                    <span key={s.key} className={`cycle-seg ${s.key}`} style={{ flexGrow: s.amount }} />
+                                ))
+                                : <span className="cycle-seg empty" style={{ flexGrow: 1 }} />}
                         </div>
-                        <div className="stat-label">{terms.unitCountLabel}</div>
-                        <div className="stat-value">{stats.totalRooms}</div>
-                    </div>
-                    <div className="stat-card success">
-                        <div className="stat-icon success"><TrendingUp size={24} /></div>
-                        <div className="stat-label">รายได้คาดการณ์</div>
-                        <div className="stat-value">{formatCurrency(stats.totalRevenue)}</div>
-                    </div>
-                    <div className="stat-card warning">
-                        <div className="stat-icon warning"><Zap size={24} /></div>
-                        <div className="stat-label">หน่วยไฟฟ้ารวม</div>
-                        <div className="stat-value">{totalElecUnits.toLocaleString()}</div>
-                        <div className="stat-subvalue">≈ {formatCurrency(totalElecBill)}</div>
-                    </div>
-                    <div className="stat-card primary">
-                        <div className="stat-icon primary"><Droplets size={24} /></div>
-                        <div className="stat-label">หน่วยน้ำรวม</div>
-                        <div className="stat-value">{totalWaterUnits.toLocaleString()}</div>
-                        <div className="stat-subvalue">≈ {formatCurrency(totalWaterBill)}</div>
-                    </div>
-                </div>
-            )}
 
-            {/* ── Expense Summary & Net Profit ── */}
-            {isEnabled('expense_summary') && (
-                <div className="card mt-6">
-                    <div className="card-header">
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Receipt size={18} /> ค่าใช้จ่าย & กำไร — {formatMonthThai(currentMonth)}
-                        </span>
-                    </div>
+                        <ul className="money-rows">
+                            {moneySegs.map(s => {
+                                const body = (
+                                    <>
+                                        <span className={`status-dot ${s.key}`} aria-hidden />
+                                        <span className="money-row-label">
+                                            {s.label}
+                                            {s.rooms.length > 0 && <span className="money-row-rooms">{unit} {roomList(s.rooms)}</span>}
+                                        </span>
+                                        <span className="money-row-count">{s.count} {unit}</span>
+                                        <span className="money-row-amount">{formatCurrency(s.amount)}</span>
+                                        {onGoToPayments && <ChevronRight size={16} className="money-row-go" aria-hidden />}
+                                    </>
+                                );
+                                // Rows that still need action open the slips/payments page
+                                return (
+                                    <li key={s.key}>
+                                        {s.rooms.length > 0 && onGoToPayments
+                                            ? <button className="money-row money-row-link" onClick={onGoToPayments}>{body}</button>
+                                            : <div className="money-row">{body}</div>}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
+                )}
 
-                    {/* 3-column summary */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: expenseByCategory.length > 0 ? '1rem' : 0 }}>
-                        <div style={{ background: 'var(--color-success-ultra-light)', borderRadius: '12px', padding: '0.875rem', border: '1px solid var(--color-success-light)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-success)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
-                                <ArrowUpRight size={14} /> รายได้จริง
-                            </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-success)' }}>{formatCurrency(collection_.collected)}</div>
+                {/* ── What's left to do this cycle ── */}
+                {showTodo && (
+                    <section className={`panel ${showMoney ? 'span-4' : 'span-12'}`} aria-labelledby="dash-todo-title">
+                        <div className="panel-head">
+                            <h2 id="dash-todo-title" className="panel-title">งานที่เหลือรอบนี้</h2>
                         </div>
-                        <div style={{ background: 'var(--color-danger-ultra-light)', borderRadius: '12px', padding: '0.875rem', border: '1px solid var(--color-danger-light)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-danger)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
-                                <ArrowDownRight size={14} /> ค่าใช้จ่าย
-                            </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: 'var(--color-danger)' }}>{formatCurrency(totalExpense)}</div>
-                        </div>
-                        <div style={{
-                            background: netProfit >= 0 ? 'var(--color-primary-ultra-light)' : 'var(--color-danger-ultra-light)',
-                            borderRadius: '12px', padding: '0.875rem',
-                            border: `1px solid ${netProfit >= 0 ? 'var(--color-primary-light)' : 'var(--color-danger-light)'}`,
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: netProfit >= 0 ? 'var(--color-primary)' : 'var(--color-danger)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.375rem' }}>
-                                {netProfit >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                กำไรสุทธิ
-                            </div>
-                            <div style={{ fontWeight: 800, fontSize: '1.0625rem', color: netProfit >= 0 ? 'var(--color-primary)' : 'var(--color-danger)' }}>
-                                {netProfit >= 0 ? '' : '−'}{formatCurrency(Math.abs(netProfit))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Expense breakdown by category */}
-                    {expenseByCategory.length > 0 && (
-                        <div>
-                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
-                                ค่าใช้จ่ายตามหมวด
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-                                {expenseByCategory.map(([cat, amount]) => {
-                                    const pct = totalExpense > 0 ? (amount / totalExpense) * 100 : 0;
+                        {cycleSteps.length === 0 ? (
+                            <p className="panel-note" style={{ marginTop: 0 }}>ยังไม่มี{unit}หรือบิลในรอบนี้</p>
+                        ) : (
+                            <ul className="todo-list">
+                                {cycleSteps.map(s => {
+                                    const Icon = s.key === 'meter' ? Gauge : Send;
+                                    const done = s.done >= s.of;
                                     return (
-                                        <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                                            <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-700)', width: 120, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat}</span>
-                                            <div style={{ flex: 1, height: 8, background: 'var(--color-gray-200)', borderRadius: 4, overflow: 'hidden' }}>
-                                                <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#F87171,#EF4444)', borderRadius: 4, transition: 'width 0.4s' }} />
+                                        <li key={s.key}>
+                                            <Icon size={17} aria-hidden />
+                                            <span className="todo-label">{s.label}</span>
+                                            <span className={`todo-value ${done ? 'done' : ''}`}>
+                                                {done
+                                                    ? <><CheckCircle2 size={15} /> ครบแล้ว</>
+                                                    : <>{s.done}<span className="todo-of">/{s.of}</span></>}
+                                            </span>
+                                            <div className="cycle-bar cycle-bar-sm" role="progressbar" aria-valuemin={0} aria-valuemax={s.of} aria-valuenow={s.done}
+                                                aria-label={`${s.label} ${s.done} จาก ${s.of}`}>
+                                                {s.done > 0 && <span className="cycle-seg done" style={{ flexGrow: s.done }} />}
+                                                {s.of - s.done > 0 && <span className="cycle-seg empty" style={{ flexGrow: s.of - s.done }} />}
                                             </div>
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-gray-700)', width: 80, textAlign: 'right', flexShrink: 0 }}>{formatCurrency(amount)}</span>
-                                        </div>
+                                            {!done && <span className="todo-left">เหลือ {s.of - s.done} {unit}</span>}
+                                        </li>
                                     );
                                 })}
+                            </ul>
+                        )}
+                    </section>
+                )}
+
+                {/* ── Room status overview ── */}
+                {showRoomMap && (
+                    <div className="span-12">
+                        <RoomStatusDashboard rooms={rooms!} occupancy={occupancy} onOpenRoom={onOpenRoom} buildingType={config?.building_type} />
+                    </div>
+                )}
+
+                {/* ── Key figures ── */}
+                {isEnabled('stats') && (
+                    <section className="panel span-12 figures" aria-label="สถิติหลัก">
+                        <div className="figure">
+                            <span className="figure-label"><Home size={14} aria-hidden /> {terms.unitCountLabel}</span>
+                            <span className="figure-value">{stats.totalRooms}</span>
+                        </div>
+                        <div className="figure">
+                            <span className="figure-label"><Clock size={14} aria-hidden /> รายได้คาดการณ์</span>
+                            <span className="figure-value">{formatCurrency(stats.totalRevenue)}</span>
+                        </div>
+                        <div className="figure">
+                            <span className="figure-label"><Zap size={14} aria-hidden /> หน่วยไฟฟ้ารวม</span>
+                            <span className="figure-value">{totalElecUnits.toLocaleString()}</span>
+                            <span className="figure-sub">≈ {formatCurrency(mixElec)}</span>
+                        </div>
+                        <div className="figure">
+                            <span className="figure-label"><Droplets size={14} aria-hidden /> หน่วยน้ำรวม</span>
+                            <span className="figure-value">{totalWaterUnits.toLocaleString()}</span>
+                            <span className="figure-sub">≈ {formatCurrency(mixWater)}</span>
+                        </div>
+                    </section>
+                )}
+
+                {/* ── Revenue vs Expense Trend ── */}
+                {isEnabled('revenue_trend') && hasTrend && (
+                    <section className="panel span-7" aria-labelledby="dash-trend-title">
+                        <div className="panel-head panel-head-wrap">
+                            <h2 id="dash-trend-title" className="panel-title">รายได้ย้อนหลัง 6 เดือน</h2>
+                            <Legend items={[
+                                { label: 'เก็บได้จริง', color: 'var(--series-1)' },
+                                ...(hasExpenseHistory ? [{ label: 'ค่าใช้จ่าย', color: 'var(--series-2)' }] : []),
+                                { label: 'ยอดที่ต้องเก็บ', color: 'var(--color-gray-500)', dashed: true },
+                            ]} />
+                        </div>
+                        <BarChart
+                            title="รายได้ที่เก็บได้จริงเทียบค่าใช้จ่ายและยอดที่ต้องเก็บ ย้อนหลัง 6 เดือน"
+                            labels={trend.map(r => formatMonthThai(r.month))}
+                            mode="grouped"
+                            series={[
+                                { key: 'collected', label: 'เก็บได้จริง', color: 'var(--series-1)' },
+                                ...(hasExpenseHistory ? [{ key: 'expense', label: 'ค่าใช้จ่าย', color: 'var(--series-2)' }] : []),
+                            ]}
+                            values={[
+                                trend.map(r => r.collected * 100),
+                                ...(hasExpenseHistory ? [trend.map(r => r.expense * 100)] : []),
+                            ]}
+                            line={{ label: 'ยอดที่ต้องเก็บ', color: 'var(--color-gray-500)', area: true, values: trend.map(r => (r.projected > 0 ? r.projected * 100 : null)) }}
+                            format={axisBaht}
+                            formatTip={tipBaht}
+                            highlight={trend.length - 1}
+                            height={210}
+                        />
+                    </section>
+                )}
+
+                {/* ── Expense Summary & Net Profit ── */}
+                {isEnabled('expense_summary') && (
+                    <section className={`panel ${isEnabled('revenue_trend') && hasTrend ? 'span-5' : 'span-12'}`} aria-labelledby="dash-exp-title">
+                        <div className="panel-head">
+                            <h2 id="dash-exp-title" className="panel-title">ค่าใช้จ่าย & กำไร</h2>
+                            <span className="panel-meta">{formatMonthThai(currentMonth)}</span>
+                        </div>
+                        <dl className="pl">
+                            <div><dt>รายได้จริง</dt><dd>{formatCurrency(collection_.collected)}</dd></div>
+                            <div><dt>ค่าใช้จ่าย</dt><dd>{totalExpense > 0 ? '−' : ''}{formatCurrency(totalExpense)}</dd></div>
+                            <div className="pl-total">
+                                <dt>กำไรสุทธิ</dt>
+                                <dd className={netProfit < 0 ? 'neg' : ''}>{netProfit >= 0 ? '' : '−'}{formatCurrency(Math.abs(netProfit))}</dd>
                             </div>
-                        </div>
-                    )}
+                        </dl>
 
-                    {currentMonthExpenses.length === 0 && !buildingId && (
-                        <p style={{ fontSize: '0.8125rem', color: '#9CA3AF', margin: 0, textAlign: 'center' }}>
-                            ยังไม่มีค่าใช้จ่ายเดือนนี้ — บันทึกได้ที่หน้า "ระบบจัดการ"
-                        </p>
-                    )}
-                    {currentMonthExpenses.length === 0 && buildingId && (
-                        <p style={{ fontSize: '0.8125rem', color: '#9CA3AF', margin: 0, textAlign: 'center' }}>
-                            ยังไม่มีค่าใช้จ่ายเดือนนี้
-                        </p>
-                    )}
-                </div>
-            )}
-
-            {/* ── Revenue vs Expense Trend ── */}
-            {isEnabled('revenue_trend') && hasTrend && (
-                <div className="card mt-6">
-                    <div className="card-header">
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <BarChart3 size={18} /> รายได้ vs ค่าใช้จ่าย ย้อนหลัง 6 เดือน
-                        </span>
-                        <div className="trend-legend">
-                            <span><i className="dot projected" /> คาดการณ์</span>
-                            <span><i className="dot collected" /> เก็บได้จริง</span>
-                            <span><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#F87171', marginRight: 2 }} /> ค่าใช้จ่าย</span>
-                        </div>
-                    </div>
-                    <div className="trend-chart">
-                        {trend.rows.map(r => {
-                            const ph = Math.round((r.projected / trend.peak) * 100);
-                            const eh = Math.round((r.expense / trend.peak) * 100);
-                            const hasData = r.projected > 0 || r.expense > 0;
-                            return (
-                                <div key={r.month} className={`trend-col ${r.month === currentMonth ? 'current' : ''}`}>
-                                    <div className="trend-bars" style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 3 }}
-                                        title={`${formatMonthThai(r.month)} · คาดการณ์ ${formatCurrency(r.projected)} · เก็บได้ ${formatCurrency(r.collected)} · ค่าใช้จ่าย ${formatCurrency(r.expense)}`}>
-                                        {/* Revenue bar (projected + collected overlay) */}
-                                        <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                                            <div className="trend-bar projected" style={{ height: `${ph}%`, width: '100%' }}>
-                                                <div className="trend-bar collected" style={{ height: `${r.projected > 0 ? (r.collected / r.projected) * 100 : 0}%` }} />
-                                            </div>
-                                        </div>
-                                        {/* Expense bar */}
-                                        <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                                            <div style={{
-                                                width: '100%', height: `${eh}%`,
-                                                background: 'linear-gradient(to top, #EF4444, #F87171)',
-                                                borderRadius: '3px 3px 0 0', minHeight: eh > 0 ? 2 : 0,
-                                                opacity: 0.85,
-                                            }} />
-                                        </div>
+                        {expenseByCategory.length > 0 ? (
+                            <div className="hbars">
+                                <span className="hbars-caption">ค่าใช้จ่ายตามหมวด</span>
+                                {expenseByCategory.map(([cat, amount]) => (
+                                    <div key={cat} className="hbar">
+                                        <span className="hbar-label" title={cat}>{cat}</span>
+                                        <span className="hbar-track"><span className="hbar-fill expense" style={{ width: `${totalExpense > 0 ? (amount / totalExpense) * 100 : 0}%` }} /></span>
+                                        <span className="hbar-value">{formatCurrency(amount)}</span>
                                     </div>
-                                    <div className="trend-amount">{hasData ? `฿${Math.round(r.projected / 1000)}k` : '–'}</div>
-                                    <div className="trend-month">{formatMonthThai(r.month)}</div>
-                                    {/* Net profit label */}
-                                    {(r.collected > 0 || r.expense > 0) && (
-                                        <div style={{
-                                            fontSize: '0.6rem', fontWeight: 700, textAlign: 'center', marginTop: '0.1rem',
-                                            color: r.net >= 0 ? '#059669' : '#DC2626',
-                                        }}>
-                                            {r.net >= 0 ? '+' : ''}{Math.round(r.net / 1000)}k
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* ── Revenue Breakdown Chart ── */}
-            {isEnabled('revenue_chart') && stats.totalRevenue > 0 && (
-                <div className="card mt-6">
-                    <div className="card-header">
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <LineChart size={18} /> สัดส่วนรายได้
-                        </span>
-                    </div>
-                    <div className="chart-container">
-                        {(() => {
-                            const totalRoomRent = recentBills.reduce((sum, b) => sum + b.room_rent, 0);
-                            const total = totalElecBill + totalWaterBill + totalRoomRent;
-                            const elecPct   = total > 0 ? (totalElecBill   / total) * 100 : 0;
-                            const waterPct  = total > 0 ? (totalWaterBill  / total) * 100 : 0;
-                            const rentPct   = total > 0 ? (totalRoomRent   / total) * 100 : 0;
-                            const expPct    = total > 0 ? (totalExpense     / total) * 100 : 0;
-                            return (
-                                <>
-                                    <div className="chart-bar-group">
-                                        <div className="chart-bar-label"><span className="chart-dot rent" /><span>ค่าห้อง</span></div>
-                                        <div className="chart-bar-wrapper"><div className="chart-bar rent" style={{ width: `${rentPct}%` }} /></div>
-                                        <div className="chart-bar-value">{formatCurrency(totalRoomRent)}<span className="chart-percent">({rentPct.toFixed(0)}%)</span></div>
-                                    </div>
-                                    <div className="chart-bar-group">
-                                        <div className="chart-bar-label"><span className="chart-dot elec" /><span>ค่าไฟฟ้า</span></div>
-                                        <div className="chart-bar-wrapper"><div className="chart-bar elec" style={{ width: `${elecPct}%` }} /></div>
-                                        <div className="chart-bar-value">{formatCurrency(totalElecBill)}<span className="chart-percent">({elecPct.toFixed(0)}%)</span></div>
-                                    </div>
-                                    <div className="chart-bar-group">
-                                        <div className="chart-bar-label"><span className="chart-dot water" /><span>ค่าน้ำ</span></div>
-                                        <div className="chart-bar-wrapper"><div className="chart-bar water" style={{ width: `${waterPct}%` }} /></div>
-                                        <div className="chart-bar-value">{formatCurrency(totalWaterBill)}<span className="chart-percent">({waterPct.toFixed(0)}%)</span></div>
-                                    </div>
-                                    {totalExpense > 0 && (
-                                        <div className="chart-bar-group">
-                                            <div className="chart-bar-label">
-                                                <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 3, background: '#EF4444', marginRight: 6 }} />
-                                                <span style={{ color: '#DC2626' }}>ค่าใช้จ่าย</span>
-                                            </div>
-                                            <div className="chart-bar-wrapper">
-                                                <div style={{ height: '100%', width: `${expPct}%`, background: 'linear-gradient(90deg,#F87171,#EF4444)', borderRadius: 4 }} />
-                                            </div>
-                                            <div className="chart-bar-value" style={{ color: '#DC2626' }}>{formatCurrency(totalExpense)}<span className="chart-percent">({expPct.toFixed(0)}%)</span></div>
-                                        </div>
-                                    )}
-                                </>
-                            );
-                        })()}
-                    </div>
-                </div>
-            )}
-
-            {/* ── Rate Configuration Summary ── */}
-            {isEnabled('rate_config') && (
-                <div className="card mt-6">
-                    <div className="card-header">
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Settings size={18} /> อัตราค่าบริการปัจจุบัน
-                        </span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                        <div>
-                            <div className="stat-label">ค่าไฟฟ้า</div>
-                            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{config.electricity_rate} บาท/หน่วย</div>
-                        </div>
-                        <div>
-                            <div className="stat-label">ค่าน้ำประปา</div>
-                            <div className="stat-value" style={{ fontSize: '1.25rem' }}>
-                                {config.water_config.unit_rate || config.water_config.excess_unit_rate} บาท/หน่วย
+                                ))}
                             </div>
-                        </div>
-                        <div>
-                            <div className="stat-label">ค่าเช่าห้องเริ่มต้น</div>
-                            <div className="stat-value" style={{ fontSize: '1.25rem' }}>{formatCurrency(config.room_rent)}</div>
-                        </div>
-                    </div>
-                </div>
-            )}
+                        ) : (
+                            <p className="panel-note">
+                                ยังไม่มีค่าใช้จ่ายเดือนนี้{!buildingId && ' — บันทึกได้ที่หน้า "ระบบจัดการ"'}
+                            </p>
+                        )}
+                    </section>
+                )}
 
-            {/* ── Recent Bills ── */}
-            {isEnabled('recent_bills') && recentBills.length > 0 && (
-                <div className="card mt-6">
-                    <div className="card-header">
-                        <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <ClipboardList size={18} /> รายการล่าสุด
-                        </span>
-                    </div>
-                    <div className="table-container">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th>ห้อง</th>
-                                    <th className="text-right">ค่าไฟ</th>
-                                    <th className="text-right">ค่าน้ำ</th>
-                                    <th className="text-right">ยอดรวม</th>
-                                    <th className="text-center">การชำระ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentBills.slice(0, 5).map(bill => {
-                                    const s = statusOf(bill);
-                                    return (
-                                        <tr key={bill.id}>
-                                            <td className="mono">{bill.room_number}</td>
-                                            <td className="text-right mono">{formatCurrency(bill.elec_bill)}</td>
-                                            <td className="text-right mono">{formatCurrency(bill.water_bill)}</td>
-                                            <td className="text-right mono font-bold">{formatCurrency(bill.total_bill)}</td>
-                                            <td className="text-center">
-                                                {!bill.is_saved ? (
-                                                    <span className="badge badge-gray"><Clock size={12} /> รอบันทึก</span>
-                                                ) : s === 'paid' ? (
-                                                    <span className="badge badge-success"><CheckCircle size={12} /> จ่ายแล้ว</span>
-                                                ) : s === 'pending' ? (
-                                                    <span className="badge badge-warning"><Clock size={12} /> รอตรวจสอบ</span>
-                                                ) : (
-                                                    <span className="badge badge-danger"><Wallet size={12} /> ยังไม่จ่าย</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-            </>
+                {/* ── Revenue Breakdown ── */}
+                {isEnabled('revenue_chart') && incomeTotal > 0 && (
+                    <section className="panel span-6" aria-labelledby="dash-mix-title">
+                        <div className="panel-head">
+                            <h2 id="dash-mix-title" className="panel-title">รายได้มาจากไหน</h2>
+                            <span className="panel-meta">บิลรอบนี้</span>
+                        </div>
+                        <DonutChart
+                            items={incomeParts}
+                            title="รายได้ของบิลรอบนี้แยกตามประเภท"
+                            centerLabel="ทั้งหมด"
+                            format={formatCurrency}
+                        />
+                    </section>
+                )}
+
+                {/* ── Rate Configuration Summary ── */}
+                {isEnabled('rate_config') && (
+                    <section className={`panel ${isEnabled('revenue_chart') && incomeTotal > 0 ? 'span-6' : 'span-12'}`} aria-labelledby="dash-rate-title">
+                        <div className="panel-head">
+                            <h2 id="dash-rate-title" className="panel-title">อัตราค่าบริการปัจจุบัน</h2>
+                        </div>
+                        <dl className="rates">
+                            <div><dt>ค่าไฟฟ้า</dt><dd>{config.electricity_rate} <small>บาท/หน่วย</small></dd></div>
+                            <div><dt>ค่าน้ำประปา</dt><dd>{config.water_config.unit_rate || config.water_config.excess_unit_rate} <small>บาท/หน่วย</small></dd></div>
+                            <div><dt>ค่าเช่าเริ่มต้น</dt><dd>{formatCurrency(config.room_rent)}</dd></div>
+                        </dl>
+                    </section>
+                )}
+
+                {/* ── Recent Bills ── */}
+                {isEnabled('recent_bills') && recentBills.length > 0 && (
+                    <section className="panel panel-flush span-12" aria-labelledby="dash-bills-title">
+                        <div className="panel-head">
+                            <h2 id="dash-bills-title" className="panel-title">บิลล่าสุด</h2>
+                        </div>
+                        <div className="table-container">
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>{unit}</th>
+                                        <th className="text-right col-opt">ค่าไฟ</th>
+                                        <th className="text-right col-opt">ค่าน้ำ</th>
+                                        <th className="text-right">ยอดรวม</th>
+                                        <th>การชำระ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentBills.slice(0, 5).map(bill => {
+                                        const s = statusOf(bill);
+                                        return (
+                                            <tr key={bill.id}>
+                                                <td className="num">{bill.room_number}</td>
+                                                <td className="text-right num col-opt">{formatCurrency(bill.elec_bill)}</td>
+                                                <td className="text-right num col-opt">{formatCurrency(waterOf(bill))}</td>
+                                                <td className="text-right num font-bold">{formatCurrency(bill.total_bill)}</td>
+                                                <td>
+                                                    {!bill.is_saved ? (
+                                                        <span className="badge badge-gray">รอบันทึก</span>
+                                                    ) : s === 'paid' ? (
+                                                        <span className="badge badge-success"><CheckCircle2 size={12} /> จ่ายแล้ว</span>
+                                                    ) : s === 'pending' ? (
+                                                        <span className="badge badge-warning"><Clock size={12} /> รอตรวจ</span>
+                                                    ) : (
+                                                        <span className="badge badge-danger">ยังไม่จ่าย</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                )}
+            </div>
             )}
 
             {/* ── Customize Panel ── */}
             {showCustomize && (
                 <div className="modal-overlay" onClick={() => setShowCustomize(false)}>
-                    <div className="modal dashboard-customize-modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <SlidersHorizontal size={18} /> ปรับแต่ง Dashboard
-                            </h3>
-                            <button className="btn-icon" onClick={() => setShowCustomize(false)}><X size={18} /></button>
+                    <div className="modal dashboard-customize-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="dash-customize-title">
+                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                            <h3 id="dash-customize-title" className="modal-title" style={{ fontSize: '1.0625rem' }}>ปรับแต่ง Dashboard</h3>
+                            <button className="btn-icon btn-ghost" onClick={() => setShowCustomize(false)} aria-label="ปิด"><X size={18} /></button>
                         </div>
                         <div className="modal-body">
                             <p className="customize-hint">เลือกส่วนที่ต้องการแสดงบน Dashboard</p>

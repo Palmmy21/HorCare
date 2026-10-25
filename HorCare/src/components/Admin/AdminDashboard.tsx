@@ -353,7 +353,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                 {copied ? 'คัดลอกแล้ว!' : 'คัดลอก UID'}
                             </button>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748B', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>
                             {u.uid}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>

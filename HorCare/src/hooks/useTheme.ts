@@ -33,24 +33,12 @@ export interface ThemePreset {
 export const THEME_PRESETS: ThemePreset[] = [
   {
     id: 'cyber-minimal',
-    name: 'HorCare Cyber (Navy, Cyan, Emerald, Orange)',
+    name: 'HorCare (Blue, Orange, Green)',
     icon: 'Shield',
-    swatch: '#0EA5E9',
-    swatchSecondary: '#10B981',
-    vars: {
-      '--color-primary':             '#0EA5E9',
-      '--color-primary-dark':        '#0284C7',
-      '--color-primary-light':       '#38BDF8',
-      '--color-primary-ultra-light': 'rgba(14, 165, 233, 0.08)',
-      '--color-navy':                '#0F172A',
-      '--color-emerald':             '#10B981',
-      '--color-orange':              '#F97316',
-      '--gradient-primary':          'linear-gradient(135deg, #0EA5E9 0%, #10B981 100%)',
-      '--gradient-accent':           'linear-gradient(135deg, #F97316 0%, #F59E0B 100%)',
-      '--shadow-glow-primary':       '0 0 0 3px rgba(14, 165, 233, 0.22)',
-      '--shadow-glow-success':       '0 0 0 3px rgba(16, 185, 129, 0.22)',
-      '--sidebar-bg':                'linear-gradient(180deg, #0284C7 0%, #0369A1 50%, #075985 100%)',
-    },
+    swatch: '#0A6CC2',
+    swatchSecondary: '#E8740C',
+    // Colours live in index.css (:root and html.dark) so dark mode can restep them; inline vars would pin the light values.
+    vars: {},
   },
 ];
 

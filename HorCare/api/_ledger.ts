@@ -2,8 +2,8 @@
  * /api/ledger — HorCare's own books.
  *
  * The only writer of ledgers and journal entries (clients can read under rules that need `ledger.read`).
- * Entries are immutable: a mistake is fixed by a reversal. Posting uses the same rules as the Mango
- * export (src/shared/accounting.ts) so what lands in the books is what an export would have contained.
+ * Entries are immutable: a mistake is fixed by a reversal. Posting rules are pure and tested in
+ * src/shared/accounting.ts (buildVouchers), shared with the automatic posting in _ledger-auto.ts.
  *
  * Actions: ledger_save | lock_period | unlock_period | post_preview | post | reverse | manual_entry
  */

@@ -473,7 +473,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: 'var(--color-gray-700)' }}>
                   <Zap size={13} color="#F59E0B" /> {t.elec_meter}
                 </span>
-                <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
                   {fmt(bill.prev_elec)} → {fmt(bill.curr_elec)}
                 </span>
               </div>
@@ -481,7 +481,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: 'var(--color-gray-700)' }}>
                   <Droplets size={13} color="#3B82F6" /> {t.water_meter}
                 </span>
-                <span style={{ fontFamily: 'monospace', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
                   {fmt(bill.prev_water)} → {fmt(bill.curr_water)}
                 </span>
               </div>
@@ -958,7 +958,7 @@ export default function TenantPortalPage() {
               width: '100%', textAlign: 'center', fontSize: '2rem', letterSpacing: '0.5em',
               padding: '0.75rem 1rem', borderRadius: '14px', border: pinError ? '2px solid #EF4444' : '2px solid #BAE6FD',
               background: '#F8FAFC', color: '#0F172A', outline: 'none',
-              fontFamily: 'monospace', boxSizing: 'border-box', marginBottom: '0.75rem',
+              fontFamily: 'var(--font-mono)', boxSizing: 'border-box', marginBottom: '0.75rem',
             }}
             autoFocus
           />
@@ -1243,7 +1243,6 @@ export default function TenantPortalPage() {
         </div>
 
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800;900&display=swap');
           @keyframes spin { to { transform: rotate(360deg); } }
           @keyframes scaleIn {
             from { opacity: 0; transform: scale(0.95) translateY(-4px); }

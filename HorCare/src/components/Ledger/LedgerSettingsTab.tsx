@@ -125,17 +125,16 @@ export default function LedgerSettingsTab({ ownerUid, buildings, ledgers, select
                 </div>
             </Section>
 
-            <Section title="ผังบัญชี" hint="รหัสเป็นของเรา แก้ได้ บัญชีที่มีรายการแล้วลบไม่ได้ (ปิดใช้งานแทน) ช่อง “รหัส Mango” ใช้แปลงตอนส่งออกเท่านั้น">
+            <Section title="ผังบัญชี" hint="รหัสเป็นของเรา แก้ได้ บัญชีที่มีรายการแล้วลบไม่ได้ (ปิดใช้งานแทน)">
                 <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                        <thead><tr style={{ textAlign: 'left' }}><th>รหัส</th><th>ชื่อบัญชี</th><th>ประเภท</th><th>รหัส Mango</th><th>ใช้งาน</th><th /></tr></thead>
+                        <thead><tr style={{ textAlign: 'left' }}><th>รหัส</th><th>ชื่อบัญชี</th><th>ประเภท</th><th>ใช้งาน</th><th /></tr></thead>
                         <tbody>
                             {d.accounts.map((a, i) => (
                                 <tr key={i}>
                                     <td><input style={{ ...input, width: 90 }} value={a.code} maxLength={20} onChange={e => setAccount(i, { code: e.target.value })} aria-label="รหัสบัญชี" /></td>
                                     <td><input style={input} value={a.name} maxLength={100} onChange={e => setAccount(i, { name: e.target.value })} aria-label="ชื่อบัญชี" /></td>
                                     <td><select style={input} value={a.type} onChange={e => setAccount(i, { type: e.target.value as Account['type'] })}>{ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABELS_TH[t]}</option>)}</select></td>
-                                    <td><input style={{ ...input, width: 110 }} value={a.external?.mango ?? ''} maxLength={40} onChange={e => setAccount(i, { external: { ...a.external, mango: e.target.value } })} aria-label="รหัส Mango" /></td>
                                     <td><input type="checkbox" checked={a.active} onChange={e => setAccount(i, { active: e.target.checked })} aria-label="ใช้งาน" /></td>
                                     <td><button className="btn btn-outline btn-sm" onClick={() => upd({ accounts: d.accounts.filter((_, k) => k !== i) })} aria-label="ลบบัญชี"><Trash2 size={13} /></button></td>
                                 </tr>

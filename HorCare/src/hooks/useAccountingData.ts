@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import type { ExportBatch, MangoProfile, PaymentRec } from '../shared/accounting';
+import type { PaymentRec } from '../shared/accounting';
 import type { Fine, MonthlyBill, Room } from '../types';
 
 function useLive<T>(path: string | null) {
@@ -16,16 +16,6 @@ function useLive<T>(path: string | null) {
   }, [path]);
   const cur = snap && snap.path === path ? snap : null;
   return { list: cur?.list ?? [], loading: !!path && cur === null, error: cur?.error ?? false };
-}
-
-export function useMangoProfiles(ownerUid: string | null) {
-  const { list, loading, error } = useLive<MangoProfile>(ownerUid ? `users/${ownerUid}/accounting_profiles` : null);
-  return { profiles: useMemo(() => [...list].sort((a, b) => a.name.localeCompare(b.name, 'th')), [list]), loading, error };
-}
-
-export function useExportBatches(ownerUid: string | null) {
-  const { list, loading, error } = useLive<ExportBatch>(ownerUid ? `users/${ownerUid}/accounting_batches` : null);
-  return { batches: useMemo(() => [...list].sort((a, b) => b.created_at.localeCompare(a.created_at)), [list]), loading, error };
 }
 
 export function useBuildingRooms(ownerUid: string | null, buildingId: string | null) {

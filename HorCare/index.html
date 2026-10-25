@@ -11,15 +11,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link
-    href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
-  <meta name="theme-color" content="#0284C7" />
+  <meta name="theme-color" content="#0A5DAA" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="HorCare" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="application-name" content="HorCare" />
-  <meta name="msapplication-TileColor" content="#0284C7" />
+  <meta name="msapplication-TileColor" content="#0A5DAA" />
   <meta name="format-detection" content="telephone=no" />
   <title>HorCare</title>
   <meta name="description" content="HorCare - ระบบจัดการหอพักอัจฉริยะ จดมิเตอร์ คํานวณค่าเช่า ออกบิลอัตโนมัติ" />
@@ -43,7 +43,7 @@
     });
   </script>
   <style>
-    body { margin: 0; background-color: #0B0F19; font-family: 'Prompt', sans-serif; }
+    body { margin: 0; background-color: #0A5DAA; font-family: 'Anuphan', sans-serif; }
     .splash-screen {
       display: flex;
       flex-direction: column;
@@ -51,31 +51,26 @@
       justify-content: center;
       height: 100vh;
       width: 100vw;
-      background: radial-gradient(circle at 50% 30%, #0F172A 0%, #080C14 100%);
-    }
-    .splash-logo-container {
-      perspective: 1000px;
-      filter: drop-shadow(0 12px 36px rgba(14, 165, 233, 0.25));
+      background: #0A5DAA;
     }
     .splash-logo-container img {
-      width: 130px;
-      height: 130px;
+      width: 96px;
+      height: 96px;
       object-fit: contain;
-      animation: cool-spin-entry 2.8s cubic-bezier(0.2, 0.8, 0.2, 1.1) infinite alternate;
-      transform-style: preserve-3d;
+      animation: splash-breathe 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate;
     }
-    @keyframes cool-spin-entry {
-      0% { transform: scale(0.85) translateY(0px); opacity: 0.8; filter: drop-shadow(0 4px 12px rgba(14, 165, 233, 0.2)); }
-      50% { transform: scale(1.02) translateY(-6px); opacity: 1; filter: drop-shadow(0 14px 28px rgba(16, 185, 129, 0.35)); }
-      100% { transform: scale(0.95) translateY(0px); opacity: 0.9; filter: drop-shadow(0 8px 18px rgba(249, 115, 22, 0.25)); }
+    @keyframes splash-breathe {
+      from { transform: scale(0.96); opacity: 0.75; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-logo-container img { animation: none; }
     }
     .splash-text {
-      margin-top: 1.5rem;
-      font-size: 0.9rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #94A3B8;
-      font-weight: 600;
+      margin-top: 1.25rem;
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 500;
     }
   </style>
 </head>

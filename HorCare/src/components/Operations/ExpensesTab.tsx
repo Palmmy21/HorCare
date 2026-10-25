@@ -110,7 +110,7 @@ export default function ExpensesTab({ uid, buildingId }: Props) {
           borderRadius: '10px', padding: '0.5rem 1rem', textAlign: 'right',
         }}>
           <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>รวมเดือนนี้</span>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'monospace' }}>
+          <div style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
             ฿{fmtBaht(totalFiltered)}
           </div>
         </div>
@@ -220,7 +220,7 @@ export default function ExpensesTab({ uid, buildingId }: Props) {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#DC2626', fontFamily: 'monospace' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#DC2626', fontFamily: 'var(--font-mono)' }}>
                         ฿{fmtBaht(e.amount)}
                       </div>
                     </div>

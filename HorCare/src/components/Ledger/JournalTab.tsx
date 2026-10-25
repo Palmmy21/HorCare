@@ -67,10 +67,9 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
     };
     /** One row per journal line, oldest first — a neutral file any accounting package can be fed from. */
     const exportCsv = () => {
-        const rows: (string | number)[][] = [['วันที่', 'เลขเอกสาร', 'ประเภท', 'คำอธิบาย', 'รหัสบัญชี', 'ชื่อบัญชี', 'รายการ', 'เดบิต', 'เครดิต', 'แผง/ห้อง (รหัสภายใน)', 'รหัส Mango']];
-        const mango = new Map(ledger.accounts.map(a => [a.code, a.external?.mango ?? '']));
+        const rows: (string | number)[][] = [['วันที่', 'เลขเอกสาร', 'ประเภท', 'คำอธิบาย', 'รหัสบัญชี', 'ชื่อบัญชี', 'รายการ', 'เดบิต', 'เครดิต', 'แผง/ห้อง (รหัสภายใน)']];
         for (const e of [...entries].reverse()) {
-            for (const l of e.lines) rows.push([e.date, e.doc_ref, KIND_LABELS[e.kind], e.memo, l.account, names.get(l.account) ?? '', l.description, l.dr_satang ? fromSatang(l.dr_satang) : '', l.cr_satang ? fromSatang(l.cr_satang) : '', l.party_id ?? '', mango.get(l.account) ?? '']);
+            for (const l of e.lines) rows.push([e.date, e.doc_ref, KIND_LABELS[e.kind], e.memo, l.account, names.get(l.account) ?? '', l.description, l.dr_satang ? fromSatang(l.dr_satang) : '', l.cr_satang ? fromSatang(l.cr_satang) : '', l.party_id ?? '']);
         }
         downloadCsv(`journal-${ledger.name || ledger.id}.csv`, rows);
     };

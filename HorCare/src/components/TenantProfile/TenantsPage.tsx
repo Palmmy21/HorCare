@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Users, User, Phone, AlertTriangle, Search,
   LogIn, Banknote, ChevronRight, Home, MessageCircle,
@@ -12,6 +12,9 @@ import { fetchPortalUrl } from '../../utils/portalLinks';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 import InvitationModal from './InvitationModal';
+import { useRoomOccupancy } from '../../hooks/useRoomOccupancy';
+import { canOpenView } from '../../shared/viewAccess';
+import type { Permission } from '../../shared/permissions';
 
 interface TenantsPageProps {
   rooms: Room[];
@@ -22,6 +25,13 @@ interface TenantsPageProps {
   onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
   buildingType?: DormConfig['building_type'];
   config?: DormConfig;
+  /** Staff permissions; null for the owner. */
+  permissions?: readonly Permission[] | null;
+  /** Shown in the room-status override record. */
+  actorName?: string;
+  /** Open this room's profile on arrival (e.g. a room tapped on the Dashboard). */
+  openRoomId?: string | null;
+  onOpenRoomHandled?: () => void;
 }
 
 // ── Helper: วันที่เหลือ ──────────────────────────────────────────────────────
@@ -314,14 +324,29 @@ type FilterMode = 'all' | 'has_profile' | 'signed' | 'no_profile' | 'risk';
 
 export default function TenantsPage({
   rooms, uid, buildingId, isPaid, onUpgrade, onUpdateRoom, buildingType, config,
+  permissions = null, actorName, openRoomId, onOpenRoomHandled,
 }: TenantsPageProps) {
   const terms = getWorkspaceTerms(buildingType);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [inviteTarget, setInviteTarget] = useState<{ room: Room; tenantName?: string } | null>(null);
 
   const activeRooms = rooms.filter(r => r.is_active);
+  // follow the live room (its override changes while the profile is open)
+  const selectedRoom = selectedRoomId ? rooms.find(r => r.id === selectedRoomId) ?? null : null;
+  const { byRoom: occupancy } = useRoomOccupancy(uid, buildingId, rooms, {
+    leasing: canOpenView('leasing', permissions),
+    tenants: true, // this page is only reachable with tenant.read
+  });
+  const canOverrideStatus = !!onUpdateRoom && (permissions === null || permissions.includes('room.update'));
+
+  // A room tapped elsewhere (Dashboard) opens straight into its profile
+  useEffect(() => {
+    if (!openRoomId) return;
+    if (rooms.some(r => r.id === openRoomId)) setSelectedRoomId(openRoomId); // eslint-disable-line react-hooks/set-state-in-effect
+    onOpenRoomHandled?.();
+  }, [openRoomId, rooms, onOpenRoomHandled]);
 
   return (
     <div>
@@ -336,7 +361,7 @@ export default function TenantsPage({
       </div>
 
       {/* ── Room Status Dashboard ── */}
-      <RoomStatusDashboard rooms={rooms} onUpdateRoom={onUpdateRoom} buildingType={buildingType} />
+      <RoomStatusDashboard rooms={rooms} occupancy={occupancy} onOpenRoom={r => setSelectedRoomId(r.id)} buildingType={buildingType} />
 
       {/* Search + Filter Bar */}
       <div className="card mb-6" style={{ padding: '0.75rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
@@ -417,7 +442,7 @@ export default function TenantsPage({
         onUpgrade={onUpgrade}
         search={search}
         filter={filter}
-        onOpenProfile={setSelectedRoom}
+        onOpenProfile={r => setSelectedRoomId(r.id)}
         onInvite={(room, tenantName) => setInviteTarget({ room, tenantName })}
         buildingType={buildingType}
       />
@@ -441,8 +466,12 @@ export default function TenantsPage({
           buildingId={buildingId}
           isPaid={isPaid}
           onUpgrade={onUpgrade}
-          onClose={() => setSelectedRoom(null)}
+          onClose={() => setSelectedRoomId(null)}
           config={config}
+          occupancy={occupancy[selectedRoom.id]}
+          canOverrideStatus={canOverrideStatus}
+          onUpdateRoom={onUpdateRoom}
+          actorName={actorName}
         />
       )}
     </div>

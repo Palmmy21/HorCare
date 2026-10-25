@@ -200,7 +200,7 @@ export default function StockTab({ uid, buildingId }: Props) {
                         {it.note && <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.375rem 0 0' }}>{it.note}</p>}
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: isLow ? '#D97706' : 'var(--color-text)', fontFamily: 'monospace', lineHeight: 1 }}>
+                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: isLow ? '#D97706' : 'var(--color-text)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
                           {it.quantity}
                         </div>
                         <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{it.unit}</div>

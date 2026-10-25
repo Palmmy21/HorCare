@@ -12,21 +12,21 @@ export type WidgetId =
     | 'recent_bills';
 
 export const WIDGET_LABELS: Record<WidgetId, string> = {
-    room_status:     'ภาพรวมสถานะห้องพัก (มีผู้เช่า / ว่าง / ติดจอง)',
-    collection:      'การเก็บเงิน (คาดการณ์ / จริง / ค้าง)',
-    progress:        'สถานะการจดมิเตอร์',
+    room_status:     'สถานะห้องพัก (มีผู้เช่า / ว่าง / ติดจอง)',
+    collection:      'การเก็บเงินรอบนี้ (เก็บแล้ว / รอตรวจสลิป / ยังไม่จ่าย)',
+    progress:        'งานที่เหลือรอบนี้ (จดมิเตอร์ / ส่งบิลทาง LINE)',
     stats:           'สถิติหลัก (ห้อง / รายได้ / ไฟ / น้ำ)',
     expense_summary: 'ค่าใช้จ่าย & กำไรสุทธิ',
-    revenue_trend:   'กราฟรายได้ vs ค่าใช้จ่าย ย้อนหลัง 6 เดือน',
-    revenue_chart:   'กราฟสัดส่วนรายได้',
+    revenue_trend:   'กราฟรายได้ย้อนหลัง 6 เดือน (เก็บได้จริง / ยอดที่ต้องเก็บ)',
+    revenue_chart:   'รายได้มาจากไหน (ค่าห้อง / ไฟ / น้ำ)',
     rate_config:     'อัตราค่าบริการปัจจุบัน',
-    recent_bills:    'รายการบิลล่าสุด',
+    recent_bills:    'บิลล่าสุด',
 };
 
+// Listed in the order the Dashboard shows them
 const ALL_WIDGETS: WidgetId[] = [
-    'room_status',
-    'collection', 'progress', 'stats', 'expense_summary',
-    'revenue_trend', 'revenue_chart', 'rate_config', 'recent_bills',
+    'collection', 'progress', 'room_status', 'stats',
+    'revenue_trend', 'expense_summary', 'revenue_chart', 'rate_config', 'recent_bills',
 ];
 // v4 — added room_status; bump so existing users see it
 const STORAGE_KEY = 'horcare_dashboard_prefs_v4';

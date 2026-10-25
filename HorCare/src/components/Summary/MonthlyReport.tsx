@@ -51,7 +51,7 @@ const MonthlyReport = forwardRef<HTMLDivElement, MonthlyReportProps>(
                 minHeight: '297mm',
                 background: '#fff',
                 color: '#000',
-                fontFamily: '"TH Sarabun PSK", "TH Sarabun New", "Sarabun", "Noto Sans Thai", sans-serif',
+                fontFamily: 'var(--font-sans)',
                 padding: '20mm 15mm',
                 boxSizing: 'border-box' as const,
                 fontSize: '15px',

@@ -23,6 +23,8 @@ import { useTenantProfile } from '../../hooks/useTenantProfiles';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import ContractSignModal from '../ESignature/ContractSignModal';
 import ShareContractModal from '../ESignature/ShareContractModal';
+import RoomStatusPanel from './RoomStatusPanel';
+import type { Occupancy } from '../../shared/roomOccupancy';
 
 import { errorInfo } from '../../shared/errorInfo';
 
@@ -34,6 +36,12 @@ interface TenantProfilePageProps {
   onUpgrade?: () => void;
   onClose: () => void;
   config?: DormConfig;
+  /** Contract-derived status of this room (useRoomOccupancy). */
+  occupancy?: Occupancy;
+  /** The account may correct the status by hand (room.update). */
+  canOverrideStatus?: boolean;
+  onUpdateRoom?: (roomId: string, updates: Partial<Room>) => Promise<void>;
+  actorName?: string;
 }
 
 type TabId = 'info' | 'contract' | 'history';
@@ -74,6 +82,7 @@ function emptyForm(): Omit<TenantProfile, 'id' | 'room_id' | 'building_id' | 'cr
 
 export default function TenantProfilePage({
   room, uid, buildingId, isPaid, onUpgrade, onClose, config,
+  occupancy, canOverrideStatus = false, onUpdateRoom, actorName,
 }: TenantProfilePageProps) {
   const { profile, events, eventsError, loading, saveProfile, addEvent, deleteEvent } =
     useTenantProfile(uid, buildingId, room.id);
@@ -275,14 +284,14 @@ export default function TenantProfilePage({
       >
         {/* ── Header ── */}
         <div style={{
-          background: 'linear-gradient(135deg, #1e2535 0%, #2d3748 100%)',
+          background: 'var(--sidebar-bg)',
           padding: isMobile ? '0.875rem 1rem' : '1.25rem 1.5rem',
           display: 'flex', alignItems: 'center', gap: '1rem',
           flexShrink: 0,
         }}>
           <div style={{
             width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-            background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+            background: 'rgba(255,255,255,0.16)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <User size={22} color="#fff" />
@@ -291,7 +300,7 @@ export default function TenantProfilePage({
             <div style={{ color: '#fff', fontWeight: 800, fontSize: '1.0625rem', lineHeight: 1.2 }}>
               {profile?.full_name || 'ยังไม่มีข้อมูลผู้เช่า'}
             </div>
-            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', marginTop: '0.125rem' }}>
+            <div style={{ color: 'rgba(255,255,255,0.78)', fontSize: '0.8rem', marginTop: '0.125rem' }}>
               ห้อง {room.room_number}
               {profile?.phone && ` • ${profile.phone}`}
             </div>
@@ -331,6 +340,16 @@ export default function TenantProfilePage({
             <X size={18} />
           </button>
         </div>
+
+        {/* ── Room status (from contracts; admins may correct it deliberately) ── */}
+        <RoomStatusPanel
+          room={room}
+          occupancy={occupancy}
+          canOverride={canOverrideStatus}
+          onUpdateRoom={onUpdateRoom}
+          actorName={actorName}
+          labels={{ occupied: terms.occupiedUnitLabel, vacant: terms.vacantUnitLabel, reserved: terms.reservedUnitLabel }}
+        />
 
         {/* ── Tabs ── */}
         <div style={{

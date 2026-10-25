@@ -13,8 +13,9 @@ async function sendResendEmail(to: string, verifyLink: string): Promise<void> {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ยืนยันอีเมล HorCare</title>
+  <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;600;700&display=swap" rel="stylesheet" />
 </head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:'Anuphan','Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:40px 0;">
     <tr>
       <td align="center">

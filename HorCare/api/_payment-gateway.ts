@@ -9,7 +9,7 @@
  *   • the amount is always computed here from the document, never taken from the caller;
  *   • a webhook is applied once (event claim + intent state), and a wrong amount is never applied — it goes to review;
  *   • every payment for a document is recorded with the same allocation fields the manual "record payment" uses,
- *     so the ledger, the Mango export and reconciliation see gateway money like any other.
+ *     so the ledger and reconciliation see gateway money like any other.
  *
  * Actions: status | create_intent | get_intent | list_intents | cancel_intent
  */

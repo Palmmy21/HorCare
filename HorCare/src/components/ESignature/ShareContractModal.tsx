@@ -229,7 +229,7 @@ export default function ShareContractModal({
                 <strong style={{ color: '#1E293B' }}>{contract.unit_number}</strong>
               </div>
               <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.2rem' }}>
-                เลขที่สัญญา: <span style={{ fontFamily: 'monospace' }}>{contract.contract_number}</span>
+                เลขที่สัญญา: <span style={{ fontFamily: 'var(--font-mono)' }}>{contract.contract_number}</span>
               </div>
             </div>
 
@@ -352,7 +352,7 @@ export default function ShareContractModal({
                   outline: 'none',
                   fontSize: '0.825rem',
                   color: '#334155',
-                  fontFamily: 'monospace',
+                  fontFamily: 'var(--font-mono)',
                 }}
               />
               <button
