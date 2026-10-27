@@ -17,8 +17,8 @@ interface Props {
 }
 
 const baht = (s: number) => (s / 100).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const field: React.CSSProperties = { padding: '0.5rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
+const field: React.CSSProperties = { padding: '0.5rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
 const DAY_NAMES = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
 export default function RatesPlansView({ data, style, call, act, reload }: Props) {
@@ -55,7 +55,7 @@ export default function RatesPlansView({ data, style, call, act, reload }: Props
       <div style={card}>
         <strong>{stall ? 'ราคาค่าแผง / ค่าที่ขาจร' : 'ราคาห้องพักต่อคืน'}</strong>
         <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>ราคาเฉพาะห้อง มาก่อนราคาโซน และมาก่อนราคาทั่วไป · ราคาช่วงเทศกาล (ระบุวันที่) มาก่อนราคาปกติ</span>
-        {data.rates.length === 0 && <span style={{ color: '#B45309' }}>ยังไม่มีราคา — เพิ่มราคาด้านล่าง ระบบจะคิดเงินให้อัตโนมัติ</span>}
+        {data.rates.length === 0 && <span style={{ color: '#C2410C' }}>ยังไม่มีราคา — เพิ่มราคาด้านล่าง ระบบจะคิดเงินให้อัตโนมัติ</span>}
         {data.rates.map(x => (
           <div key={x.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', opacity: x.active ? 1 : 0.5 }}>
             <span style={{ flex: 1, minWidth: 180 }}>

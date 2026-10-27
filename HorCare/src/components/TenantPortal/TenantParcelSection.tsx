@@ -44,13 +44,13 @@ export default function TenantParcelSection({ uid, buildingId, roomId, Label }: 
           return (
             <div key={p.id} style={{
               background: '#fff', borderRadius: 14, padding: '0.75rem 0.875rem',
-              border: `1px solid ${done ? '#E2E8F0' : '#FDE68A'}`, opacity: done ? 0.7 : 1,
+              border: `1px solid ${done ? '#DCE5EF' : '#FBD9A8'}`, opacity: done ? 0.7 : 1,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, color: '#0F172A', fontSize: '0.9rem' }}>{p.carrier}</span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: done ? '#059669' : '#B45309' }}>{PARCEL_STATUS_LABELS_TH[p.status]}</span>
+                <span style={{ fontWeight: 700, color: '#102A43', fontSize: '0.9rem' }}>{p.carrier}</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: done ? '#15803D' : '#C2410C' }}>{PARCEL_STATUS_LABELS_TH[p.status]}</span>
               </div>
-              <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: 2, display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.78rem', color: '#557089', marginTop: 2, display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <span>มาถึง {fmt(p.received_at)}</span>
                 {p.picked_up_at && <span>รับแล้ว {fmt(p.picked_up_at)}</span>}
                 {!done && p.storage_location && <span style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}><MapPin size={12} /> {p.storage_location}</span>}

@@ -93,7 +93,7 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
     <div>
       {/* Header card */}
       <div style={{
-        background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+        background: 'linear-gradient(135deg, #0A6CC2, #0F4C81)',
         borderRadius: '16px', padding: '1.25rem 1.5rem',
         marginBottom: '1.25rem', color: '#fff',
         display: 'flex', alignItems: 'center', gap: '1rem',
@@ -133,11 +133,11 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
       {showForm && (
         <div className="card mb-4" style={{
           padding: '1.25rem',
-          border: '1.5px solid rgba(79,70,229,0.3)',
-          background: 'rgba(79,70,229,0.04)',
+          border: '1.5px solid rgba(10, 108, 194,0.3)',
+          background: 'rgba(10, 108, 194,0.04)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <Building2 size={18} color="#4F46E5" />
+            <Building2 size={18} color="#0A6CC2" />
             <h3 style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text)', margin: 0 }}>
               {editId ? 'แก้ไขรายการส่วนกลาง' : 'เพิ่มรายการส่วนกลาง'}
             </h3>
@@ -226,10 +226,10 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                 onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  background: form.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)',
-                  border: `1.5px solid ${form.is_active ? 'rgba(16,185,129,0.35)' : 'rgba(107,114,128,0.2)'}`,
+                  background: form.is_active ? 'rgba(34, 163, 90,0.1)' : 'rgba(85, 112, 137,0.08)',
+                  border: `1.5px solid ${form.is_active ? 'rgba(34, 163, 90,0.35)' : 'rgba(85, 112, 137,0.2)'}`,
                   borderRadius: '10px', padding: '0.625rem 0.875rem',
-                  color: form.is_active ? '#059669' : '#6B7280',
+                  color: form.is_active ? '#15803D' : '#557089',
                   fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
                   transition: 'all 0.15s',
                   width: '100%'
@@ -295,7 +295,7 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
               className="card"
               style={{
                 padding: '0.875rem 1.125rem',
-                borderLeft: `4px solid ${fee.is_active ? '#4F46E5' : '#D1D5DB'}`,
+                borderLeft: `4px solid ${fee.is_active ? '#0A6CC2' : '#C3D0DE'}`,
                 opacity: fee.is_active ? 1 : 0.6,
                 transition: 'opacity 0.2s',
               }}
@@ -325,8 +325,8 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                         <span style={{
                           fontSize: '0.8125rem', fontWeight: 700,
                           padding: '0.25rem 0.625rem', borderRadius: '6px',
-                          background: fee.is_active ? 'rgba(79,70,229,0.12)' : 'rgba(107,114,128,0.1)',
-                          color: fee.is_active ? '#4F46E5' : '#6B7280',
+                          background: fee.is_active ? 'rgba(10, 108, 194,0.12)' : 'rgba(85, 112, 137,0.1)',
+                          color: fee.is_active ? '#0A6CC2' : '#557089',
                         }}>
                           {fee.is_active ? 'เปิดใช้งาน' : 'ปิด'}
                         </span>
@@ -343,7 +343,7 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{
                         fontSize: '1.25rem', fontWeight: 800,
-                        color: fee.is_active ? '#4F46E5' : '#9CA3AF',
+                        color: fee.is_active ? '#0A6CC2' : '#8FA3B8',
                         fontFamily: 'var(--font-mono)',
                       }}>
                         ฿{fmtBaht(fee.amount)}
@@ -361,9 +361,9 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
                       onClick={() => handleToggle(fee)}
                       title={fee.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
                       style={{
-                        color: fee.is_active ? '#059669' : '#6B7280',
-                        background: fee.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.08)',
-                        border: `1px solid ${fee.is_active ? 'rgba(16,185,129,0.25)' : 'rgba(107,114,128,0.2)'}`,
+                        color: fee.is_active ? '#15803D' : '#557089',
+                        background: fee.is_active ? 'rgba(34, 163, 90,0.1)' : 'rgba(85, 112, 137,0.08)',
+                        border: `1px solid ${fee.is_active ? 'rgba(34, 163, 90,0.25)' : 'rgba(85, 112, 137,0.2)'}`,
                       }}
                     >
                       {fee.is_active ? <ToggleRight size={15} /> : <ToggleLeft size={15} />}
@@ -389,13 +389,13 @@ export default function CommonFeesTab({ commonFees, onAdd, onUpdate, onDelete }:
           {commonFees.some(f => f.is_active) && (
             <div style={{
               marginTop: '0.5rem', padding: '0.75rem 1rem',
-              background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.2)',
+              background: 'rgba(10, 108, 194,0.08)', border: '1px solid rgba(10, 108, 194,0.2)',
               borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
-              <span style={{ fontSize: '0.8125rem', color: '#4F46E5', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.8125rem', color: '#0A6CC2', fontWeight: 600 }}>
                 รวมค่าส่วนกลางที่เรียกเก็บต่อห้อง
               </span>
-              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#4F46E5', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0A6CC2', fontFamily: 'var(--font-mono)' }}>
                 ฿{fmtBaht(activeTotal)} / เดือน
               </span>
             </div>

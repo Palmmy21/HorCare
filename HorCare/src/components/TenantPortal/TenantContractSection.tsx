@@ -148,11 +148,11 @@ export default function TenantContractSection({
         /* PENDING SIGNATURE CARD */
         <div
           style={{
-            background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 60%, #075985 100%)',
+            background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 60%, #08589F 100%)',
             borderRadius: '20px',
             padding: '1.25rem',
             color: '#FFFFFF',
-            boxShadow: '0 10px 25px -5px rgba(3, 105, 161, 0.4)',
+            boxShadow: '0 10px 25px -5px rgba(8, 88, 159, 0.4)',
             position: 'relative',
             overflow: 'hidden',
           }}
@@ -194,8 +194,8 @@ export default function TenantContractSection({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.3rem',
-                    background: '#FEF3C7',
-                    color: '#92400E',
+                    background: '#FDEBD3',
+                    color: '#9A3412',
                     fontSize: '0.72rem',
                     fontWeight: 800,
                     padding: '0.15rem 0.55rem',
@@ -247,7 +247,7 @@ export default function TenantContractSection({
             style={{
               width: '100%',
               background: '#FFFFFF',
-              color: '#0369A1',
+              color: '#08589F',
               border: 'none',
               borderRadius: '14px',
               padding: '0.85rem 1rem',
@@ -273,8 +273,8 @@ export default function TenantContractSection({
             background: '#FFFFFF',
             borderRadius: '20px',
             padding: '1.25rem',
-            border: '1.5px solid #86EFAC',
-            boxShadow: '0 4px 20px -2px rgba(16, 185, 129, 0.12)',
+            border: '1.5px solid #A7DDBB',
+            boxShadow: '0 4px 20px -2px rgba(34, 163, 90, 0.12)',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.85rem',
@@ -287,11 +287,11 @@ export default function TenantContractSection({
                   width: 38,
                   height: 38,
                   borderRadius: '10px',
-                  background: '#DCFCE7',
+                  background: '#DCF2E4',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#16A34A',
+                  color: '#15803D',
                   flexShrink: 0,
                 }}
               >
@@ -299,18 +299,18 @@ export default function TenantContractSection({
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0F172A' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#102A43' }}>
                     สัญญาเช่าดิจิทัล (E-Signature)
                   </h4>
                   <span
                     style={{
-                      background: '#DCFCE7',
-                      color: '#16A34A',
+                      background: '#DCF2E4',
+                      color: '#15803D',
                       fontSize: '0.7rem',
                       fontWeight: 700,
                       padding: '0.15rem 0.5rem',
                       borderRadius: '999px',
-                      border: '1px solid #86EFAC',
+                      border: '1px solid #A7DDBB',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.2rem',
@@ -319,7 +319,7 @@ export default function TenantContractSection({
                     <CheckCircle2 size={11} /> ลงนามสมบูรณ์
                   </span>
                 </div>
-                <div style={{ fontSize: '0.775rem', color: '#64748B', marginTop: '0.15rem' }}>
+                <div style={{ fontSize: '0.775rem', color: '#557089', marginTop: '0.15rem' }}>
                   เลขที่: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{contract.contract_number}</span> • ตรวจสอบได้
                 </div>
               </div>
@@ -329,11 +329,11 @@ export default function TenantContractSection({
               style={{
                 fontSize: '0.72rem',
                 fontFamily: 'var(--font-mono)',
-                background: '#F1F5F9',
+                background: '#EBF1F7',
                 padding: '0.25rem 0.6rem',
                 borderRadius: '8px',
-                color: '#475569',
-                border: '1px solid #CBD5E1',
+                color: '#3E5872',
+                border: '1px solid #C3D0DE',
               }}
             >
               {contract.verification_code || 'VERIFIED'}
@@ -343,10 +343,10 @@ export default function TenantContractSection({
           <div
             style={{
               padding: '0.65rem 0.85rem',
-              background: '#F8FAFC',
+              background: '#F4F7FB',
               borderRadius: '10px',
               fontSize: '0.8rem',
-              color: '#475569',
+              color: '#3E5872',
               display: 'flex',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
@@ -367,7 +367,7 @@ export default function TenantContractSection({
               onClick={() => setShowPreviewModal(true)}
               style={{
                 flex: 1,
-                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '12px',
@@ -390,9 +390,9 @@ export default function TenantContractSection({
                 setTimeout(handleDownloadPDF, 400);
               }}
               style={{
-                background: '#F8FAFC',
-                color: '#334155',
-                border: '1px solid #CBD5E1',
+                background: '#F4F7FB',
+                color: '#29435E',
+                border: '1px solid #C3D0DE',
                 borderRadius: '12px',
                 padding: '0.65rem 1rem',
                 fontWeight: 700,
@@ -419,7 +419,7 @@ export default function TenantContractSection({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backgroundColor: 'rgba(16, 42, 67, 0.75)',
             backdropFilter: 'blur(8px)',
             padding: '1rem',
             overflow: 'hidden',
@@ -447,7 +447,7 @@ export default function TenantContractSection({
             <div
               style={{
                 padding: '1.25rem 1.5rem',
-                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                 color: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
@@ -501,8 +501,8 @@ export default function TenantContractSection({
             <div
               style={{
                 display: 'flex',
-                backgroundColor: '#F8FAFC',
-                borderBottom: '1px solid #E2E8F0',
+                backgroundColor: '#F4F7FB',
+                borderBottom: '1px solid #DCE5EF',
                 padding: '0.5rem 1.5rem',
                 gap: '1rem',
               }}
@@ -516,7 +516,7 @@ export default function TenantContractSection({
                   border: 'none',
                   borderRadius: '10px',
                   background: modalStep === 'review' ? '#FFFFFF' : 'transparent',
-                  color: modalStep === 'review' ? '#0284C7' : '#64748B',
+                  color: modalStep === 'review' ? '#0A6CC2' : '#557089',
                   fontWeight: modalStep === 'review' ? 800 : 600,
                   fontSize: '0.875rem',
                   cursor: 'pointer',
@@ -538,7 +538,7 @@ export default function TenantContractSection({
                   border: 'none',
                   borderRadius: '10px',
                   background: modalStep === 'sign' ? '#FFFFFF' : 'transparent',
-                  color: modalStep === 'sign' ? '#0284C7' : '#64748B',
+                  color: modalStep === 'sign' ? '#0A6CC2' : '#557089',
                   fontWeight: modalStep === 'sign' ? 800 : 600,
                   fontSize: '0.875rem',
                   cursor: 'pointer',
@@ -564,34 +564,34 @@ export default function TenantContractSection({
                       display: 'grid',
                       gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
                       gap: '0.75rem',
-                      background: '#F8FAFC',
+                      background: '#F4F7FB',
                       padding: '1rem',
                       borderRadius: '16px',
-                      border: '1px solid #E2E8F0',
+                      border: '1px solid #DCE5EF',
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#08589F', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
                         ฝ่ายผู้ให้เช่า
                       </div>
-                      <div style={{ fontWeight: 800, fontSize: '0.925rem', color: '#0F172A' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.925rem', color: '#102A43' }}>
                         {contract.lessor_name}
                       </div>
                       {contract.lessor_phone && (
-                        <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.1rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#557089', marginTop: '0.1rem' }}>
                           โทร: {contract.lessor_phone}
                         </div>
                       )}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
                         ฝ่ายผู้เช่า (ท่าน)
                       </div>
-                      <div style={{ fontWeight: 800, fontSize: '0.925rem', color: '#0F172A' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.925rem', color: '#102A43' }}>
                         {contract.lessee_name}
                       </div>
                       {contract.lessee_phone && (
-                        <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.1rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#557089', marginTop: '0.1rem' }}>
                           โทร: {contract.lessee_phone}
                         </div>
                       )}
@@ -606,25 +606,25 @@ export default function TenantContractSection({
                       gap: '0.75rem',
                     }}
                   >
-                    <div style={{ background: '#F1F5F9', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 600 }}>{unitLabel}</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0F172A' }}>{contract.unit_number}</div>
+                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>{unitLabel}</div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#102A43' }}>{contract.unit_number}</div>
                     </div>
-                    <div style={{ background: '#F1F5F9', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 600 }}>ค่าเช่า</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0284C7' }}>
+                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>ค่าเช่า</div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0A6CC2' }}>
                         ฿{contract.rent_amount.toLocaleString()}
                       </div>
                     </div>
-                    <div style={{ background: '#F1F5F9', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 600 }}>เงินประกัน/มัดจำ</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0F172A' }}>
+                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>เงินประกัน/มัดจำ</div>
+                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#102A43' }}>
                         ฿{contract.deposit_amount.toLocaleString()}
                       </div>
                     </div>
-                    <div style={{ background: '#F1F5F9', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#64748B', fontWeight: 600 }}>วันเริ่มสัญญา</div>
-                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0F172A' }}>
+                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
+                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>วันเริ่มสัญญา</div>
+                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#102A43' }}>
                         {formatThaiDate(contract.start_date)}
                       </div>
                     </div>
@@ -632,8 +632,8 @@ export default function TenantContractSection({
 
                   {/* Utilities */}
                   {(contract.electricity_rate_desc || contract.water_rate_desc || contract.waste_fee_desc) && (
-                    <div style={{ background: '#F8FAFC', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid #E2E8F0', fontSize: '0.825rem' }}>
-                      <div style={{ fontWeight: 800, color: '#334155', marginBottom: '0.35rem' }}>
+                    <div style={{ background: '#F4F7FB', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid #DCE5EF', fontSize: '0.825rem' }}>
+                      <div style={{ fontWeight: 800, color: '#29435E', marginBottom: '0.35rem' }}>
                         อัตราค่าสาธารณูปโภคและบริการ:
                       </div>
                       {contract.electricity_rate_desc && <div>• ค่าไฟฟ้า: {contract.electricity_rate_desc}</div>}
@@ -644,7 +644,7 @@ export default function TenantContractSection({
 
                   {/* Clauses */}
                   <div>
-                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.925rem', fontWeight: 800, color: '#0F172A' }}>
+                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.925rem', fontWeight: 800, color: '#102A43' }}>
                       ข้อกำหนดและเงื่อนไขสัญญา:
                     </h4>
                     <div
@@ -653,16 +653,16 @@ export default function TenantContractSection({
                         flexDirection: 'column',
                         gap: '0.5rem',
                         background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
+                        border: '1px solid #DCE5EF',
                         borderRadius: '14px',
                         padding: '1rem',
                         fontSize: '0.825rem',
-                        color: '#334155',
+                        color: '#29435E',
                         lineHeight: 1.55,
                       }}
                     >
                       {contract.clauses.map((clause, idx) => (
-                        <div key={idx} style={{ paddingBottom: '0.35rem', borderBottom: idx < contract.clauses.length - 1 ? '1px dashed #E2E8F0' : 'none' }}>
+                        <div key={idx} style={{ paddingBottom: '0.35rem', borderBottom: idx < contract.clauses.length - 1 ? '1px dashed #DCE5EF' : 'none' }}>
                           {clause}
                         </div>
                       ))}
@@ -671,15 +671,15 @@ export default function TenantContractSection({
 
                   {/* Additional terms */}
                   {contract.custom_terms && (
-                    <div style={{ background: '#FEF3C7', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #FCD34D', fontSize: '0.825rem', color: '#92400E' }}>
+                    <div style={{ background: '#FDEBD3', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #F7B86C', fontSize: '0.825rem', color: '#9A3412' }}>
                       <strong>ข้อตกลงพิเศษเพิ่มเติม:</strong> {contract.custom_terms}
                     </div>
                   )}
 
                   {/* Lessor signature status */}
                   {contract.lessor_signature && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#F0FDF4', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
-                      <CheckCircle2 size={18} color="#16A34A" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: '#EFF8F2', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #A7DDBB' }}>
+                      <CheckCircle2 size={18} color="#15803D" />
                       <div style={{ fontSize: '0.825rem', color: '#166534' }}>
                         ฝ่ายผู้ให้เช่าได้ลงนามรับรองแล้วเมื่อ{' '}
                         <strong>{formatThaiDate(contract.lessor_signed_at)}</strong>
@@ -691,7 +691,7 @@ export default function TenantContractSection({
                     type="button"
                     onClick={() => setModalStep('sign')}
                     style={{
-                      background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                      background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '14px',
@@ -703,7 +703,7 @@ export default function TenantContractSection({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.45rem',
-                      boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)',
+                      boxShadow: '0 4px 14px rgba(10, 108, 194, 0.25)',
                     }}
                   >
                     อ่านครบถ้วนแล้ว ไปยังหน้าลงนาม <ArrowRight size={16} />
@@ -715,24 +715,24 @@ export default function TenantContractSection({
                   <div
                     style={{
                       padding: '0.85rem 1rem',
-                      background: '#F0F9FF',
+                      background: '#F2F7FC',
                       borderRadius: '14px',
-                      border: '1px solid #BAE6FD',
+                      border: '1px solid #CFE2F6',
                       fontSize: '0.825rem',
-                      color: '#0369A1',
+                      color: '#08589F',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.5rem',
                     }}
                   >
-                    <Sparkles size={16} color="#0284C7" />
+                    <Sparkles size={16} color="#0A6CC2" />
                     <span>
                       ผู้ลงนาม: <strong>{contract.lessee_name}</strong> (ฝ่ายผู้เช่า)
                     </span>
                   </div>
 
                   {/* Digital Signature Pad */}
-                  <div style={{ border: '1.5px solid #CBD5E1', borderRadius: '18px', overflow: 'hidden' }}>
+                  <div style={{ border: '1.5px solid #C3D0DE', borderRadius: '18px', overflow: 'hidden' }}>
                     <SignaturePad
                       label="ลายมือชื่อผู้เช่า (Lessee Signature)"
                       subtitle="ใช้นิ้วมือ หรือ ปากกาสไตลัส วาดลายมือชื่อของท่านในกรอบนี้"
@@ -749,12 +749,12 @@ export default function TenantContractSection({
                       alignItems: 'flex-start',
                       gap: '0.625rem',
                       padding: '0.85rem 1rem',
-                      background: '#F8FAFC',
+                      background: '#F4F7FB',
                       borderRadius: '14px',
-                      border: '1px solid #E2E8F0',
+                      border: '1px solid #DCE5EF',
                       cursor: 'pointer',
                       fontSize: '0.825rem',
-                      color: '#334155',
+                      color: '#29435E',
                       lineHeight: 1.5,
                     }}
                   >
@@ -762,7 +762,7 @@ export default function TenantContractSection({
                       type="checkbox"
                       checked={agreeTerms}
                       onChange={(e) => setAgreeTerms(e.target.checked)}
-                      style={{ marginTop: '0.2rem', width: 18, height: 18, accentColor: '#0284C7', cursor: 'pointer' }}
+                      style={{ marginTop: '0.2rem', width: 18, height: 18, accentColor: '#0A6CC2', cursor: 'pointer' }}
                     />
                     <span>
                       ข้าพเจ้าได้ตรวจสอบรายละเอียดและยอมรับข้อตกลงและเงื่อนไขทั้งหมดในสัญญานี้
@@ -778,9 +778,9 @@ export default function TenantContractSection({
                       style={{
                         padding: '0.875rem 1.25rem',
                         borderRadius: '14px',
-                        border: '1px solid #CBD5E1',
+                        border: '1px solid #C3D0DE',
                         background: '#FFFFFF',
-                        color: '#475569',
+                        color: '#3E5872',
                         fontWeight: 700,
                         fontSize: '0.875rem',
                         cursor: 'pointer',
@@ -796,8 +796,8 @@ export default function TenantContractSection({
                         flex: 1,
                         background:
                           !lesseeSignature || !agreeTerms || isSubmitting
-                            ? '#CBD5E1'
-                            : 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                            ? '#C3D0DE'
+                            : 'linear-gradient(135deg, #15803D 0%, #22A35A 100%)',
                         color: '#FFFFFF',
                         border: 'none',
                         borderRadius: '14px',
@@ -810,7 +810,7 @@ export default function TenantContractSection({
                         justifyContent: 'center',
                         gap: '0.45rem',
                         boxShadow:
-                          !lesseeSignature || !agreeTerms || isSubmitting ? 'none' : '0 4px 14px rgba(16, 185, 129, 0.3)',
+                          !lesseeSignature || !agreeTerms || isSubmitting ? 'none' : '0 4px 14px rgba(34, 163, 90, 0.3)',
                         transition: 'all 0.15s ease',
                       }}
                     >
@@ -840,7 +840,7 @@ export default function TenantContractSection({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+            backgroundColor: 'rgba(16, 42, 67, 0.8)',
             backdropFilter: 'blur(8px)',
             padding: '1rem',
             overflow: 'hidden',
@@ -853,7 +853,7 @@ export default function TenantContractSection({
             style={{
               width: '100%',
               maxWidth: '860px',
-              backgroundColor: '#F1F5F9',
+              backgroundColor: '#EBF1F7',
               borderRadius: '20px',
               display: 'flex',
               flexDirection: 'column',
@@ -868,15 +868,15 @@ export default function TenantContractSection({
               style={{
                 padding: '1rem 1.5rem',
                 backgroundColor: '#FFFFFF',
-                borderBottom: '1px solid #E2E8F0',
+                borderBottom: '1px solid #DCE5EF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldCheck size={20} color="#16A34A" />
-                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0F172A' }}>
+                <ShieldCheck size={20} color="#15803D" />
+                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#102A43' }}>
                   เอกสารสัญญาเช่าฉบับสมบูรณ์ (A4 Preview)
                 </span>
               </div>
@@ -886,7 +886,7 @@ export default function TenantContractSection({
                   onClick={handleDownloadPDF}
                   disabled={isExporting}
                   style={{
-                    background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                    background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: '10px',
@@ -906,7 +906,7 @@ export default function TenantContractSection({
                   onClick={() => setShowPreviewModal(false)}
                   style={{
                     background: 'transparent',
-                    border: '1px solid #CBD5E1',
+                    border: '1px solid #C3D0DE',
                     borderRadius: '50%',
                     width: 32,
                     height: 32,
@@ -914,7 +914,7 @@ export default function TenantContractSection({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: '#64748B',
+                    color: '#557089',
                   }}
                 >
                   <X size={18} />
@@ -933,23 +933,23 @@ export default function TenantContractSection({
                   padding: '2.5rem',
                   borderRadius: '4px',
                   boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                  color: '#1E293B',
+                  color: '#1A3350',
                   fontFamily: 'var(--font-sans)',
                   fontSize: '0.875rem',
                   lineHeight: 1.6,
                 }}
               >
                 {/* Header with Logo */}
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #0F172A', paddingBottom: '1rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #102A43', paddingBottom: '1rem' }}>
                   <img
                     src={config?.bill_customization?.dorm_logo || horcareLogo}
                     alt="Logo"
                     style={{ height: '48px', objectFit: 'contain', marginBottom: '0.5rem' }}
                   />
-                  <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#0F172A' }}>
+                  <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#102A43' }}>
                     {contract.title}
                   </h2>
-                  <div style={{ fontSize: '0.825rem', color: '#64748B', marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: '0.825rem', color: '#557089', marginTop: '0.2rem' }}>
                     เลขที่สัญญา: <strong style={{ fontFamily: 'var(--font-mono)' }}>{contract.contract_number}</strong>
                   </div>
                 </div>
@@ -968,10 +968,10 @@ export default function TenantContractSection({
                 {/* Rates Table */}
                 <div
                   style={{
-                    backgroundColor: '#F8FAFC',
+                    backgroundColor: '#F4F7FB',
                     borderRadius: '8px',
                     padding: '0.875rem',
-                    border: '1px solid #E2E8F0',
+                    border: '1px solid #DCE5EF',
                     marginBottom: '1.25rem',
                   }}
                 >
@@ -1000,7 +1000,7 @@ export default function TenantContractSection({
                     ))}
                   </div>
                   {contract.custom_terms && (
-                    <div style={{ marginTop: '0.65rem', fontStyle: 'italic', color: '#475569' }}>
+                    <div style={{ marginTop: '0.65rem', fontStyle: 'italic', color: '#3E5872' }}>
                       * ข้อตกลงเพิ่มเติม: {contract.custom_terms}
                     </div>
                   )}
@@ -1014,7 +1014,7 @@ export default function TenantContractSection({
                     gap: '2rem',
                     marginTop: '2rem',
                     paddingTop: '1.5rem',
-                    borderTop: '1px solid #E2E8F0',
+                    borderTop: '1px solid #DCE5EF',
                   }}
                 >
                   {/* Lessor Sign */}
@@ -1029,15 +1029,15 @@ export default function TenantContractSection({
                         style={{ height: '54px', objectFit: 'contain', margin: '0 auto' }}
                       />
                     ) : (
-                      <div style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.75rem' }}>
+                      <div style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8FA3B8', fontSize: '0.75rem' }}>
                         (ลงนามดิจิทัล)
                       </div>
                     )}
-                    <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#3E5872', marginTop: '0.25rem' }}>
                       ({contract.lessor_name})
                     </div>
                     {contract.lessor_signed_at && (
-                      <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#8FA3B8' }}>
                         วันที่ {formatThaiDate(contract.lessor_signed_at)}
                       </div>
                     )}
@@ -1055,15 +1055,15 @@ export default function TenantContractSection({
                         style={{ height: '54px', objectFit: 'contain', margin: '0 auto' }}
                       />
                     ) : (
-                      <div style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.75rem' }}>
+                      <div style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8FA3B8', fontSize: '0.75rem' }}>
                         (รอดำเนินการลงนาม)
                       </div>
                     )}
-                    <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#3E5872', marginTop: '0.25rem' }}>
                       ({contract.lessee_name})
                     </div>
                     {contract.lessee_signed_at && (
-                      <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#8FA3B8' }}>
                         วันที่ {formatThaiDate(contract.lessee_signed_at)}
                       </div>
                     )}
@@ -1075,19 +1075,19 @@ export default function TenantContractSection({
                   style={{
                     marginTop: '2.5rem',
                     paddingTop: '0.75rem',
-                    borderTop: '1px dashed #CBD5E1',
+                    borderTop: '1px dashed #C3D0DE',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     fontSize: '0.72rem',
-                    color: '#64748B',
+                    color: '#557089',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <ShieldCheck size={14} color="#16A34A" />
+                    <ShieldCheck size={14} color="#15803D" />
                     <span>
                       เอกสารนี้ลงนามอิเล็กทรอนิกส์ผ่านระบบ HorCare • Audit Code:{' '}
-                      <strong style={{ fontFamily: 'var(--font-mono)', color: '#0F172A' }}>
+                      <strong style={{ fontFamily: 'var(--font-mono)', color: '#102A43' }}>
                         {contract.verification_code || 'VERIFIED'}
                       </strong>
                     </span>

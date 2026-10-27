@@ -90,7 +90,7 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
                                             {s.role === 'technician' ? <Wrench size={15} /> : <Sparkles size={15} />}
                                             <span style={{ fontWeight: 700 }}>{s.name}</span>
                                             <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>{STAFF_ROLE_LABELS_TH[s.role]}{s.phone ? ` · ${s.phone}` : ''}</span>
-                                            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: s.line_user_id ? '#059669' : '#B45309', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: s.line_user_id ? '#15803D' : '#C2410C', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                                                 <MessageCircle size={12} /> {s.line_user_id ? 'เชื่อม LINE แล้ว' : 'ยังไม่เชื่อม LINE'}
                                             </span>
                                         </div>

@@ -33,7 +33,15 @@ export type TranslationKey =
     | 'flex_service_bill'
     | 'flex_open_portal'
     | 'flex_split_pay'
-    | 'flex_send_slip';
+    | 'flex_send_slip'
+    | 'flex_amount_due'
+    | 'flex_status_unpaid'
+    | 'flex_status_pending'
+    | 'flex_status_paid'
+    | 'flex_pay_to'
+    | 'flex_fine_notice'
+    | 'flex_fine_date'
+    | 'flex_note';
 
 export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> = {
     th: {
@@ -70,6 +78,14 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         flex_open_portal: '🔗 เปิดพอร์ทัล / ดูบิล',
         flex_split_pay: '💸 แบ่งจ่าย',
         flex_send_slip: '📎 กรุณาส่งสลิปยืนยันการโอนเงินมาในแชทนี้ด้วยนะคะ 🙏',
+        flex_amount_due: 'ยอดที่ต้องชำระ',
+        flex_status_unpaid: 'รอชำระ',
+        flex_status_pending: 'รอตรวจสลิป',
+        flex_status_paid: 'ชำระแล้ว',
+        flex_pay_to: 'โอนเข้าบัญชี',
+        flex_fine_notice: 'ใบแจ้งค่าปรับ',
+        flex_fine_date: 'วันที่',
+        flex_note: 'หมายเหตุ',
     },
     en: {
         invoice_title: 'INVOICE',
@@ -105,6 +121,14 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         flex_open_portal: '🔗 View Bill / Portal',
         flex_split_pay: '💸 Pay in parts',
         flex_send_slip: '📎 Please attach transfer slip in this chat. Thank you! 🙏',
+        flex_amount_due: 'Amount due',
+        flex_status_unpaid: 'Unpaid',
+        flex_status_pending: 'Checking slip',
+        flex_status_paid: 'Paid',
+        flex_pay_to: 'Pay to',
+        flex_fine_notice: 'Fine notice',
+        flex_fine_date: 'Date',
+        flex_note: 'Note',
     },
     my: {
         invoice_title: 'ငွေတောင်းခံလွှာ',
@@ -140,6 +164,14 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         flex_open_portal: '🔗 ဘေလ်ကြည့်ရန် / ပေါ်တယ်',
         flex_split_pay: '💸 အရစ်ကျပေးမည်',
         flex_send_slip: '📎 ငွေလွှဲစလစ်ကို ဤချက်ထဲသို့ ပို့ပေးပါ ကျေးဇူးတင်ပါသည် 🙏',
+        flex_amount_due: 'ပေးရန်ငွေ',
+        flex_status_unpaid: 'မပေးရသေး',
+        flex_status_pending: 'စလစ်စစ်ဆေးနေသည်',
+        flex_status_paid: 'ပေးပြီး',
+        flex_pay_to: 'ငွေလွှဲရန်အကောင့်',
+        flex_fine_notice: 'ဒဏ်ကြေးအကြောင်းကြားစာ',
+        flex_fine_date: 'ရက်စွဲ',
+        flex_note: 'မှတ်ချက်',
     },
     zh: {
         invoice_title: '账单明细',
@@ -175,6 +207,14 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         flex_open_portal: '🔗 查看账单详情',
         flex_split_pay: '💸 分期付款',
         flex_send_slip: '📎 转账后请在此聊天发送付款水单凭证，谢谢！🙏',
+        flex_amount_due: '应付金额',
+        flex_status_unpaid: '待付款',
+        flex_status_pending: '核对转账凭证中',
+        flex_status_paid: '已付款',
+        flex_pay_to: '收款账户',
+        flex_fine_notice: '罚款通知',
+        flex_fine_date: '日期',
+        flex_note: '备注',
     },
     lo: {
         invoice_title: 'ໃບແຈ້ງໜີ້',
@@ -210,6 +250,14 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         flex_open_portal: '🔗 ເປີດພໍທັລ / ເບິ່ງບິນ',
         flex_split_pay: '💸 ແບ່ງຈ່າຍ',
         flex_send_slip: '📎 ກະລຸນາສົ່ງສະລິບຢືນຢັນການໂອນເງິນມາໃນແຊັດນີ້ດ້ວຍ ຂອບໃຈ 🙏',
+        flex_amount_due: 'ຍອດທີ່ຕ້ອງຊຳລະ',
+        flex_status_unpaid: 'ລໍຖ້າຊຳລະ',
+        flex_status_pending: 'ກຳລັງກວດສລິບ',
+        flex_status_paid: 'ຊຳລະແລ້ວ',
+        flex_pay_to: 'ໂອນເຂົ້າບັນຊີ',
+        flex_fine_notice: 'ໃບແຈ້ງຄ່າປັບ',
+        flex_fine_date: 'ວັນທີ',
+        flex_note: 'ໝາຍເຫດ',
     },
     vi: {
         invoice_title: 'HÓA ĐƠN',
@@ -245,6 +293,14 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         flex_open_portal: '🔗 Xem hoá đơn / Cổng thông tin',
         flex_split_pay: '💸 Trả một phần',
         flex_send_slip: '📎 Vui lòng gửi ảnh biên lai chuyển khoản vào đoạn chat này 🙏',
+        flex_amount_due: 'Số tiền cần trả',
+        flex_status_unpaid: 'Chưa thanh toán',
+        flex_status_pending: 'Đang kiểm tra biên lai',
+        flex_status_paid: 'Đã thanh toán',
+        flex_pay_to: 'Chuyển khoản đến',
+        flex_fine_notice: 'Thông báo tiền phạt',
+        flex_fine_date: 'Ngày',
+        flex_note: 'Ghi chú',
     },
 };
 

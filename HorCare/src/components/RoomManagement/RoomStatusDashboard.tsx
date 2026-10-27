@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronDown, PenLine, AlertCircle } from 'lucide-react';
 import type { Room, DormConfig } from '../../types';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
+import { DonutChart, RateChart } from '../Accounting/charts';
 import type { Occupancy, RoomStatus } from '../../shared/roomOccupancy';
 
 export type { RoomStatus };
@@ -41,6 +42,16 @@ export interface RoomStatusDashboardProps {
   onOpenRoom?: (room: Room) => void;
   defaultCollapsed?: boolean;
   buildingType?: DormConfig['building_type'];
+  /**
+   * Occupancy rate (0–1) per month, oldest first, ending with the current month. Past months come from billed rooms;
+   * the current month's value is replaced with today's contract-based rate so it matches the tiles. null = no data.
+   * Without it only the status donut is drawn.
+   */
+  history?: { labels: string[]; values: (number | null)[] };
+  /** Drawn instead of the tile grid (the Dashboard passes its mini plan). */
+  map?: ReactNode;
+  /** Opens the full plan page. */
+  onOpenPlan?: () => void;
 }
 
 export default function RoomStatusDashboard({
@@ -49,6 +60,9 @@ export default function RoomStatusDashboard({
   onOpenRoom,
   defaultCollapsed = false,
   buildingType,
+  history,
+  map,
+  onOpenPlan,
 }: RoomStatusDashboardProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const terms = getWorkspaceTerms(buildingType);
@@ -75,6 +89,9 @@ export default function RoomStatusDashboard({
   );
 
   const occupancyPct = activeRooms.length > 0 ? Math.round((counts.occupied / activeRooms.length) * 100) : 0;
+  const rateValues = history?.values.map((v, i, all) =>
+    i === all.length - 1 && activeRooms.length > 0 ? counts.occupied / activeRooms.length : v);
+  const showTrend = !!history && !!rateValues && rateValues.filter(v => v !== null).length >= 2;
 
   return (
     <section className="panel room-map mb-6">
@@ -102,43 +119,68 @@ export default function RoomStatusDashboard({
 
       {!collapsed && (
         <div className="room-map-body">
-          <div className="room-tiles">
-            {sorted.map(room => {
-              const occ = occupancy[room.id];
-              const status = statusOf(room);
-              const cfg = STATUS_CONFIG[status];
-              const why = occ ? (occ.override ? `ปรับเอง: ${occ.override.reason}` : occ.detail) : '';
-              const label = `${terms.unitName} ${room.room_number} ${labelOf(status)}${why ? ` (${why})` : ''}${occ?.warning ? ` — ${occ.warning}` : ''}`;
-              return (
-                <button
-                  key={room.id}
-                  id={`room-status-tile-${room.id}`}
-                  type="button"
-                  onClick={() => onOpenRoom?.(room)}
-                  disabled={!onOpenRoom}
-                  title={`${label}${onOpenRoom ? ' · แตะเพื่อเปิดข้อมูลผู้เช่า' : ''}`}
-                  aria-label={label}
-                  className={`room-status-tile ${status}`}
-                >
-                  <span className="room-tile-top">
-                    <span className="room-tile-num">{room.room_number}</span>
-                    {occ?.override && <PenLine size={12} className="room-tile-flag override" aria-hidden />}
-                    {contractIssue(room) && <AlertCircle size={12} className="room-tile-flag warn" aria-hidden />}
-                  </span>
-                  {/* Occupied is the normal state and stays unmarked, so vacant / reserved stand out */}
-                  {status !== 'occupied' && (
-                    <span className="room-tile-status">
-                      <i className="status-dot" style={{ background: cfg.dot }} aria-hidden />
-                      {cfg.label}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          <div className="room-map-charts">
+            <div className="room-map-chart">
+              <h3 className="room-map-chart-title">สัดส่วนสถานะ{terms.unitNamePlural}</h3>
+              <DonutChart
+                items={ORDER.map(s => ({ key: s, label: labelOf(s), value: counts[s], color: STATUS_CONFIG[s].dot }))}
+                title={`สถานะ${terms.unitNamePlural}`}
+                centerLabel="อัตราเข้าพัก"
+                centerValue={`${occupancyPct}%`}
+                format={n => `${n} ${terms.unitName}`}
+                size={152}
+              />
+            </div>
+            {history && (
+              <div className="room-map-chart">
+                <h3 className="room-map-chart-title">อัตราการเข้าพัก {history.labels.length} เดือน</h3>
+                {showTrend
+                  ? <RateChart labels={history.labels} values={rateValues!} color="var(--series-1)" title="อัตราการเข้าพัก" />
+                  : <p className="room-map-chart-empty">ยังไม่มีบิลย้อนหลังพอจะแสดงแนวโน้ม · กราฟจะขึ้นเมื่อบันทึกบิลเดือนก่อน ๆ แล้ว</p>}
+              </div>
+            )}
           </div>
+          {map ?? (
+            <div className="room-tiles">
+              {sorted.map(room => {
+                const occ = occupancy[room.id];
+                const status = statusOf(room);
+                const cfg = STATUS_CONFIG[status];
+                const why = occ ? (occ.override ? `ปรับเอง: ${occ.override.reason}` : occ.detail) : '';
+                const label = `${terms.unitName} ${room.room_number} ${labelOf(status)}${why ? ` (${why})` : ''}${occ?.warning ? ` — ${occ.warning}` : ''}`;
+                return (
+                  <button
+                    key={room.id}
+                    id={`room-status-tile-${room.id}`}
+                    type="button"
+                    onClick={() => onOpenRoom?.(room)}
+                    disabled={!onOpenRoom}
+                    title={`${label}${onOpenRoom ? ' · แตะเพื่อเปิดข้อมูลผู้เช่า' : ''}`}
+                    aria-label={label}
+                    className={`room-status-tile ${status}`}
+                  >
+                    <span className="room-tile-top">
+                      <span className="room-tile-num">{room.room_number}</span>
+                      {occ?.override && <PenLine size={12} className="room-tile-flag override" aria-hidden />}
+                      {contractIssue(room) && <AlertCircle size={12} className="room-tile-flag warn" aria-hidden />}
+                    </span>
+                    {/* Occupied is the normal state and stays unmarked, so vacant / reserved stand out */}
+                    {status !== 'occupied' && (
+                      <span className="room-tile-status">
+                        <i className="status-dot" style={{ background: cfg.dot }} aria-hidden />
+                        {cfg.label}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <p className="room-map-hint">
             สถานะคิดจากสัญญาเช่าและข้อมูลผู้เช่า
+            {showTrend && <> · อัตราเดือนก่อน ๆ คิดจาก{terms.unitName}ที่ออกบิลค่าเช่า</>}
             {onOpenRoom && <> · แตะเลข{terms.unitName}เพื่อเปิดข้อมูลผู้เช่า</>}
+            {onOpenPlan && <> · <button type="button" className="link-btn room-map-plan-link" onClick={onOpenPlan}>เปิดผังเต็ม</button></>}
             {overridden > 0 && <> · <PenLine size={11} aria-hidden /> ปรับเอง {overridden} {terms.unitName}</>}
             {needsLook > 0 && <> · <AlertCircle size={11} aria-hidden /> ควรตรวจสัญญา {needsLook} {terms.unitName}</>}
           </p>

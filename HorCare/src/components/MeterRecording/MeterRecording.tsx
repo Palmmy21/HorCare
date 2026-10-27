@@ -624,7 +624,7 @@ export default function MeterRecording({
                 {/* Electricity */}
                 <div className="meter-section">
                     <div className="meter-label">
-                        <Zap size={16} color="#F59E0B" />
+                        <Zap size={16} color="#F59E2E" />
                         ค่าไฟฟ้า
                     </div>
                     <div className="meter-row">
@@ -672,7 +672,7 @@ export default function MeterRecording({
                 {/* Water */}
                 <div className="meter-section">
                     <div className="meter-label">
-                        <Droplets size={16} color="#2563EB" />
+                        <Droplets size={16} color="#0A6CC2" />
                         ค่าน้ำประปา
                     </div>
                     <div className="meter-row">
@@ -722,14 +722,14 @@ export default function MeterRecording({
                     <div className="bill-preview">
                         <div className="bill-row">
                             <span className="bill-label">
-                                <Zap size={14} color="#F59E0B" />
+                                <Zap size={14} color="#F59E2E" />
                                 ค่าไฟ ({calculation.elec_units} หน่วย × {roomElecRate}฿)
                             </span>
                             <span className="bill-value">{formatCurrency(calculation.elec_bill)}</span>
                         </div>
                         <div className="bill-row">
                             <span className="bill-label">
-                                <Droplets size={14} color="#2563EB" />
+                                <Droplets size={14} color="#0A6CC2" />
                                 {roomWaterCfg.type === 'normal'
                                     ? `ค่าน้ำ (${calculation.water_units} หน่วย × ${roomWaterCfg.unit_rate}฿)`
                                     : `ค่าน้ำ ${calculation.water_excess_units > 0 ? `(เกิน ${calculation.water_excess_units} หน่วย)` : '(เหมา)'}`
@@ -739,7 +739,7 @@ export default function MeterRecording({
                         </div>
                         <div className="bill-row">
                             <span className="bill-label">
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#16A34A" /> ค่าห้อง</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#15803D" /> ค่าห้อง</span>
                                 {room.rent_type === 'semester' && (
                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-warning)', marginLeft: '4px' }}>(รายเทอม)</span>
                                 )}
@@ -831,8 +831,8 @@ export default function MeterRecording({
                 transition: 'opacity 0.25s ease',
             }}>
                 <div style={{
-                    background: '#1e1b4b',
-                    border: '1px solid rgba(139,92,246,0.3)',
+                    background: '#102a43',
+                    border: '1px solid rgba(15, 76, 129,0.3)',
                     borderRadius: '24px',
                     padding: '2rem',
                     width: '100%',
@@ -847,13 +847,13 @@ export default function MeterRecording({
                     <div style={{
                         width: 64, height: 64, borderRadius: '50%',
                         background: bulkProgress.done
-                            ? 'linear-gradient(135deg,#10B981,#059669)'
-                            : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                            ? 'linear-gradient(135deg,#22A35A,#15803D)'
+                            : 'linear-gradient(135deg,#0A6CC2,#0F4C81)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         margin: '0 auto 1.25rem',
                         boxShadow: bulkProgress.done
-                            ? '0 8px 24px rgba(16,185,129,0.45)'
-                            : '0 8px 24px rgba(99,102,241,0.45)',
+                            ? '0 8px 24px rgba(34, 163, 90,0.45)'
+                            : '0 8px 24px rgba(10, 108, 194,0.45)',
                         transition: 'background 0.4s ease, box-shadow 0.4s ease',
                         transform: bulkProgress.done ? 'scale(1.1)' : 'scale(1)',
                     }}>
@@ -868,7 +868,7 @@ export default function MeterRecording({
                     </div>
                     <div style={{ fontSize: '0.8125rem', color: 'rgba(165,180,252,0.7)', marginBottom: '1.5rem', minHeight: '1.3em' }}>
                         {bulkProgress.done
-                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>สำเร็จ {bulkProgress.total - bulkProgress.failed} ห้อง{bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed}` : <CheckCircle size={12} color="#4ADE80" />}</span>
+                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>สำเร็จ {bulkProgress.total - bulkProgress.failed} ห้อง{bulkProgress.failed > 0 ? ` · ล้มเหลว ${bulkProgress.failed}` : <CheckCircle size={12} color="#22A35A" />}</span>
                             : `ห้อง ${bulkProgress.roomNumber}`}
                     </div>
 
@@ -895,11 +895,11 @@ export default function MeterRecording({
                         <div style={{
                             height: '100%', borderRadius: 999,
                             background: bulkProgress.done
-                                ? 'linear-gradient(90deg,#10B981,#34D399)'
-                                : 'linear-gradient(90deg,#6366F1,#A78BFA)',
+                                ? 'linear-gradient(90deg,#22A35A,#22A35A)'
+                                : 'linear-gradient(90deg,#0A6CC2,#3D8FD6)',
                             width: `${Math.round((bulkProgress.current / bulkProgress.total) * 100)}%`,
                             transition: 'width 0.35s ease, background 0.4s ease',
-                            boxShadow: '0 0 10px rgba(139,92,246,0.6)',
+                            boxShadow: '0 0 10px rgba(15, 76, 129,0.6)',
                         }} />
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'rgba(165,180,252,0.4)', marginBottom: '1.5rem' }}>
@@ -911,10 +911,10 @@ export default function MeterRecording({
                             onClick={() => setBulkProgress(null)}
                             style={{
                                 width: '100%', padding: '0.75rem',
-                                background: 'linear-gradient(135deg,#10B981,#059669)',
+                                background: 'linear-gradient(135deg,#22A35A,#15803D)',
                                 color: '#fff', border: 'none', borderRadius: '12px',
                                 fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer',
-                                boxShadow: '0 4px 16px rgba(16,185,129,0.4)',
+                                boxShadow: '0 4px 16px rgba(34, 163, 90,0.4)',
                             }}
                         >
                             ปิด
@@ -1003,13 +1003,13 @@ export default function MeterRecording({
             {importResult && (
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '0.625rem',
-                    background: importResult.updated > 0 ? '#ECFDF5' : '#FEF3C7',
-                    border: `1px solid ${importResult.updated > 0 ? '#A7F3D0' : '#FDE68A'}`,
-                    color: importResult.updated > 0 ? '#065F46' : '#92400E',
+                    background: importResult.updated > 0 ? '#EFF8F2' : '#FDEBD3',
+                    border: `1px solid ${importResult.updated > 0 ? '#A7DDBB' : '#FBD9A8'}`,
+                    color: importResult.updated > 0 ? '#166534' : '#9A3412',
                     borderRadius: '10px', padding: '0.625rem 0.875rem',
                     fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.75rem',
                 }}>
-                    <CheckCircle size={15} color={importResult.updated > 0 ? '#059669' : '#D97706'} />
+                    <CheckCircle size={15} color={importResult.updated > 0 ? '#15803D' : '#E8740C'} />
                     <span style={{ flex: 1 }}>
                         {importResult.updated > 0
                             ? `นำเข้าสำเร็จ ${importResult.updated} ห้อง`
@@ -1048,11 +1048,11 @@ export default function MeterRecording({
             <div className="card mb-6" style={{ padding: '0.75rem 0.875rem', display: 'flex', flexWrap: 'wrap', gap: '0.625rem', alignItems: 'center' }}>
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
-                    background: 'var(--color-gray-50, #F9FAFB)',
-                    border: '1px solid var(--color-border, #E5E7EB)',
+                    background: 'var(--color-gray-50, #F4F7FB)',
+                    border: '1px solid var(--color-border, #DCE5EF)',
                     borderRadius: '10px', padding: '0.5rem 0.75rem', flex: 1, minWidth: '200px'
                 }}>
-                    <Search size={15} color="var(--color-text-muted, #9CA3AF)" />
+                    <Search size={15} color="var(--color-text-muted, #8FA3B8)" />
                     <input
                         type="text"
                         placeholder="ค้นหาเลขห้อง..."
@@ -1060,18 +1060,18 @@ export default function MeterRecording({
                         onChange={e => setSearchQuery(e.target.value)}
                         style={{
                             border: 'none', background: 'none', outline: 'none',
-                            flex: 1, fontSize: '0.875rem', color: 'var(--color-text, #111827)',
+                            flex: 1, fontSize: '0.875rem', color: 'var(--color-text, #102A43)',
                         }}
                     />
                     {searchQuery && (
-                        <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-muted, #9CA3AF)', display: 'flex' }}>
+                        <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-muted, #8FA3B8)', display: 'flex' }}>
                             <X size={15} />
                         </button>
                     )}
                 </div>
 
                 <div style={{
-                    display: 'flex', background: 'var(--color-gray-100, #F3F4F6)',
+                    display: 'flex', background: 'var(--color-gray-100, #EBF1F7)',
                     borderRadius: '10px', padding: '3px', gap: '2px', flexWrap: 'wrap'
                 }}>
                     {([
@@ -1090,7 +1090,7 @@ export default function MeterRecording({
                                     border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.78rem',
                                     fontWeight: active ? 700 : 500, transition: 'all 0.15s',
                                     background: active ? '#fff' : 'transparent',
-                                    color: active ? 'var(--color-primary, #8B5CF6)' : 'var(--color-text-muted, #6B7280)',
+                                    color: active ? 'var(--color-primary, #0F4C81)' : 'var(--color-text-muted, #557089)',
                                     boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                                 }}
                             >
@@ -1103,7 +1103,7 @@ export default function MeterRecording({
 
             {filteredRooms.length === 0 ? (
                 <div className="card empty-state">
-                    <div><Home size={48} color="#9CA3AF" style={{ margin: '0 auto 1rem' }} /></div>
+                    <div><Home size={48} color="#8FA3B8" style={{ margin: '0 auto 1rem' }} /></div>
                     <h3>ไม่พบห้องพัก</h3>
                     <p>ไม่มีห้องพักที่ตรงกับเงื่อนไขการค้นหา</p>
                 </div>

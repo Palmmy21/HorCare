@@ -33,7 +33,7 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
     const chartBuildings = current ? buildings.filter(b => current.property_ids.includes(b.id)) : buildings;
 
     return (
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
                 <h1 style={{ margin: 0, fontSize: '1.4rem', display: 'flex', gap: 8, alignItems: 'center' }}><BookOpen size={26} /> สมุดบัญชี</h1>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-gray-500)' }}>
@@ -50,7 +50,7 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
                 ))}
             </div>
             {ledgers.length > 1 && activeTab !== 'settings' && (
-                <select value={current?.id} onChange={e => setSelected(e.target.value)} aria-label="สมุดบัญชี" style={{ alignSelf: 'flex-start', padding: '0.45rem 0.6rem', borderRadius: 8, border: '1px solid var(--color-gray-300, #D1D5DB)' }}>
+                <select value={current?.id} onChange={e => setSelected(e.target.value)} aria-label="สมุดบัญชี" style={{ alignSelf: 'flex-start', padding: '0.45rem 0.6rem', borderRadius: 8, border: '1px solid var(--color-gray-300, #C3D0DE)' }}>
                     {ledgers.map(l => <option key={l.id} value={l.id}>{l.name || l.legal_entity_name}</option>)}
                 </select>
             )}

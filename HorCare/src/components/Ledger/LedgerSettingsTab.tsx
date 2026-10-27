@@ -12,8 +12,8 @@ import type { Building } from '../../types';
 
 interface Props { ownerUid: string; buildings: Building[]; ledgers: Ledger[]; selectedId: string; onSelect: (id: string) => void }
 
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.875rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.875rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
 const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 };
 const lab: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.8rem' };
 
@@ -101,7 +101,7 @@ export default function LedgerSettingsTab({ ownerUid, buildings, ledgers, select
             </div>
 
             {gaps.length > 0 && (
-                <div style={{ ...card, background: '#FEF3C7' }}>
+                <div style={{ ...card, background: '#FDEBD3' }}>
                     <strong style={{ display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={15} /> ยังขาด {gaps.length} รายการก่อนลงบัญชีได้</strong>
                     <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>{gaps.map((g, i) => <li key={i}>{g.message}</li>)}</ul>
                 </div>
@@ -173,7 +173,7 @@ export default function LedgerSettingsTab({ ownerUid, buildings, ledgers, select
                     <input type="checkbox" checked={d.options.auto_post !== false} onChange={e => upd({ options: { ...d.options, auto_post: e.target.checked } })} /> ลงบัญชีอัตโนมัติทันที (ตั้งลูกหนี้เมื่อออกบิล · รับชำระเมื่อได้รับเงิน)
                 </label>
                 {lastAuto && (
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: lastAuto.problems ? '#B45309' : 'var(--color-gray-500)' }}>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: lastAuto.problems ? '#C2410C' : 'var(--color-gray-500)' }}>
                         ลงอัตโนมัติล่าสุด {new Date(lastAuto.at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })} · ลงใหม่ {lastAuto.posted} รายการ
                         {lastAuto.problems ? ` · ข้าม ${lastAuto.problems} รายการ: ${lastAuto.first_problem ?? ''}` : ''}
                     </p>

@@ -122,7 +122,7 @@ export default function ShareContractModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backgroundColor: 'rgba(16, 42, 67, 0.65)',
         backdropFilter: 'blur(8px)',
         padding: '1rem',
       }}
@@ -149,7 +149,7 @@ export default function ShareContractModal({
         <div
           style={{
             padding: '1.25rem 1.5rem',
-            background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+            background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
             color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
@@ -207,9 +207,9 @@ export default function ShareContractModal({
           <div
             style={{
               padding: '1rem 1.25rem',
-              backgroundColor: '#F8FAFC',
+              backgroundColor: '#F4F7FB',
               borderRadius: '16px',
-              border: '1px solid #E2E8F0',
+              border: '1px solid #DCE5EF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -219,16 +219,16 @@ export default function ShareContractModal({
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <FileText size={15} color="#0284C7" />
-                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0F172A' }}>
+                <FileText size={15} color="#0A6CC2" />
+                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#102A43' }}>
                   {contract.title}
                 </span>
               </div>
-              <div style={{ fontSize: '0.825rem', color: '#64748B' }}>
-                ผู้เช่า: <strong style={{ color: '#1E293B' }}>{contract.lessee_name || '—'}</strong> • {unitLabel}:{' '}
-                <strong style={{ color: '#1E293B' }}>{contract.unit_number}</strong>
+              <div style={{ fontSize: '0.825rem', color: '#557089' }}>
+                ผู้เช่า: <strong style={{ color: '#1A3350' }}>{contract.lessee_name || '—'}</strong> • {unitLabel}:{' '}
+                <strong style={{ color: '#1A3350' }}>{contract.unit_number}</strong>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#8FA3B8', marginTop: '0.2rem' }}>
                 เลขที่สัญญา: <span style={{ fontFamily: 'var(--font-mono)' }}>{contract.contract_number}</span>
               </div>
             </div>
@@ -243,11 +243,11 @@ export default function ShareContractModal({
                     gap: '0.35rem',
                     padding: '0.35rem 0.75rem',
                     borderRadius: '20px',
-                    background: '#DCFCE7',
-                    color: '#16A34A',
+                    background: '#DCF2E4',
+                    color: '#15803D',
                     fontWeight: 700,
                     fontSize: '0.8rem',
-                    border: '1px solid #86EFAC',
+                    border: '1px solid #A7DDBB',
                   }}
                 >
                   <ShieldCheck size={14} /> ลงนามเรียบร้อย
@@ -260,11 +260,11 @@ export default function ShareContractModal({
                     gap: '0.35rem',
                     padding: '0.35rem 0.75rem',
                     borderRadius: '20px',
-                    background: '#FEF3C7',
-                    color: '#D97706',
+                    background: '#FDEBD3',
+                    color: '#E8740C',
                     fontWeight: 700,
                     fontSize: '0.8rem',
-                    border: '1px solid #FCD34D',
+                    border: '1px solid #F7B86C',
                   }}
                 >
                   <Clock size={14} /> รอดำเนินการเซ็น
@@ -305,7 +305,7 @@ export default function ShareContractModal({
                 type="button"
                 onClick={handleNativeShare}
                 style={{
-                  background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                  background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '14px',
@@ -316,7 +316,7 @@ export default function ShareContractModal({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.45rem',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                  boxShadow: '0 4px 12px rgba(10, 108, 194, 0.25)',
                 }}
               >
                 <Smartphone size={18} />
@@ -327,7 +327,7 @@ export default function ShareContractModal({
 
           {/* Direct Link Box */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
+            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 700, color: '#29435E', marginBottom: '0.4rem' }}>
               🔗 ลิงก์ตรงสำหรับเซ็นสัญญา (Direct Sign URL)
             </label>
             <div
@@ -335,10 +335,10 @@ export default function ShareContractModal({
                 display: 'flex',
                 gap: '0.5rem',
                 alignItems: 'center',
-                background: '#F1F5F9',
+                background: '#EBF1F7',
                 borderRadius: '12px',
                 padding: '0.4rem 0.5rem 0.4rem 0.85rem',
-                border: '1px solid #CBD5E1',
+                border: '1px solid #C3D0DE',
               }}
             >
               <input
@@ -351,7 +351,7 @@ export default function ShareContractModal({
                   border: 'none',
                   outline: 'none',
                   fontSize: '0.825rem',
-                  color: '#334155',
+                  color: '#29435E',
                   fontFamily: 'var(--font-mono)',
                 }}
               />
@@ -362,7 +362,7 @@ export default function ShareContractModal({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '0.35rem',
-                  background: copied ? '#10B981' : '#0284C7',
+                  background: copied ? '#22A35A' : '#0A6CC2',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
@@ -384,9 +384,9 @@ export default function ShareContractModal({
           <div
             style={{
               padding: '1.25rem',
-              backgroundColor: '#F8FAFC',
+              backgroundColor: '#F4F7FB',
               borderRadius: '16px',
-              border: '1px dashed #CBD5E1',
+              border: '1px dashed #C3D0DE',
               display: 'flex',
               alignItems: 'center',
               gap: '1.25rem',
@@ -409,11 +409,11 @@ export default function ShareContractModal({
               />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.9rem', color: '#0F172A', marginBottom: '0.3rem' }}>
-                <QrCode size={16} color="#0284C7" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, fontSize: '0.9rem', color: '#102A43', marginBottom: '0.3rem' }}>
+                <QrCode size={16} color="#0A6CC2" />
                 สแกนเซ็นสดต่อหน้า (In-Person QR)
               </div>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748B', lineHeight: 1.45 }}>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#557089', lineHeight: 1.45 }}>
                 ให้ผู้เช่ายกกล้องมือถือสแกน QR Code นี้ จะเปิดหน้าสัญญาพร้อมช่องเซ็นชื่อดิจิทัลทันทีโดยไม่ต้องพิมพ์เอกสาร
               </p>
               <button
@@ -425,16 +425,16 @@ export default function ShareContractModal({
                   alignItems: 'center',
                   gap: '0.35rem',
                   background: 'transparent',
-                  border: '1px solid #CBD5E1',
+                  border: '1px solid #C3D0DE',
                   borderRadius: '8px',
                   padding: '0.35rem 0.75rem',
                   fontSize: '0.775rem',
                   fontWeight: 600,
-                  color: '#475569',
+                  color: '#3E5872',
                   cursor: 'pointer',
                 }}
               >
-                {copiedMsg ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
+                {copiedMsg ? <Check size={12} color="#22A35A" /> : <Copy size={12} />}
                 {copiedMsg ? 'คัดลอกข้อความเต็มแล้ว' : 'คัดลอกข้อความทักทายพร้อมลิงก์'}
               </button>
             </div>
@@ -445,8 +445,8 @@ export default function ShareContractModal({
         <div
           style={{
             padding: '1rem 1.5rem',
-            backgroundColor: '#F8FAFC',
-            borderTop: '1px solid #E2E8F0',
+            backgroundColor: '#F4F7FB',
+            borderTop: '1px solid #DCE5EF',
             display: 'flex',
             justifyContent: 'flex-end',
           }}
@@ -457,9 +457,9 @@ export default function ShareContractModal({
             style={{
               padding: '0.625rem 1.25rem',
               borderRadius: '10px',
-              border: '1px solid #CBD5E1',
+              border: '1px solid #C3D0DE',
               backgroundColor: '#FFFFFF',
-              color: '#475569',
+              color: '#3E5872',
               fontWeight: 700,
               fontSize: '0.875rem',
               cursor: 'pointer',

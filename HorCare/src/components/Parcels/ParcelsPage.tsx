@@ -24,7 +24,7 @@ interface ParcelsPageProps {
 type Tab = 'open' | 'history' | 'all';
 
 const STATUS_COLOR: Record<ParcelStatus, string> = {
-    received: '#6B7280', tenant_notified: '#2563EB', waiting_pickup: '#D97706', picked_up: '#059669',
+    received: '#557089', tenant_notified: '#0A6CC2', waiting_pickup: '#E8740C', picked_up: '#15803D',
 };
 
 const ERRORS: Record<string, string> = {
@@ -156,8 +156,8 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                                     <button key={r.id} type="button" role="option" aria-selected={on} onClick={() => setRoomId(r.id)}
                                         style={{
                                             padding: '0.3rem 0.65rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: on ? 700 : 500,
-                                            border: `1.5px solid ${on ? '#6366F1' : 'var(--color-gray-200)'}`,
-                                            background: on ? 'rgba(99,102,241,0.1)' : 'transparent', color: 'var(--color-gray-800)',
+                                            border: `1.5px solid ${on ? '#0A6CC2' : 'var(--color-gray-200)'}`,
+                                            background: on ? 'rgba(10, 108, 194,0.1)' : 'transparent', color: 'var(--color-gray-800)',
                                             display: 'inline-flex', gap: 4, alignItems: 'center',
                                         }}>
                                         {r.room_number}{r.line_user_id && <MessageCircle size={11} color="#06C755" aria-label="เชื่อม LINE แล้ว" />}
@@ -166,7 +166,7 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                             })}
                         </div>
                         {room && !room.line_user_id && (
-                            <span style={{ fontSize: '0.75rem', color: '#B45309' }}>{unitName} {room.room_number} ยังไม่ได้เชื่อม LINE — จะแจ้งผ่านพอร์ทัลเท่านั้น</span>
+                            <span style={{ fontSize: '0.75rem', color: '#C2410C' }}>{unitName} {room.room_number} ยังไม่ได้เชื่อม LINE — จะแจ้งผ่านพอร์ทัลเท่านั้น</span>
                         )}
                     </div>
 
@@ -218,7 +218,7 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                         {ocr && (
                             <span role="status" style={{
                                 fontSize: '0.75rem', display: 'inline-flex', gap: 4, alignItems: 'center',
-                                color: ocr.state === 'error' ? '#B45309' : ocr.state === 'done' ? '#047857' : 'var(--color-gray-500)',
+                                color: ocr.state === 'error' ? '#C2410C' : ocr.state === 'done' ? '#166534' : 'var(--color-gray-500)',
                             }}>
                                 {ocr.state === 'reading' && <Loader2 size={12} className="spin" />}{ocr.text}
                             </span>
@@ -300,13 +300,13 @@ export default function ParcelsPage(props: ParcelsPageProps) {
     ];
 
     return (
-        <div style={{ maxWidth: 980, margin: '0 auto' }}>
+        <div>
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Package size={28} /> พัสดุ</h1>
                     <p className="page-subtitle">
                         รับพัสดุแทน{props.unitName}และแจ้งผู้เช่าอัตโนมัติ
-                        {overdueCount > 0 && <span style={{ color: '#B45309', fontWeight: 700 }}> · ค้างรับเกิน {REMIND_AFTER_DAYS} วัน {overdueCount} ชิ้น</span>}
+                        {overdueCount > 0 && <span style={{ color: '#C2410C', fontWeight: 700 }}> · ค้างรับเกิน {REMIND_AFTER_DAYS} วัน {overdueCount} ชิ้น</span>}
                     </p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setAdding(true)}><Plus size={16} /> รับพัสดุใหม่</button>
@@ -348,7 +348,7 @@ export default function ParcelsPage(props: ParcelsPageProps) {
                         const busy = busyId === p.id;
                         const line = p.notify_channels?.line;
                         return (
-                            <div key={p.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', gap: '0.875rem', flexWrap: 'wrap', alignItems: 'flex-start', borderColor: overdue ? 'rgba(245,158,11,0.5)' : undefined }}>
+                            <div key={p.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', gap: '0.875rem', flexWrap: 'wrap', alignItems: 'flex-start', borderColor: overdue ? 'rgba(245, 158, 46,0.5)' : undefined }}>
                                 <div style={{ width: 52, height: 52, borderRadius: 12, background: 'var(--color-gray-100)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                     <span style={{ fontSize: '0.62rem', color: 'var(--color-gray-400)', lineHeight: 1 }}>{unitName}</span>
                                     <span style={{ fontWeight: 800, color: 'var(--color-gray-800)' }}>{p.room_number}</span>
@@ -359,7 +359,7 @@ export default function ParcelsPage(props: ParcelsPageProps) {
                                         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: STATUS_COLOR[p.status], display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                                             {p.status === 'picked_up' ? <CheckCircle2 size={12} /> : <Clock size={12} />}{PARCEL_STATUS_LABELS_TH[p.status]}
                                         </span>
-                                        {overdue && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#B45309', display: 'inline-flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={12} /> ค้าง {daysSince(p.received_at)} วัน</span>}
+                                        {overdue && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#C2410C', display: 'inline-flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={12} /> ค้าง {daysSince(p.received_at)} วัน</span>}
                                     </div>
                                     <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-600)', marginTop: 2, display: 'flex', flexWrap: 'wrap', gap: '0.25rem 0.875rem' }}>
                                         {p.tenant_name && <span>ผู้เช่า: {p.tenant_name}</span>}

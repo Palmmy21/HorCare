@@ -36,8 +36,8 @@ function MaidPhotoViewer({ uid, buildingId, req }: { uid: string; buildingId: st
         type="button"
         style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-          fontSize: '0.75rem', fontWeight: 600, color: '#0284C7',
-          background: '#F0F9FF', border: '1px solid #BAE6FD',
+          fontSize: '0.75rem', fontWeight: 600, color: '#0A6CC2',
+          background: '#F2F7FC', border: '1px solid #CFE2F6',
           padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer',
         }}
       >
@@ -47,7 +47,7 @@ function MaidPhotoViewer({ uid, buildingId, req }: { uid: string; buildingId: st
         <img
           src={src}
           alt="รูปงานทำความสะอาด"
-          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, border: '1px solid #E2E8F0' }}
+          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 8, border: '1px solid #DCE5EF' }}
         />
       )}
     </div>
@@ -119,11 +119,11 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
       {/* ── Welcome Header ────────────────────────────────────────── */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+          background: 'linear-gradient(135deg, #0A6CC2, #08589F)',
           borderRadius: 16,
           padding: '1.25rem 1.5rem',
           color: '#fff',
-          boxShadow: '0 8px 24px rgba(2, 132, 199, 0.25)',
+          boxShadow: '0 8px 24px rgba(10, 108, 194, 0.25)',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -172,7 +172,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
         style={{
           background: '#fff',
           borderRadius: 14,
-          border: '1px solid #E2E8F0',
+          border: '1px solid #DCE5EF',
           padding: '1rem 1.25rem',
           display: 'flex',
           alignItems: 'center',
@@ -183,34 +183,34 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #10B981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #22A35A, #15803D)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
             <Gauge size={22} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.975rem', color: '#0F172A' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.975rem', color: '#102A43' }}>
               จดมิเตอร์น้ำ - ไฟ
             </div>
-            <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
+            <div style={{ fontSize: '0.8rem', color: '#557089' }}>
               กดที่นี่เพื่อเปิดหน้าจดเลขมิเตอร์ประจำเดือน
             </div>
           </div>
         </div>
-        <ChevronRight size={20} style={{ color: '#94A3B8' }} />
+        <ChevronRight size={20} style={{ color: '#8FA3B8' }} />
       </div>
 
       {/* ── Tabs: งานที่ต้องทำ vs ประวัติงานเสร็จสิ้น ──────────────── */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #E2E8F0' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #DCE5EF' }}>
         <button
           onClick={() => setActiveTab('todo')}
           style={{
             padding: '0.75rem 1rem',
             background: 'none',
             border: 'none',
-            borderBottom: activeTab === 'todo' ? '2px solid #0284C7' : '2px solid transparent',
+            borderBottom: activeTab === 'todo' ? '2px solid #0A6CC2' : '2px solid transparent',
             marginBottom: '-2px',
             fontWeight: 700,
             fontSize: '0.9rem',
-            color: activeTab === 'todo' ? '#0284C7' : '#64748B',
+            color: activeTab === 'todo' ? '#0A6CC2' : '#557089',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -232,11 +232,11 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
             padding: '0.75rem 1rem',
             background: 'none',
             border: 'none',
-            borderBottom: activeTab === 'done' ? '2px solid #0284C7' : '2px solid transparent',
+            borderBottom: activeTab === 'done' ? '2px solid #0A6CC2' : '2px solid transparent',
             marginBottom: '-2px',
             fontWeight: 700,
             fontSize: '0.9rem',
-            color: activeTab === 'done' ? '#0284C7' : '#64748B',
+            color: activeTab === 'done' ? '#0A6CC2' : '#557089',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -250,16 +250,16 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
 
       {/* ── Jobs List ──────────────────────────────────────────────── */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#64748B' }}>
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#557089' }}>
           กำลังโหลดรายการงาน...
         </div>
       ) : myTasks.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#fff', borderRadius: 14, border: '1px dashed #CBD5E1' }}>
-          <Sparkles size={38} style={{ color: '#94A3B8', marginBottom: '0.5rem' }} />
-          <div style={{ fontWeight: 700, color: '#334155' }}>
+        <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#fff', borderRadius: 14, border: '1px dashed #C3D0DE' }}>
+          <Sparkles size={38} style={{ color: '#8FA3B8', marginBottom: '0.5rem' }} />
+          <div style={{ fontWeight: 700, color: '#29435E' }}>
             {activeTab === 'todo' ? 'ไม่มีงานทำความสะอาดที่ค้างอยู่' : 'ยังไม่มีประวัติงานที่เสร็จสิ้น'}
           </div>
-          <div style={{ fontSize: '0.825rem', color: '#64748B', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.825rem', color: '#557089', marginTop: '0.25rem' }}>
             เมื่อมีผู้เช่าหรือเจ้าของหอแจ้งทำความสะอาด รายการจะปรากฏที่นี่ทันที
           </div>
         </div>
@@ -277,7 +277,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                 style={{
                   background: '#fff',
                   borderRadius: 14,
-                  border: isAssignedToMe ? '2px solid #BAE6FD' : '1px solid #E2E8F0',
+                  border: isAssignedToMe ? '2px solid #CFE2F6' : '1px solid #DCE5EF',
                   padding: '1.125rem',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
                   display: 'flex',
@@ -288,15 +288,15 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                 {/* Header: Room & Status */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0284C7' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0A6CC2' }}>
                       ห้อง {req.room_number}
                     </span>
                     {isAssignedToMe ? (
-                      <span style={{ fontSize: '0.725rem', fontWeight: 700, background: '#E0F2FE', color: '#0369A1', padding: '0.15rem 0.5rem', borderRadius: 6 }}>
+                      <span style={{ fontSize: '0.725rem', fontWeight: 700, background: '#E7F0FA', color: '#08589F', padding: '0.15rem 0.5rem', borderRadius: 6 }}>
                         งานของคุณ
                       </span>
                     ) : (
-                      <span style={{ fontSize: '0.725rem', fontWeight: 600, background: '#FEF3C7', color: '#B45309', padding: '0.15rem 0.5rem', borderRadius: 6 }}>
+                      <span style={{ fontSize: '0.725rem', fontWeight: 600, background: '#FDEBD3', color: '#C2410C', padding: '0.15rem 0.5rem', borderRadius: 6 }}>
                         รองานรับมอบหมาย
                       </span>
                     )}
@@ -339,14 +339,14 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
 
                 {/* Description */}
                 {req.description && (
-                  <div style={{ fontSize: '0.875rem', color: '#334155', background: '#F8FAFC', padding: '0.5rem 0.75rem', borderRadius: 8 }}>
+                  <div style={{ fontSize: '0.875rem', color: '#29435E', background: '#F4F7FB', padding: '0.5rem 0.75rem', borderRadius: 8 }}>
                     {req.description}
                   </div>
                 )}
 
                 {/* Time Slot */}
                 {(req.preferred_date || req.preferred_time_slot) && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#64748B' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: '#557089' }}>
                     <Calendar size={14} />
                     <span>
                       {req.preferred_date ? new Date(req.preferred_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : 'วันนี้ / ตามนัดหมาย'}{' '}
@@ -360,14 +360,14 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
 
                 {/* Completed Note if done */}
                 {(req.completed_note || req.completion_notes) && (
-                  <div style={{ fontSize: '0.8rem', color: '#16A34A', background: '#F0FDF4', padding: '0.45rem 0.65rem', borderRadius: 6 }}>
+                  <div style={{ fontSize: '0.8rem', color: '#15803D', background: '#EFF8F2', padding: '0.45rem 0.65rem', borderRadius: 6 }}>
                     <strong>บันทึกปิดงาน:</strong> {req.completed_note || req.completion_notes}
                   </div>
                 )}
 
                 {/* Action Buttons for Maid */}
                 {activeTab === 'todo' && (
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem', paddingTop: '0.625rem', borderTop: '1px solid #F1F5F9' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem', paddingTop: '0.625rem', borderTop: '1px solid #EBF1F7' }}>
                     {(req.status === 'pending' || req.status === 'open') && (
                       <button
                         onClick={() => handleAccept(req)}
@@ -377,7 +377,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.4rem',
-                          background: '#0284C7',
+                          background: '#0A6CC2',
                           color: '#fff',
                           border: 'none',
                           borderRadius: 8,
@@ -404,7 +404,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.4rem',
-                          background: '#16A34A',
+                          background: '#15803D',
                           color: '#fff',
                           border: 'none',
                           borderRadius: 8,
@@ -430,17 +430,17 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
       {completingReq && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ background: '#fff', borderRadius: 14, maxWidth: 400, width: '100%', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }}>
-            <div style={{ padding: '1.25rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.25rem', borderBottom: '1px solid #DCE5EF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontWeight: 700, fontSize: '1rem', color: '#15803D', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <CheckCircle2 size={18} />
                 ปิดงานทำความสะอาดห้อง {completingReq.room_number}
               </div>
-              <button onClick={() => setCompletingReq(null)} type="button" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#94A3B8' }}>✕</button>
+              <button onClick={() => setCompletingReq(null)} type="button" style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#8FA3B8' }}>✕</button>
             </div>
 
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '0.35rem', color: '#334155' }}>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '0.35rem', color: '#29435E' }}>
                   บันทึกผลงาน / ข้อความถึงเจ้าของหอ (ถ้ามี)
                 </label>
                 <textarea
@@ -448,7 +448,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                   placeholder="เช่น ทำความสะอาดห้องน้ำและระเบียงเรียบร้อยแล้วค่ะ..."
                   value={completeNote}
                   onChange={e => setCompleteNote(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: '0.875rem' }}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8, border: '1px solid #C3D0DE', fontSize: '0.875rem' }}
                 />
               </div>
 
@@ -456,7 +456,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                 <button
                   type="button"
                   onClick={() => setCompletingReq(null)}
-                  style={{ padding: '0.45rem 0.875rem', borderRadius: 8, border: '1px solid #CBD5E1', background: '#F8FAFC', color: '#475569', fontSize: '0.825rem', cursor: 'pointer' }}
+                  style={{ padding: '0.45rem 0.875rem', borderRadius: 8, border: '1px solid #C3D0DE', background: '#F4F7FB', color: '#3E5872', fontSize: '0.825rem', cursor: 'pointer' }}
                 >
                   ยกเลิก
                 </button>
@@ -464,7 +464,7 @@ export default function MaidPortalView({ session, buildingName, onGoToRecording,
                   type="button"
                   onClick={handleConfirmComplete}
                   disabled={actionLoadingId === completingReq.id}
-                  style={{ padding: '0.45rem 1.125rem', borderRadius: 8, border: 'none', background: '#16A34A', color: '#fff', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ padding: '0.45rem 1.125rem', borderRadius: 8, border: 'none', background: '#15803D', color: '#fff', fontSize: '0.825rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   {actionLoadingId === completingReq.id ? 'กำลังบันทึก...' : 'ยืนยันปิดงาน'}
                 </button>

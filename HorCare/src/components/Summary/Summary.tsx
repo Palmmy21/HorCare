@@ -520,9 +520,9 @@ export default function Summary({
                     {canSendLine && unlinkedLineCount > 0 && lineStatus === 'idle' && (
                         <div style={{
                             display: 'flex', alignItems: 'center', gap: '0.35rem',
-                            fontSize: '0.75rem', color: '#92400E',
-                            background: '#FEF3C7', borderRadius: 6, padding: '0.25rem 0.6rem',
-                            border: '1px solid #FDE68A',
+                            fontSize: '0.75rem', color: '#9A3412',
+                            background: '#FDEBD3', borderRadius: 6, padding: '0.25rem 0.6rem',
+                            border: '1px solid #FBD9A8',
                         }}>
                             <AlertTriangle size={12} />
                             {unlinkedLineCount} ห้องยังไม่ลงทะเบียน LINE จะถูกข้าม
@@ -538,17 +538,17 @@ export default function Summary({
                         <h3 className="card-title flex items-center gap-2">
                             {isLocked ? (
                                 <>
-                                    <Lock size={20} color="#16A34A" />
+                                    <Lock size={20} color="#15803D" />
                                     เดือนนี้ปิดยอดแล้ว
                                 </>
                             ) : stats.isAllSaved ? (
                                 <>
-                                    <CheckCircle size={20} color="#16A34A" />
+                                    <CheckCircle size={20} color="#15803D" />
                                     จดครบทุกห้องแล้ว พร้อมส่งบิล!
                                 </>
                             ) : (
                                 <>
-                                    <AlertTriangle size={20} color="#F59E0B" />
+                                    <AlertTriangle size={20} color="#F59E2E" />
                                     ยังจดไม่ครบ ({stats.savedCount}/{stats.totalRooms} ห้อง)
                                 </>
                             )}
@@ -648,7 +648,7 @@ export default function Summary({
                                                             </span>
                                                         )}
                                                         {bill.is_notified && (
-                                                            <span className="badge" style={{ background: '#E8F5E9', color: '#059669', borderColor: '#bbf7d0' }}>
+                                                            <span className="badge" style={{ background: '#E8F5E9', color: '#15803D', borderColor: '#a7ddbb' }}>
                                                                 <MessageCircle size={12} />
                                                                 ส่ง LINE แล้ว
                                                             </span>
@@ -718,7 +718,7 @@ export default function Summary({
                                                         <span className="badge badge-success"><CheckCircle size={12} /> พร้อมส่ง</span>
                                                     )}
                                                     {bill.is_notified && (
-                                                        <span className="badge" style={{ background: '#E8F5E9', color: '#059669', borderColor: '#bbf7d0' }}>
+                                                        <span className="badge" style={{ background: '#E8F5E9', color: '#15803D', borderColor: '#a7ddbb' }}>
                                                             <MessageCircle size={12} /> ส่งแล้ว
                                                         </span>
                                                     )}
@@ -730,20 +730,20 @@ export default function Summary({
                                     </div>
                                     <div className="summary-bill-card-body">
                                         <div className="summary-bill-card-row">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Zap size={14} color="#D97706" /> ไฟฟ้า</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Zap size={14} color="#E8740C" /> ไฟฟ้า</span>
                                             <span className="mono">{hasBill ? `${bill.elec_units} หน่วย = ${formatCurrency(bill.elec_bill)}` : '-'}</span>
                                         </div>
                                         <div className="summary-bill-card-row">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Droplets size={14} color="#2563EB" /> น้ำประปา</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Droplets size={14} color="#0A6CC2" /> น้ำประปา</span>
                                             <span className="mono">{hasBill ? `${bill.water_units} หน่วย = ${formatCurrency(bill.water_bill)}` : '-'}</span>
                                         </div>
                                         <div className="summary-bill-card-row">
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#16A34A" /> ค่าห้อง</span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#15803D" /> ค่าห้อง</span>
                                             <span className="mono">{formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}</span>
                                         </div>
                                         {hasBill && bill.common_fee ? (
                                             <div className="summary-bill-card-row">
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Building2 size={14} color="#4F46E5" /> ส่วนกลาง</span>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Building2 size={14} color="#0A6CC2" /> ส่วนกลาง</span>
                                                 <span className="mono" style={{ color: 'var(--color-primary)' }}>+{formatCurrency(bill.common_fee)}</span>
                                             </div>
                                         ) : null}
@@ -794,7 +794,7 @@ export default function Summary({
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
                 <div className={`card text-center ${isLocked ? 'saved' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: '400px', width: '100%' }}>
                     <h3 className="card-title mb-2 flex justify-center items-center gap-2">
-                        <Send size={20} color={isLocked ? "var(--color-success)" : "#10B981"} />
+                        <Send size={20} color={isLocked ? "var(--color-success)" : "#22A35A"} />
                         ระบบส่งบิล
                     </h3>
                     <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
@@ -812,7 +812,7 @@ export default function Summary({
                                 className="btn w-full mt-auto"
                                 disabled={!stats.isAllSaved || isSending}
                                 onClick={() => setShowConfirm(true)}
-                                style={{ background: '#10B981', borderColor: '#10B981', color: 'white' }}
+                                style={{ background: '#22A35A', borderColor: '#22A35A', color: 'white' }}
                             >
                                 <Send size={18} />
                                 ส่งบิล
@@ -852,7 +852,7 @@ export default function Summary({
                                     const room = rooms.find(r => r.id === selectedBill.room_id);
                                     const activeLang = previewLang || room?.language || billCustomization?.default_language || 'th';
                                     return (
-                                        <div style={{ display: 'flex', gap: '2px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '2px', background: '#EBF1F7', padding: '3px', borderRadius: '8px' }}>
                                             {LANGUAGE_OPTIONS.map(opt => (
                                                 <button
                                                     key={opt.code}
@@ -1087,7 +1087,7 @@ export default function Summary({
                     >
                         {/* Modal Header — LINE green gradient */}
                         <div style={{
-                            background: 'linear-gradient(135deg, #00B900 0%, #00C300 50%, #06D6A0 100%)',
+                            background: 'linear-gradient(135deg, #00B900 0%, #00C300 50%, #22A35A 100%)',
                             padding: '2rem 1.75rem 1.5rem',
                             textAlign: 'center',
                             position: 'relative',
@@ -1123,7 +1123,7 @@ export default function Summary({
 
                         {/* Modal Body */}
                         <div style={{ padding: '1.5rem 1.75rem', background: 'var(--color-surface, #fff)' }}>
-                            <p style={{ color: 'var(--color-text-muted, #6B7280)', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
+                            <p style={{ color: 'var(--color-text-muted, #557089)', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
                                 การส่งบิลอัตโนมัติผ่าน LINE ช่วยให้คุณแจ้งยอดให้ผู้เช่าได้ง่าย ๆ เพียงปลายนิ้ว ไม่ต้องส่งทีละห้อง
                             </p>
 
@@ -1137,28 +1137,28 @@ export default function Summary({
                                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
                                         <div style={{
                                             width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                                            background: 'linear-gradient(135deg, #00B900, #06D6A0)',
+                                            background: 'linear-gradient(135deg, #00B900, #22A35A)',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             marginTop: '0.1rem',
                                         }}>
                                             <CheckCircle size={12} color="#fff" />
                                         </div>
-                                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text, #111827)', lineHeight: 1.5 }}>{feat}</span>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text, #102A43)', lineHeight: 1.5 }}>{feat}</span>
                                     </div>
                                 ))}
                             </div>
 
                             {/* Pricing hint */}
                             <div style={{
-                                background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.06))',
-                                border: '1px solid rgba(139,92,246,0.2)',
+                                background: 'linear-gradient(135deg, rgba(15, 76, 129,0.08), rgba(232, 116, 12,0.06))',
+                                border: '1px solid rgba(15, 76, 129,0.2)',
                                 borderRadius: '12px', padding: '0.875rem 1rem',
                                 marginBottom: '1.25rem',
                                 display: 'flex', alignItems: 'center', gap: '0.625rem',
                             }}>
-                                <Zap size={18} color="#8B5CF6" style={{ flexShrink: 0 }} />
-                                <span style={{ fontSize: '0.8125rem', color: 'var(--color-text, #111827)', lineHeight: 1.5 }}>
-                                    เริ่มต้นเพียง <strong style={{ color: '#8B5CF6' }}>฿399/เดือน</strong> สำหรับแพ็กเกจ HorCare
+                                <Zap size={18} color="#0F4C81" style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: '0.8125rem', color: 'var(--color-text, #102A43)', lineHeight: 1.5 }}>
+                                    เริ่มต้นเพียง <strong style={{ color: '#0F4C81' }}>฿399/เดือน</strong> สำหรับแพ็กเกจ HorCare
                                 </span>
                             </div>
 
@@ -1179,10 +1179,10 @@ export default function Summary({
                                     }}
                                     style={{
                                         flex: 2,
-                                        background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+                                        background: 'linear-gradient(135deg, #0F4C81, #E8740C)',
                                         border: 'none',
                                         fontWeight: 700,
-                                        boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                                        boxShadow: '0 4px 16px rgba(15, 76, 129,0.35)',
                                     }}
                                 >
                                     <Zap size={16} />
@@ -1201,17 +1201,17 @@ export default function Summary({
                             <div style={{
                                 width: '48px', height: '48px',
                                 borderRadius: '50%',
-                                background: 'rgba(16,185,129,0.1)',
-                                color: '#10B981',
+                                background: 'rgba(34, 163, 90,0.1)',
+                                color: '#22A35A',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 margin: '0 auto 1rem auto'
                             }}>
                                 <CheckCircle size={24} />
                             </div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text, #111827)', marginBottom: '0.5rem' }}>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text, #102A43)', marginBottom: '0.5rem' }}>
                                 เตรียมรูปภาพสำเร็จ {preparedFiles.length} รูป
                             </h3>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-light, #6B7280)' }}>
+                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-light, #557089)' }}>
                                 คุณสามารถบันทึกรูปลงอัลบั้มบนเครื่องได้ทันที
                             </p>
                         </div>
@@ -1229,7 +1229,7 @@ export default function Summary({
                             <button
                                 className="btn btn-primary"
                                 onClick={handleShareAll}
-                                style={{ flex: 1, background: '#10B981', borderColor: '#10B981', color: '#fff' }}
+                                style={{ flex: 1, background: '#22A35A', borderColor: '#22A35A', color: '#fff' }}
                             >
                                 <Download size={16} />
                                 บันทึกลงเครื่อง

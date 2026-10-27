@@ -49,8 +49,8 @@ const BUILDING_TYPES = [
     {
         key: 'dormitory',
         icon: Home,
-        iconBg: '#E0E7FF',
-        iconColor: '#4F46E5',
+        iconBg: '#E7F0FA',
+        iconColor: '#0A6CC2',
         title: 'หอพัก',
         subtitle: '(Dormitory)',
         desc: 'คิดค่าน้ำ/ไฟอัตราเดียวกันทุกห้อง',
@@ -58,8 +58,8 @@ const BUILDING_TYPES = [
     {
         key: 'commercial',
         icon: Building2,
-        iconBg: '#FEF3C7',
-        iconColor: '#D97706',
+        iconBg: '#FDEBD3',
+        iconColor: '#E8740C',
         title: 'อาคารพาณิชย์',
         subtitle: '(Commercial)',
         desc: 'ตั้งค่าน้ำ/ไฟแยกรายห้องได้',
@@ -67,8 +67,8 @@ const BUILDING_TYPES = [
     {
         key: 'market',
         icon: Store,
-        iconBg: '#FEF08A',
-        iconColor: '#CA8A04',
+        iconBg: '#FBD9A8',
+        iconColor: '#E8740C',
         title: 'พื้นที่ขายของ / ตลาดนัด',
         subtitle: '(Market / Stall)',
         desc: 'จัดการแผงค้าและค่าเช่าพื้นที่',
@@ -76,8 +76,8 @@ const BUILDING_TYPES = [
     {
         key: 'resort',
         icon: Trees,
-        iconBg: '#D1FAE5',
-        iconColor: '#059669',
+        iconBg: '#DCF2E4',
+        iconColor: '#15803D',
         title: 'รีสอร์ท',
         subtitle: '(Resort)',
         desc: 'เหมาะสำหรับรีสอร์ทและที่พักธรรมชาติ',
@@ -85,8 +85,8 @@ const BUILDING_TYPES = [
     {
         key: 'hotel',
         icon: Hotel,
-        iconBg: '#DBEAFE',
-        iconColor: '#2563EB',
+        iconBg: '#E7F0FA',
+        iconColor: '#0A6CC2',
         title: 'โรงแรม',
         subtitle: '(Hotel)',
         desc: 'สำหรับโรงแรมและที่พักแบบมืออาชีพ',
@@ -94,8 +94,8 @@ const BUILDING_TYPES = [
     {
         key: 'apartment',
         icon: Building2,
-        iconBg: '#EDE9FE',
-        iconColor: '#8B5CF6',
+        iconBg: '#E7F0FA',
+        iconColor: '#0F4C81',
         title: 'อพาร์ทเมนต์',
         subtitle: '(Apartment)',
         desc: 'คล้ายหอพัก เหมาะสำหรับผู้เช่าระยะยาว',
@@ -103,8 +103,8 @@ const BUILDING_TYPES = [
     {
         key: 'condo',
         icon: Building2,
-        iconBg: '#E0F2FE',
-        iconColor: '#0284C7',
+        iconBg: '#E7F0FA',
+        iconColor: '#0A6CC2',
         title: 'คอนโดมิเนียม',
         subtitle: '(Condo)',
         desc: 'บริหารจัดการนิติบุคคลหรือปล่อยเช่าส่วนตัว',
@@ -112,8 +112,8 @@ const BUILDING_TYPES = [
     {
         key: 'house',
         icon: Home,
-        iconBg: '#FCE7F3',
-        iconColor: '#DB2777',
+        iconBg: '#FDEBD3',
+        iconColor: '#E8740C',
         title: 'บ้านเช่า / ทาวน์โฮม',
         subtitle: '(House / Townhouse)',
         desc: 'ให้เช่าบ้านเป็นหลังพร้อมจัดการบิล',
@@ -121,8 +121,8 @@ const BUILDING_TYPES = [
     {
         key: 'office',
         icon: LayoutGrid,
-        iconBg: '#E0E7FF',
-        iconColor: '#4338CA',
+        iconBg: '#E7F0FA',
+        iconColor: '#08589F',
         title: 'พื้นที่เช่า / สำนักงาน',
         subtitle: '(Workspace / Office)',
         desc: 'ออฟฟิศให้เช่ารายเดือนพร้อมค่าน้ำไฟ',
@@ -130,17 +130,27 @@ const BUILDING_TYPES = [
     {
         key: 'other',
         icon: LayoutGrid,
-        iconBg: '#F3F4F6',
-        iconColor: '#6B7280',
+        iconBg: '#EBF1F7',
+        iconColor: '#557089',
         title: 'อื่นๆ',
         subtitle: '(Others)',
         desc: 'อาคารประเภทอื่นที่ต้องการจัดการมิเตอร์',
     },
 ];
 
+type SettingsTab = 'general' | 'billing' | 'contract' | 'integrations' | 'account';
+
+const SETTINGS_TABS: { id: SettingsTab; label: string; desc: string; icon: typeof SettingsIcon }[] = [
+    { id: 'general', label: 'ทั่วไป', desc: 'ประเภทพื้นที่ ภาษา โลโก้ ธีม', icon: SettingsIcon },
+    { id: 'billing', label: 'ค่าเช่าและค่าบริการ', desc: 'ค่าเช่า ค่าไฟ ค่าน้ำ ใบแจ้งหนี้', icon: Zap },
+    { id: 'contract', label: 'สัญญาเช่า', desc: 'แม่แบบสัญญาและลายเซ็น', icon: FileText },
+    { id: 'integrations', label: 'การเชื่อมต่อ', desc: 'LINE การแจ้งเตือน พอร์ทัลผู้เช่า', icon: Share2 },
+    { id: 'account', label: 'บัญชีและความปลอดภัย', desc: 'อีเมล รหัสผ่าน', icon: Lock },
+];
+
 export default function Settings(props: SettingsProps) {
     const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid } = props;
-    const [activeTab, setActiveTab] = useState<'general' | 'billing' | 'contract' | 'integrations' | 'account'>('general');
+    const [activeTab, setActiveTab] = useState<SettingsTab>('general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,
@@ -329,6 +339,13 @@ export default function Settings(props: SettingsProps) {
         });
     }
 
+    const snapshot = JSON.stringify({ formData, billForm, dormLogo, dormCode, portalPin, marketConfig });
+    const [baseline, setBaseline] = useState<string | null>(null);
+    const [baselineFor, setBaselineFor] = useState(prevConfig);
+    if (baselineFor !== prevConfig) { setBaselineFor(prevConfig); setBaseline(null); }
+    if (baseline === null) setBaseline(snapshot);
+    const dirty = baseline !== null && baseline !== snapshot;
+
     const handleChange = (field: string, value: string | number) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
@@ -419,21 +436,22 @@ export default function Settings(props: SettingsProps) {
         };
 
         onSaveConfig(newConfig);
+        setBaseline(snapshot);
         toast.success('บันทึกเรียบร้อยแล้ว!', {
             id: 'settings-saved',
             duration: 3000,
             style: {
-                background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                background: 'linear-gradient(135deg, #15803D 0%, #22A35A 100%)',
                 color: '#ffffff',
                 fontWeight: 600,
                 borderRadius: '14px',
                 padding: '0.85rem 1.4rem',
-                boxShadow: '0 10px 25px rgba(16, 185, 129, 0.35)',
+                boxShadow: '0 10px 25px rgba(34, 163, 90, 0.35)',
                 fontSize: '0.95rem',
             },
             iconTheme: {
                 primary: '#ffffff',
-                secondary: '#059669',
+                secondary: '#15803D',
             },
         });
     };
@@ -569,44 +587,29 @@ export default function Settings(props: SettingsProps) {
         <div>
             <div className="page-header">
                 <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><SettingsIcon size={28} /> ตั้งค่าระบบ</h1>
-                <p className="page-subtitle">กำหนดอัตราค่าบริการและค่าเช่า</p>
+                <p className="page-subtitle">ข้อมูลกิจการ ค่าบริการ การเชื่อมต่อ และบัญชีของคุณ</p>
             </div>
 
-            {/* Tab Navigation */}
-            <div style={{
-                display: 'flex', gap: '1rem', borderBottom: '1px solid var(--color-gray-200)',
-                marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.5rem'
-            }}>
-                {(['general', 'billing', 'contract', 'integrations', 'account'] as const).map(tab => {
-                    const label = tab === 'general' ? 'ทั่วไป (General)' :
-                                  tab === 'billing' ? 'ค่าใช้จ่าย (Billing & Utilities)' :
-                                  tab === 'contract' ? 'สัญญาเช่า (Contracts & E-Sign)' :
-                                  tab === 'integrations' ? 'การเชื่อมต่อ (Integrations)' :
-                                  'บัญชี (Account & Security)';
-                    const Icon = tab === 'general' ? SettingsIcon :
-                                 tab === 'billing' ? Zap :
-                                 tab === 'contract' ? FileText :
-                                 tab === 'integrations' ? Share2 : Lock;
-                    return (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                padding: '0.75rem 1.25rem', background: 'none',
-                                border: 'none', cursor: 'pointer',
-                                borderBottom: activeTab === tab ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                color: activeTab === tab ? 'var(--color-primary-dark)' : 'var(--color-gray-500)',
-                                fontWeight: activeTab === tab ? 700 : 500,
-                                fontSize: '0.9375rem', transition: 'all 0.2s',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >
-                            <Icon size={18} /> {label}
-                        </button>
-                    );
-                })}
-            </div>
+            <div className="settings-layout">
+            <nav className="settings-nav" aria-label="หมวดการตั้งค่า">
+                {SETTINGS_TABS.map(t => (
+                    <button
+                        key={t.id}
+                        type="button"
+                        className={`settings-nav-item${activeTab === t.id ? ' active' : ''}`}
+                        aria-current={activeTab === t.id ? 'page' : undefined}
+                        onClick={() => setActiveTab(t.id)}
+                    >
+                        <span className="settings-nav-icon"><t.icon size={18} aria-hidden /></span>
+                        <span className="settings-nav-text">
+                            <span className="settings-nav-label">{t.id === 'billing' ? `${terms.rentLabel}และค่าบริการ` : t.label}</span>
+                            <span className="settings-nav-desc">{t.desc}</span>
+                        </span>
+                    </button>
+                ))}
+            </nav>
+            <div className="settings-body">
+            <h2 className="settings-body-title">{activeTab === 'billing' ? `${terms.rentLabel}และค่าบริการ` : SETTINGS_TABS.find(t => t.id === activeTab)!.label}</h2>
 
             {/* ── Account Info (Owner ID) ── */}
             {activeTab === 'account' && uid && (
@@ -662,8 +665,8 @@ export default function Settings(props: SettingsProps) {
             {/* ── Email Verification Banner ── */}
             {activeTab === 'account' && !emailVerified && (
                 <div style={{
-                    background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(239,68,68,0.06))',
-                    border: '1.5px solid rgba(245,158,11,0.35)',
+                    background: 'linear-gradient(135deg, rgba(245, 158, 46,0.08), rgba(239,68,68,0.06))',
+                    border: '1.5px solid rgba(245, 158, 46,0.35)',
                     borderRadius: '16px',
                     padding: '1.25rem 1.5rem',
                     marginBottom: '1.5rem',
@@ -674,10 +677,10 @@ export default function Settings(props: SettingsProps) {
                 }}>
                     <div style={{
                         width: 44, height: 44, borderRadius: '12px', flexShrink: 0,
-                        background: 'rgba(245,158,11,0.15)',
+                        background: 'rgba(245, 158, 46,0.15)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                        <Mail size={22} color="#D97706" />
+                        <Mail size={22} color="#E8740C" />
                     </div>
                     <div style={{ flex: 1, minWidth: '200px' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-gray-800)', marginBottom: '0.25rem' }}>
@@ -689,7 +692,7 @@ export default function Settings(props: SettingsProps) {
                         {verifyMsg && (
                             <div style={{
                                 marginTop: '0.5rem', fontSize: '0.8rem', lineHeight: 1.5,
-                                color: verifyStatus === 'error' ? '#DC2626' : '#059669',
+                                color: verifyStatus === 'error' ? '#DC2626' : '#15803D',
                                 fontWeight: 500,
                             }}>
                                 {verifyMsg}
@@ -704,14 +707,14 @@ export default function Settings(props: SettingsProps) {
                                 display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                                 background: verifyCooldown > 0
                                     ? 'var(--color-gray-200)'
-                                    : 'linear-gradient(135deg, #F59E0B, #D97706)',
+                                    : 'linear-gradient(135deg, #F59E2E, #E8740C)',
                                 color: verifyCooldown > 0 ? 'var(--color-gray-500)' : '#fff',
                                 border: 'none',
                                 padding: '0.625rem 1.25rem', borderRadius: '10px',
                                 fontWeight: 700, fontSize: '0.875rem',
                                 cursor: verifyCooldown > 0 ? 'not-allowed' : 'pointer',
                                 opacity: verifyStatus === 'sending' ? 0.7 : 1,
-                                boxShadow: verifyCooldown > 0 ? 'none' : '0 2px 10px rgba(245,158,11,0.3)',
+                                boxShadow: verifyCooldown > 0 ? 'none' : '0 2px 10px rgba(245, 158, 46,0.3)',
                                 transition: 'all 0.2s',
                             }}
                         >
@@ -746,16 +749,16 @@ export default function Settings(props: SettingsProps) {
             {/* ── Email Verified Badge ── */}
             {activeTab === 'account' && emailVerified && (
                 <div style={{
-                    background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.05))',
-                    border: '1.5px solid rgba(16,185,129,0.3)',
+                    background: 'linear-gradient(135deg, rgba(34, 163, 90,0.08), rgba(21, 128, 61,0.05))',
+                    border: '1.5px solid rgba(34, 163, 90,0.3)',
                     borderRadius: '14px',
                     padding: '0.875rem 1.25rem',
                     marginBottom: '1.5rem',
                     display: 'flex', alignItems: 'center', gap: '0.75rem',
                 }}>
-                    <ShieldCheck size={20} color="#059669" />
+                    <ShieldCheck size={20} color="#15803D" />
                     <div>
-                        <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#059669' }}>อีเมลยืนยันแล้ว</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#15803D' }}>อีเมลยืนยันแล้ว</span>
                         <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)', marginLeft: '0.5rem' }}>{userEmail}</span>
                     </div>
                 </div>
@@ -764,11 +767,452 @@ export default function Settings(props: SettingsProps) {
             {/* General Tab */}
             {activeTab === 'general' && (
                 <>
+                {/* Workspace & Property Type Selector */}
+                <div className="settings-section">
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                        <div>
+                            <h3 className="settings-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                                {formData.building_type === 'market' ? <Store size={22} color="#E8740C" /> : <Building2 size={22} color="#0A6CC2" />}
+                                ประเภทพื้นที่
+                            </h3>
+                            <p className="form-hint" style={{ margin: 0 }}>
+                                เลือกลักษณะพื้นที่เพื่อปรับคำศัพท์ (เช่น แผงค้า vs ห้องพัก, ผู้ค้า vs ผู้เช่า) และรูปแบบการคิดเงินอัตโนมัติ
+                            </p>
+                        </div>
+                        <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            padding: '0.4rem 0.95rem',
+                            borderRadius: '999px',
+                            background: formData.building_type === 'market' ? 'rgba(245, 158, 46, 0.15)' : 'rgba(10, 108, 194, 0.12)',
+                            border: `1.5px solid ${formData.building_type === 'market' ? '#F59E2E' : '#0A6CC2'}`,
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            color: formData.building_type === 'market' ? '#9A3412' : '#08589F'
+                        }}>
+                            <Sparkles size={14} /> โหมดปัจจุบัน: {BUILDING_TYPES.find(b => b.key === formData.building_type)?.title || 'หอพัก'}
+                        </div>
+                    </div>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                        gap: '0.85rem',
+                        marginTop: '1rem',
+                    }}>
+                        {BUILDING_TYPES.map(bt => {
+                            const Icon = bt.icon;
+                            const isSelected = formData.building_type === bt.key;
+                            return (
+                                <div
+                                    key={bt.key}
+                                    onClick={() => handleChange('building_type', bt.key)}
+                                    style={{
+                                        position: 'relative',
+                                        padding: '1rem 0.85rem',
+                                        borderRadius: '14px',
+                                        cursor: 'pointer',
+                                        border: isSelected 
+                                            ? bt.key === 'market' 
+                                                ? '2px solid #F59E2E'
+                                                : '2px solid var(--color-primary)'
+                                            : '1px solid var(--color-gray-200)',
+                                        background: isSelected
+                                            ? bt.key === 'market'
+                                                ? 'linear-gradient(135deg, rgba(251, 217, 168, 0.25), rgba(245, 158, 46, 0.08))'
+                                                : 'linear-gradient(135deg, rgba(10, 108, 194, 0.08), rgba(10, 108, 194, 0.04))'
+                                            : 'var(--color-gray-50)',
+                                        boxShadow: isSelected 
+                                            ? bt.key === 'market' ? '0 4px 14px rgba(245, 158, 46, 0.2)' : '0 4px 14px rgba(10, 108, 194, 0.15)'
+                                            : 'none',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        textAlign: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        transform: isSelected ? 'scale(1.02)' : 'none',
+                                    }}
+                                >
+                                    {isSelected && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '8px',
+                                            right: '8px',
+                                            background: bt.key === 'market' ? '#E8740C' : 'var(--color-primary)',
+                                            color: '#fff',
+                                            borderRadius: '50%',
+                                            width: '18px',
+                                            height: '18px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '10px'
+                                        }}>
+                                            <Check size={11} strokeWidth={3} />
+                                        </div>
+                                    )}
+
+                                    <div style={{
+                                        background: bt.iconBg,
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: '12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                                    }}>
+                                        <Icon size={22} color={bt.iconColor} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: isSelected ? '#102A43' : 'var(--color-gray-800)' }}>
+                                            {bt.title}
+                                        </div>
+                                        <div style={{ fontSize: '0.725rem', color: 'var(--color-gray-500)' }}>
+                                            {bt.subtitle}
+                                        </div>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '0.725rem', color: 'var(--color-gray-500)', lineHeight: 1.35 }}>
+                                        {bt.desc}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Market Specific Configuration (Rendered when workspace is Market) */}
+                {formData.building_type === 'market' && (
+                    <div className="settings-section" style={{
+                        border: '1.5px solid rgba(245, 158, 46, 0.45)',
+                        background: 'linear-gradient(135deg, rgba(253, 235, 211, 0.2), rgba(255, 255, 255, 0.95))',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        boxShadow: '0 8px 24px rgba(245, 158, 46, 0.1)',
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                            <div style={{
+                                background: '#FDEBD3',
+                                width: 44,
+                                height: 44,
+                                borderRadius: '12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                            }}>
+                                <Store size={24} color="#E8740C" />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800, color: '#9A3412', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    ตั้งค่าตลาดและแผงค้า
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#C2410C' }}>
+                                    กำหนดค่าบริการเริ่มต้นสำหรับแผงค้า, ล็อกตลาด, ค่าขยะ, และการแบ่งโซน
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Market Config Grid */}
+                        <div className="settings-grid" style={{ marginBottom: '1.25rem' }}>
+                            {/* Default Rent Cycle */}
+                            <div className="form-group">
+                                <label className="form-label" style={{ fontWeight: 700 }}>รอบคิดค่าเช่าแผงเริ่มต้น</label>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    {[
+                                        { key: 'daily', label: '☀️ รายวัน', sub: 'ตลาดนัด/ถนนคนเดิน' },
+                                        { key: 'weekly', label: '📅 รายสัปดาห์', sub: 'ตลาดเปิด 1-3 วัน/สัปดาห์' },
+                                        { key: 'monthly', label: '🗓️ รายเดือน', sub: 'ตลาดสด/ล็อกประจำ' },
+                                    ].map(cycle => {
+                                        const active = marketConfig.default_rent_cycle === cycle.key;
+                                        return (
+                                            <button
+                                                key={cycle.key}
+                                                type="button"
+                                                onClick={() => handleMarketChange('default_rent_cycle', cycle.key)}
+                                                style={{
+                                                    flex: '1 1 120px',
+                                                    padding: '0.65rem 0.75rem',
+                                                    borderRadius: '10px',
+                                                    border: active ? '2px solid #E8740C' : '1px solid var(--color-gray-300)',
+                                                    background: active ? '#FDEBD3' : '#FFFFFF',
+                                                    color: active ? '#9A3412' : 'var(--color-gray-700)',
+                                                    fontWeight: active ? 700 : 500,
+                                                    fontSize: '0.875rem',
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    transition: 'all 0.15s ease',
+                                                }}
+                                            >
+                                                <div>{cycle.label}</div>
+                                                <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>{cycle.sub}</div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="form-hint">รอบตั้งต้นเมื่อเพิ่มแผงใหม่ (สามารถปรับรายแผงได้)</p>
+                            </div>
+
+                            {/* Default Stall Size */}
+                            <div className="form-group">
+                                <label className="form-label" style={{ fontWeight: 700 }}>ขนาดแผงค้ามาตรฐาน (กว้าง x ลึก)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                    value={marketConfig.default_stall_size || ''}
+                                    onChange={e => handleMarketChange('default_stall_size', e.target.value)}
+                                    placeholder="เช่น 2x2 ม., 3x3 ม."
+                                />
+                                <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
+                                    {['2x2 ม.', '2.5x2.5 ม.', '3x3 ม.', '4x4 ม.'].map(size => (
+                                        <button
+                                            key={size}
+                                            type="button"
+                                            onClick={() => handleMarketChange('default_stall_size', size)}
+                                            style={{
+                                                background: marketConfig.default_stall_size === size ? '#FDEBD3' : '#EBF1F7',
+                                                border: marketConfig.default_stall_size === size ? '1px solid #E8740C' : '1px solid #DCE5EF',
+                                                color: marketConfig.default_stall_size === size ? '#9A3412' : '#3E5872',
+                                                borderRadius: '6px',
+                                                padding: '0.2rem 0.5rem',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {size}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Stall Utilities Grid */}
+                        <div style={{
+                            background: '#FFFFFF',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(245, 158, 46, 0.25)',
+                            padding: '1.25rem',
+                            marginBottom: '1.25rem'
+                        }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#9A3412', marginBottom: '0.85rem' }}>
+                                🧹 ค่าบริการและสิ่งอำนวยความสะดวกสำหรับตลาด (Market Utilities)
+                            </div>
+                            <div className="settings-grid">
+                                <div className="form-group">
+                                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>ค่าขยะ & ดูแลความสะอาดแผง (บาท)</span>
+                                        <span style={{ fontSize: '0.75rem', color: '#E8740C', fontWeight: 600 }}>
+                                            {marketConfig.waste_fee_cycle === 'monthly' ? 'ต่อเดือน' : 'ต่อวัน'}
+                                        </span>
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <input
+                                            type="number"
+                                            className="form-input mono"
+                                            style={{ flex: 1, padding: '0.65rem 0.85rem' }}
+                                            value={marketConfig.waste_fee_per_stall ?? 20}
+                                            onChange={e => handleMarketChange('waste_fee_per_stall', Number(e.target.value))}
+                                        />
+                                        <select
+                                            className="form-input"
+                                            style={{ width: '110px', padding: '0.65rem 0.5rem', fontSize: '0.85rem' }}
+                                            value={marketConfig.waste_fee_cycle || 'daily'}
+                                            onChange={e => handleMarketChange('waste_fee_cycle', e.target.value)}
+                                        >
+                                            <option value="daily">/ วัน</option>
+                                            <option value="monthly">/ เดือน</option>
+                                        </select>
+                                    </div>
+                                    <p className="form-hint">ค่าเก็บขยะ/ทำความสะอาดทางเดินตลาด</p>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">ค่าไฟเหมาต่อแผง (บาท/วัน)</label>
+                                    <input
+                                        type="number"
+                                        className="form-input mono"
+                                        style={{ padding: '0.65rem 0.85rem' }}
+                                        value={marketConfig.electricity_flat_fee ?? 30}
+                                        onChange={e => handleMarketChange('electricity_flat_fee', Number(e.target.value))}
+                                    />
+                                    <p className="form-hint">สำหรับแผงใช้ไฟส่องสว่าง/พัดลม (ไม่ติดมิเตอร์)</p>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">ค่าเช่าโต๊ะ / เต็นท์ / อุปกรณ์ (บาท/วัน)</label>
+                                    <input
+                                        type="number"
+                                        className="form-input mono"
+                                        style={{ padding: '0.65rem 0.85rem' }}
+                                        value={marketConfig.table_rental_fee ?? 0}
+                                        onChange={e => handleMarketChange('table_rental_fee', Number(e.target.value))}
+                                    />
+                                    <p className="form-hint">กรณีตลาดมีบริการให้เช่าโต๊ะพับหรือร่มแม่ค้า</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Market Zones */}
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+                                <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>
+                                    🏷️ โซนแผงค้าในตลาด (Market Zones)
+                                </label>
+                                <span style={{ fontSize: '0.75rem', color: '#C2410C' }}>
+                                    {marketConfig.zones?.length || 0} โซน
+                                </span>
+                            </div>
+
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                {(marketConfig.zones || []).map((zone, idx) => (
+                                    <span
+                                        key={idx}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.35rem',
+                                            background: '#FFFFFF',
+                                            border: '1px solid rgba(245, 158, 46, 0.4)',
+                                            color: '#9A3412',
+                                            borderRadius: '999px',
+                                            padding: '0.35rem 0.75rem',
+                                            fontSize: '0.8125rem',
+                                            fontWeight: 600,
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                        }}
+                                    >
+                                        <span>{zone}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveZone(zone)}
+                                            style={{
+                                                background: 'transparent',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                color: '#EF4444',
+                                                padding: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                fontWeight: 800,
+                                                fontSize: '12px'
+                                            }}
+                                            title="ลบโซนนี้"
+                                        >
+                                            ✕
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+
+                            {/* Add zone input */}
+                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '420px' }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ padding: '0.55rem 0.85rem', fontSize: '0.875rem' }}
+                                    placeholder="เช่น โซน F (ฟู้ดทรัค), โซน G (ตลาดต้นไม้)"
+                                    value={newZoneInput}
+                                    onChange={e => setNewZoneInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddZone();
+                                        }
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={handleAddZone}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        background: '#E8740C',
+                                        color: '#FFFFFF',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    <Plus size={15} /> เพิ่มโซน
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Multi-Language Settings */}
+                <div className="settings-section">
+                    <h3 className="settings-title">
+                        <Globe size={20} color="#0A6CC2" />
+                        ภาษาของระบบและบิล
+                    </h3>
+                    <p className="form-hint" style={{ marginBottom: '1.25rem' }}>
+                        กำหนดภาษาหลักของหอพักสำหรับใบแจ้งหนี้, สลิปความร้อน, และข้อความแจ้งเตือนผ่าน LINE
+                    </p>
+
+                    <div className="settings-grid">
+                        <div className="form-group">
+                            <label className="form-label">ภาษาเริ่มต้นของหอพัก (Default Language)</label>
+                            <select
+                                className="form-input"
+                                style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                value={billForm.default_language}
+                                onChange={e => handleBillFormChange('default_language', e.target.value)}
+                            >
+                                {LANGUAGE_OPTIONS.map(opt => (
+                                    <option key={opt.code} value={opt.code}>
+                                        {opt.flag} {opt.name} ({opt.nativeName})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="form-hint">ภาษาหลักที่ใช้สร้างบิลและข้อความแจ้งเตือน</p>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>โหมด 2 ภาษา (Bilingual Invoices)</span>
+                                <input
+                                    type="checkbox"
+                                    checked={billForm.bilingual_mode}
+                                    onChange={e => handleBillFormChange('bilingual_mode', e.target.checked)}
+                                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0A6CC2' }}
+                                />
+                            </label>
+                            <p className="form-hint" style={{ marginTop: '0.25rem' }}>
+                                พิมพ์บิลพร้อมคำแปลภาษาที่สองคู่ขนาน (เช่น ไทย + English)
+                            </p>
+
+                            {billForm.bilingual_mode && (
+                                <div style={{ marginTop: '0.75rem' }}>
+                                    <label className="form-label" style={{ fontSize: '0.85rem' }}>ภาษาที่สอง (Secondary Language)</label>
+                                    <select
+                                        className="form-input"
+                                        style={{ padding: '0.6rem 0.85rem', fontSize: '0.9rem' }}
+                                        value={billForm.secondary_language}
+                                        onChange={e => handleBillFormChange('secondary_language', e.target.value)}
+                                    >
+                                        {LANGUAGE_OPTIONS.filter(o => o.code !== billForm.default_language).map(opt => (
+                                            <option key={opt.code} value={opt.code}>
+                                                {opt.flag} {opt.name} ({opt.nativeName})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {/* Dorm Logo Settings */}
                 <div className="settings-section">
                     <h3 className="settings-title">
-                        <ImageIcon size={20} color="#0EA5E9" />
-                        โลโก้หอพัก (Dormitory Logo)
+                        <ImageIcon size={20} color="#0A6CC2" />
+                        โลโก้{terms.facilityType}
                     </h3>
                     <p className="form-hint" style={{ marginBottom: '1.25rem' }}>
                         โลโก้นี้จะแสดงที่หน้าเลือกสาขาหอพัก, มุมบนหน้า Dashboard, พอร์ทัลผู้เช่า, และบนใบแจ้งหนี้
@@ -789,7 +1233,7 @@ export default function Settings(props: SettingsProps) {
                                         border: '1.5px solid var(--color-primary)',
                                         background: '#FFFFFF',
                                         padding: 4,
-                                        boxShadow: '0 4px 14px rgba(14, 165, 233, 0.18)'
+                                        boxShadow: '0 4px 14px rgba(10, 108, 194, 0.18)'
                                     }}
                                 />
                             </div>
@@ -857,457 +1301,40 @@ export default function Settings(props: SettingsProps) {
                     </div>
                 </div>
 
-                {/* Multi-Language Settings */}
-                <div className="settings-section">
-                    <h3 className="settings-title">
-                        <Globe size={20} color="#0EA5E9" />
-                        ภาษาของระบบและบิล (Language & Localization)
-                    </h3>
-                    <p className="form-hint" style={{ marginBottom: '1.25rem' }}>
-                        กำหนดภาษาหลักของหอพักสำหรับใบแจ้งหนี้, สลิปความร้อน, และข้อความแจ้งเตือนผ่าน LINE
-                    </p>
-
-                    <div className="settings-grid">
-                        <div className="form-group">
-                            <label className="form-label">ภาษาเริ่มต้นของหอพัก (Default Language)</label>
-                            <select
-                                className="form-input"
-                                style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
-                                value={billForm.default_language}
-                                onChange={e => handleBillFormChange('default_language', e.target.value)}
-                            >
-                                {LANGUAGE_OPTIONS.map(opt => (
-                                    <option key={opt.code} value={opt.code}>
-                                        {opt.flag} {opt.name} ({opt.nativeName})
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="form-hint">ภาษาหลักที่ใช้สร้างบิลและข้อความแจ้งเตือน</p>
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span>โหมด 2 ภาษา (Bilingual Invoices)</span>
-                                <input
-                                    type="checkbox"
-                                    checked={billForm.bilingual_mode}
-                                    onChange={e => handleBillFormChange('bilingual_mode', e.target.checked)}
-                                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0EA5E9' }}
-                                />
-                            </label>
-                            <p className="form-hint" style={{ marginTop: '0.25rem' }}>
-                                พิมพ์บิลพร้อมคำแปลภาษาที่สองคู่ขนาน (เช่น ไทย + English)
-                            </p>
-
-                            {billForm.bilingual_mode && (
-                                <div style={{ marginTop: '0.75rem' }}>
-                                    <label className="form-label" style={{ fontSize: '0.85rem' }}>ภาษาที่สอง (Secondary Language)</label>
-                                    <select
-                                        className="form-input"
-                                        style={{ padding: '0.6rem 0.85rem', fontSize: '0.9rem' }}
-                                        value={billForm.secondary_language}
-                                        onChange={e => handleBillFormChange('secondary_language', e.target.value)}
-                                    >
-                                        {LANGUAGE_OPTIONS.filter(o => o.code !== billForm.default_language).map(opt => (
-                                            <option key={opt.code} value={opt.code}>
-                                                {opt.flag} {opt.name} ({opt.nativeName})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Workspace & Property Type Selector */}
-                <div className="settings-section">
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                        <div>
-                            <h3 className="settings-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                                {formData.building_type === 'market' ? <Store size={22} color="#D97706" /> : <Building2 size={22} color="#0EA5E9" />}
-                                ประเภทพื้นที่ & โหมด Workspace (Property Workspace)
-                            </h3>
-                            <p className="form-hint" style={{ margin: 0 }}>
-                                เลือกลักษณะพื้นที่เพื่อปรับคำศัพท์ (เช่น แผงค้า vs ห้องพัก, ผู้ค้า vs ผู้เช่า) และรูปแบบการคิดเงินอัตโนมัติ
-                            </p>
-                        </div>
-                        <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.45rem',
-                            padding: '0.4rem 0.95rem',
-                            borderRadius: '999px',
-                            background: formData.building_type === 'market' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(14, 165, 233, 0.12)',
-                            border: `1.5px solid ${formData.building_type === 'market' ? '#F59E0B' : '#0EA5E9'}`,
-                            fontSize: '0.85rem',
-                            fontWeight: 700,
-                            color: formData.building_type === 'market' ? '#92400E' : '#0369A1'
-                        }}>
-                            <Sparkles size={14} /> โหมดปัจจุบัน: {BUILDING_TYPES.find(b => b.key === formData.building_type)?.title || 'หอพัก'}
-                        </div>
-                    </div>
-
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-                        gap: '0.85rem',
-                        marginTop: '1rem',
-                    }}>
-                        {BUILDING_TYPES.map(bt => {
-                            const Icon = bt.icon;
-                            const isSelected = formData.building_type === bt.key;
-                            return (
-                                <div
-                                    key={bt.key}
-                                    onClick={() => handleChange('building_type', bt.key)}
-                                    style={{
-                                        position: 'relative',
-                                        padding: '1rem 0.85rem',
-                                        borderRadius: '14px',
-                                        cursor: 'pointer',
-                                        border: isSelected 
-                                            ? bt.key === 'market' 
-                                                ? '2px solid #F59E0B'
-                                                : '2px solid var(--color-primary)'
-                                            : '1px solid var(--color-gray-200)',
-                                        background: isSelected
-                                            ? bt.key === 'market'
-                                                ? 'linear-gradient(135deg, rgba(254, 240, 138, 0.25), rgba(245, 158, 11, 0.08))'
-                                                : 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(99, 102, 241, 0.04))'
-                                            : 'var(--color-gray-50)',
-                                        boxShadow: isSelected 
-                                            ? bt.key === 'market' ? '0 4px 14px rgba(245, 158, 11, 0.2)' : '0 4px 14px rgba(14, 165, 233, 0.15)'
-                                            : 'none',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        textAlign: 'center',
-                                        gap: '0.5rem',
-                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        transform: isSelected ? 'scale(1.02)' : 'none',
-                                    }}
-                                >
-                                    {isSelected && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: '8px',
-                                            right: '8px',
-                                            background: bt.key === 'market' ? '#D97706' : 'var(--color-primary)',
-                                            color: '#fff',
-                                            borderRadius: '50%',
-                                            width: '18px',
-                                            height: '18px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '10px'
-                                        }}>
-                                            <Check size={11} strokeWidth={3} />
-                                        </div>
-                                    )}
-
-                                    <div style={{
-                                        background: bt.iconBg,
-                                        width: 44,
-                                        height: 44,
-                                        borderRadius: '12px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                                    }}>
-                                        <Icon size={22} color={bt.iconColor} />
-                                    </div>
-                                    <div>
-                                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: isSelected ? '#111827' : 'var(--color-gray-800)' }}>
-                                            {bt.title}
-                                        </div>
-                                        <div style={{ fontSize: '0.725rem', color: 'var(--color-gray-500)' }}>
-                                            {bt.subtitle}
-                                        </div>
-                                    </div>
-                                    <p style={{ margin: 0, fontSize: '0.725rem', color: 'var(--color-gray-500)', lineHeight: 1.35 }}>
-                                        {bt.desc}
-                                    </p>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Market Specific Configuration (Rendered when workspace is Market) */}
-                {formData.building_type === 'market' && (
-                    <div className="settings-section" style={{
-                        border: '1.5px solid rgba(245, 158, 11, 0.45)',
-                        background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.2), rgba(255, 255, 255, 0.95))',
-                        borderRadius: '16px',
-                        padding: '1.5rem',
-                        boxShadow: '0 8px 24px rgba(245, 158, 11, 0.1)',
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                            <div style={{
-                                background: '#FEF3C7',
-                                width: 44,
-                                height: 44,
-                                borderRadius: '12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                            }}>
-                                <Store size={24} color="#D97706" />
-                            </div>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800, color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                    ตั้งค่าตลาดและแผงค้า (Market Configuration)
-                                </h3>
-                                <p style={{ margin: 0, fontSize: '0.85rem', color: '#B45309' }}>
-                                    กำหนดค่าบริการเริ่มต้นสำหรับแผงค้า, ล็อกตลาด, ค่าขยะ, และการแบ่งโซน
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Market Config Grid */}
-                        <div className="settings-grid" style={{ marginBottom: '1.25rem' }}>
-                            {/* Default Rent Cycle */}
-                            <div className="form-group">
-                                <label className="form-label" style={{ fontWeight: 700 }}>รอบคิดค่าเช่าแผงเริ่มต้น</label>
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    {[
-                                        { key: 'daily', label: '☀️ รายวัน', sub: 'ตลาดนัด/ถนนคนเดิน' },
-                                        { key: 'weekly', label: '📅 รายสัปดาห์', sub: 'ตลาดเปิด 1-3 วัน/สัปดาห์' },
-                                        { key: 'monthly', label: '🗓️ รายเดือน', sub: 'ตลาดสด/ล็อกประจำ' },
-                                    ].map(cycle => {
-                                        const active = marketConfig.default_rent_cycle === cycle.key;
-                                        return (
-                                            <button
-                                                key={cycle.key}
-                                                type="button"
-                                                onClick={() => handleMarketChange('default_rent_cycle', cycle.key)}
-                                                style={{
-                                                    flex: '1 1 120px',
-                                                    padding: '0.65rem 0.75rem',
-                                                    borderRadius: '10px',
-                                                    border: active ? '2px solid #D97706' : '1px solid var(--color-gray-300)',
-                                                    background: active ? '#FEF3C7' : '#FFFFFF',
-                                                    color: active ? '#92400E' : 'var(--color-gray-700)',
-                                                    fontWeight: active ? 700 : 500,
-                                                    fontSize: '0.875rem',
-                                                    cursor: 'pointer',
-                                                    textAlign: 'center',
-                                                    transition: 'all 0.15s ease',
-                                                }}
-                                            >
-                                                <div>{cycle.label}</div>
-                                                <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>{cycle.sub}</div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <p className="form-hint">รอบตั้งต้นเมื่อเพิ่มแผงใหม่ (สามารถปรับรายแผงได้)</p>
-                            </div>
-
-                            {/* Default Stall Size */}
-                            <div className="form-group">
-                                <label className="form-label" style={{ fontWeight: 700 }}>ขนาดแผงค้ามาตรฐาน (กว้าง x ลึก)</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
-                                    value={marketConfig.default_stall_size || ''}
-                                    onChange={e => handleMarketChange('default_stall_size', e.target.value)}
-                                    placeholder="เช่น 2x2 ม., 3x3 ม."
-                                />
-                                <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
-                                    {['2x2 ม.', '2.5x2.5 ม.', '3x3 ม.', '4x4 ม.'].map(size => (
-                                        <button
-                                            key={size}
-                                            type="button"
-                                            onClick={() => handleMarketChange('default_stall_size', size)}
-                                            style={{
-                                                background: marketConfig.default_stall_size === size ? '#FEF3C7' : '#F3F4F6',
-                                                border: marketConfig.default_stall_size === size ? '1px solid #D97706' : '1px solid #E5E7EB',
-                                                color: marketConfig.default_stall_size === size ? '#92400E' : '#4B5563',
-                                                borderRadius: '6px',
-                                                padding: '0.2rem 0.5rem',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 600,
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            {size}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Stall Utilities Grid */}
-                        <div style={{
-                            background: '#FFFFFF',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(245, 158, 11, 0.25)',
-                            padding: '1.25rem',
-                            marginBottom: '1.25rem'
-                        }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#92400E', marginBottom: '0.85rem' }}>
-                                🧹 ค่าบริการและสิ่งอำนวยความสะดวกสำหรับตลาด (Market Utilities)
-                            </div>
-                            <div className="settings-grid">
-                                <div className="form-group">
-                                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>ค่าขยะ & ดูแลความสะอาดแผง (บาท)</span>
-                                        <span style={{ fontSize: '0.75rem', color: '#D97706', fontWeight: 600 }}>
-                                            {marketConfig.waste_fee_cycle === 'monthly' ? 'ต่อเดือน' : 'ต่อวัน'}
-                                        </span>
-                                    </label>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <input
-                                            type="number"
-                                            className="form-input mono"
-                                            style={{ flex: 1, padding: '0.65rem 0.85rem' }}
-                                            value={marketConfig.waste_fee_per_stall ?? 20}
-                                            onChange={e => handleMarketChange('waste_fee_per_stall', Number(e.target.value))}
-                                        />
-                                        <select
-                                            className="form-input"
-                                            style={{ width: '110px', padding: '0.65rem 0.5rem', fontSize: '0.85rem' }}
-                                            value={marketConfig.waste_fee_cycle || 'daily'}
-                                            onChange={e => handleMarketChange('waste_fee_cycle', e.target.value)}
-                                        >
-                                            <option value="daily">/ วัน</option>
-                                            <option value="monthly">/ เดือน</option>
-                                        </select>
-                                    </div>
-                                    <p className="form-hint">ค่าเก็บขยะ/ทำความสะอาดทางเดินตลาด</p>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">ค่าไฟเหมาต่อแผง (บาท/วัน)</label>
-                                    <input
-                                        type="number"
-                                        className="form-input mono"
-                                        style={{ padding: '0.65rem 0.85rem' }}
-                                        value={marketConfig.electricity_flat_fee ?? 30}
-                                        onChange={e => handleMarketChange('electricity_flat_fee', Number(e.target.value))}
-                                    />
-                                    <p className="form-hint">สำหรับแผงใช้ไฟส่องสว่าง/พัดลม (ไม่ติดมิเตอร์)</p>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">ค่าเช่าโต๊ะ / เต็นท์ / อุปกรณ์ (บาท/วัน)</label>
-                                    <input
-                                        type="number"
-                                        className="form-input mono"
-                                        style={{ padding: '0.65rem 0.85rem' }}
-                                        value={marketConfig.table_rental_fee ?? 0}
-                                        onChange={e => handleMarketChange('table_rental_fee', Number(e.target.value))}
-                                    />
-                                    <p className="form-hint">กรณีตลาดมีบริการให้เช่าโต๊ะพับหรือร่มแม่ค้า</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Market Zones */}
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
-                                <label className="form-label" style={{ fontWeight: 700, margin: 0 }}>
-                                    🏷️ โซนแผงค้าในตลาด (Market Zones)
-                                </label>
-                                <span style={{ fontSize: '0.75rem', color: '#B45309' }}>
-                                    {marketConfig.zones?.length || 0} โซน
-                                </span>
-                            </div>
-
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                                {(marketConfig.zones || []).map((zone, idx) => (
-                                    <span
-                                        key={idx}
-                                        style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '0.35rem',
-                                            background: '#FFFFFF',
-                                            border: '1px solid rgba(245, 158, 11, 0.4)',
-                                            color: '#92400E',
-                                            borderRadius: '999px',
-                                            padding: '0.35rem 0.75rem',
-                                            fontSize: '0.8125rem',
-                                            fontWeight: 600,
-                                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                                        }}
-                                    >
-                                        <span>{zone}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveZone(zone)}
-                                            style={{
-                                                background: 'transparent',
-                                                border: 'none',
-                                                cursor: 'pointer',
-                                                color: '#EF4444',
-                                                padding: 0,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                fontWeight: 800,
-                                                fontSize: '12px'
-                                            }}
-                                            title="ลบโซนนี้"
-                                        >
-                                            ✕
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-
-                            {/* Add zone input */}
-                            <div style={{ display: 'flex', gap: '0.5rem', maxWidth: '420px' }}>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    style={{ padding: '0.55rem 0.85rem', fontSize: '0.875rem' }}
-                                    placeholder="เช่น โซน F (ฟู้ดทรัค), โซน G (ตลาดต้นไม้)"
-                                    value={newZoneInput}
-                                    onChange={e => setNewZoneInput(e.target.value)}
-                                    onKeyDown={e => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleAddZone();
-                                        }
-                                    }}
-                                />
-                                <button
-                                    type="button"
-                                    className="btn btn-secondary btn-sm"
-                                    onClick={handleAddZone}
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.3rem',
-                                        background: '#D97706',
-                                        color: '#FFFFFF',
-                                        border: 'none',
-                                        fontWeight: 700,
-                                        whiteSpace: 'nowrap'
-                                    }}
-                                >
-                                    <Plus size={15} /> เพิ่มโซน
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
                 </>
             )}
 
             {/* Billing Tab */}
             {activeTab === 'billing' && (
                 <>
+            {/* Rent Settings */}
+            <div className="settings-section">
+                <h3 className="settings-title">
+                    {formData.building_type === 'market' ? <Store size={20} color="#15803D" /> : <Home size={20} color="#15803D" />}
+                    {terms.rentLabel}
+                </h3>
+                <div className="form-group">
+                    <label className="form-label">
+                        {formData.building_type === 'market'
+                            ? `ค่าเช่าเริ่มต้น (บาท / ${marketConfig.default_rent_cycle === 'daily' ? 'วัน' : marketConfig.default_rent_cycle === 'weekly' ? 'สัปดาห์' : 'เดือน'})`
+                            : 'ค่าเช่าเริ่มต้น (บาท)'
+                        }
+                    </label>
+                    <input
+                        type="number"
+                        className="form-input mono"
+                        style={{ maxWidth: '200px', padding: '0.75rem 1rem', fontSize: '1rem' }}
+                        value={formData.room_rent}
+                        onChange={e => handleChange('room_rent', e.target.value)}
+                    />
+                    <p className="form-hint">ค่าเช่าเริ่มต้นสำหรับ{terms.unitNamePlural}ใหม่ (แก้ไขราย{terms.unitName}ได้ในหน้า{terms.manageUnitsLabel})</p>
+                </div>
+            </div>
+
                 {/* Electricity Settings */}
                 <div className="settings-section">
                 <h3 className="settings-title">
-                    <Zap size={20} color="#F59E0B" />
+                    <Zap size={20} color="#F59E2E" />
                     {formData.building_type === 'commercial' ? 'ค่าไฟฟ้า (เริ่มต้น)' : 'ค่าไฟฟ้า'}
                 </h3>
                 <div className="form-group">
@@ -1331,8 +1358,8 @@ export default function Settings(props: SettingsProps) {
             {/* Water Settings - Dormitory */}
             <div className="settings-section">
                 <h3 className="settings-title">
-                    <Droplets size={20} color="#2563EB" />
-                    <Home size={20} color="#2563EB" style={{ marginRight: '8px' }} />
+                    <Droplets size={20} color="#0A6CC2" />
+                    <Home size={20} color="#0A6CC2" style={{ marginRight: '8px' }} />
                     ค่าน้ำประปา — หอพัก
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
@@ -1344,8 +1371,8 @@ export default function Settings(props: SettingsProps) {
             {/* Water Settings - Commercial */}
             <div className="settings-section">
                 <h3 className="settings-title">
-                    <Droplets size={20} color="#0EA5E9" />
-                    <Building2 size={20} color="#0EA5E9" style={{ marginRight: '8px' }} />
+                    <Droplets size={20} color="#0A6CC2" />
+                    <Building2 size={20} color="#0A6CC2" style={{ marginRight: '8px' }} />
                     ค่าน้ำประปา — อาคารพาณิชย์
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
@@ -1354,34 +1381,10 @@ export default function Settings(props: SettingsProps) {
                 {renderWaterForm('comm', formData.comm_water_type)}
             </div>
 
-            {/* Rent Settings */}
-            <div className="settings-section">
-                <h3 className="settings-title">
-                    {formData.building_type === 'market' ? <Store size={20} color="#16A34A" /> : <Home size={20} color="#16A34A" />}
-                    {terms.rentLabel}
-                </h3>
-                <div className="form-group">
-                    <label className="form-label">
-                        {formData.building_type === 'market'
-                            ? `ค่าเช่าเริ่มต้น (บาท / ${marketConfig.default_rent_cycle === 'daily' ? 'วัน' : marketConfig.default_rent_cycle === 'weekly' ? 'สัปดาห์' : 'เดือน'})`
-                            : 'ค่าเช่าเริ่มต้น (บาท)'
-                        }
-                    </label>
-                    <input
-                        type="number"
-                        className="form-input mono"
-                        style={{ maxWidth: '200px', padding: '0.75rem 1rem', fontSize: '1rem' }}
-                        value={formData.room_rent}
-                        onChange={e => handleChange('room_rent', e.target.value)}
-                    />
-                    <p className="form-hint">ค่าเช่าเริ่มต้นสำหรับ{terms.unitNamePlural}ใหม่ (แก้ไขราย{terms.unitName}ได้ในหน้า{terms.manageUnitsLabel})</p>
-                </div>
-            </div>
-
             {/* Bill Customization */}
             <div className="settings-section">
                 <h3 className="settings-title">
-                    <FileText size={20} color="#0EA5E9" />
+                    <FileText size={20} color="#0A6CC2" />
                     ตั้งค่าใบแจ้งหนี้ / ใบเสร็จ
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
@@ -1396,9 +1399,9 @@ export default function Settings(props: SettingsProps) {
                     <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoChange} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                         {dormLogo ? (
-                            <img src={dormLogo} alt={`โลโก้${terms.facilityType}`} style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 10, border: '1.5px solid var(--color-gray-200)', background: '#F9FAFB', padding: 4 }} />
+                            <img src={dormLogo} alt={`โลโก้${terms.facilityType}`} style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 10, border: '1.5px solid var(--color-gray-200)', background: '#F4F7FB', padding: 4 }} />
                         ) : (
-                            <div style={{ width: 72, height: 72, borderRadius: 10, border: '1.5px dashed var(--color-gray-300)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-gray-400)', background: '#F9FAFB' }}>
+                            <div style={{ width: 72, height: 72, borderRadius: 10, border: '1.5px dashed var(--color-gray-300)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-gray-400)', background: '#F4F7FB' }}>
                                 <ImageIcon size={24} />
                             </div>
                         )}
@@ -1409,14 +1412,14 @@ export default function Settings(props: SettingsProps) {
                                 disabled={logoLoading}
                                 style={{
                                     padding: '0.5rem 1rem', borderRadius: 8, cursor: 'pointer',
-                                    border: '1.5px solid var(--color-primary)', background: 'rgba(139,92,246,0.07)',
+                                    border: '1.5px solid var(--color-primary)', background: 'rgba(15, 76, 129,0.07)',
                                     color: 'var(--color-primary)', fontWeight: 600, fontSize: '0.875rem',
                                     display: 'flex', alignItems: 'center', gap: '0.35rem',
                                     opacity: logoLoading ? 0.6 : 1,
                                 }}
                             >
                                 {logoLoading
-                                    ? <span style={{ width: 14, height: 14, border: '2px solid rgba(14, 165, 233, 0.3)', borderTopColor: '#0EA5E9', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                                    ? <span style={{ width: 14, height: 14, border: '2px solid rgba(10, 108, 194, 0.3)', borderTopColor: '#0A6CC2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
                                     : <ImageIcon size={14} />
                                 }
                                 {dormLogo ? 'เปลี่ยนโลโก้' : 'อัพโหลดโลโก้'}
@@ -1477,7 +1480,7 @@ export default function Settings(props: SettingsProps) {
                     />
                 </div>
 
-                <div className="form-group" style={{ background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.25)', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                <div className="form-group" style={{ background: 'rgba(10, 108, 194,0.08)', border: '1px solid rgba(10, 108, 194,0.25)', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.875rem', lineHeight: 1.5 }}>
                     <strong>QR สำหรับรับเงินในบิล</strong> สร้างจากบัญชีรับเงินหลักของสถานที่นี้ ตั้งค่าได้ที่หน้า <em>การชำระเงิน → บัญชีรับเงิน</em> (ใส่เลข PromptPay เบอร์โทรหรือเลขบัตรประชาชนที่บัญชีนั้นได้)
                 </div>
 
@@ -1535,21 +1538,21 @@ export default function Settings(props: SettingsProps) {
                 }}>
                     <div style={{
                         width: 48, height: 48, borderRadius: '50%',
-                        background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+                        background: 'linear-gradient(135deg,#0F4C81,#0F4C81)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 16px rgba(109,40,217,0.3)',
+                        boxShadow: '0 4px 16px rgba(15, 76, 129,0.3)',
                     }}>
                         <Lock size={22} color="#fff" />
                     </div>
-                    <p style={{ margin: 0, fontWeight: 700, color: '#111827', fontSize: '0.9375rem' }}>ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงิน</p>
+                    <p style={{ margin: 0, fontWeight: 700, color: '#102A43', fontSize: '0.9375rem' }}>ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงิน</p>
                     <button
                         onClick={onUpgrade}
                         style={{
-                            background: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
+                            background: 'linear-gradient(135deg,#0F4C81,#E8740C)',
                             color: '#fff', border: 'none', borderRadius: '10px',
                             padding: '0.625rem 1.5rem', fontWeight: 700, fontSize: '0.875rem',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem',
-                            boxShadow: '0 4px 14px rgba(139,92,246,0.35)',
+                            boxShadow: '0 4px 14px rgba(15, 76, 129,0.35)',
                         }}
                     >
                         <Zap size={15} /> ดูแพ็กเกจ
@@ -1561,7 +1564,7 @@ export default function Settings(props: SettingsProps) {
                     เชื่อมต่อ LINE (ส่งบิลผ่าน LINE)
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-5)' }}>
-                    สร้าง Invite Link แล้วส่งให้ลูกหอ — กดลิ้งก์เดียว พิมพ์เลขห้อง แล้วจบ <CheckCircle2 size={14} color="#059669" style={{ display: 'inline', verticalAlign: 'text-bottom' }} />
+                    สร้าง Invite Link แล้วส่งให้ลูกหอ — กดลิ้งก์เดียว พิมพ์เลขห้อง แล้วจบ <CheckCircle2 size={14} color="#15803D" style={{ display: 'inline', verticalAlign: 'text-bottom' }} />
                 </p>
 
                 {/* Dorm Code row */}
@@ -1855,7 +1858,7 @@ export default function Settings(props: SettingsProps) {
                                                                 />
                                                             </div>
                                                             <div style={{ fontSize: '1.25rem', color: '#555', marginTop: '0.5rem' }}>
-                                                                รหัสลงทะเบียน: <strong style={{ fontSize: '2.25rem', color: '#10B981', letterSpacing: '4px', background: '#ecfdf5', padding: '0.5rem 1.5rem', borderRadius: '1rem', display: 'inline-block', border: '2px dashed #10b981' }}>{dormCode}</strong>
+                                                                รหัสลงทะเบียน: <strong style={{ fontSize: '2.25rem', color: '#22A35A', letterSpacing: '4px', background: '#eff8f2', padding: '0.5rem 1.5rem', borderRadius: '1rem', display: 'inline-block', border: '2px dashed #22a35a' }}>{dormCode}</strong>
                                                             </div>
                                                             
                                                             <div style={{ display: 'flex', gap: '3rem', justifyContent: 'center', alignItems: 'center', marginTop: '2rem' }}>
@@ -1881,7 +1884,7 @@ export default function Settings(props: SettingsProps) {
                                                         <button
                                                             style={{
                                                                 display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                                                                background: '#10B981', color: '#fff',
+                                                                background: '#22A35A', color: '#fff',
                                                                 border: 'none', borderRadius: 8,
                                                                 padding: '0.5rem 1rem', fontSize: '0.8125rem',
                                                                 cursor: 'pointer',
@@ -1943,21 +1946,21 @@ export default function Settings(props: SettingsProps) {
                 }}>
                     <div style={{
                         width: 48, height: 48, borderRadius: '50%',
-                        background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+                        background: 'linear-gradient(135deg,#0F4C81,#0F4C81)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 16px rgba(109,40,217,0.3)',
+                        boxShadow: '0 4px 16px rgba(15, 76, 129,0.3)',
                     }}>
                         <Lock size={22} color="#fff" />
                     </div>
-                    <p style={{ margin: 0, fontWeight: 700, color: '#111827', fontSize: '0.9375rem' }}>ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงิน</p>
+                    <p style={{ margin: 0, fontWeight: 700, color: '#102A43', fontSize: '0.9375rem' }}>ฟีเจอร์สำหรับแพ็กเกจที่ชำระเงิน</p>
                     <button
                         onClick={onUpgrade}
                         style={{
-                            background: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
+                            background: 'linear-gradient(135deg,#0F4C81,#E8740C)',
                             color: '#fff', border: 'none', borderRadius: '10px',
                             padding: '0.625rem 1.5rem', fontWeight: 700, fontSize: '0.875rem',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem',
-                            boxShadow: '0 4px 14px rgba(139,92,246,0.35)',
+                            boxShadow: '0 4px 14px rgba(15, 76, 129,0.35)',
                         }}
                     >
                         <Zap size={15} /> ดูแพ็กเกจ
@@ -1965,7 +1968,7 @@ export default function Settings(props: SettingsProps) {
                 </div>
             )}
                 <h3 className="settings-title">
-                    <Lock size={20} color="#059669" />
+                    <Lock size={20} color="#15803D" />
                     พอร์ทัลผู้เช่า — PIN
                 </h3>
                 <p className="form-hint" style={{ marginBottom: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-gray-500)' }}>
@@ -1999,7 +2002,7 @@ export default function Settings(props: SettingsProps) {
             {activeTab === 'general' && (
                 <div className="settings-section">
                 <h3 className="settings-title">
-                    <Palette size={20} color="#0EA5E9" />
+                    <Palette size={20} color="#0A6CC2" />
                     ธีมและสีสันของระบบ
                 </h3>
 
@@ -2057,7 +2060,7 @@ export default function Settings(props: SettingsProps) {
                 {/* Brand Identity & Color System */}
                 <div style={{
                     background: 'var(--color-bg-alt)',
-                    border: '1px solid rgba(14, 165, 233, 0.2)',
+                    border: '1px solid rgba(10, 108, 194, 0.2)',
                     borderRadius: '14px',
                     padding: '1.25rem',
                     display: 'flex',
@@ -2068,8 +2071,8 @@ export default function Settings(props: SettingsProps) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <div style={{
                                 width: 8, height: 8, borderRadius: '50%',
-                                background: '#10B981',
-                                boxShadow: '0 0 8px #10B981',
+                                background: '#22A35A',
+                                boxShadow: '0 0 8px #22A35A',
                             }} />
                             <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-text)' }}>
                                 ธีมทางการ HorCare Gen Z Hi-Tech (Active Standard)
@@ -2078,8 +2081,8 @@ export default function Settings(props: SettingsProps) {
                         <span style={{
                             fontSize: '0.75rem', fontWeight: 600,
                             padding: '0.2rem 0.6rem', borderRadius: '20px',
-                            background: 'rgba(14, 165, 233, 0.1)', color: '#0EA5E9',
-                            border: '1px solid rgba(14, 165, 233, 0.2)',
+                            background: 'rgba(10, 108, 194, 0.1)', color: '#0A6CC2',
+                            border: '1px solid rgba(10, 108, 194, 0.2)',
                         }}>
                             มาตรฐานสากลเดี่ยว
                         </span>
@@ -2087,10 +2090,10 @@ export default function Settings(props: SettingsProps) {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                         {[
-                            { name: 'Deep Navy', code: '#080C14', desc: 'พื้นหลังหลัก/มิติ', color: '#0F172A' },
-                            { name: 'Electric Cyan', code: '#0EA5E9', desc: 'สีปุ่มและไอคอน', color: '#0EA5E9' },
-                            { name: 'Cyber Emerald', code: '#10B981', desc: 'สถานะและผลรวม', color: '#10B981' },
-                            { name: 'Neon Orange', code: '#F97316', desc: 'แจ้งเตือน/เน้นย้ำ', color: '#F97316' },
+                            { name: 'Deep Navy', code: '#080C14', desc: 'พื้นหลังหลัก/มิติ', color: '#102A43' },
+                            { name: 'Electric Cyan', code: '#0A6CC2', desc: 'สีปุ่มและไอคอน', color: '#0A6CC2' },
+                            { name: 'Cyber Emerald', code: '#22A35A', desc: 'สถานะและผลรวม', color: '#22A35A' },
+                            { name: 'Neon Orange', code: '#E8740C', desc: 'แจ้งเตือน/เน้นย้ำ', color: '#E8740C' },
                         ].map((swatch, idx) => (
                             <div key={idx} style={{
                                 background: 'var(--color-card)',
@@ -2128,8 +2131,8 @@ export default function Settings(props: SettingsProps) {
             <>
             <div className="settings-section">
                 <h3 className="settings-title">
-                    <Bell size={20} color="#8B5CF6" />
-                    การแจ้งเตือน (Push Notification)
+                    <Bell size={20} color="#0F4C81" />
+                    การแจ้งเตือน
                 </h3>
                 <p className="form-hint" style={{ marginBottom: '1.25rem', fontSize: '0.875rem' }}>
                     รับการแจ้งเตือนบนมือถือ/เดสก์ท็อปเมื่อลูกหอแจ้งซ่อม, ส่งสลิป หรือมีเหตุการณ์สำคัญ
@@ -2149,8 +2152,8 @@ export default function Settings(props: SettingsProps) {
                     <div style={{
                         display: 'flex', alignItems: 'flex-start', gap: '0.625rem',
                         padding: '0.875rem 1rem', borderRadius: '12px',
-                        background: '#FEF3C7', border: '1px solid #FDE68A',
-                        fontSize: '0.875rem', color: '#92400E',
+                        background: '#FDEBD3', border: '1px solid #FBD9A8',
+                        fontSize: '0.875rem', color: '#9A3412',
                     }}>
                         <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
                         <div>
@@ -2165,10 +2168,10 @@ export default function Settings(props: SettingsProps) {
                         gap: '1rem', flexWrap: 'wrap',
                         padding: '1rem 1.25rem', borderRadius: '14px',
                         background: enabled
-                            ? 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(109,40,217,0.04))'
+                            ? 'linear-gradient(135deg, rgba(15, 76, 129,0.08), rgba(15, 76, 129,0.04))'
                             : 'var(--color-gray-50)',
                         border: enabled
-                            ? '1.5px solid rgba(139,92,246,0.3)'
+                            ? '1.5px solid rgba(15, 76, 129,0.3)'
                             : '1.5px solid var(--color-gray-200)',
                         transition: 'all 0.2s',
                     }}>
@@ -2176,7 +2179,7 @@ export default function Settings(props: SettingsProps) {
                             <div style={{
                                 width: 42, height: 42, borderRadius: '12px', flexShrink: 0,
                                 background: enabled
-                                    ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)'
+                                    ? 'linear-gradient(135deg, #0F4C81, #0F4C81)'
                                     : 'var(--color-gray-200)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 transition: 'background 0.2s',
@@ -2207,7 +2210,7 @@ export default function Settings(props: SettingsProps) {
                                 width: 52, height: 28, borderRadius: 14,
                                 border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0,
                                 background: enabled
-                                    ? 'linear-gradient(135deg, #8B5CF6, #6D28D9)'
+                                    ? 'linear-gradient(135deg, #0F4C81, #0F4C81)'
                                     : 'var(--color-gray-300)',
                                 transition: 'background 0.25s',
                                 opacity: notifLoading ? 0.6 : 1,
@@ -2245,12 +2248,12 @@ export default function Settings(props: SettingsProps) {
                             style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
                                 padding: '0.5rem 1rem', borderRadius: '10px',
-                                border: '1px solid #e2e8f0', background: '#f8fafc',
-                                color: '#475569', fontSize: '0.8125rem', fontWeight: 600,
+                                border: '1px solid #dce5ef', background: '#f4f7fb',
+                                color: '#3E5872', fontSize: '0.8125rem', fontWeight: 600,
                                 cursor: 'pointer', transition: 'all 0.15s ease',
                             }}
                         >
-                            <Bell size={14} color="#8B5CF6" />
+                            <Bell size={14} color="#0F4C81" />
                             {testNotifSending ? 'กำลังส่งแจ้งเตือน...' : 'ทดสอบส่งการแจ้งเตือน'}
                         </button>
                     </div>
@@ -2260,14 +2263,14 @@ export default function Settings(props: SettingsProps) {
                     <div style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem',
                         padding: '1.75rem 1.5rem', borderRadius: '16px', textAlign: 'center',
-                        background: 'linear-gradient(135deg, rgba(139,92,246,0.06), rgba(109,40,217,0.03))',
-                        border: '1.5px dashed rgba(139,92,246,0.3)',
+                        background: 'linear-gradient(135deg, rgba(15, 76, 129,0.06), rgba(15, 76, 129,0.03))',
+                        border: '1.5px dashed rgba(15, 76, 129,0.3)',
                     }}>
                         <div style={{
                             width: 56, height: 56, borderRadius: '16px',
-                            background: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
+                            background: 'linear-gradient(135deg, #0F4C81, #0F4C81)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 4px 16px rgba(139,92,246,0.35)',
+                            boxShadow: '0 4px 16px rgba(15, 76, 129,0.35)',
                         }}>
                             <Bell size={26} color="#fff" />
                         </div>
@@ -2298,21 +2301,14 @@ export default function Settings(props: SettingsProps) {
             )}
 
 
-            {activeTab !== 'account' && (
-            <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
-                {/* Save Button */}
-                <button
-                    className="btn btn-primary"
-                    onClick={handleSave}
-                    style={{
-                        padding: '1rem 2.5rem',
-                        fontSize: '1.125rem',
-                        borderRadius: '12px',
-                        minWidth: '240px',
-                        fontWeight: 600
-                    }}
-                >
-                    <Save size={22} />
+            {activeTab !== 'account' && activeTab !== 'contract' && (
+            <div className={`settings-savebar${dirty ? ' dirty' : ''}`} role="region" aria-label="บันทึกการตั้งค่า">
+                <span className="settings-savebar-note" aria-live="polite">
+                    {dirty ? 'มีการแก้ไขที่ยังไม่ได้บันทึก' : 'บันทึกล่าสุดแล้ว'}
+                </span>
+                {dirty && <button type="button" className="btn btn-outline" onClick={() => setPrevConfig({ ...config }) /* a fresh copy makes the form reload from the saved config */}>ยกเลิกการแก้ไข</button>}
+                <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!dirty}>
+                    <Save size={18} />
                     บันทึกการตั้งค่า
                 </button>
             </div>
@@ -2405,7 +2401,7 @@ export default function Settings(props: SettingsProps) {
                         fontSize: '0.875rem',
                         marginBottom: 'var(--space-4)',
                         display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                        border: '1px solid rgba(34,197,94,0.15)'
+                        border: '1px solid rgba(34, 163, 90,0.15)'
                     }}>
                         <Check size={16} /> เปลี่ยนรหัสผ่านเรียบร้อยแล้ว!
                     </div>
@@ -2429,6 +2425,8 @@ export default function Settings(props: SettingsProps) {
             </div>
             </>
             )}
+            </div>
+            </div>
         </div>
     );
 }

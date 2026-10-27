@@ -14,7 +14,7 @@ export default function AccountingPage({ ownerUid, buildings }: { ownerUid: stri
         { id: 'payment', label: 'บันทึกรับชำระแบบตัดหลายบิล', icon: Wallet },
     ];
     return (
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="page-header" style={{ marginBottom: 0 }}>
                 <h1 className="page-title" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><LineChart size={24} /> ภาพรวมการเงิน</h1>
                 <p className="page-subtitle">ยอดเรียกเก็บ รับเงินจริง และยอดค้าง — ลงบัญชีอยู่ที่หน้า "สมุดบัญชี"</p>

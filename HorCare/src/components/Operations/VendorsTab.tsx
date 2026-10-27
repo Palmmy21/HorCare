@@ -147,7 +147,7 @@ export default function VendorsTab({ uid, buildingId }: Props) {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                     <div style={{
                       width: 48, height: 48, borderRadius: '12px', flexShrink: 0,
-                      background: 'linear-gradient(135deg,#8B5CF6,#6D28D9)',
+                      background: 'linear-gradient(135deg,#0F4C81,#0F4C81)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       <HardHat size={22} color="#fff" />
@@ -158,7 +158,7 @@ export default function VendorsTab({ uid, buildingId }: Props) {
                       </div>
                       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         {v.phone && (
-                          <a href={`tel:${v.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: '#4F46E5', textDecoration: 'none', fontWeight: 600 }}>
+                          <a href={`tel:${v.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: '#0A6CC2', textDecoration: 'none', fontWeight: 600 }}>
                             <Phone size={14} /> {v.phone}
                           </a>
                         )}

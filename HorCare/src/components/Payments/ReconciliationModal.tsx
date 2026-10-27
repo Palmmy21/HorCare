@@ -37,11 +37,11 @@ const ERRORS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<ReconStatus, { bg: string; fg: string }> = {
-    unmatched: { bg: '#F3F4F6', fg: '#4B5563' },
-    suggested: { bg: '#FEF3C7', fg: '#92400E' },
-    matched: { bg: '#DBEAFE', fg: '#1E40AF' },
+    unmatched: { bg: '#EBF1F7', fg: '#3E5872' },
+    suggested: { bg: '#FDEBD3', fg: '#9A3412' },
+    matched: { bg: '#E7F0FA', fg: '#08589F' },
     conflict: { bg: '#FEE2E2', fg: '#991B1B' },
-    reconciled: { bg: '#D1FAE5', fg: '#065F46' },
+    reconciled: { bg: '#DCF2E4', fg: '#166534' },
 };
 
 const baht = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -136,7 +136,7 @@ export default function ReconciliationModal({ ownerUid, buildingId, accounts, tr
         if (r) toast.success(`ยืนยัน ${r.confirmed} รายการ${r.failed ? ` · ไม่สำเร็จ ${r.failed}` : ''}`);
     };
 
-    const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, minWidth: 0, font: 'inherit' };
+    const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, minWidth: 0, font: 'inherit' };
     const noAccounts = accounts.length === 0;
 
     return (
@@ -153,7 +153,7 @@ export default function ReconciliationModal({ ownerUid, buildingId, accounts, tr
                     </p>
 
                     {noAccounts ? (
-                        <div style={{ padding: '1rem', background: '#FEF3C7', borderRadius: 8, fontSize: '0.9rem' }}>กรุณาเพิ่มบัญชีรับเงินก่อน แล้วจึงนำเข้ารายการธนาคาร</div>
+                        <div style={{ padding: '1rem', background: '#FDEBD3', borderRadius: 8, fontSize: '0.9rem' }}>กรุณาเพิ่มบัญชีรับเงินก่อน แล้วจึงนำเข้ารายการธนาคาร</div>
                     ) : (
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                             <select value={accountId} onChange={e => setAccountId(e.target.value)} style={input} aria-label="บัญชีที่นำเข้า">
@@ -177,7 +177,7 @@ export default function ReconciliationModal({ ownerUid, buildingId, accounts, tr
                     )}
 
                     {showManual && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 10 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', padding: '0.75rem', border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 10 }}>
                             <input type="datetime-local" value={manual.occurred_at} onChange={e => setManual({ ...manual, occurred_at: e.target.value })} style={input} aria-label="วันที่เวลา" />
                             <input type="number" min="0" step="0.01" placeholder="จำนวนเงิน" value={manual.amount} onChange={e => setManual({ ...manual, amount: e.target.value })} style={input} />
                             <input placeholder="เลขอ้างอิง (ถ้ามี)" value={manual.reference} onChange={e => setManual({ ...manual, reference: e.target.value })} style={input} maxLength={80} />
@@ -207,7 +207,7 @@ export default function ReconciliationModal({ ownerUid, buildingId, accounts, tr
                                 const color = STATUS_COLORS[tx.status];
                                 const open = tx.status !== 'reconciled';
                                 return (
-                                    <div key={tx.id} style={{ border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 10, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    <div key={tx.id} style={{ border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 10, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                         <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
                                             <BankLogo short={acc?.bank_short} size={32} />
                                             <div style={{ flex: 1, minWidth: 0 }}>

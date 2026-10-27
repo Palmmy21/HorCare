@@ -24,19 +24,19 @@ export default function DayClosePanel({ data, totals, call, reload }: {
   };
 
   return (
-    <div style={{ border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <strong>ปิดยอดประจำวัน</strong>
       <span style={{ fontSize: '0.85rem' }}>ระบบบันทึกเงินสดวันนี้ ฿{baht(totals.cash_satang)} · โอน ฿{baht(totals.transfer_satang)} ({totals.count} รายการ)</span>
       {closed ? (
-        <div style={{ background: closed.difference_satang === 0 ? '#F0FDF4' : '#FEF3C7', borderRadius: 8, padding: 8 }}>
+        <div style={{ background: closed.difference_satang === 0 ? '#EFF8F2' : '#FDEBD3', borderRadius: 8, padding: 8 }}>
           ปิดยอดแล้วโดย {closed.closed_by_name} · นับได้ ฿{baht(closed.counted_cash_satang)}
           {closed.difference_satang !== 0 && <strong> · ผลต่าง {closed.difference_satang > 0 ? '+' : ''}{baht(closed.difference_satang)}</strong>}
         </div>
       ) : (
         <>
-          <input style={{ padding: '0.7rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 10, font: 'inherit' }} inputMode="decimal" placeholder="เงินสดที่นับได้ (บาท)" value={counted} onChange={e => setCounted(e.target.value)} />
-          {diff !== null && <span style={{ fontSize: '0.85rem', color: diff === 0 ? '#16A34A' : '#B45309' }}>{diff === 0 ? 'ตรงกับระบบ' : `ผลต่าง ${diff > 0 ? 'เกิน' : 'ขาด'} ฿${baht(Math.abs(diff))}`}</span>}
-          {diff !== null && diff !== 0 && <input style={{ padding: '0.7rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 10, font: 'inherit' }} placeholder="หมายเหตุสาเหตุที่ไม่ตรง" value={note} onChange={e => setNote(e.target.value)} maxLength={300} />}
+          <input style={{ padding: '0.7rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 10, font: 'inherit' }} inputMode="decimal" placeholder="เงินสดที่นับได้ (บาท)" value={counted} onChange={e => setCounted(e.target.value)} />
+          {diff !== null && <span style={{ fontSize: '0.85rem', color: diff === 0 ? '#15803D' : '#C2410C' }}>{diff === 0 ? 'ตรงกับระบบ' : `ผลต่าง ${diff > 0 ? 'เกิน' : 'ขาด'} ฿${baht(Math.abs(diff))}`}</span>}
+          {diff !== null && diff !== 0 && <input style={{ padding: '0.7rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 10, font: 'inherit' }} placeholder="หมายเหตุสาเหตุที่ไม่ตรง" value={note} onChange={e => setNote(e.target.value)} maxLength={300} />}
           <button className="btn btn-primary" disabled={busy || counted === '' || !(Number(counted) >= 0)} onClick={() => void close()}>ปิดยอด</button>
         </>
       )}

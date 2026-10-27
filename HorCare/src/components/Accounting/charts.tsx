@@ -64,7 +64,7 @@ function labelStep(band: number, longest: number) {
   return band >= need ? 1 : Math.ceil(need / band);
 }
 
-interface TipRow { label: string; color: string; value: string; dashed?: boolean }
+interface TipRow { label: string; color: string; value: string; dashed?: boolean; ghost?: boolean }
 
 function Tooltip({ x, width, title, rows }: { x: number; width: number; title: string; rows: TipRow[] }) {
   const left = Math.min(Math.max(x, 110), width - 110);
@@ -73,7 +73,7 @@ function Tooltip({ x, width, title, rows }: { x: number; width: number; title: s
       <div className="chart-tip-title">{title}</div>
       {rows.map(r => (
         <div key={r.label} className="chart-tip-row">
-          <span className={`chart-key${r.dashed ? ' dashed' : ''}`} style={{ ['--key' as string]: r.color }} />
+          <span className={`chart-key${r.dashed ? ' dashed' : r.ghost ? ' ghost' : ''}`} style={{ ['--key' as string]: r.color }} />
           <span className="chart-tip-label">{r.label}</span>
           <span className="chart-tip-value">{r.value}</span>
         </div>
@@ -109,6 +109,11 @@ interface BarProps {
   mode: 'grouped' | 'stacked';
   /** Optional line drawn over the bars (e.g. last year / the target), one value per label. */
   line?: { label: string; color: string; values: (number | null)[]; area?: boolean };
+  /**
+   * What the first series should reach (e.g. the amount due): drawn as a pale column behind that series' bar, which
+   * fills it like a gauge, so "how much of it came in" reads without a second line to follow.
+   */
+  target?: { label: string; values: (number | null)[] };
   height?: number;
   title: string;
   format?: (v: number) => string;
@@ -118,15 +123,19 @@ interface BarProps {
   highlight?: number;
 }
 
-export function BarChart({ labels, series, values, mode, line, height = 220, title, format = compactBaht, formatTip, highlight }: BarProps) {
+export function BarChart({ labels, series, values, mode, line, target, height = 220, title, format = compactBaht, formatTip, highlight }: BarProps) {
   const [ref, W] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const uid = useId().replace(/:/g, '');
   const tipFmt = formatTip ?? format;
   const padR = 4, padT = 22, padB = 26;
   const totals = labels.map((_, i) => (mode === 'stacked' ? values.reduce((s, v) => s + Math.max(0, v[i] ?? 0), 0) : Math.max(...values.map(v => v[i] ?? 0), 0)));
-  const lineMax = line ? Math.max(0, ...line.values.map(v => v ?? 0)) : 0;
+  const lineMax = Math.max(0, ...(line?.values ?? []).map(v => v ?? 0), ...(target?.values ?? []).map(v => v ?? 0));
   const max = niceMax(Math.max(...totals, lineMax, 1));
+  const pctOf = (i: number) => {
+    const t = target?.values[i];
+    return t && t > 0 ? Math.round(((values[0]?.[i] ?? 0) / t) * 100) : null;
+  };
   const ticks = [0, 0.5, 1].map(f => f * max);
   const padL = Math.max(...ticks.map(t => format(t).length)) * 6.6 + 10;
   const innerW = W - padL - padR, innerH = height - padT - padB;
@@ -150,6 +159,7 @@ export function BarChart({ labels, series, values, mode, line, height = 220, tit
   const tip = hover === null ? null : (
     <Tooltip x={cx(hover)} width={W} title={labels[hover]} rows={[
       ...series.map((s, si) => ({ label: s.label, color: s.color, value: tipFmt(values[si][hover] ?? 0) })),
+      ...(target && target.values[hover] ? [{ label: target.label, color: series[0].color, value: `${tipFmt(target.values[hover] as number)} · ได้ ${pctOf(hover)}%`, ghost: true }] : []),
       ...(line && line.values[hover] !== null ? [{ label: line.label, color: line.color, value: tipFmt(line.values[hover] as number), dashed: true }] : []),
     ]} />
   );
@@ -176,6 +186,11 @@ export function BarChart({ labels, series, values, mode, line, height = 220, tit
           return (
             <g key={`${l}-${i}`}>
               <g className="chart-grow" style={{ animationDelay: `${i * 55}ms`, opacity: dim ? 0.55 : 1, transition: 'opacity 150ms' }}>
+                {target && mode === 'grouped' && (target.values[i] ?? 0) > 0 && (() => {
+                  const t = target.values[i] as number;
+                  const x = cx(i) - (barW * n + 3 * (n - 1)) / 2;
+                  return <path d={colPath(x, y(t), barW, y(0) - y(t))} className="chart-ghost" style={{ fill: series[0].color, stroke: series[0].color }} />;
+                })()}
                 {series.map((s, si) => {
                   const v = Math.max(0, values[si][i] ?? 0);
                   if (v <= 0) return null;
@@ -194,7 +209,13 @@ export function BarChart({ labels, series, values, mode, line, height = 220, tit
                     : <rect key={s.key} x={cx(i) - barW / 2} y={top} width={barW} height={h} style={{ fill: s.color }} />;
                 })}
               </g>
-              {i === highlight && totals[i] > 0 && (
+              {i === highlight && target && pctOf(i) !== null && (
+                <text x={cx(i)} y={y(Math.max(totals[i], target.values[i] ?? 0)) - 7} fontSize={FONT} fontWeight={600} textAnchor="middle" className="chart-fade-in"
+                  style={{ fill: 'var(--color-gray-900)', fontVariantNumeric: 'tabular-nums', animationDelay: `${i * 55 + 450}ms` }}>
+                  {`${format(values[0][i] ?? 0)} · ${pctOf(i)}%`}
+                </text>
+              )}
+              {i === highlight && !target && totals[i] > 0 && (
                 <text x={cx(i)} y={y(totals[i]) - 7} fontSize={FONT} fontWeight={600} textAnchor="middle" className="chart-fade-in"
                   style={{ fill: 'var(--color-gray-900)', fontVariantNumeric: 'tabular-nums', animationDelay: `${i * 55 + 450}ms` }}>
                   {format(totals[i])}
@@ -217,6 +238,102 @@ export function BarChart({ labels, series, values, mode, line, height = 220, tit
         )}
         <rect x={padL} y={padT} width={innerW} height={innerH + padB} fill="transparent"
           onPointerMove={pick} onPointerDown={pick} />
+      </svg>
+    </Frame>
+  );
+}
+
+interface NetProps {
+  labels: string[];
+  /** Net result per label in satang; null = nothing recorded that period. */
+  values: (number | null)[];
+  /** Extra tooltip rows per label (e.g. revenue and expenses), already formatted by the caller. */
+  details?: { label: string; values: (number | null)[] }[];
+  title: string;
+  height?: number;
+  format?: (v: number) => string;
+  formatTip?: (v: number) => string;
+  /** Hues for a gain and a loss; the sign is also written in the tooltip and the highlighted value. */
+  colors?: { gain: string; loss: string };
+  highlight?: number;
+}
+
+/** Column with a rounded data end below a zero line (a loss), square at the baseline. */
+function colPathDown(x: number, y: number, w: number, h: number, r = 5) {
+  if (h <= 0 || w <= 0) return '';
+  const rr = Math.min(r, w / 2, h);
+  return `M${x},${y}V${y + h - rr}Q${x},${y + h} ${x + rr},${y + h}H${x + w - rr}Q${x + w},${y + h} ${x + w},${y + h - rr}V${y}Z`;
+}
+
+/** A result that can go either way (profit / loss) as columns growing up or down from a zero line. */
+export function NetChart({ labels, values, details = [], title, height = 200, format = compactBaht, formatTip, colors = { gain: 'var(--series-1)', loss: 'var(--series-2)' }, highlight }: NetProps) {
+  const [ref, W] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+  const tipFmt = formatTip ?? format;
+  const padR = 4, padT = 22, padB = 26;
+  const nums = values.filter((v): v is number => v !== null);
+  const top = niceMax(Math.max(0, ...nums));
+  const bottom = Math.min(0, ...nums) < 0 ? -niceMax(-Math.min(...nums)) : 0;
+  const ticks = bottom < 0 ? [bottom, 0, top] : [0, top / 2, top];
+  const padL = Math.max(...ticks.map(t => format(t).length)) * 6.6 + 10;
+  const innerW = W - padL - padR, innerH = height - padT - padB;
+  const y = (v: number) => padT + ((top - v) / (top - bottom)) * innerH;
+  const band = innerW / Math.max(labels.length, 1);
+  const barW = Math.max(4, Math.min(28, band * 0.5));
+  const step = labelStep(band, Math.max(...labels.map(l => l.length)));
+  const cx = (i: number) => padL + band * i + band / 2;
+  const signed = (v: number) => `${v < 0 ? '−' : ''}${tipFmt(Math.abs(v))}`;
+  const alt = labels.map((l, i) => `${l}: ${values[i] === null ? 'ไม่มีข้อมูล' : signed(values[i]!)}`).join('; ');
+
+  const pick = (e: React.PointerEvent<SVGRectElement>) => {
+    const r = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
+    const i = Math.floor((e.clientX - r.left - padL) / band);
+    setHover(i >= 0 && i < labels.length ? i : null);
+  };
+  const tip = hover === null ? null : (
+    <Tooltip x={cx(hover)} width={W} title={labels[hover]} rows={[
+      ...details.map(d => ({ label: d.label, color: 'transparent', value: d.values[hover] === null ? '—' : tipFmt(d.values[hover]!) })),
+      { label: title, color: (values[hover] ?? 0) < 0 ? colors.loss : colors.gain, value: values[hover] === null ? 'ไม่มีข้อมูล' : signed(values[hover]!) },
+    ]} />
+  );
+
+  return (
+    <Frame wrapRef={ref} tip={tip} onLeave={() => setHover(null)}>
+      <svg width={W} height={height} role="img" aria-label={`${title}. ${alt}`} style={{ display: 'block', overflow: 'visible' }}>
+        {ticks.map(t => (
+          <g key={t}>
+            <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} style={{ stroke: t === 0 ? AXIS : GRID }} strokeWidth={1} shapeRendering="crispEdges" />
+            <text x={padL - 8} y={y(t) + 4} fontSize={FONT} textAnchor="end" style={{ fill: TEXT, fontVariantNumeric: 'tabular-nums' }}>{format(t)}</text>
+          </g>
+        ))}
+        {hover !== null && <rect x={padL + band * hover + 2} y={padT - 6} width={band - 4} height={innerH + 6} rx={8} style={{ fill: 'var(--color-gray-100)' }} />}
+        {labels.map((l, i) => {
+          const v = values[i];
+          const dim = hover !== null && hover !== i;
+          const x = cx(i) - barW / 2;
+          return (
+            <g key={`${l}-${i}`}>
+              {v !== null && v !== 0 && (
+                <g className="chart-grow" style={{ animationDelay: `${i * 55}ms`, opacity: dim ? 0.55 : 1, transition: 'opacity 150ms' }}>
+                  {v > 0
+                    ? <path d={colPath(x, y(v), barW, y(0) - y(v))} style={{ fill: colors.gain }} />
+                    : <path d={colPathDown(x, y(0), barW, y(v) - y(0))} style={{ fill: colors.loss }} />}
+                </g>
+              )}
+              {i === highlight && v !== null && (
+                <text x={cx(i)} y={v >= 0 ? y(v) - 7 : y(v) + 14} fontSize={FONT} fontWeight={600} textAnchor="middle" className="chart-fade-in"
+                  style={{ fill: 'var(--color-gray-900)', fontVariantNumeric: 'tabular-nums', animationDelay: `${i * 55 + 450}ms` }}>
+                  {`${v < 0 ? '−' : ''}${format(Math.abs(v))}`}
+                </text>
+              )}
+              {(labels.length - 1 - i) % step === 0 && (
+                <text x={cx(i)} y={height - 6} fontSize={FONT} textAnchor="middle"
+                  style={{ fill: i === highlight ? 'var(--color-gray-900)' : TEXT, fontWeight: i === highlight ? 600 : 400 }}>{l}</text>
+              )}
+            </g>
+          );
+        })}
+        <rect x={padL} y={padT} width={innerW} height={innerH + padB} fill="transparent" onPointerMove={pick} onPointerDown={pick} />
       </svg>
     </Frame>
   );
@@ -288,8 +405,11 @@ export interface DonutItem { key: string; label: string; value: number; color: s
  * Parts of a whole as a ring that sweeps in, with the total in the middle. Touching a part puts its own amount and
  * share in the middle. Use for 2–5 parts; the list beside it carries the exact numbers, so colour is never the only key.
  */
-export function DonutChart({ items, title, centerLabel, format, size = 168 }: {
-  items: DonutItem[]; title: string; centerLabel: string; format: (v: number) => string; size?: number;
+export function DonutChart({ items, title, centerLabel, centerValue, format, size = 168 }: {
+  items: DonutItem[]; title: string; centerLabel: string;
+  /** What the middle shows while no part is touched; defaults to the formatted total. */
+  centerValue?: string;
+  format: (v: number) => string; size?: number;
 }) {
   const [active, setActive] = useState<string | null>(null);
   const total = items.reduce((s, i) => s + Math.max(0, i.value), 0);
@@ -328,7 +448,7 @@ export function DonutChart({ items, title, centerLabel, format, size = 168 }: {
           ))}
         </g>
         <text x="50%" y="46%" textAnchor="middle" className="donut-center-label">{shown ? shown.label : centerLabel}</text>
-        <text x="50%" y="60%" textAnchor="middle" className="donut-center-value">{format(shown ? shown.value : total)}</text>
+        <text x="50%" y="60%" textAnchor="middle" className="donut-center-value">{shown ? format(shown.value) : centerValue ?? format(total)}</text>
         {shown && <text x="50%" y="71%" textAnchor="middle" className="donut-center-label">{pct(shown.value)}</text>}
       </svg>
       <ul className="donut-legend">
@@ -345,12 +465,12 @@ export function DonutChart({ items, title, centerLabel, format, size = 168 }: {
   );
 }
 
-export function Legend({ items }: { items: { label: string; color: string; dashed?: boolean }[] }) {
+export function Legend({ items }: { items: { label: string; color: string; dashed?: boolean; ghost?: boolean }[] }) {
   return (
     <div className="chart-legend">
       {items.map(i => (
         <span key={i.label}>
-          <span className={`chart-key${i.dashed ? ' dashed' : ''}`} style={{ ['--key' as string]: i.color }} />
+          <span className={`chart-key${i.dashed ? ' dashed' : i.ghost ? ' ghost' : ''}`} style={{ ['--key' as string]: i.color }} />
           {i.label}
         </span>
       ))}

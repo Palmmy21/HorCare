@@ -13,18 +13,18 @@ function fmtBaht(n: number) {
 function FieldRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
-      <span style={{ fontSize: '0.75rem', color: '#9CA3AF', minWidth: 72 }}>{label}</span>
-      <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>{value || '—'}</span>
+      <span style={{ fontSize: '0.75rem', color: '#8FA3B8', minWidth: 72 }}>{label}</span>
+      <span style={{ fontSize: '0.875rem', color: '#29435E', fontWeight: 500 }}>{value || '—'}</span>
     </div>
   );
 }
 
 const ASSET_CATEGORIES = ['เฟอร์นิเจอร์', 'เครื่องใช้ไฟฟ้า', 'แอร์', 'ประตู/หน้าต่าง', 'ระบบน้ำ', 'ระบบไฟ', 'ส่วนกลาง', 'อื่นๆ'];
 const CONDITION_CFG: Record<AssetCondition, { label: string; color: string }> = {
-  good:   { label: 'ดี',           color: '#059669' },
-  fair:   { label: 'พอใช้',        color: '#D97706' },
+  good:   { label: 'ดี',           color: '#15803D' },
+  fair:   { label: 'พอใช้',        color: '#E8740C' },
   poor:   { label: 'ทรุดโทรม',     color: '#DC2626' },
-  broken: { label: 'ชำรุด/เสียหาย', color: '#9CA3AF' },
+  broken: { label: 'ชำรุด/เสียหาย', color: '#8FA3B8' },
 };
 
 type AssetForm = Omit<Asset, 'id' | 'created_at'>;
@@ -201,7 +201,7 @@ export default function AssetsTab({ uid, buildingId, rooms }: Props) {
                       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                           <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>{a.name}</span>
-                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#EBF1F7)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
                             {a.category}
                           </span>
                           <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: cond.color, background: `${cond.color}18`, padding: '0.25rem 0.625rem', borderRadius: '6px' }}>

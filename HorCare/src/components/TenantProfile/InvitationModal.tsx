@@ -45,10 +45,10 @@ const ERRORS: Record<string, string> = {
 };
 
 function statusOf(i: InvitationRow): { label: string; color: string } {
-    if (i.status === 'revoked') return { label: 'ยกเลิกแล้ว', color: '#6B7280' };
-    if (i.status === 'used') return { label: 'ใช้แล้ว', color: '#059669' };
-    if (i.expires_at <= Date.now()) return { label: 'หมดอายุ', color: '#D97706' };
-    return { label: 'ใช้งานได้', color: '#2563EB' };
+    if (i.status === 'revoked') return { label: 'ยกเลิกแล้ว', color: '#557089' };
+    if (i.status === 'used') return { label: 'ใช้แล้ว', color: '#15803D' };
+    if (i.expires_at <= Date.now()) return { label: 'หมดอายุ', color: '#E8740C' };
+    return { label: 'ใช้งานได้', color: '#0A6CC2' };
 }
 
 export default function InvitationModal({ ownerUid, buildingId, room, tenantName, unitName, onClose }: InvitationModalProps) {

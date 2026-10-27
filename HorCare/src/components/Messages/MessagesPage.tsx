@@ -138,7 +138,7 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
     const pane: React.CSSProperties = { background: 'var(--color-white)', border: '1px solid var(--color-gray-200)', borderRadius: 16, minHeight: 0 };
 
     return (
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        <div>
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MessageSquare size={28} /> ข้อความ LINE</h1>
@@ -146,7 +146,8 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                 </div>
             </div>
 
-            <div className="messages-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: '1rem', height: 'min(68vh, 680px)' }}>
+            {/* Fills the rest of the viewport under the page header, like a chat app */}
+            <div className="messages-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(17rem, 24rem) 1fr', gap: '1rem', height: 'max(26rem, calc(100dvh - 13rem))' }}>
                 {/* Conversation list */}
                 <div className={showList ? '' : 'messages-hide-narrow'} style={{ ...pane, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <div style={{ padding: '0.75rem', borderBottom: '1px solid var(--color-gray-100)', position: 'relative' }}>
@@ -216,7 +217,7 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                                 {msgLoading ? <Loader2 size={20} className="spin" style={{ margin: 'auto' }} /> : messages.map(m => {
                                     const mine = m.direction === 'out';
                                     return (
-                                        <div key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
+                                        <div key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: 'min(78%, 40rem)' }}>
                                             <div style={{
                                                 padding: '0.5rem 0.75rem', borderRadius: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                                 background: mine ? '#06C755' : '#fff', color: mine ? '#fff' : 'var(--color-gray-800)',
@@ -263,7 +264,7 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
             <style>{`
                 .messages-back { display: none; }
                 @media (max-width: 760px) {
-                    .messages-grid { grid-template-columns: 1fr !important; }
+                    .messages-grid { grid-template-columns: 1fr !important; height: max(24rem, calc(100dvh - 11rem)) !important; }
                     .messages-hide-narrow { display: none !important; }
                     .messages-back { display: inline-flex; }
                 }

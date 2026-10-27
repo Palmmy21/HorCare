@@ -14,8 +14,8 @@ interface Preview {
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const today = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit' };
 
 const ERRORS: Record<string, string> = {
     blocked: 'มีรายการติดปัญหา — แก้ก่อน (ระบบไม่ลงบัญชีบางส่วน)',
@@ -74,7 +74,7 @@ export default function PostingTab({ ownerUid, ledger }: { ownerUid: string; led
             {preview && (
                 <>
                     {preview.gaps.length > 0 && (
-                        <div style={{ ...card, background: '#FEF3C7' }}>
+                        <div style={{ ...card, background: '#FDEBD3' }}>
                             <strong>การตั้งค่ายังขาด:</strong>
                             <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>{preview.gaps.map((g, i) => <li key={i}>{g.message}</li>)}</ul>
                         </div>
@@ -96,12 +96,12 @@ export default function PostingTab({ ownerUid, ledger }: { ownerUid: string; led
                     {preview.vouchers.length > 0 && (
                         <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                                <thead><tr style={{ textAlign: 'left', background: 'var(--color-gray-50, #F9FAFB)' }}>
+                                <thead><tr style={{ textAlign: 'left', background: 'var(--color-gray-50, #F4F7FB)' }}>
                                     <th style={{ padding: '0.5rem' }}>เลขเอกสาร</th><th>วันที่</th><th>แผง/ห้อง</th><th style={{ textAlign: 'right', paddingRight: '0.5rem' }}>ยอด</th>
                                 </tr></thead>
                                 <tbody>
                                     {preview.vouchers.slice(0, 200).map(v => (
-                                        <tr key={v.key} style={{ borderTop: '1px solid var(--color-gray-100, #F3F4F6)' }}>
+                                        <tr key={v.key} style={{ borderTop: '1px solid var(--color-gray-100, #EBF1F7)' }}>
                                             <td style={{ padding: '0.5rem' }}>{v.doc_ref}</td><td>{v.voucher_date}</td><td>{v.room_number}</td>
                                             <td style={{ textAlign: 'right', paddingRight: '0.5rem' }}>{baht(v.total_dr_satang)}</td>
                                         </tr>

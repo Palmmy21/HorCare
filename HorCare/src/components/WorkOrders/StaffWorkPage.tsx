@@ -14,7 +14,7 @@ import {
 interface WorkImage { id: string; kind: string; data_url: string }
 interface PendingPhoto { kind: 'before' | 'after'; base64: string }
 
-const PRIORITY_COLOR: Record<Priority, string> = { low: '#64748B', normal: '#0284C7', high: '#D97706', urgent: '#DC2626' };
+const PRIORITY_COLOR: Record<Priority, string> = { low: '#557089', normal: '#0A6CC2', high: '#E8740C', urgent: '#DC2626' };
 
 async function call<T>(link: string, body: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: T & { error?: string; message?: string } }> {
     const res = await fetch('/api/work-orders', {
@@ -86,8 +86,8 @@ export default function StaffWorkPage() {
         await load();
     };
 
-    const page: React.CSSProperties = { minHeight: '100dvh', background: '#F1F5F9', padding: '1rem', fontFamily: 'var(--font-sans)' };
-    const card: React.CSSProperties = { maxWidth: 520, margin: '0 auto', background: '#fff', borderRadius: 18, padding: '1.25rem', boxShadow: '0 4px 20px rgba(15,23,42,0.08)' };
+    const page: React.CSSProperties = { minHeight: '100dvh', background: '#EBF1F7', padding: '1rem', fontFamily: 'var(--font-sans)' };
+    const card: React.CSSProperties = { maxWidth: 520, margin: '0 auto', background: '#fff', borderRadius: 18, padding: '1.25rem', boxShadow: '0 4px 20px rgba(16, 42, 67,0.08)' };
 
     if (state === 'loading') {
         return <div style={{ ...page, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={32} className="spin" /></div>;
@@ -96,9 +96,9 @@ export default function StaffWorkPage() {
         return (
             <div style={page}>
                 <div style={{ ...card, textAlign: 'center' }}>
-                    <AlertTriangle size={36} color="#D97706" />
+                    <AlertTriangle size={36} color="#E8740C" />
                     <h2 style={{ margin: '0.5rem 0', fontSize: '1.15rem' }}>เปิดงานนี้ไม่ได้</h2>
-                    <p style={{ color: '#64748B', fontSize: '0.9rem', margin: 0 }}>ลิงก์อาจหมดอายุ งานถูกปิดแล้ว หรือถูกมอบหมายให้คนอื่น กรุณาติดต่อผู้จัดการ</p>
+                    <p style={{ color: '#557089', fontSize: '0.9rem', margin: 0 }}>ลิงก์อาจหมดอายุ งานถูกปิดแล้ว หรือถูกมอบหมายให้คนอื่น กรุณาติดต่อผู้จัดการ</p>
                 </div>
             </div>
         );
@@ -116,22 +116,22 @@ export default function StaffWorkPage() {
     return (
         <div style={page}>
             <div style={card}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0369A1', fontWeight: 700, fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#08589F', fontWeight: 700, fontSize: '0.85rem' }}>
                     <Wrench size={16} /> {job.dorm_name || 'HorCare'} · สวัสดีคุณ {job.staff_name}
                 </div>
-                <h1 style={{ margin: '0.5rem 0 0.25rem', fontSize: '1.35rem', color: '#0F172A' }}>{job.area}</h1>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem 0.875rem', fontSize: '0.85rem', color: '#475569' }}>
+                <h1 style={{ margin: '0.5rem 0 0.25rem', fontSize: '1.35rem', color: '#102A43' }}>{job.area}</h1>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem 0.875rem', fontSize: '0.85rem', color: '#3E5872' }}>
                     <span>{WORK_TYPE_LABELS_TH[job.work_type]}</span>
                     <span style={{ color: PRIORITY_COLOR[job.priority], fontWeight: 700 }}>ความสำคัญ: {PRIORITY_LABELS_TH[job.priority]}</span>
                     {job.due_date && <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Calendar size={13} /> เสร็จภายใน {job.due_date}</span>}
                 </div>
-                <div style={{ marginTop: 10, display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 999, background: '#E0F2FE', color: '#0369A1', fontWeight: 700, fontSize: '0.8rem' }}>
+                <div style={{ marginTop: 10, display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: 999, background: '#E7F0FA', color: '#08589F', fontWeight: 700, fontSize: '0.8rem' }}>
                     {WORK_STATUS_LABELS_TH[job.status]}
                 </div>
 
-                <p style={{ whiteSpace: 'pre-wrap', color: '#1E293B', margin: '1rem 0' }}>{job.description}</p>
+                <p style={{ whiteSpace: 'pre-wrap', color: '#1A3350', margin: '1rem 0' }}>{job.description}</p>
                 {job.reopen_note && job.status !== 'completed' && (
-                    <div style={{ padding: 10, borderRadius: 10, background: '#FEF3C7', color: '#92400E', fontSize: '0.85rem', marginBottom: 12 }}>
+                    <div style={{ padding: 10, borderRadius: 10, background: '#FDEBD3', color: '#9A3412', fontSize: '0.85rem', marginBottom: 12 }}>
                         ผู้จัดการส่งกลับให้แก้ไข: {job.reopen_note}
                     </div>
                 )}
@@ -161,7 +161,7 @@ export default function StaffWorkPage() {
                                 {photos.map((p, i) => (
                                     <div key={i} style={{ position: 'relative', textAlign: 'center' }}>
                                         <img src={`data:image/jpeg;base64,${p.base64}`} alt={p.kind} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
-                                        <span style={{ fontSize: '0.65rem', color: '#64748B' }}>{p.kind === 'before' ? 'ก่อน' : 'หลัง'}</span>
+                                        <span style={{ fontSize: '0.65rem', color: '#557089' }}>{p.kind === 'before' ? 'ก่อน' : 'หลัง'}</span>
                                         <button type="button" aria-label="เอารูปออก" onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
                                             style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', border: 'none', background: '#DC2626', color: '#fff', cursor: 'pointer', lineHeight: 1 }}>×</button>
                                     </div>
@@ -193,9 +193,9 @@ export default function StaffWorkPage() {
                         </div>
                     </>
                 ) : (
-                    <div style={{ padding: 12, borderRadius: 10, background: '#ECFDF5', color: '#065F46', fontSize: '0.9rem' }}>
+                    <div style={{ padding: 12, borderRadius: 10, background: '#EFF8F2', color: '#166534', fontSize: '0.9rem' }}>
                         ส่งงานแล้ว รอผู้จัดการตรวจสอบ ขอบคุณค่ะ 🙏
-                        {job.completion_note && <div style={{ marginTop: 6, color: '#047857' }}>หมายเหตุของคุณ: {job.completion_note}</div>}
+                        {job.completion_note && <div style={{ marginTop: 6, color: '#166534' }}>หมายเหตุของคุณ: {job.completion_note}</div>}
                     </div>
                 )}
             </div>
@@ -205,7 +205,7 @@ export default function StaffWorkPage() {
                     <img src={zoom} alt="รูปงาน" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12 }} />
                 </div>
             )}
-            <div style={{ textAlign: 'center', marginTop: 12, color: '#94A3B8', fontSize: '0.7rem' }}><MapPin size={11} style={{ verticalAlign: -1 }} /> HorCare Maintenance</div>
+            <div style={{ textAlign: 'center', marginTop: 12, color: '#8FA3B8', fontSize: '0.7rem' }}><MapPin size={11} style={{ verticalAlign: -1 }} /> HorCare Maintenance</div>
         </div>
     );
 }

@@ -110,8 +110,8 @@ function TenantCard({
       style={{
         border: `1px solid ${
           riskLevel === 'high' ? 'rgba(220,38,38,0.35)' :
-          riskLevel === 'medium' ? 'rgba(245,158,11,0.35)' :
-          'var(--color-border, #E5E7EB)'
+          riskLevel === 'medium' ? 'rgba(245, 158, 46,0.35)' :
+          'var(--color-border, #DCE5EF)'
         }`,
         borderRadius: '14px',
         padding: '1rem 1.125rem',
@@ -119,7 +119,7 @@ function TenantCard({
         background: riskLevel === 'high'
           ? 'rgba(220,38,38,0.04)'
           : riskLevel === 'medium'
-          ? 'rgba(245,158,11,0.04)'
+          ? 'rgba(245, 158, 46,0.04)'
           : 'var(--color-surface, #fff)',
         transition: 'all 0.15s',
         display: 'flex', alignItems: 'center', gap: '0.875rem',
@@ -132,12 +132,12 @@ function TenantCard({
         width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
         background: hasProfile
           ? terms.isMarket
-            ? 'linear-gradient(135deg, #D97706, #F59E0B)'
-            : 'linear-gradient(135deg, #8B5CF6, #EC4899)'
-          : 'var(--color-gray-100, #F3F4F6)',
+            ? 'linear-gradient(135deg, #E8740C, #F59E2E)'
+            : 'linear-gradient(135deg, #0F4C81, #E8740C)'
+          : 'var(--color-gray-100, #EBF1F7)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '1.125rem', fontWeight: 800,
-        color: hasProfile ? '#fff' : 'var(--color-gray-400, #9CA3AF)',
+        color: hasProfile ? '#fff' : 'var(--color-gray-400, #8FA3B8)',
       }}>
         {hasProfile
           ? profile.full_name.charAt(0).toUpperCase()
@@ -149,7 +149,7 @@ function TenantCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
           <span style={{
             fontWeight: 700, fontSize: '0.9rem',
-            color: 'var(--color-text, #111827)',
+            color: 'var(--color-text, #102A43)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {loading ? '...' : (profile?.full_name || 'ยังไม่มีข้อมูล')}
@@ -163,15 +163,15 @@ function TenantCard({
 
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.625rem',
-          fontSize: '0.775rem', color: 'var(--color-text-muted, #6B7280)',
+          fontSize: '0.775rem', color: 'var(--color-text-muted, #557089)',
           flexWrap: 'wrap',
         }}>
           {/* Room / Stall badge */}
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700,
-            color: terms.isMarket ? '#92400E' : 'inherit'
+            color: terms.isMarket ? '#9A3412' : 'inherit'
           }}>
-            {terms.isMarket ? <Store size={13} color="#D97706" /> : <Home size={12} />}
+            {terms.isMarket ? <Store size={13} color="#E8740C" /> : <Home size={12} />}
             {terms.unitPrefix}{room.room_number}
           </span>
 
@@ -179,7 +179,7 @@ function TenantCard({
           {room.business_type && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
-              color: '#059669', background: 'rgba(16, 185, 129, 0.1)',
+              color: '#15803D', background: 'rgba(34, 163, 90, 0.1)',
               padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.72rem'
             }}>
               <Tag size={10} /> {room.business_type}
@@ -193,7 +193,7 @@ function TenantCard({
           )}
 
           {/* Tenant Count badge */}
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#0284C7', fontWeight: 600 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#0A6CC2', fontWeight: 600 }}>
             <Users size={12} /> {profile?.tenant_count ?? room.tenant_count ?? 1} คน
           </span>
 
@@ -217,13 +217,13 @@ function TenantCard({
               display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
               padding: '0.1rem 0.4rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
               background:
-                profile.deposit_status === 'returned' ? 'rgba(5,150,105,0.1)' :
+                profile.deposit_status === 'returned' ? 'rgba(21, 128, 61,0.1)' :
                 profile.deposit_status === 'deducted' ? 'rgba(220,38,38,0.1)' :
-                'rgba(245,158,11,0.1)',
+                'rgba(245, 158, 46,0.1)',
               color:
-                profile.deposit_status === 'returned' ? '#059669' :
+                profile.deposit_status === 'returned' ? '#15803D' :
                 profile.deposit_status === 'deducted' ? '#DC2626' :
-                '#D97706',
+                '#E8740C',
             }}>
               <Banknote size={11} />
               {profile.deposit_status === 'held' ? `${terms.depositLabel}: ถือไว้` :
@@ -237,7 +237,7 @@ function TenantCard({
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                 padding: '0.1rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
-                background: 'rgba(5,150,105,0.1)', color: '#059669', border: '1px solid rgba(5,150,105,0.25)',
+                background: 'rgba(21, 128, 61,0.1)', color: '#15803D', border: '1px solid rgba(21, 128, 61,0.25)',
               }} title={`สัญญาเลขที่: ${profile.signed_contract.contract_number} (ลงนามครบ 2 ฝ่าย)`}>
                 <ShieldCheck size={11} /> E-Sign: {profile.signed_contract.contract_number}
               </span>
@@ -245,7 +245,7 @@ function TenantCard({
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                 padding: '0.1rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700,
-                background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A',
+                background: '#FDEBD3', color: '#9A3412', border: '1px solid #FBD9A8',
               }} title={`สัญญาเลขที่: ${profile.signed_contract.contract_number} (ส่งร่างแล้ว รอผู้เช่าเซ็น)`}>
                 <Clock size={11} /> รอเซ็น: {profile.signed_contract.contract_number}
               </span>
@@ -254,7 +254,7 @@ function TenantCard({
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
               padding: '0.1rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600,
-              background: 'rgba(107,114,128,0.08)', color: 'var(--color-text-muted, #6B7280)', border: '1px solid rgba(107,114,128,0.15)',
+              background: 'rgba(85, 112, 137,0.08)', color: 'var(--color-text-muted, #557089)', border: '1px solid rgba(85, 112, 137,0.15)',
             }}>
               <PenTool size={10} /> ยังไม่เซ็นสัญญา
             </span>
@@ -268,9 +268,9 @@ function TenantCard({
           <span style={{
             fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
             padding: '0.2rem 0.5rem', borderRadius: '7px',
-            background: riskLevel === 'high' ? 'rgba(220,38,38,0.15)' : 'rgba(245,158,11,0.15)',
-            color: riskLevel === 'high' ? '#F87171' : '#FCD34D',
-            border: `1px solid ${riskLevel === 'high' ? 'rgba(220,38,38,0.3)' : 'rgba(245,158,11,0.3)'}`,
+            background: riskLevel === 'high' ? 'rgba(220,38,38,0.15)' : 'rgba(245, 158, 46,0.15)',
+            color: riskLevel === 'high' ? '#F87171' : '#F7B86C',
+            border: `1px solid ${riskLevel === 'high' ? 'rgba(220,38,38,0.3)' : 'rgba(245, 158, 46,0.3)'}`,
           }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
               <AlertTriangle size={12} />
@@ -289,7 +289,7 @@ function TenantCard({
               background: 'rgba(6,199,85,0.08)', border: '1px solid rgba(6,199,85,0.25)',
               borderRadius: '8px', padding: '0.3rem 0.5rem', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: '0.25rem',
-              color: '#059669', fontSize: '0.7rem', fontWeight: 700,
+              color: '#15803D', fontSize: '0.7rem', fontWeight: 700,
             }}
           >
             <MessageCircle size={13} />
@@ -300,11 +300,11 @@ function TenantCard({
             onClick={copyTenantLink}
             title={`คัดลอกลิงก์หน้า${terms.tenantLabel}`}
             style={{
-              background: copied ? 'rgba(5,150,105,0.1)' : 'rgba(139,92,246,0.08)',
-              border: `1px solid ${copied ? 'rgba(5,150,105,0.25)' : 'rgba(139,92,246,0.2)'}`,
+              background: copied ? 'rgba(21, 128, 61,0.1)' : 'rgba(15, 76, 129,0.08)',
+              border: `1px solid ${copied ? 'rgba(21, 128, 61,0.25)' : 'rgba(15, 76, 129,0.2)'}`,
               borderRadius: '8px', padding: '0.3rem 0.5rem',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem',
-              color: copied ? '#059669' : '#8B5CF6',
+              color: copied ? '#15803D' : '#0F4C81',
               fontSize: '0.7rem', fontWeight: 700,
               transition: 'all 0.2s',
             }}
@@ -312,7 +312,7 @@ function TenantCard({
             {copied ? <CheckCheck size={13} /> : <Link2 size={13} />}
             <span className="tenant-link-label">{copied ? 'คัดลอกแล้ว' : 'ลิงก์'}</span>
           </button>
-          <ChevronRight size={16} color="var(--color-gray-300, #D1D5DB)" />
+          <ChevronRight size={16} color="var(--color-gray-300, #C3D0DE)" />
         </div>
       </div>
     </div>
@@ -353,7 +353,7 @@ export default function TenantsPage({
       {/* Page Header */}
       <div className="page-header">
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {terms.isMarket ? <Store size={28} color="#D97706" /> : <Users size={28} />} ข้อมูล{terms.tenantPlural}
+          {terms.isMarket ? <Store size={28} color="#E8740C" /> : <Users size={28} />} ข้อมูล{terms.tenantPlural}
         </h1>
         <p className="page-subtitle">
           จัดการและดูข้อมูล{terms.tenantLabel}ทั้งหมด {activeRooms.length} {terms.unitName}
@@ -368,11 +368,11 @@ export default function TenantsPage({
         {/* Search */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.5rem',
-          background: 'var(--color-gray-50, #F9FAFB)',
-          border: '1px solid var(--color-border, #E5E7EB)',
+          background: 'var(--color-gray-50, #F4F7FB)',
+          border: '1px solid var(--color-border, #DCE5EF)',
           borderRadius: '10px', padding: '0.5rem 0.75rem',
         }}>
-          <Search size={15} color="var(--color-text-muted, #9CA3AF)" />
+          <Search size={15} color="var(--color-text-muted, #8FA3B8)" />
           <input
             type="text"
             placeholder={`ค้นหาชื่อ, เบอร์โทร หรือ${terms.unitNumberLabel}...`}
@@ -381,11 +381,11 @@ export default function TenantsPage({
             style={{
               border: 'none', background: 'none', outline: 'none',
               flex: 1, fontSize: '0.875rem',
-              color: 'var(--color-text, #111827)',
+              color: 'var(--color-text, #102A43)',
             }}
           />
           {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-muted, #9CA3AF)', display: 'flex' }}>
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--color-text-muted, #8FA3B8)', display: 'flex' }}>
               <UserX size={15} />
             </button>
           )}
@@ -393,7 +393,7 @@ export default function TenantsPage({
 
         {/* Filter tabs — segmented control */}
         <div style={{
-          display: 'flex', flexWrap: 'wrap', background: 'var(--color-gray-100, #F3F4F6)',
+          display: 'flex', flexWrap: 'wrap', background: 'var(--color-gray-100, #EBF1F7)',
           borderRadius: '10px', padding: '3px', gap: '2px',
         }}>
           {([
@@ -416,11 +416,11 @@ export default function TenantsPage({
                   border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.78rem',
                   fontWeight: active ? 700 : 500, transition: 'all 0.15s',
                   background: active
-                    ? (isRisk ? 'rgba(220,38,38,0.12)' : isSigned ? 'rgba(5,150,105,0.12)' : '#fff')
+                    ? (isRisk ? 'rgba(220,38,38,0.12)' : isSigned ? 'rgba(21, 128, 61,0.12)' : '#fff')
                     : 'transparent',
                   color: active
-                    ? (isRisk ? '#DC2626' : isSigned ? '#059669' : 'var(--color-primary, #8B5CF6)')
-                    : 'var(--color-text-muted, #6B7280)',
+                    ? (isRisk ? '#DC2626' : isSigned ? '#15803D' : 'var(--color-primary, #0F4C81)')
+                    : 'var(--color-text-muted, #557089)',
                   boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                 }}
               >
@@ -502,7 +502,7 @@ function TenantGrid({
     }}>
       {rooms.length === 0 ? (
         <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-          {terms.isMarket ? <Store size={48} color="#D97706" /> : <Users size={48} />}
+          {terms.isMarket ? <Store size={48} color="#E8740C" /> : <Users size={48} />}
           <h3>ยังไม่มี{terms.unitNamePlural}</h3>
           <p>เพิ่ม{terms.unitNamePlural}ใน "{terms.manageUnitsLabel}" ก่อน</p>
         </div>

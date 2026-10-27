@@ -50,10 +50,10 @@ interface MeterBatchModalProps {
 }
 
 const STATUS_META: Record<BatchItem['status'], { label: string; color: string }> = {
-    processing: { label: 'กำลังประมวลผล', color: '#6B7280' },
-    review_required: { label: 'รอตรวจสอบ', color: '#D97706' },
-    confirmed: { label: 'ยืนยันแล้ว', color: '#2563EB' },
-    saved: { label: 'บันทึกแล้ว', color: '#059669' },
+    processing: { label: 'กำลังประมวลผล', color: '#557089' },
+    review_required: { label: 'รอตรวจสอบ', color: '#E8740C' },
+    confirmed: { label: 'ยืนยันแล้ว', color: '#0A6CC2' },
+    saved: { label: 'บันทึกแล้ว', color: '#15803D' },
     error: { label: 'ผิดพลาด', color: '#DC2626' },
 };
 
@@ -286,8 +286,8 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
     const chip = (f: MeterFlag) => (
         <span key={f} style={{
             fontSize: '0.7rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 6,
-            background: isBlocking(f) ? 'rgba(220,38,38,0.12)' : 'rgba(245,158,11,0.15)',
-            color: isBlocking(f) ? '#B91C1C' : '#B45309',
+            background: isBlocking(f) ? 'rgba(220,38,38,0.12)' : 'rgba(245, 158, 46,0.15)',
+            color: isBlocking(f) ? '#B91C1C' : '#C2410C',
         }}>{FLAG_LABELS_TH[f]}</span>
     );
 
@@ -396,7 +396,7 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                                                     </span>
                                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{item.fileName}</span>
                                                     {item.status !== 'processing' && item.status !== 'error' && (
-                                                        <span style={{ fontSize: '0.75rem', color: item.confidence < settings.minConfidence ? '#B45309' : 'var(--color-gray-500)' }}>
+                                                        <span style={{ fontSize: '0.75rem', color: item.confidence < settings.minConfidence ? '#C2410C' : 'var(--color-gray-500)' }}>
                                                             AI มั่นใจ {Math.round(item.confidence * 100)}%
                                                         </span>
                                                     )}
@@ -482,7 +482,7 @@ export default function MeterBatchModal({ ownerUid, buildingId, rooms, monthLabe
                         {zoomItem?.box && (
                             // the meter this row is about, on the full photo
                             <div style={{
-                                position: 'absolute', border: '3px solid #F59E0B', borderRadius: 6, boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
+                                position: 'absolute', border: '3px solid #F59E2E', borderRadius: 6, boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
                                 left: `${zoomItem.box[0] * 100}%`, top: `${zoomItem.box[1] * 100}%`, width: `${zoomItem.box[2] * 100}%`, height: `${zoomItem.box[3] * 100}%`,
                             }} />
                         )}

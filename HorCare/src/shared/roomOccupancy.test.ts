@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanOverride, contractOccupancy, effectiveOccupancy, type LeaseFacts } from './roomOccupancy';
+import { cleanOverride, contractOccupancy, contractTerms, effectiveOccupancy, type LeaseFacts } from './roomOccupancy';
 
 const today = '2026-10-25';
 const lease = (over: Partial<LeaseFacts> = {}): LeaseFacts => ({ id: 'L1', room_id: 'r1', status: 'active', start_date: '2026-01-01', end_date: '2026-12-31', tenant_name: 'สมชาย', ...over });
@@ -75,5 +75,17 @@ describe('admin override', () => {
     const eff = effectiveOccupancy(renewed, ov);
     expect(eff.status).toBe('occupied');
     expect(eff.override).toBeUndefined();
+  });
+});
+
+describe('contractTerms', () => {
+  it('reads the active lease first, then the signed E-Sign contract, then the profile', () => {
+    expect(contractTerms({ leases: [lease()] }, today)).toEqual({ tenant: 'สมชาย', end: '2026-12-31' });
+    expect(contractTerms({ profile: { full_name: 'ก', signed_contract: { id: 'c', status: 'signed', end_date: '2027-01-31' } } }, today)).toEqual({ tenant: 'ก', end: '2027-01-31' });
+    expect(contractTerms({ profile: { full_name: 'ข', move_in_date: '2026-01-01', contract_end_date: '2026-11-30' } }, today)).toEqual({ tenant: 'ข', end: '2026-11-30' });
+  });
+  it('is empty once the tenant has moved out or nobody holds the room', () => {
+    expect(contractTerms({ profile: { full_name: 'ค', expected_move_out: '2026-10-01' } }, today)).toEqual({});
+    expect(contractTerms({}, today)).toEqual({});
   });
 });

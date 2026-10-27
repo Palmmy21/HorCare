@@ -25,9 +25,9 @@ const DAYS = 14;
 const baht = (s: number) => (s / 100).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const shortDay = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 const weekday = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { weekday: 'short' });
-const field: React.CSSProperties = { padding: '0.5rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
-const STATUS_COLOR: Record<string, string> = { reserved: '#FDE68A', checked_in: '#86EFAC', checked_out: '#E5E7EB', cancelled: '#FECACA', no_show: '#FECACA' };
+const field: React.CSSProperties = { padding: '0.5rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
+const STATUS_COLOR: Record<string, string> = { reserved: '#FBD9A8', checked_in: '#A7DDBB', checked_out: '#DCE5EF', cancelled: '#FECACA', no_show: '#FECACA' };
 
 export default function StaysView({ data, from, onShift, accounts, canManage, call, act, reload }: Props) {
   const dates = useMemo(() => Array.from({ length: DAYS }, (_, i) => addDays(from, i)), [from]);
@@ -47,7 +47,7 @@ export default function StaysView({ data, from, onShift, accounts, canManage, ca
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ ...card, flex: '1 1 140px' }}><span style={{ fontSize: '0.75rem' }}>เข้าพักวันนี้</span><strong style={{ fontSize: '1.3rem' }}>{arrivals.length}</strong></div>
         <div style={{ ...card, flex: '1 1 140px' }}><span style={{ fontSize: '0.75rem' }}>พักอยู่</span><strong style={{ fontSize: '1.3rem' }}>{inHouse.length}/{data.rooms.length}</strong></div>
-        <div style={{ ...card, flex: '1 1 140px', background: owing.length ? '#FEF3C7' : undefined }}><span style={{ fontSize: '0.75rem' }}>ค้างชำระ</span><strong style={{ fontSize: '1.3rem' }}>฿{baht(owing.reduce((s, c) => s + outstanding(c), 0))}</strong></div>
+        <div style={{ ...card, flex: '1 1 140px', background: owing.length ? '#FDEBD3' : undefined }}><span style={{ fontSize: '0.75rem' }}>ค้างชำระ</span><strong style={{ fontSize: '1.3rem' }}>฿{baht(owing.reduce((s, c) => s + outstanding(c), 0))}</strong></div>
       </div>
 
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -59,12 +59,12 @@ export default function StaysView({ data, from, onShift, accounts, canManage, ca
         </button>
       </div>
 
-      <div style={{ overflowX: 'auto', border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12 }}>
+      <div style={{ overflowX: 'auto', border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12 }}>
         <table style={{ borderCollapse: 'collapse', minWidth: 'max-content', width: '100%', fontSize: '0.8rem' }}>
           <thead>
             <tr>
               <th style={{ position: 'sticky', left: 0, background: 'var(--color-white, #fff)', padding: 6, textAlign: 'left', zIndex: 1 }}>ห้อง</th>
-              {dates.map(d => <th key={d} style={{ padding: '4px 6px', minWidth: 44, background: d === data.today ? '#E0F2FE' : undefined }}><div>{weekday(d)}</div><div>{Number(d.slice(8))}</div></th>)}
+              {dates.map(d => <th key={d} style={{ padding: '4px 6px', minWidth: 44, background: d === data.today ? '#E7F0FA' : undefined }}><div>{weekday(d)}</div><div>{Number(d.slice(8))}</div></th>)}
             </tr>
           </thead>
           <tbody>
@@ -74,7 +74,7 @@ export default function StaysView({ data, from, onShift, accounts, canManage, ca
                 {dates.map(d => {
                   const b = cellBooking(r.id, d);
                   return (
-                    <td key={d} style={{ padding: 0, border: '1px solid var(--color-gray-100, #F3F4F6)', height: 34 }}>
+                    <td key={d} style={{ padding: 0, border: '1px solid var(--color-gray-100, #EBF1F7)', height: 34 }}>
                       <button
                         aria-label={b ? `${r.room_number} ${b.guest_name}` : `จอง ${r.room_number} ${d}`}
                         onClick={() => (b ? setPicked(b) : setForm({ room_id: r.id, check_in: d >= data.today ? d : data.today }))}
@@ -148,7 +148,7 @@ function BookingForm({ data, initial, accounts, canManage, onClose, onSave }: {
             <label style={{ fontSize: '0.75rem' }}>เช็กเอาต์<input style={field} type="date" min={addDays(f.check_in, 1)} value={f.check_out} onChange={e => setF({ ...f, check_out: e.target.value })} /></label>
           </div>
           {quote && (
-            <div style={{ ...card, background: missing ? '#FEF3C7' : '#ECFDF5' }}>
+            <div style={{ ...card, background: missing ? '#FDEBD3' : '#EFF8F2' }}>
               {missing
                 ? <span>ยังไม่มีราคาสำหรับบางคืน ({quote.missing.length} คืน){canManage ? ' — ใส่ราคารวมเองได้ หรือตั้งราคาที่แท็บ "ราคา"' : ' — ให้ผู้จัดการตั้งราคาที่แท็บ "ราคา"'}</span>
                 : <span>{quote.nights.length} คืน · รวม <strong>฿{baht(quote.total_satang)}</strong> (เซิร์ฟเวอร์คิดราคาอีกครั้งตอนบันทึก)</span>}

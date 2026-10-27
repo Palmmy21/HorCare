@@ -32,13 +32,13 @@ function MaintenancePhoto({ uid, buildingId, reqId }: { uid: string; buildingId:
         onClick={load}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-          fontSize: '0.75rem', fontWeight: 600, color: '#7C3AED',
-          background: '#F5F3FF', border: '1px solid #DDD6FE',
+          fontSize: '0.75rem', fontWeight: 600, color: '#0F4C81',
+          background: '#F2F7FC', border: '1px solid #CFE2F6',
           padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer',
         }}
       >
         {loading
-          ? <span style={{ width: 12, height: 12, border: '1.5px solid #C4B5FD', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+          ? <span style={{ width: 12, height: 12, border: '1.5px solid #CFE2F6', borderTopColor: '#0F4C81', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
           : <ImageIcon size={13} />
         }
         {src ? (expanded ? 'ซ่อนรูป' : 'ดูรูป') : 'ดูรูปประกอบ'}
@@ -47,7 +47,7 @@ function MaintenancePhoto({ uid, buildingId, reqId }: { uid: string; buildingId:
         <img
           src={src}
           alt="รูปแจ้งซ่อม"
-          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #E5E7EB' }}
+          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #DCE5EF' }}
         />
       )}
     </div>
@@ -59,28 +59,28 @@ function MaintenancePhoto({ uid, buildingId, reqId }: { uid: string; buildingId:
 interface CatCfg { label: string; Icon: React.ComponentType<{ size?: number }>; color: string }
 
 const CATEGORY_CFG: Record<MaintenanceCategory, CatCfg> = {
-  electric:    { label: 'ไฟฟ้า',            Icon: Zap,       color: '#F59E0B' },
-  plumbing:    { label: 'ประปา',             Icon: Droplets,  color: '#3B82F6' },
+  electric:    { label: 'ไฟฟ้า',            Icon: Zap,       color: '#F59E2E' },
+  plumbing:    { label: 'ประปา',             Icon: Droplets,  color: '#0A6CC2' },
   appliance:   { label: 'เครื่องใช้ไฟฟ้า',  Icon: Package,   color: 'var(--color-primary)' },
   door_window: { label: 'ประตู/หน้าต่าง',    Icon: DoorOpen,  color: 'var(--color-gray-500)' },
-  bathroom:    { label: 'ห้องน้ำ',            Icon: ShowerHead, color: '#06B6D4' },
-  ac:          { label: 'แอร์',               Icon: Wind,      color: '#0EA5E9' },
-  furniture:   { label: 'เฟอร์นิเจอร์',      Icon: Sofa,      color: '#92400E' },
+  bathroom:    { label: 'ห้องน้ำ',            Icon: ShowerHead, color: '#0A6CC2' },
+  ac:          { label: 'แอร์',               Icon: Wind,      color: '#0A6CC2' },
+  furniture:   { label: 'เฟอร์นิเจอร์',      Icon: Sofa,      color: '#9A3412' },
   other:       { label: 'อื่นๆ',              Icon: Wrench,    color: 'var(--color-gray-700)' },
 };
 
 const STATUS_CFG: Record<MaintenanceStatus, { label: string; color: string; bg: string; border: string }> = {
   open:        { label: 'รอดำเนินการ',      color: '#DC2626', bg: 'var(--color-danger-ultra-light)', border: 'var(--color-danger-light)' },
-  in_progress: { label: 'กำลังดำเนินการ',  color: '#D97706', bg: 'var(--color-warning-ultra-light)', border: 'var(--color-warning-light)' },
+  in_progress: { label: 'กำลังดำเนินการ',  color: '#E8740C', bg: 'var(--color-warning-ultra-light)', border: 'var(--color-warning-light)' },
   done:        { label: 'เสร็จสิ้น',       color: 'var(--color-success)', bg: 'var(--color-success-ultra-light)', border: 'var(--color-success-light)' },
   rejected:    { label: 'ปฏิเสธ',          color: 'var(--color-gray-500)', bg: 'var(--color-gray-100)', border: 'var(--color-gray-300)' },
 };
 
 const CONDITION_CFG: Record<AssetCondition, { label: string; color: string }> = {
   good:   { label: 'ดี',         color: 'var(--color-success)' },
-  fair:   { label: 'พอใช้',      color: '#D97706' },
+  fair:   { label: 'พอใช้',      color: '#E8740C' },
   poor:   { label: 'แย่',        color: '#DC2626' },
-  broken: { label: 'ชำรุด/เสีย', color: '#7C3AED' },
+  broken: { label: 'ชำรุด/เสีย', color: '#0F4C81' },
 };
 
 function fmtRelative(iso: string): string {
@@ -260,9 +260,9 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.3rem',
                 padding: '0.4rem 0.75rem', borderRadius: '8px', cursor: 'pointer',
-                border: filter === f.id ? '1px solid var(--color-primary, #8B5CF6)' : '1px solid var(--color-border, #E5E7EB)',
-                background: filter === f.id ? 'rgba(139,92,246,0.1)' : 'none',
-                color: filter === f.id ? 'var(--color-primary, #8B5CF6)' : 'var(--color-text-muted, #6B7280)',
+                border: filter === f.id ? '1px solid var(--color-primary, #0F4C81)' : '1px solid var(--color-border, #DCE5EF)',
+                background: filter === f.id ? 'rgba(15, 76, 129,0.1)' : 'none',
+                color: filter === f.id ? 'var(--color-primary, #0F4C81)' : 'var(--color-text-muted, #557089)',
                 fontSize: '0.8rem', fontWeight: filter === f.id ? 700 : 500,
               }}
             >
@@ -270,7 +270,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
               {f.id !== 'all' && counts[f.id] > 0 && (
                 <span style={{
                   fontSize: '0.7rem', fontWeight: 700,
-                  background: filter === f.id ? 'var(--color-primary, #8B5CF6)' : 'var(--color-gray-200)',
+                  background: filter === f.id ? 'var(--color-primary, #0F4C81)' : 'var(--color-gray-200)',
                   color: filter === f.id ? 'var(--color-white)' : 'var(--color-gray-500)',
                   padding: '0.1rem 0.35rem', borderRadius: '4px',
                 }}>
@@ -306,7 +306,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
             return (
               <div key={req.id} style={{
                 background: 'var(--color-white, #fff)', borderRadius: '14px',
-                border: `1px solid ${req.urgency === 'urgent' ? 'rgba(220,38,38,0.3)' : 'var(--color-border, #E5E7EB)'}`,
+                border: `1px solid ${req.urgency === 'urgent' ? 'rgba(220,38,38,0.3)' : 'var(--color-border, #DCE5EF)'}`,
                 padding: '1rem 1.125rem',
                 boxShadow: req.urgency === 'urgent' ? '0 2px 12px rgba(220,38,38,0.07)' : 'none',
               }}>
@@ -315,7 +315,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                     padding: '0.2rem 0.6rem', borderRadius: '7px',
-                    background: 'var(--color-gray-100, #F3F4F6)', color: 'var(--color-gray-800, #1F2937)',
+                    background: 'var(--color-gray-100, #EBF1F7)', color: 'var(--color-gray-800, #1A3350)',
                     fontSize: '0.8125rem', fontWeight: 800, fontFamily: 'var(--font-mono)',
                   }}>
                     ห้อง {req.room_number}
@@ -351,7 +351,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 </div>
 
                 {/* Description */}
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-700, #374151)', margin: '0 0 0.375rem', lineHeight: 1.55 }}>
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-gray-700, #29435E)', margin: '0 0 0.375rem', lineHeight: 1.55 }}>
                   {req.description}
                 </p>
 
@@ -361,7 +361,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 )}
 
                 {/* Timestamp */}
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-400, #9CA3AF)', marginBottom: '0.375rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-400, #8FA3B8)', marginBottom: '0.375rem' }}>
                   {fmtRelative(req.created_at)}
                   {req.updated_at && ` · อัปเดต ${fmtRelative(req.updated_at)}`}
                 </div>
@@ -373,12 +373,12 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                         padding: '0.2rem 0.55rem', borderRadius: '6px',
-                        background: '#FFF7ED', color: '#D97706',
-                        border: '1px solid #FDE68A', fontSize: '0.75rem', fontWeight: 600,
+                        background: '#FEF6EC', color: '#E8740C',
+                        border: '1px solid #FBD9A8', fontSize: '0.75rem', fontWeight: 600,
                       }}>
                         <HardHat size={11} /> {req.vendor_name}
                         {req.vendor_phone && (
-                          <a href={`tel:${req.vendor_phone}`} style={{ color: '#D97706', marginLeft: '0.2rem' }}
+                          <a href={`tel:${req.vendor_phone}`} style={{ color: '#E8740C', marginLeft: '0.2rem' }}
                             onClick={e => e.stopPropagation()}>
                             <Phone size={10} />
                           </a>
@@ -389,8 +389,8 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
                         padding: '0.2rem 0.55rem', borderRadius: '6px',
-                        background: '#EFF6FF', color: '#3B82F6',
-                        border: '1px solid #BFDBFE', fontSize: '0.75rem', fontWeight: 600,
+                        background: '#F2F7FC', color: '#0A6CC2',
+                        border: '1px solid #CFE2F6', fontSize: '0.75rem', fontWeight: 600,
                       }}>
                         <Calendar size={11} />
                         {new Date(req.scheduled_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
@@ -402,10 +402,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {/* Admin note display */}
                 {req.admin_note && !isEditingNote && (
                   <div style={{
-                    fontSize: '0.8125rem', color: 'var(--color-gray-700, #374151)', lineHeight: 1.5,
-                    background: 'var(--color-gray-50, #F9FAFB)',
+                    fontSize: '0.8125rem', color: 'var(--color-gray-700, #29435E)', lineHeight: 1.5,
+                    background: 'var(--color-gray-50, #F4F7FB)',
                     borderRadius: '8px', padding: '0.5rem 0.75rem',
-                    borderLeft: '3px solid var(--color-primary, #8B5CF6)',
+                    borderLeft: '3px solid var(--color-primary, #0F4C81)',
                     marginBottom: '0.625rem',
                   }}>
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-primary)', display: 'block', marginBottom: '0.2rem' }}>
@@ -419,7 +419,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {req.status === 'done' && req.parts_used && req.parts_used.length > 0 && (
                   <div style={{
                     background: 'var(--color-success-ultra-light)', borderRadius: '8px', padding: '0.5rem 0.75rem',
-                    border: '1px solid #BBF7D0', marginBottom: '0.625rem',
+                    border: '1px solid #A7DDBB', marginBottom: '0.625rem',
                   }}>
                     <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--color-success)', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <PackageOpen size={12} /> อะไหล่ที่ใช้
@@ -442,10 +442,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {req.status === 'done' && req.asset_name && (
                   <div style={{
                     background: 'var(--color-primary-ultra-light)', borderRadius: '8px', padding: '0.5rem 0.75rem',
-                    border: '1px solid #BFDBFE', marginBottom: '0.625rem',
+                    border: '1px solid #CFE2F6', marginBottom: '0.625rem',
                     display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem',
                   }}>
-                    <Layers size={13} color="#3B82F6" />
+                    <Layers size={13} color="#0A6CC2" />
                     <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{req.asset_name}</span>
                     {req.asset_condition_after && (
                       <span style={{ color: CONDITION_CFG[req.asset_condition_after].color, fontWeight: 700, fontSize: '0.75rem' }}>
@@ -483,7 +483,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                     border: '1px solid var(--color-gray-200)', marginBottom: '0.75rem',
                   }}>
                     <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-gray-800)', marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                      <CheckCircle2 size={15} color="#059669" /> บันทึกการซ่อมเสร็จ
+                      <CheckCircle2 size={15} color="#15803D" /> บันทึกการซ่อมเสร็จ
                     </div>
 
                     {/* Note */}
@@ -513,12 +513,12 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                           <PackageOpen size={13} /> อะไหล่ที่ใช้ (สต็อก)
                           {Object.values(completion.partQty).filter(q => q > 0).length > 0 && (
-                            <span style={{ background: '#8B5CF6', color: 'var(--color-white)', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
+                            <span style={{ background: '#0F4C81', color: 'var(--color-white)', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
                               {Object.values(completion.partQty).filter(q => q > 0).length} รายการ
                             </span>
                           )}
                         </span>
-                        {stockExpanded ? <ChevronUp size={14} color="#9CA3AF" /> : <ChevronDown size={14} color="#9CA3AF" />}
+                        {stockExpanded ? <ChevronUp size={14} color="#8FA3B8" /> : <ChevronDown size={14} color="#8FA3B8" />}
                       </button>
 
                       {stockExpanded && (
@@ -547,7 +547,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                       display: 'flex', alignItems: 'center', gap: '0.5rem',
                                       padding: '0.5rem 0.75rem',
                                       borderBottom: '1px solid var(--color-gray-100)',
-                                      background: selected ? 'rgba(139,92,246,0.04)' : 'transparent',
+                                      background: selected ? 'rgba(15, 76, 129,0.04)' : 'transparent',
                                     }}>
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-gray-700)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -576,7 +576,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                         >
                                           <Minus size={12} />
                                         </button>
-                                        <span style={{ minWidth: 24, textAlign: 'center', fontSize: '0.8125rem', fontWeight: 700, color: selected ? '#7C3AED' : 'var(--color-gray-400)' }}>
+                                        <span style={{ minWidth: 24, textAlign: 'center', fontSize: '0.8125rem', fontWeight: 700, color: selected ? '#0F4C81' : 'var(--color-gray-400)' }}>
                                           {qty}
                                         </span>
                                         <button
@@ -617,12 +617,12 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                           <Layers size={13} /> ทรัพย์สินที่ซ่อม (ไม่จำเป็น)
                           {completion.assetId && (
-                            <span style={{ background: '#3B82F6', color: 'var(--color-white)', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
+                            <span style={{ background: '#0A6CC2', color: 'var(--color-white)', borderRadius: '4px', padding: '0 0.3rem', fontSize: '0.65rem' }}>
                               เลือกแล้ว
                             </span>
                           )}
                         </span>
-                        {assetExpanded ? <ChevronUp size={14} color="#9CA3AF" /> : <ChevronDown size={14} color="#9CA3AF" />}
+                        {assetExpanded ? <ChevronUp size={14} color="#8FA3B8" /> : <ChevronDown size={14} color="#8FA3B8" />}
                       </button>
 
                       {assetExpanded && (
@@ -661,7 +661,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                                         onClick={() => setCompletion(c => ({ ...c, conditionAfter: key }))}
                                         style={{
                                           padding: '0.3rem 0.7rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem',
-                                          border: completion.conditionAfter === key ? `2px solid ${cfg.color}` : '1.5px solid #E5E7EB',
+                                          border: completion.conditionAfter === key ? `2px solid ${cfg.color}` : '1.5px solid #DCE5EF',
                                           background: completion.conditionAfter === key ? `${cfg.color}18` : 'var(--color-white)',
                                           color: completion.conditionAfter === key ? cfg.color : 'var(--color-gray-500)',
                                           fontWeight: completion.conditionAfter === key ? 700 : 500,
@@ -685,7 +685,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                         className="btn btn-sm"
                         onClick={() => handleComplete(req)}
                         disabled={isSaving}
-                        style={{ background: '#059669', color: 'var(--color-white)', border: 'none', flex: 1 }}
+                        style={{ background: '#15803D', color: 'var(--color-white)', border: 'none', flex: 1 }}
                       >
                         {isSaving
                           ? <span className="loading-spinner" style={{ width: 14, height: 14, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'var(--color-white)' }} />
@@ -722,10 +722,10 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                 {/* Assignment panel */}
                 {assigningId === req.id && (
                   <div style={{
-                    background: '#FFFBEB', borderRadius: '12px', padding: '0.875rem 1rem',
-                    border: '1px solid #FDE68A', marginBottom: '0.75rem',
+                    background: '#FEF6EC', borderRadius: '12px', padding: '0.875rem 1rem',
+                    border: '1px solid #FBD9A8', marginBottom: '0.75rem',
                   }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#92400E', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#9A3412', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                       <HardHat size={15} /> มอบหมายงาน
                     </div>
 
@@ -794,7 +794,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                         className="btn btn-sm"
                         onClick={() => handleAssignConfirm(req)}
                         disabled={isSaving}
-                        style={{ background: '#D97706', color: 'var(--color-white)', border: 'none', flex: 1 }}
+                        style={{ background: '#E8740C', color: 'var(--color-white)', border: 'none', flex: 1 }}
                       >
                         {isSaving
                           ? <span className="loading-spinner" style={{ width: 14, height: 14, borderColor: 'rgba(255,255,255,0.4)', borderTopColor: 'var(--color-white)' }} />
@@ -815,7 +815,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       className="btn btn-sm"
                       onClick={() => openAssign(req)}
                       disabled={isSaving}
-                      style={{ background: '#FEF3C7', color: '#D97706', border: '1px solid #FDE68A' }}
+                      style={{ background: '#FDEBD3', color: '#E8740C', border: '1px solid #FBD9A8' }}
                     >
                       {isSaving ? <span className="loading-spinner" style={{ width: 14, height: 14 }} /> : <Clock size={14} />}
                       รับเรื่อง
@@ -826,7 +826,7 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
                       className="btn btn-sm"
                       onClick={() => openCompletion(req)}
                       disabled={isSaving}
-                      style={{ background: 'var(--color-success-ultra-light)', color: 'var(--color-success)', border: '1px solid #6EE7B7' }}
+                      style={{ background: 'var(--color-success-ultra-light)', color: 'var(--color-success)', border: '1px solid #A7DDBB' }}
                     >
                       <CheckCircle2 size={14} /> เสร็จสิ้น
                     </button>

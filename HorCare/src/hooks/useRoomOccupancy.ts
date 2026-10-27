@@ -5,7 +5,7 @@ import { apiPost } from '../utils/api';
 import { todayTh } from '../shared/market';
 import type { Lead, Lease, Reservation } from '../shared/leasing';
 import {
-  contractOccupancy, effectiveOccupancy,
+  contractOccupancy, contractTerms, effectiveOccupancy,
   type LeaseFacts, type Occupancy, type ProfileFacts, type ReservationFacts,
 } from '../shared/roomOccupancy';
 import type { Room, TenantProfile } from '../types';
@@ -87,6 +87,16 @@ export function useRoomOccupancy(
     return out;
   }, [rooms, leasing, profiles]);
 
+  // Tenant name and contract end per room (plan contract layer, units of one tenant)
+  const termsByRoom = useMemo(() => {
+    const today = todayTh();
+    const out: Record<string, { tenant?: string; end?: string }> = {};
+    for (const room of rooms) {
+      out[room.id] = contractTerms({ leases: leasing?.leases.filter(l => l.room_id === room.id), profile: profiles[room.id] ?? null }, today);
+    }
+    return out;
+  }, [rooms, leasing, profiles]);
+
   const reload = useCallback(() => setReloadTick(t => t + 1), []);
-  return { byRoom, reload, leasingAvailable: leasing !== null };
+  return { byRoom, termsByRoom, reload, leasingAvailable: leasing !== null };
 }

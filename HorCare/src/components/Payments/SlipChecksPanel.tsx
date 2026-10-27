@@ -18,9 +18,9 @@ const LABELS: { key: keyof SlipChecks; label: string }[] = [
 ];
 
 const STYLE: Record<SlipCheck, { color: string; bg: string; Icon: React.ElementType; hint: string }> = {
-    pass: { color: '#047857', bg: 'rgba(16,185,129,0.12)', Icon: CheckCircle2, hint: 'ตรงกัน' },
+    pass: { color: '#166534', bg: 'rgba(34, 163, 90,0.12)', Icon: CheckCircle2, hint: 'ตรงกัน' },
     fail: { color: '#B91C1C', bg: 'rgba(220,38,38,0.12)', Icon: XCircle, hint: 'ไม่ตรงกัน' },
-    unknown: { color: '#6B7280', bg: 'rgba(107,114,128,0.12)', Icon: HelpCircle, hint: 'อ่านไม่ได้ / เทียบไม่ได้' },
+    unknown: { color: '#557089', bg: 'rgba(85, 112, 137,0.12)', Icon: HelpCircle, hint: 'อ่านไม่ได้ / เทียบไม่ได้' },
 };
 
 const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : undefined);

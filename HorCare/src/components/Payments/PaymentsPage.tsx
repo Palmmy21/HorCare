@@ -39,8 +39,8 @@ function monthLabel(m: string): string {
 }
 
 const STATUS_META: Record<PaymentStatus, { label: string; color: string; bg: string; border: string; icon: React.ElementType }> = {
-    paid:    { label: 'จ่ายแล้ว',     color: '#059669', bg: 'rgba(16,185,129,0.12)',  border: 'rgba(16,185,129,0.3)',  icon: CheckCircle2 },
-    pending: { label: 'รอตรวจสอบ',   color: '#D97706', bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.3)',  icon: Clock },
+    paid:    { label: 'จ่ายแล้ว',     color: '#15803D', bg: 'rgba(34, 163, 90,0.12)',  border: 'rgba(34, 163, 90,0.3)',  icon: CheckCircle2 },
+    pending: { label: 'รอตรวจสอบ',   color: '#E8740C', bg: 'rgba(245, 158, 46,0.12)',  border: 'rgba(245, 158, 46,0.3)',  icon: Clock },
     unpaid:  { label: 'ยังไม่จ่าย',   color: '#DC2626', bg: 'rgba(220,38,38,0.10)',   border: 'rgba(220,38,38,0.25)',  icon: AlertCircle },
 };
 
@@ -355,10 +355,10 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     };
 
     const statCards = [
-        { label: 'เก็บได้แล้ว', value: `฿${stats.collected.toLocaleString()}`, sub: `${stats.paid} รายการ`, icon: TrendingUp, color: '#059669', bg: 'rgba(16,185,129,0.1)' },
+        { label: 'เก็บได้แล้ว', value: `฿${stats.collected.toLocaleString()}`, sub: `${stats.paid} รายการ`, icon: TrendingUp, color: '#15803D', bg: 'rgba(34, 163, 90,0.1)' },
         { label: 'ค้างชำระ', value: `฿${stats.outstanding.toLocaleString()}`, sub: `${stats.unpaid + stats.pending} รายการ`, icon: Wallet, color: '#DC2626', bg: 'rgba(220,38,38,0.08)' },
-        { label: 'รอตรวจสลิป', value: `${stats.pending}`, sub: 'รายการ', icon: Clock, color: '#D97706', bg: 'rgba(245,158,11,0.1)' },
-        { label: 'ทั้งหมด', value: `${stats.total}`, sub: 'รายการ', icon: Receipt, color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
+        { label: 'รอตรวจสลิป', value: `${stats.pending}`, sub: 'รายการ', icon: Clock, color: '#E8740C', bg: 'rgba(245, 158, 46,0.1)' },
+        { label: 'ทั้งหมด', value: `${stats.total}`, sub: 'รายการ', icon: Receipt, color: '#0A6CC2', bg: 'rgba(10, 108, 194,0.1)' },
     ];
 
     const filterTabs: { key: FilterKey; label: string; count: number }[] = [
@@ -369,11 +369,11 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
     ];
 
     return (
-        <div style={{ maxWidth: 980, margin: '0 auto' }}>
+        <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                     <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-gray-800)', margin: 0 }}>
-                        <Wallet size={24} color="#6366F1" /> การชำระเงิน / สลิป
+                        <Wallet size={24} color="#0A6CC2" /> การชำระเงิน / สลิป
                     </h1>
                     <p style={{ margin: '0.25rem 0 0', color: 'var(--color-gray-500)', fontSize: '0.875rem' }}>
                         {dormName} · รอบ {monthLabel(currentMonth)}
@@ -473,8 +473,8 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                     onClick={() => { setMethodFilter(on ? 'all' : m); if (!on) setFilter('paid'); }}
                                     style={{
                                         textAlign: 'left', cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: 10,
-                                        border: `1.5px solid ${on ? '#6366F1' : 'var(--color-gray-200)'}`,
-                                        background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                        border: `1.5px solid ${on ? '#0A6CC2' : 'var(--color-gray-200)'}`,
+                                        background: on ? 'rgba(10, 108, 194,0.08)' : 'transparent',
                                     }}
                                 >
                                     <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>{PAYMENT_METHOD_LABELS[m]} · {methodTotals[m].count} รายการ</div>
@@ -537,7 +537,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
                     marginBottom: '0.75rem', padding: '0.625rem 0.875rem',
-                    background: selected.size > 0 ? 'rgba(99,102,241,0.07)' : 'var(--color-gray-50)',
+                    background: selected.size > 0 ? 'rgba(10, 108, 194,0.07)' : 'var(--color-gray-50)',
                     borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-200)',
                     transition: 'background 0.2s',
                 }}>
@@ -545,19 +545,19 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                         onClick={toggleSelectAll}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--color-gray-600)', fontSize: '0.8125rem', fontWeight: 600, padding: 0 }}
                     >
-                        {allSelected ? <CheckSquare size={17} color="#6366F1" /> : <Square size={17} />}
+                        {allSelected ? <CheckSquare size={17} color="#0A6CC2" /> : <Square size={17} />}
                         {allSelected ? 'ยกเลิกเลือกทั้งหมด' : 'เลือกทั้งหมด'}
                     </button>
                     {selected.size > 0 && (
                         <>
-                            <span style={{ fontSize: '0.8125rem', color: '#6366F1', fontWeight: 700 }}>เลือกแล้ว {selected.size} รายการ</span>
+                            <span style={{ fontSize: '0.8125rem', color: '#0A6CC2', fontWeight: 700 }}>เลือกแล้ว {selected.size} รายการ</span>
                             <button
                                 onClick={bulkConfirmPaid}
                                 disabled={bulkProcessing}
                                 style={{
                                     marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
                                     padding: '0.4rem 0.875rem', borderRadius: 'var(--radius-md)', border: 'none',
-                                    background: '#059669', color: '#fff', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer',
+                                    background: '#15803D', color: '#fff', fontWeight: 700, fontSize: '0.8125rem', cursor: 'pointer',
                                     opacity: bulkProcessing ? 0.6 : 1,
                                 }}
                             >
@@ -583,9 +583,9 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                         const isSelectable = s !== 'paid';
                         const isSelected = selected.has(b.id);
                         return (
-                            <div key={b.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', outline: isSelected ? '2px solid #6366F1' : 'none', outlineOffset: -1 }}>
+                            <div key={b.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', outline: isSelected ? '2px solid #0A6CC2' : 'none', outlineOffset: -1 }}>
                                 {isSelectable ? (
-                                    <button onClick={() => toggleSelect(b.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, color: isSelected ? '#6366F1' : 'var(--color-gray-300)' }}>
+                                    <button onClick={() => toggleSelect(b.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0, color: isSelected ? '#0A6CC2' : 'var(--color-gray-300)' }}>
                                         {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                                     </button>
                                 ) : (
@@ -606,7 +606,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                         {b.slip_submitted_at && (
                                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: 2, fontSize: '0.72rem', color: 'var(--color-gray-500)' }}>
                                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Receipt size={11} />ส่งสลิปแล้ว</span>
-                                                {b.slip_ref && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#059669', fontWeight: 700 }}><CheckCircle2 size={11} />QR Verified</span>}
+                                                {b.slip_ref && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#15803D', fontWeight: 700 }}><CheckCircle2 size={11} />QR Verified</span>}
                                                 {b.slip_amount != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Banknote size={11} />฿{b.slip_amount.toLocaleString()}</span>}
                                                 {b.slip_sender && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><User size={11} />{b.slip_sender}</span>}
                                             </div>
@@ -615,7 +615,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                         {s === 'pending' && b.verify_note && (() => {
                                             const good = b.verify_note.startsWith('ตรวจ QR ผ่าน');
                                             return (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: good ? '#059669' : '#D97706', marginTop: 2 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', color: good ? '#15803D' : '#E8740C', marginTop: 2 }}>
                                                     {good ? <CheckCircle2 size={11} /> : <TriangleAlert size={11} />}
                                                     {b.verify_note}
                                                 </div>
@@ -648,7 +648,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                                     )}
                                     {s !== 'paid' ? (
                                         <button className="btn btn-sm" onClick={() => confirmPaid(b)} disabled={busy}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#059669', color: '#fff', border: 'none' }}>
+                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#15803D', color: '#fff', border: 'none' }}>
                                             {busy ? <Loader2 size={14} className="spin" /> : <Check size={14} />} ยืนยันจ่าย
                                         </button>
                                     ) : (
@@ -706,7 +706,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                             <button className="btn btn-outline btn-sm btn-icon" onClick={() => setSlipView(null)}><X size={16} /></button>
                         </div>
                         {slipView.loading ? (
-                            <div style={{ padding: '3rem', textAlign: 'center' }}><Loader2 size={28} className="spin" style={{ color: '#6366F1' }} /></div>
+                            <div style={{ padding: '3rem', textAlign: 'center' }}><Loader2 size={28} className="spin" style={{ color: '#0A6CC2' }} /></div>
                         ) : slipView.error ? (
                             <div style={{ padding: '2rem', textAlign: 'center', color: '#DC2626', fontSize: '0.875rem' }}>{slipView.error}</div>
                         ) : (

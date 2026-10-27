@@ -211,7 +211,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                       </button>
                     ))}
                   </div>
-                  <span style={{ fontSize: '0.8125rem', color: '#64748b', marginTop: 6 }}>{styleInfo.hint}</span>
+                  <span style={{ fontSize: '0.8125rem', color: '#557089', marginTop: 6 }}>{styleInfo.hint}</span>
                 </div>
               </div>
             </div>
@@ -239,7 +239,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                       onChange={e => setElecRate(parseFloat(e.target.value) || 0)}
                       placeholder="8"
                     />
-                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#94a3b8' }}>
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#8fa3b8' }}>
                       ฿/หน่วย
                     </span>
                   </div>
@@ -284,7 +284,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                         onChange={e => setWaterUnitRate(parseFloat(e.target.value) || 0)}
                         placeholder="18"
                       />
-                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#94a3b8' }}>
+                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#8fa3b8' }}>
                         ฿/หน่วย
                       </span>
                     </div>
@@ -304,7 +304,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                         onChange={e => setWaterFlatRate(parseFloat(e.target.value) || 0)}
                         placeholder="100"
                       />
-                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#94a3b8' }}>
+                      <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#8fa3b8' }}>
                         ฿/เดือน
                       </span>
                     </div>
@@ -336,7 +336,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                       onChange={e => setRoomRent(parseFloat(e.target.value) || 0)}
                       placeholder="3500"
                     />
-                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#94a3b8' }}>
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#8fa3b8' }}>
                       ฿/{styleInfo.unit.split('/')[1]}
                     </span>
                   </div>
@@ -356,7 +356,7 @@ export default function AddBuildingModal({ isOpen, onClose, onAdd }: AddBuilding
                       onChange={e => setDueDay(parseInt(e.target.value, 10) || 5)}
                       placeholder="5"
                     />
-                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#94a3b8' }}>
+                    <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.8125rem', color: '#8fa3b8' }}>
                       ของเดือน
                     </span>
                   </div>

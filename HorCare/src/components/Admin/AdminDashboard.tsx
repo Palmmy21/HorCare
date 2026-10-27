@@ -29,14 +29,14 @@ interface LicenseStyle {
 }
 
 const LICENSE_STYLES: Record<string, LicenseStyle> = {
-    free:           { label: 'Free Plan',         shortLabel: 'Free',         color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.25)' },
-    monthly_small:  { label: 'Start (รายเดือน)',   shortLabel: 'Start/ด.',    color: '#38BDF8', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.28)' },
-    monthly_medium: { label: 'Plus (รายเดือน)',    shortLabel: 'Plus/ด.',     color: '#818CF8', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.28)' },
-    monthly_large:  { label: 'HorCare (รายเดือน)', shortLabel: 'HorCare/ด.',  color: '#C084FC', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.28)' },
-    yearly_small:   { label: 'Start (รายปี)',      shortLabel: 'Start/ปี',    color: '#38BDF8', bg: 'rgba(14,165,233,0.12)',  border: 'rgba(14,165,233,0.28)' },
-    yearly_medium:  { label: 'Plus (รายปี)',       shortLabel: 'Plus/ปี',     color: '#818CF8', bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.28)' },
-    yearly_large:   { label: 'HorCare (รายปี)',    shortLabel: 'HorCare/ปี',   color: '#C084FC', bg: 'rgba(168,85,247,0.12)',  border: 'rgba(168,85,247,0.28)' },
-    active:         { label: 'ตลอดชีพ (VIP)',      shortLabel: 'ตลอดชีพ',     color: '#34D399', bg: 'rgba(16,185,129,0.14)',  border: 'rgba(16,185,129,0.32)' },
+    free:           { label: 'Free Plan',         shortLabel: 'Free',         color: '#8FA3B8', bg: 'rgba(143, 163, 184,0.12)', border: 'rgba(143, 163, 184,0.25)' },
+    monthly_small:  { label: 'Start (รายเดือน)',   shortLabel: 'Start/ด.',    color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)',  border: 'rgba(10, 108, 194,0.28)' },
+    monthly_medium: { label: 'Plus (รายเดือน)',    shortLabel: 'Plus/ด.',     color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)',  border: 'rgba(10, 108, 194,0.28)' },
+    monthly_large:  { label: 'HorCare (รายเดือน)', shortLabel: 'HorCare/ด.',  color: '#3D8FD6', bg: 'rgba(15, 76, 129,0.12)',  border: 'rgba(15, 76, 129,0.28)' },
+    yearly_small:   { label: 'Start (รายปี)',      shortLabel: 'Start/ปี',    color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)',  border: 'rgba(10, 108, 194,0.28)' },
+    yearly_medium:  { label: 'Plus (รายปี)',       shortLabel: 'Plus/ปี',     color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)',  border: 'rgba(10, 108, 194,0.28)' },
+    yearly_large:   { label: 'HorCare (รายปี)',    shortLabel: 'HorCare/ปี',   color: '#3D8FD6', bg: 'rgba(15, 76, 129,0.12)',  border: 'rgba(15, 76, 129,0.28)' },
+    active:         { label: 'ตลอดชีพ (VIP)',      shortLabel: 'ตลอดชีพ',     color: '#22A35A', bg: 'rgba(34, 163, 90,0.14)',  border: 'rgba(34, 163, 90,0.32)' },
 };
 
 const LICENSE_OPTIONS: LicenseType[] = [
@@ -49,7 +49,7 @@ function getLicenseStyle(license?: LicenseType): LicenseStyle {
     if (!license) return LICENSE_STYLES.free;
     return LICENSE_STYLES[license] ?? {
         label: license, shortLabel: license,
-        color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.25)',
+        color: '#8FA3B8', bg: 'rgba(143, 163, 184,0.12)', border: 'rgba(143, 163, 184,0.25)',
     };
 }
 
@@ -75,11 +75,11 @@ function UserAvatar({ name, email, size = 38 }: { name?: string; email?: string;
     return (
         <div style={{
             width: size, height: size, borderRadius: '12px',
-            background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+            background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#FFFFFF', fontWeight: 700, fontSize: size > 48 ? '1.25rem' : '0.8rem',
             flexShrink: 0, letterSpacing: '0.04em',
-            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+            boxShadow: '0 2px 8px rgba(10, 108, 194, 0.25)',
         }}>
             {initials}
         </div>
@@ -161,14 +161,14 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
             <div style={{
                 position: 'fixed', top: 0, right: 0, height: '100vh',
                 width: 'min(460px, 94vw)',
-                background: '#0F172A', zIndex: 201, display: 'flex', flexDirection: 'column',
+                background: '#102A43', zIndex: 201, display: 'flex', flexDirection: 'column',
                 borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
                 boxShadow: '-12px 0 40px rgba(0, 0, 0, 0.8)',
-                color: '#F8FAFC',
+                color: '#F4F7FB',
             }}>
                 {/* Header */}
                 <div style={{
-                    padding: '1.5rem', background: 'rgba(15, 23, 42, 0.95)',
+                    padding: '1.5rem', background: 'rgba(16, 42, 67, 0.95)',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                     display: 'flex', alignItems: 'flex-start', gap: '1rem',
                 }}>
@@ -177,7 +177,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         <div style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '1.15rem', marginBottom: '0.2rem' }}>
                             {u.display_name || 'ไม่ระบุชื่อ'}
                         </div>
-                        <div style={{ color: '#94A3B8', fontSize: '0.825rem', wordBreak: 'break-all', marginBottom: '0.5rem' }}>
+                        <div style={{ color: '#8FA3B8', fontSize: '0.825rem', wordBreak: 'break-all', marginBottom: '0.5rem' }}>
                             {u.email}
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
@@ -198,7 +198,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         onClick={onClose}
                         style={{
                             background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '8px', color: '#94A3B8', cursor: 'pointer', padding: '0.4rem',
+                            borderRadius: '8px', color: '#8FA3B8', cursor: 'pointer', padding: '0.4rem',
                             display: 'flex', alignItems: 'center',
                         }}
                     >
@@ -213,21 +213,21 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                     {u.license !== 'free' && u.license !== 'active' && (
                         <div style={{
                             padding: '1.1rem', borderRadius: '14px',
-                            background: expired ? 'rgba(239, 68, 68, 0.08)' : 'rgba(14, 165, 233, 0.08)',
-                            border: `1px solid ${expired ? 'rgba(239, 68, 68, 0.25)' : 'rgba(14, 165, 233, 0.25)'}`,
+                            background: expired ? 'rgba(239, 68, 68, 0.08)' : 'rgba(10, 108, 194, 0.08)',
+                            border: `1px solid ${expired ? 'rgba(239, 68, 68, 0.25)' : 'rgba(10, 108, 194, 0.25)'}`,
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: expired ? '#F87171' : '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: expired ? '#F87171' : '#3D8FD6', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                     สถานะแพ็กเกจ
                                 </span>
                                 <LicenseBadge license={u.license} expired={expired} size="sm" />
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                                <span style={{ color: '#94A3B8' }}>วันหมดอายุ</span>
+                                <span style={{ color: '#8FA3B8' }}>วันหมดอายุ</span>
                                 <span style={{ fontWeight: 600, color: expired ? '#F87171' : '#FFFFFF' }}>
                                     {u.current_period_end ? new Date(u.current_period_end).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                                     {daysLeft !== null && (
-                                        <span style={{ marginLeft: '0.5rem', color: daysLeft <= 0 ? '#F87171' : daysLeft <= 7 ? '#FBBF24' : '#34D399', fontSize: '0.75rem' }}>
+                                        <span style={{ marginLeft: '0.5rem', color: daysLeft <= 0 ? '#F87171' : daysLeft <= 7 ? '#F7B86C' : '#22A35A', fontSize: '0.75rem' }}>
                                             ({daysLeft <= 0 ? 'หมดอายุแล้ว' : `เหลือ ${daysLeft} วัน`})
                                         </span>
                                     )}
@@ -242,7 +242,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         background: 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                     }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3D8FD6', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <CalendarPlus size={14} /> ต่ออายุการใช้งานทันที
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
@@ -257,8 +257,8 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                     onClick={() => onExtendDays(u.uid, item.days)}
                                     disabled={isProcessing}
                                     style={{
-                                        background: 'rgba(14, 165, 233, 0.12)', color: '#38BDF8',
-                                        border: '1px solid rgba(14, 165, 233, 0.28)', borderRadius: '8px',
+                                        background: 'rgba(10, 108, 194, 0.12)', color: '#3D8FD6',
+                                        border: '1px solid rgba(10, 108, 194, 0.28)', borderRadius: '8px',
                                         padding: '0.55rem 0', fontSize: '0.8rem', fontWeight: 600,
                                         cursor: isProcessing ? 'not-allowed' : 'pointer',
                                         transition: 'all 0.15s ease',
@@ -276,7 +276,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         background: 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                     }}>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#3D8FD6', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <Package size={14} /> เปลี่ยนระดับแพ็กเกจ (Tier)
                         </div>
                         <div style={{ position: 'relative' }}>
@@ -291,16 +291,16 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                 }}
                             >
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <Package size={14} color="#38BDF8" />
+                                    <Package size={14} color="#3D8FD6" />
                                     {getLicenseStyle(u.license).label}
                                 </span>
-                                <ChevronDown size={15} style={{ transform: licenseMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: '#94A3B8' }} />
+                                <ChevronDown size={15} style={{ transform: licenseMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: '#8FA3B8' }} />
                             </button>
 
                             {licenseMenuOpen && (
                                 <div style={{
                                     position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                                    background: '#1E293B', border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    background: '#1A3350', border: '1px solid rgba(255, 255, 255, 0.15)',
                                     borderRadius: '12px', overflow: 'hidden', zIndex: 60,
                                     boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6)',
                                 }}>
@@ -316,14 +316,14 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                                 }}
                                                 style={{
                                                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                    padding: '0.65rem 0.85rem', background: isSelected ? 'rgba(14, 165, 233, 0.15)' : 'transparent',
+                                                    padding: '0.65rem 0.85rem', background: isSelected ? 'rgba(10, 108, 194, 0.15)' : 'transparent',
                                                     border: 'none', borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                                    color: isSelected ? '#38BDF8' : '#F8FAFC', cursor: 'pointer',
+                                                    color: isSelected ? '#3D8FD6' : '#F4F7FB', cursor: 'pointer',
                                                     fontSize: '0.825rem', fontWeight: isSelected ? 700 : 500, textAlign: 'left',
                                                 }}
                                             >
                                                 <span>{s.label}</span>
-                                                {isSelected && <Check size={14} color="#38BDF8" />}
+                                                {isSelected && <Check size={14} color="#3D8FD6" />}
                                             </button>
                                         );
                                     })}
@@ -340,11 +340,11 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                         display: 'flex', flexDirection: 'column', gap: '0.75rem',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                            <span style={{ color: '#94A3B8' }}>User ID (UID)</span>
+                            <span style={{ color: '#8FA3B8' }}>User ID (UID)</span>
                             <button
                                 onClick={copyUID}
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.06)', border: 'none', color: copied ? '#34D399' : '#38BDF8',
+                                    background: 'rgba(255, 255, 255, 0.06)', border: 'none', color: copied ? '#22A35A' : '#3D8FD6',
                                     borderRadius: '6px', padding: '0.2rem 0.5rem', cursor: 'pointer', fontSize: '0.75rem',
                                     display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
                                 }}
@@ -353,13 +353,13 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                 {copied ? 'คัดลอกแล้ว!' : 'คัดลอก UID'}
                             </button>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748B', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#557089', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>
                             {u.uid}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                            <span style={{ color: '#94A3B8' }}>ยืนยันอีเมล</span>
+                            <span style={{ color: '#8FA3B8' }}>ยืนยันอีเมล</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span style={{ color: u.email_verified ? '#34D399' : '#FBBF24', fontWeight: 600, fontSize: '0.78rem' }}>
+                                <span style={{ color: u.email_verified ? '#22A35A' : '#F7B86C', fontWeight: 600, fontSize: '0.78rem' }}>
                                     {u.email_verified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}
                                 </span>
                                 {!u.email_verified && (
@@ -367,8 +367,8 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                         onClick={handleVerify}
                                         disabled={verifyingEmail}
                                         style={{
-                                            background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)',
-                                            color: '#34D399', borderRadius: '6px', padding: '0.15rem 0.45rem', fontSize: '0.7rem',
+                                            background: 'rgba(34, 163, 90, 0.15)', border: '1px solid rgba(34, 163, 90, 0.3)',
+                                            color: '#22A35A', borderRadius: '6px', padding: '0.15rem 0.45rem', fontSize: '0.7rem',
                                             cursor: 'pointer',
                                         }}
                                     >
@@ -378,7 +378,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                            <span style={{ color: '#94A3B8' }}>วันที่สมัครสมาชิก</span>
+                            <span style={{ color: '#8FA3B8' }}>วันที่สมัครสมาชิก</span>
                             <span style={{ color: '#FFFFFF', fontWeight: 500 }}>
                                 {u.created_at ? new Date(u.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                             </span>
@@ -393,7 +393,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                                 disabled={isProcessing}
                                 style={{
                                     flex: 1, padding: '0.75rem', borderRadius: '10px', border: 'none',
-                                    background: 'rgba(16, 185, 129, 0.15)', color: '#34D399',
+                                    background: 'rgba(34, 163, 90, 0.15)', color: '#22A35A',
                                     cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
                                 }}
                             >
@@ -419,7 +419,7 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                             style={{
                                 flex: 1, padding: '0.75rem', borderRadius: '10px',
                                 background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.15)',
-                                color: '#94A3B8', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+                                color: '#8FA3B8', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
                             }}
                         >
                             รีเซ็ตเป็น Free
@@ -436,16 +436,16 @@ function UserDetailPanel({ u, onClose, onBan, onUnban, onRevoke, onSetLicense, o
                             disabled={isProcessing}
                             style={{
                                 width: '100%', padding: '0.85rem', borderRadius: '12px', border: 'none',
-                                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                background: 'linear-gradient(135deg, #22A35A 0%, #15803D 100%)',
                                 color: '#FFFFFF', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
+                                boxShadow: '0 4px 16px rgba(34, 163, 90, 0.35)',
                             }}
                         >
                             <Key size={16} /> ปลดล็อกถาวรตลอดชีพ (Lifetime Access)
                         </button>
                     ) : (
-                        <div style={{ textAlign: 'center', color: '#34D399', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                        <div style={{ textAlign: 'center', color: '#22A35A', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
                             <CheckCircle2 size={18} /> ผู้ใช้นี้มีสิทธิ์ใช้งานตลอดชีพแล้ว
                         </div>
                     )}
@@ -739,25 +739,25 @@ export default function AdminDashboard() {
     const isAdmin = isAdminUser(user?.email, profile?.role);
     if (!isAdmin) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', background: '#090D16', color: '#F8FAFC' }}>
-                <div style={{ background: '#1E293B', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px', padding: '2.5rem 3.5rem', textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', background: '#102A43', color: '#F4F7FB' }}>
+                <div style={{ background: '#1A3350', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px', padding: '2.5rem 3.5rem', textAlign: 'center' }}>
                     <AlertTriangle size={48} color="#EF4444" style={{ margin: '0 auto 1rem' }} />
                     <h2 style={{ color: '#F87171', fontWeight: 800 }}>Access Denied</h2>
-                    <p style={{ color: '#94A3B8' }}>คุณไม่มีสิทธิ์เข้าถึงส่วนควบคุมผู้ดูแลระบบ</p>
+                    <p style={{ color: '#8FA3B8' }}>คุณไม่มีสิทธิ์เข้าถึงส่วนควบคุมผู้ดูแลระบบ</p>
                 </div>
             </div>
         );
     }
 
     const filterChips: { key: FilterKey; label: string; count: number; color: string }[] = [
-        { key: 'all',           label: 'ทั้งหมด',        count: stats.total,        color: '#38BDF8' },
-        { key: 'paid',          label: 'ผู้ใช้จ่ายเงิน',   count: stats.paid,         color: '#34D399' },
-        { key: 'free',          label: 'Free Plan',      count: stats.free,         color: '#94A3B8' },
-        { key: 'small',         label: 'Start',          count: stats.small,        color: '#38BDF8' },
-        { key: 'medium',        label: 'Plus',           count: stats.medium,       color: '#818CF8' },
-        { key: 'large',         label: 'HorCare Pro',    count: stats.large,        color: '#C084FC' },
-        { key: 'active',        label: 'ตลอดชีพ (VIP)',  count: stats.lifetime,     color: '#34D399' },
-        { key: 'expiring_soon', label: 'ใกล้หมดอายุ',   count: stats.expiringSoon, color: '#FBBF24' },
+        { key: 'all',           label: 'ทั้งหมด',        count: stats.total,        color: '#3D8FD6' },
+        { key: 'paid',          label: 'ผู้ใช้จ่ายเงิน',   count: stats.paid,         color: '#22A35A' },
+        { key: 'free',          label: 'Free Plan',      count: stats.free,         color: '#8FA3B8' },
+        { key: 'small',         label: 'Start',          count: stats.small,        color: '#3D8FD6' },
+        { key: 'medium',        label: 'Plus',           count: stats.medium,       color: '#3D8FD6' },
+        { key: 'large',         label: 'HorCare Pro',    count: stats.large,        color: '#3D8FD6' },
+        { key: 'active',        label: 'ตลอดชีพ (VIP)',  count: stats.lifetime,     color: '#22A35A' },
+        { key: 'expiring_soon', label: 'ใกล้หมดอายุ',   count: stats.expiringSoon, color: '#F7B86C' },
         { key: 'expired',       label: 'หมดอายุแล้ว',    count: stats.expired,      color: '#F87171' },
         { key: 'banned',        label: 'ถูกแบน',        count: stats.banned,       color: '#EF4444' },
     ];
@@ -766,16 +766,16 @@ export default function AdminDashboard() {
         <div className="admin-dashboard-page" style={{
             minHeight: '100vh',
             width: '100%',
-            background: '#090D16',
-            backgroundImage: 'radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.08) 0%, rgba(9, 13, 22, 0) 60%)',
-            color: '#F8FAFC',
+            background: '#102A43',
+            backgroundImage: 'radial-gradient(circle at 50% -10%, rgba(10, 108, 194, 0.08) 0%, rgba(16, 42, 67, 0) 60%)',
+            color: '#F4F7FB',
             padding: '2rem 2.5rem 5rem',
             boxSizing: 'border-box',
             fontFamily: 'var(--font-sans)',
         }}>
             {/* Header Command Bar */}
             <div style={{
-                background: 'rgba(15, 23, 42, 0.75)',
+                background: 'rgba(16, 42, 67, 0.75)',
                 backdropFilter: 'blur(16px)',
                 borderRadius: '16px',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -791,10 +791,10 @@ export default function AdminDashboard() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{
                         width: 44, height: 44, borderRadius: '12px',
-                        background: 'rgba(14, 165, 233, 0.12)',
-                        border: '1px solid rgba(14, 165, 233, 0.25)',
+                        background: 'rgba(10, 108, 194, 0.12)',
+                        border: '1px solid rgba(10, 108, 194, 0.25)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#38BDF8',
+                        color: '#3D8FD6',
                     }}>
                         <Shield size={22} />
                     </div>
@@ -805,16 +805,16 @@ export default function AdminDashboard() {
                             </h1>
                             <span style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)',
-                                color: '#34D399', borderRadius: '999px', padding: '0.1rem 0.5rem',
+                                background: 'rgba(34, 163, 90, 0.12)', border: '1px solid rgba(34, 163, 90, 0.25)',
+                                color: '#22A35A', borderRadius: '999px', padding: '0.1rem 0.5rem',
                                 fontSize: '0.7rem', fontWeight: 700,
                             }}>
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34D399' }} /> Live System
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22A35A' }} /> Live System
                             </span>
                         </div>
-                        <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: '0.15rem 0 0' }}>
+                        <p style={{ color: '#8FA3B8', fontSize: '0.85rem', margin: '0.15rem 0 0' }}>
                             จัดการสิทธิ์ สมาชิกภาพ และข้อมูลผู้ใช้งานระบบ HorCare ทั่วประเทศ
-                            {lastSyncTime && <span style={{ marginLeft: '0.5rem', color: '#64748B' }}>· ซิงค์ล่าสุด {lastSyncTime}</span>}
+                            {lastSyncTime && <span style={{ marginLeft: '0.5rem', color: '#557089' }}>· ซิงค์ล่าสุด {lastSyncTime}</span>}
                         </p>
                     </div>
                 </div>
@@ -825,8 +825,8 @@ export default function AdminDashboard() {
                             onClick={handleBackfill}
                             disabled={backfilling}
                             style={{
-                                background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)',
-                                borderRadius: '10px', color: '#FBBF24', padding: '0.55rem 1rem',
+                                background: 'rgba(245, 158, 46, 0.12)', border: '1px solid rgba(245, 158, 46, 0.3)',
+                                borderRadius: '10px', color: '#F7B86C', padding: '0.55rem 1rem',
                                 cursor: backfilling ? 'not-allowed' : 'pointer',
                                 display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', fontWeight: 600,
                             }}
@@ -839,7 +839,7 @@ export default function AdminDashboard() {
                         onClick={handleExportCSV}
                         style={{
                             background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '10px', color: '#CBD5E1', padding: '0.55rem 1rem',
+                            borderRadius: '10px', color: '#C3D0DE', padding: '0.55rem 1rem',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
                             fontSize: '0.825rem', fontWeight: 600, transition: 'all 0.15s ease',
                         }}
@@ -850,11 +850,11 @@ export default function AdminDashboard() {
                         onClick={() => loadUsers(true)}
                         disabled={refreshing}
                         style={{
-                            background: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)',
+                            background: 'linear-gradient(135deg, #0A6CC2 0%, #0A6CC2 100%)',
                             border: 'none', borderRadius: '10px', color: '#FFFFFF',
                             padding: '0.55rem 1.15rem', cursor: refreshing ? 'not-allowed' : 'pointer',
                             display: 'flex', alignItems: 'center', gap: '0.45rem',
-                            fontSize: '0.825rem', fontWeight: 600, boxShadow: '0 2px 8px rgba(2, 132, 199, 0.3)',
+                            fontSize: '0.825rem', fontWeight: 600, boxShadow: '0 2px 8px rgba(10, 108, 194, 0.3)',
                         }}
                     >
                         <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
@@ -871,19 +871,19 @@ export default function AdminDashboard() {
                 marginBottom: '1.5rem',
             }}>
                 {[
-                    { label: 'ผู้ใช้งานทั้งหมด', value: stats.total, sub: `${stats.paid} ผู้ใช้ชำระเงิน`, color: '#38BDF8', bg: 'rgba(14,165,233,0.12)', icon: Users },
-                    { label: 'ประมาณการ MRR', value: `฿${stats.mrr.toLocaleString()}`, sub: 'รายได้เฉลี่ย/เดือน', color: '#34D399', bg: 'rgba(16,185,129,0.12)', icon: Coins },
-                    { label: 'ตลอดชีพ (VIP)', value: stats.lifetime, sub: 'สิทธิ์ไม่จำกัด', color: '#A78BFA', bg: 'rgba(139,92,246,0.12)', icon: Crown },
-                    { label: 'Start Plan', value: stats.small, sub: 'สูงสุด 50 ห้อง', color: '#38BDF8', bg: 'rgba(14,165,233,0.12)', icon: Package },
-                    { label: 'Plus Plan', value: stats.medium, sub: 'สูงสุด 150 ห้อง', color: '#818CF8', bg: 'rgba(99,102,241,0.12)', icon: Package },
-                    { label: 'HorCare Pro', value: stats.large, sub: 'ไม่จำกัดห้อง', color: '#C084FC', bg: 'rgba(168,85,247,0.12)', icon: Sparkles },
-                    { label: 'ใกล้หมดอายุ (<7 วัน)', value: stats.expiringSoon, sub: 'ต้องติดตาม', color: '#FBBF24', bg: 'rgba(245,158,11,0.12)', icon: Timer },
+                    { label: 'ผู้ใช้งานทั้งหมด', value: stats.total, sub: `${stats.paid} ผู้ใช้ชำระเงิน`, color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)', icon: Users },
+                    { label: 'ประมาณการ MRR', value: `฿${stats.mrr.toLocaleString()}`, sub: 'รายได้เฉลี่ย/เดือน', color: '#22A35A', bg: 'rgba(34, 163, 90,0.12)', icon: Coins },
+                    { label: 'ตลอดชีพ (VIP)', value: stats.lifetime, sub: 'สิทธิ์ไม่จำกัด', color: '#3D8FD6', bg: 'rgba(15, 76, 129,0.12)', icon: Crown },
+                    { label: 'Start Plan', value: stats.small, sub: 'สูงสุด 50 ห้อง', color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)', icon: Package },
+                    { label: 'Plus Plan', value: stats.medium, sub: 'สูงสุด 150 ห้อง', color: '#3D8FD6', bg: 'rgba(10, 108, 194,0.12)', icon: Package },
+                    { label: 'HorCare Pro', value: stats.large, sub: 'ไม่จำกัดห้อง', color: '#3D8FD6', bg: 'rgba(15, 76, 129,0.12)', icon: Sparkles },
+                    { label: 'ใกล้หมดอายุ (<7 วัน)', value: stats.expiringSoon, sub: 'ต้องติดตาม', color: '#F7B86C', bg: 'rgba(245, 158, 46,0.12)', icon: Timer },
                     { label: 'หมดอายุ / แบน', value: `${stats.expired} / ${stats.banned}`, sub: 'หมดสัญญา / ระงับ', color: '#F87171', bg: 'rgba(239,68,68,0.12)', icon: XCircle },
                 ].map(s => {
                     const Icon = s.icon;
                     return (
                         <div key={s.label} style={{
-                            background: 'rgba(15, 23, 42, 0.7)',
+                            background: 'rgba(16, 42, 67, 0.7)',
                             border: '1px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '16px',
                             padding: '1.15rem 1.25rem',
@@ -894,7 +894,7 @@ export default function AdminDashboard() {
                             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontWeight: 500 }}>{s.label}</span>
+                                <span style={{ fontSize: '0.78rem', color: '#8FA3B8', fontWeight: 500 }}>{s.label}</span>
                                 <div style={{ width: 32, height: 32, borderRadius: '8px', background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Icon size={16} color={s.color} />
                                 </div>
@@ -903,7 +903,7 @@ export default function AdminDashboard() {
                                 <div style={{ fontSize: '1.65rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1, letterSpacing: '-0.02em' }}>
                                     {loading ? '…' : s.value}
                                 </div>
-                                <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '0.35rem' }}>{s.sub}</div>
+                                <div style={{ fontSize: '0.72rem', color: '#557089', marginTop: '0.35rem' }}>{s.sub}</div>
                             </div>
                         </div>
                     );
@@ -913,41 +913,41 @@ export default function AdminDashboard() {
             {/* Plan Tier Distribution Progress Bar */}
             {stats.total > 0 && (
                 <div style={{
-                    background: 'rgba(15, 23, 42, 0.7)',
+                    background: 'rgba(16, 42, 67, 0.7)',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '16px',
                     padding: '1rem 1.5rem',
                     marginBottom: '1.5rem',
                     backdropFilter: 'blur(12px)',
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', fontSize: '0.8rem', color: '#94A3B8' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: '#CBD5E1' }}>
-                            <Activity size={14} color="#38BDF8" /> สัดส่วนผู้ใช้งานตามแพ็กเกจ (Subscription Distribution)
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', fontSize: '0.8rem', color: '#8FA3B8' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, color: '#C3D0DE' }}>
+                            <Activity size={14} color="#3D8FD6" /> สัดส่วนผู้ใช้งานตามแพ็กเกจ (Subscription Distribution)
                         </span>
                         <span>ชำระเงิน {stats.paid} คน ({Math.round((stats.paid / stats.total) * 100)}%)</span>
                     </div>
                     {/* Visual Bar */}
                     <div style={{ height: '8px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', display: 'flex', overflow: 'hidden', gap: '2px' }}>
-                        <div style={{ width: `${(stats.free / stats.total) * 100}%`, background: '#64748B' }} title={`Free: ${stats.free}`} />
-                        <div style={{ width: `${(stats.small / stats.total) * 100}%`, background: '#38BDF8' }} title={`Start: ${stats.small}`} />
-                        <div style={{ width: `${(stats.medium / stats.total) * 100}%`, background: '#818CF8' }} title={`Plus: ${stats.medium}`} />
-                        <div style={{ width: `${(stats.large / stats.total) * 100}%`, background: '#C084FC' }} title={`HorCare: ${stats.large}`} />
-                        <div style={{ width: `${(stats.lifetime / stats.total) * 100}%`, background: '#34D399' }} title={`Lifetime: ${stats.lifetime}`} />
+                        <div style={{ width: `${(stats.free / stats.total) * 100}%`, background: '#557089' }} title={`Free: ${stats.free}`} />
+                        <div style={{ width: `${(stats.small / stats.total) * 100}%`, background: '#3D8FD6' }} title={`Start: ${stats.small}`} />
+                        <div style={{ width: `${(stats.medium / stats.total) * 100}%`, background: '#3D8FD6' }} title={`Plus: ${stats.medium}`} />
+                        <div style={{ width: `${(stats.large / stats.total) * 100}%`, background: '#3D8FD6' }} title={`HorCare: ${stats.large}`} />
+                        <div style={{ width: `${(stats.lifetime / stats.total) * 100}%`, background: '#22A35A' }} title={`Lifetime: ${stats.lifetime}`} />
                     </div>
                     {/* Legend */}
-                    <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.6rem', fontSize: '0.72rem', color: '#94A3B8', flexWrap: 'wrap' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#64748B' }} /> Free ({stats.free})</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38BDF8' }} /> Start ({stats.small})</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#818CF8' }} /> Plus ({stats.medium})</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#C084FC' }} /> HorCare Pro ({stats.large})</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34D399' }} /> ตลอดชีพ ({stats.lifetime})</span>
+                    <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.6rem', fontSize: '0.72rem', color: '#8FA3B8', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#557089' }} /> Free ({stats.free})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3D8FD6' }} /> Start ({stats.small})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3D8FD6' }} /> Plus ({stats.medium})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3D8FD6' }} /> HorCare Pro ({stats.large})</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22A35A' }} /> ตลอดชีพ ({stats.lifetime})</span>
                     </div>
                 </div>
             )}
 
             {/* Main Interactive Table Card */}
             <div style={{
-                background: 'rgba(15, 23, 42, 0.75)',
+                background: 'rgba(16, 42, 67, 0.75)',
                 borderRadius: '16px',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 overflow: 'hidden',
@@ -965,7 +965,7 @@ export default function AdminDashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                         {/* Search Input */}
                         <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-                            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#64748B' }} />
+                            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#557089' }} />
                             <input
                                 type="text"
                                 placeholder="ค้นหาชื่อ, อีเมล หรือ UID ของผู้ใช้..."
@@ -988,7 +988,7 @@ export default function AdminDashboard() {
                                     onClick={() => setSearchTerm('')}
                                     style={{
                                         position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                                        background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer',
+                                        background: 'transparent', border: 'none', color: '#8FA3B8', cursor: 'pointer',
                                     }}
                                 >
                                     <X size={14} />
@@ -1006,7 +1006,7 @@ export default function AdminDashboard() {
                                     background: 'rgba(255, 255, 255, 0.04)',
                                     border: '1px solid rgba(255, 255, 255, 0.1)',
                                     borderRadius: '10px',
-                                    color: '#CBD5E1',
+                                    color: '#C3D0DE',
                                     fontSize: '0.825rem',
                                     fontWeight: 500,
                                     padding: '0.65rem 2.25rem 0.65rem 1rem',
@@ -1014,12 +1014,12 @@ export default function AdminDashboard() {
                                     outline: 'none',
                                 }}
                             >
-                                <option value="created_desc" style={{ background: '#0F172A', color: '#fff' }}>สมัครล่าสุด (ใหม่ไปเก่า)</option>
-                                <option value="created_asc" style={{ background: '#0F172A', color: '#fff' }}>สมัครก่อนหน้า (เก่าไปใหม่)</option>
-                                <option value="expiry_asc" style={{ background: '#0F172A', color: '#fff' }}>หมดอายุใกล้สุด</option>
-                                <option value="name_asc" style={{ background: '#0F172A', color: '#fff' }}>ชื่อ A-Z</option>
+                                <option value="created_desc" style={{ background: '#102A43', color: '#fff' }}>สมัครล่าสุด (ใหม่ไปเก่า)</option>
+                                <option value="created_asc" style={{ background: '#102A43', color: '#fff' }}>สมัครก่อนหน้า (เก่าไปใหม่)</option>
+                                <option value="expiry_asc" style={{ background: '#102A43', color: '#fff' }}>หมดอายุใกล้สุด</option>
+                                <option value="name_asc" style={{ background: '#102A43', color: '#fff' }}>ชื่อ A-Z</option>
                             </select>
-                            <ArrowUpDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }} />
+                            <ArrowUpDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#557089', pointerEvents: 'none' }} />
                         </div>
 
                         {error && (
@@ -1028,14 +1028,14 @@ export default function AdminDashboard() {
                             </div>
                         )}
 
-                        <div style={{ fontSize: '0.825rem', color: '#64748B', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                            แสดง <strong style={{ color: '#F8FAFC' }}>{displayedUsers.length}</strong> จาก {stats.total} รายการ
+                        <div style={{ fontSize: '0.825rem', color: '#557089', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                            แสดง <strong style={{ color: '#F4F7FB' }}>{displayedUsers.length}</strong> จาก {stats.total} รายการ
                         </div>
                     </div>
 
                     {/* Filter Tabs Chips */}
                     <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Filter size={13} style={{ color: '#64748B', flexShrink: 0, marginRight: '0.2rem' }} />
+                        <Filter size={13} style={{ color: '#557089', flexShrink: 0, marginRight: '0.2rem' }} />
                         {filterChips.map(chip => {
                             const isSelected = filterKey === chip.key;
                             return (
@@ -1043,10 +1043,10 @@ export default function AdminDashboard() {
                                     key={chip.key}
                                     onClick={() => setFilterKey(chip.key)}
                                     style={{
-                                        background: isSelected ? 'rgba(14, 165, 233, 0.16)' : 'rgba(255, 255, 255, 0.04)',
-                                        border: `1px solid ${isSelected ? 'rgba(14, 165, 233, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                                        background: isSelected ? 'rgba(10, 108, 194, 0.16)' : 'rgba(255, 255, 255, 0.04)',
+                                        border: `1px solid ${isSelected ? 'rgba(10, 108, 194, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
                                         borderRadius: '999px',
-                                        color: isSelected ? '#38BDF8' : '#94A3B8',
+                                        color: isSelected ? '#3D8FD6' : '#8FA3B8',
                                         padding: '0.3rem 0.75rem',
                                         fontSize: '0.75rem',
                                         fontWeight: isSelected ? 700 : 500,
@@ -1059,8 +1059,8 @@ export default function AdminDashboard() {
                                 >
                                     <span>{chip.label}</span>
                                     <span style={{
-                                        background: isSelected ? 'rgba(14, 165, 233, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-                                        color: isSelected ? '#38BDF8' : '#64748B',
+                                        background: isSelected ? 'rgba(10, 108, 194, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                                        color: isSelected ? '#3D8FD6' : '#557089',
                                         borderRadius: '999px', padding: '0.05rem 0.4rem', fontSize: '0.68rem', fontWeight: 700,
                                     }}>
                                         {loading ? '…' : chip.count}
@@ -1074,13 +1074,13 @@ export default function AdminDashboard() {
                 {/* Table View */}
                 {loading ? (
                     <div style={{ padding: '5rem 2rem', textAlign: 'center' }}>
-                        <Loader2 size={36} color="#0EA5E9" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }} />
-                        <p style={{ color: '#94A3B8', fontSize: '0.9rem' }}>กำลังเชื่อมต่อและโหลดข้อมูลผู้ใช้...</p>
+                        <Loader2 size={36} color="#0A6CC2" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 1rem' }} />
+                        <p style={{ color: '#8FA3B8', fontSize: '0.9rem' }}>กำลังเชื่อมต่อและโหลดข้อมูลผู้ใช้...</p>
                     </div>
                 ) : displayedUsers.length === 0 ? (
-                    <div style={{ padding: '5rem 2rem', textAlign: 'center', color: '#64748B' }}>
+                    <div style={{ padding: '5rem 2rem', textAlign: 'center', color: '#557089' }}>
                         <Users size={36} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
-                        <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#94A3B8' }}>ไม่พบข้อมูลผู้ใช้งานที่ตรงกับเงื่อนไข</div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#8FA3B8' }}>ไม่พบข้อมูลผู้ใช้งานที่ตรงกับเงื่อนไข</div>
                         <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>ลองปรับเปลี่ยนคำค้นหาหรือเลือกฟิลเตอร์อื่น</div>
                     </div>
                 ) : (
@@ -1088,11 +1088,11 @@ export default function AdminDashboard() {
                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                             <thead>
                                 <tr style={{ background: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                                    <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ผู้ใช้งาน</th>
-                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>แพ็กเกจ</th>
-                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>อายุการใช้งาน</th>
-                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>วันที่สมัคร</th>
-                                    <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>การจัดการด่วน</th>
+                                    <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.72rem', fontWeight: 700, color: '#557089', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ผู้ใช้งาน</th>
+                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#557089', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>แพ็กเกจ</th>
+                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#557089', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>อายุการใช้งาน</th>
+                                    <th style={{ padding: '0.85rem 1rem', fontSize: '0.72rem', fontWeight: 700, color: '#557089', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>วันที่สมัคร</th>
+                                    <th style={{ padding: '0.85rem 1.25rem', fontSize: '0.72rem', fontWeight: 700, color: '#557089', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>การจัดการด่วน</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1109,11 +1109,11 @@ export default function AdminDashboard() {
                                             style={{
                                                 borderBottom: i < displayedUsers.length - 1 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
                                                 cursor: 'pointer',
-                                                background: isSelected ? 'rgba(14, 165, 233, 0.12)' : 'transparent',
+                                                background: isSelected ? 'rgba(10, 108, 194, 0.12)' : 'transparent',
                                                 transition: 'background 0.15s ease',
                                             }}
                                             onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.025)'; }}
-                                            onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(14, 165, 233, 0.12)' : 'transparent'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(10, 108, 194, 0.12)' : 'transparent'; }}
                                         >
                                             {/* User Info */}
                                             <td style={{ padding: '1rem 1.25rem' }}>
@@ -1123,13 +1123,13 @@ export default function AdminDashboard() {
                                                         <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                                             <span>{u.display_name || 'ไม่ระบุชื่อ'}</span>
                                                             {u.role === 'admin' && (
-                                                                <span title="ผู้ดูแลระบบ (Admin)"><Crown size={13} color="#FBBF24" /></span>
+                                                                <span title="ผู้ดูแลระบบ (Admin)"><Crown size={13} color="#F7B86C" /></span>
                                                             )}
                                                             {u.status === 'banned' && (
                                                                 <span style={{ color: '#F87171', fontSize: '0.7rem', background: 'rgba(239,68,68,0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>แบน</span>
                                                             )}
                                                         </div>
-                                                        <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: '0.15rem' }}>
+                                                        <div style={{ fontSize: '0.78rem', color: '#8FA3B8', marginTop: '0.15rem' }}>
                                                             {u.email}
                                                         </div>
                                                     </div>
@@ -1152,7 +1152,7 @@ export default function AdminDashboard() {
                                                 {u.license === 'active' ? (
                                                     <span style={{
                                                         display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                                                        color: '#34D399', fontSize: '0.8rem', fontWeight: 700,
+                                                        color: '#22A35A', fontSize: '0.8rem', fontWeight: 700,
                                                     }}>
                                                         <InfinityIcon size={13} /> ตลอดชีพ
                                                     </span>
@@ -1160,26 +1160,26 @@ export default function AdminDashboard() {
                                                     <div>
                                                         <span style={{
                                                             display: 'inline-block',
-                                                            background: daysLeft <= 0 ? 'rgba(239,68,68,0.15)' : daysLeft <= 7 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
-                                                            color: daysLeft <= 0 ? '#F87171' : daysLeft <= 7 ? '#FBBF24' : '#34D399',
+                                                            background: daysLeft <= 0 ? 'rgba(239,68,68,0.15)' : daysLeft <= 7 ? 'rgba(245, 158, 46,0.15)' : 'rgba(34, 163, 90,0.15)',
+                                                            color: daysLeft <= 0 ? '#F87171' : daysLeft <= 7 ? '#F7B86C' : '#22A35A',
                                                             borderRadius: '8px', padding: '0.2rem 0.55rem', fontSize: '0.8rem', fontWeight: 700,
                                                         }}>
                                                             {daysLeft <= 0 ? 'หมดอายุแล้ว' : `${daysLeft} วัน`}
                                                         </span>
                                                         {u.current_period_end && (
-                                                            <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '0.25rem' }}>
+                                                            <div style={{ fontSize: '0.7rem', color: '#557089', marginTop: '0.25rem' }}>
                                                                 {new Date(u.current_period_end).toLocaleDateString('th-TH')}
                                                             </div>
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <span style={{ color: '#64748B', fontSize: '0.8rem' }}>—</span>
+                                                    <span style={{ color: '#557089', fontSize: '0.8rem' }}>—</span>
                                                 )}
                                             </td>
 
                                             {/* Registration Date */}
                                             <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                <span style={{ fontSize: '0.8rem', color: '#94A3B8' }}>
+                                                <span style={{ fontSize: '0.8rem', color: '#8FA3B8' }}>
                                                     {u.created_at ? new Date(u.created_at).toLocaleDateString('th-TH', { year: '2-digit', month: 'short', day: 'numeric' }) : '—'}
                                                 </span>
                                             </td>
@@ -1194,8 +1194,8 @@ export default function AdminDashboard() {
                                                             disabled={isProcessing}
                                                             title="ต่ออายุ +30 วัน"
                                                             style={{
-                                                                background: 'rgba(14, 165, 233, 0.12)', color: '#38BDF8',
-                                                                border: '1px solid rgba(14, 165, 233, 0.3)', borderRadius: '8px',
+                                                                background: 'rgba(10, 108, 194, 0.12)', color: '#3D8FD6',
+                                                                border: '1px solid rgba(10, 108, 194, 0.3)', borderRadius: '8px',
                                                                 padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
                                                                 cursor: isProcessing ? 'not-allowed' : 'pointer',
                                                                 display: 'flex', alignItems: 'center', gap: '0.25rem',
@@ -1214,8 +1214,8 @@ export default function AdminDashboard() {
                                                             disabled={isProcessing}
                                                             title="ปลดล็อกตลอดชีพ"
                                                             style={{
-                                                                background: 'rgba(16, 185, 129, 0.12)', color: '#34D399',
-                                                                border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px',
+                                                                background: 'rgba(34, 163, 90, 0.12)', color: '#22A35A',
+                                                                border: '1px solid rgba(34, 163, 90, 0.3)', borderRadius: '8px',
                                                                 padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 600,
                                                                 cursor: isProcessing ? 'not-allowed' : 'pointer',
                                                                 display: 'flex', alignItems: 'center', gap: '0.25rem',
@@ -1232,7 +1232,7 @@ export default function AdminDashboard() {
                                                         onClick={() => setSelectedUser(u)}
                                                         title="ดูข้อมูลละเอียด"
                                                         style={{
-                                                            background: 'rgba(255, 255, 255, 0.05)', color: '#CBD5E1',
+                                                            background: 'rgba(255, 255, 255, 0.05)', color: '#C3D0DE',
                                                             border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px',
                                                             padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 500,
                                                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem',

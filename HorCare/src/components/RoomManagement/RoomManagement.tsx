@@ -328,7 +328,7 @@ export default function RoomManagement({
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {terms.isMarket ? <Store size={28} color="#D97706" /> : <Home size={28} />} {terms.manageUnitsLabel}
+                        {terms.isMarket ? <Store size={28} color="#E8740C" /> : <Home size={28} />} {terms.manageUnitsLabel}
                     </h1>
                     <p className="page-subtitle">จัดการข้อมูล{terms.unitNamePlural} · อัตราค่าเช่า · มิเตอร์และค่าบริการ</p>
                 </div>
@@ -346,7 +346,7 @@ export default function RoomManagement({
                                 }
                             }}
                             title="สร้างแผงตัวอย่างสำหรับเดโม่"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', borderColor: '#D97706', color: '#B45309', background: '#FEF3C7', fontWeight: 700 }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', borderColor: '#E8740C', color: '#C2410C', background: '#FDEBD3', fontWeight: 700 }}
                         >
                             <Sparkles size={15} /> สร้าง 10 แผงตัวอย่าง
                         </button>
@@ -395,12 +395,12 @@ export default function RoomManagement({
             {importResult && (
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: '0.625rem',
-                    background: '#ECFDF5', border: '1px solid #A7F3D0',
-                    color: '#065F46', borderRadius: '10px',
+                    background: '#EFF8F2', border: '1px solid #A7DDBB',
+                    color: '#166534', borderRadius: '10px',
                     padding: '0.625rem 0.875rem', fontSize: '0.8125rem',
                     fontWeight: 600, marginBottom: '0.75rem',
                 }}>
-                    <Check size={15} color="#059669" />
+                    <Check size={15} color="#15803D" />
                     <span style={{ flex: 1 }}>
                         {importResult.updated > 0 && `อัปเดต ${importResult.updated} ${terms.unitName}`}
                         {importResult.updated > 0 && importResult.created > 0 && ' · '}
@@ -421,12 +421,12 @@ export default function RoomManagement({
                     flexWrap: 'wrap', gap: '0.75rem',
                     padding: '0.75rem 1rem', marginBottom: '1rem',
                     borderRadius: '12px',
-                    background: atRoomLimit ? 'rgba(239,68,68,0.10)' : 'rgba(139,92,246,0.08)',
-                    border: atRoomLimit ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.2)',
+                    background: atRoomLimit ? 'rgba(239,68,68,0.10)' : 'rgba(15, 76, 129,0.08)',
+                    border: atRoomLimit ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(15, 76, 129,0.2)',
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Lock size={14} color={atRoomLimit ? '#F87171' : '#A78BFA'} />
-                        <span style={{ fontSize: '0.8125rem', color: atRoomLimit ? '#FCA5A5' : '#C4B5FD', fontWeight: 600 }}>
+                        <Lock size={14} color={atRoomLimit ? '#F87171' : '#3D8FD6'} />
+                        <span style={{ fontSize: '0.8125rem', color: atRoomLimit ? '#FCA5A5' : '#CFE2F6', fontWeight: 600 }}>
                             {atRoomLimit
                                 ? `ถึงลิมิตทดลองใช้แล้ว (${rooms.length}/${maxRooms} ${terms.unitName})`
                                 : `ทดลองใช้: ${rooms.length}/${maxRooms} ${terms.unitName}`
@@ -437,7 +437,7 @@ export default function RoomManagement({
                         <button
                             onClick={onUpgrade}
                             style={{
-                                background: 'linear-gradient(135deg,#8B5CF6,#EC4899)',
+                                background: 'linear-gradient(135deg,#0F4C81,#E8740C)',
                                 border: 'none', borderRadius: '8px',
                                 padding: '0.375rem 0.875rem',
                                 color: '#fff', fontWeight: 700, fontSize: '0.78rem',
@@ -470,10 +470,10 @@ export default function RoomManagement({
                             <button
                                 onClick={onUpgrade}
                                 style={{
-                                    marginLeft: 'auto', background: 'rgba(139,92,246,0.15)',
-                                    border: '1px solid rgba(139,92,246,0.3)',
+                                    marginLeft: 'auto', background: 'rgba(15, 76, 129,0.15)',
+                                    border: '1px solid rgba(15, 76, 129,0.3)',
                                     borderRadius: '8px', padding: '0.375rem 0.75rem',
-                                    color: '#C4B5FD', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+                                    color: '#CFE2F6', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
                                 }}
                             >
                                 อัปเกรด
@@ -519,19 +519,19 @@ export default function RoomManagement({
                         />
                     </div>
                     {/* Type filter */}
-                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#F3F4F6)', borderRadius: '8px', padding: '0.2rem' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#EBF1F7)', borderRadius: '8px', padding: '0.2rem' }}>
                         {([['all', 'ทั้งหมด'], ['dormitory', terms.isMarket ? 'แผงทั่วไป' : 'หอพัก'], ['commercial', terms.isMarket ? 'พาณิชย์/พิเศษ' : 'พาณิชย์']] as const).map(([val, label]) => (
                             <button key={val} onClick={() => setFilterType(val)}
                                 style={{
                                     padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: filterType === val ? 700 : 500, border: 'none',
-                                    background: filterType === val ? 'var(--color-primary,#8B5CF6)' : 'none',
+                                    background: filterType === val ? 'var(--color-primary,#0F4C81)' : 'none',
                                     color: filterType === val ? '#fff' : 'var(--color-text-muted)',
                                 }}
                             >{label}</button>
                         ))}
                     </div>
                     {/* LINE filter */}
-                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#F3F4F6)', borderRadius: '8px', padding: '0.2rem' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--color-gray-100,#EBF1F7)', borderRadius: '8px', padding: '0.2rem' }}>
                         {([['all', 'LINE: ทั้งหมด'], ['linked', 'เชื่อมแล้ว'], ['unlinked', 'ยังไม่เชื่อม']] as const).map(([val, label]) => (
                             <button key={val} onClick={() => setFilterLine(val)}
                                 style={{
@@ -562,7 +562,7 @@ export default function RoomManagement({
             </div>
 
             {offCycle.length > 0 && (
-                <div className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', background: '#FFFBEB', borderColor: '#FCD34D' }}>
+                <div className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', background: '#FEF6EC', borderColor: '#F7B86C' }}>
                     <span style={{ flex: 1, minWidth: 220, fontSize: '0.875rem' }}>
                         มี {offCycle.length} {terms.unitName}ที่ยังตั้งเป็น "{rentTypeLabel('monthly', config?.building_type)}" — {terms.isMarket ? 'ตลาดนี้เก็บเงินรายวัน/รายสัปดาห์' : 'ที่นี่เก็บเงินต่อคืน'}
                     </span>
@@ -617,7 +617,7 @@ export default function RoomManagement({
 
                 {rooms.length === 0 ? (
                     <div className="empty-state">
-                        {terms.isMarket ? <Store size={48} color="#D97706" /> : <Home size={48} />}
+                        {terms.isMarket ? <Store size={48} color="#E8740C" /> : <Home size={48} />}
                         <h3>ยังไม่มี{terms.unitNamePlural}</h3>
                         <p>เพิ่ม{terms.unitNamePlural}ด้านบนเพื่อเริ่มต้นใช้งาน{terms.isMarket ? ' หรือกดปุ่ม "สร้าง 10 แผงตัวอย่าง" ด้านบนเพื่อเดโม่ได้ทันที' : ''}</p>
                     </div>
@@ -635,7 +635,7 @@ export default function RoomManagement({
                                     <th style={{ width: '40px', textAlign: 'center' }}>
                                         <button
                                             onClick={toggleSelectAll}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isAllSelected ? '#60A5FA' : 'var(--color-gray-400)', display: 'flex', alignItems: 'center', margin: '0 auto' }}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isAllSelected ? '#3D8FD6' : 'var(--color-gray-400)', display: 'flex', alignItems: 'center', margin: '0 auto' }}
                                             title={isAllSelected ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
                                         >
                                             {isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
@@ -656,12 +656,12 @@ export default function RoomManagement({
                             <tbody>
                                 {filteredRooms.map((room, index) => (
                                     <Fragment key={room.id}>
-                                    <tr style={selectedRooms.has(room.id) ? { background: 'rgba(96,165,250,0.06)' } : undefined}>
+                                    <tr style={selectedRooms.has(room.id) ? { background: 'rgba(61, 143, 214,0.06)' } : undefined}>
                                         <td style={{ textAlign: 'center' }}>
                                             <button
                                                 onClick={() => editingRoom !== room.id && toggleSelect(room.id)}
                                                 disabled={editingRoom === room.id}
-                                                style={{ background: 'none', border: 'none', cursor: editingRoom === room.id ? 'default' : 'pointer', color: selectedRooms.has(room.id) ? '#60A5FA' : 'var(--color-gray-300)', display: 'flex', alignItems: 'center', margin: '0 auto', opacity: editingRoom === room.id ? 0.3 : 1 }}
+                                                style={{ background: 'none', border: 'none', cursor: editingRoom === room.id ? 'default' : 'pointer', color: selectedRooms.has(room.id) ? '#3D8FD6' : 'var(--color-gray-300)', display: 'flex', alignItems: 'center', margin: '0 auto', opacity: editingRoom === room.id ? 0.3 : 1 }}
                                             >
                                                 {selectedRooms.has(room.id) ? <CheckSquare size={16} /> : <Square size={16} />}
                                             </button>
@@ -740,7 +740,7 @@ export default function RoomManagement({
                                                 )
                                             ) : terms.isMarket ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                                    <span className="badge" style={{ fontSize: '0.75rem', background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' }}>
+                                                    <span className="badge" style={{ fontSize: '0.75rem', background: '#FDEBD3', color: '#C2410C', border: '1px solid #FBD9A8' }}>
                                                         <Store size={11} style={{ marginRight: 3 }} /> {room.zone || 'แผงทั่วไป'}
                                                     </span>
                                                     {room.business_type && (
@@ -749,7 +749,7 @@ export default function RoomManagement({
                                                         </span>
                                                     )}
                                                     {room.stall_size && (
-                                                        <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>
+                                                        <span style={{ fontSize: '0.68rem', color: '#8FA3B8' }}>
                                                             ขนาด {room.stall_size}
                                                         </span>
                                                     )}
@@ -817,7 +817,7 @@ export default function RoomManagement({
                                                         editRoomType === 'commercial' ? (
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                                    <Zap size={12} color="#F59E0B" />
+                                                                    <Zap size={12} color="#F59E2E" />
                                                                     <input
                                                                         type="number"
                                                                         className="form-input mono"
@@ -828,7 +828,7 @@ export default function RoomManagement({
                                                                     />
                                                                 </div>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                                    <Droplets size={12} color="#2563EB" />
+                                                                    <Droplets size={12} color="#0A6CC2" />
                                                                     <input
                                                                         type="number"
                                                                         className="form-input mono"
@@ -845,10 +845,10 @@ export default function RoomManagement({
                                                     ) : (
                                                         <div>
                                                             {room.custom_electricity_rate && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={12} color="#D97706" /> {room.custom_electricity_rate} บ./หน่วย</div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={12} color="#E8740C" /> {room.custom_electricity_rate} บ./หน่วย</div>
                                                             )}
                                                             {room.custom_water_config?.unit_rate && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Droplets size={12} color="#2563EB" /> {room.custom_water_config.unit_rate} บ./หน่วย</div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Droplets size={12} color="#0A6CC2" /> {room.custom_water_config.unit_rate} บ./หน่วย</div>
                                                             )}
                                                             {!room.custom_electricity_rate && !room.custom_water_config && (
                                                                 <span className="text-muted">ค่าเริ่มต้น</span>
@@ -938,11 +938,11 @@ export default function RoomManagement({
                                         </td>
                                     </tr>
                                     {editingRoom === room.id && (
-                                        <tr key={`${room.id}-lang`} style={{ background: 'rgba(96,165,250,0.06)' }}>
+                                        <tr key={`${room.id}-lang`} style={{ background: 'rgba(61, 143, 214,0.06)' }}>
                                             <td colSpan={(hasAnyCommercial ? 11 : 10) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.5rem 2rem 0.5rem', borderTop: 'none' }}>
                                                 <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                                                     <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                                        <Globe size={14} color="#0EA5E9" /> ภาษาบิล/แจ้งเตือนห้องนี้:
+                                                        <Globe size={14} color="#0A6CC2" /> ภาษาบิล/แจ้งเตือนห้องนี้:
                                                     </span>
                                                     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                                                         <button
@@ -950,7 +950,7 @@ export default function RoomManagement({
                                                             onClick={() => setEditLanguage('')}
                                                             className="btn btn-sm"
                                                             style={{
-                                                                background: editLanguage === '' ? '#0EA5E9' : 'var(--color-gray-100)',
+                                                                background: editLanguage === '' ? '#0A6CC2' : 'var(--color-gray-100)',
                                                                 color: editLanguage === '' ? '#ffffff' : 'var(--color-gray-700)',
                                                                 border: '1px solid var(--color-gray-300)',
                                                                 borderRadius: '6px',
@@ -967,7 +967,7 @@ export default function RoomManagement({
                                                                 onClick={() => setEditLanguage(opt.code)}
                                                                 className="btn btn-sm"
                                                                 style={{
-                                                                    background: editLanguage === opt.code ? '#2563EB' : 'var(--color-gray-100)',
+                                                                    background: editLanguage === opt.code ? '#0A6CC2' : 'var(--color-gray-100)',
                                                                     color: editLanguage === opt.code ? '#ffffff' : 'var(--color-gray-700)',
                                                                     border: '1px solid var(--color-gray-300)',
                                                                     borderRadius: '6px',
@@ -988,7 +988,7 @@ export default function RoomManagement({
                                         </tr>
                                     )}
                                     {editingRoom === room.id && (
-                                        <tr key={`${room.id}-amenities`} style={{ background: 'rgba(96,165,250,0.06)' }}>
+                                        <tr key={`${room.id}-amenities`} style={{ background: 'rgba(61, 143, 214,0.06)' }}>
                                             <td colSpan={(hasAnyCommercial ? 11 : 10) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.5rem 2rem', borderTop: 'none' }}>
                                                 <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
                                                     <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.5rem' }}>สิ่งอำนวยความสะดวก</div>
@@ -1003,7 +1003,7 @@ export default function RoomManagement({
                                                                     onClick={() => setEditAmenities(prev => on ? prev.filter(x => x !== key) : [...prev, key])}
                                                                     className="btn btn-sm"
                                                                     style={{
-                                                                        background: on ? '#2563EB' : 'var(--color-gray-100)',
+                                                                        background: on ? '#0A6CC2' : 'var(--color-gray-100)',
                                                                         color: on ? '#fff' : 'var(--color-gray-700)',
                                                                         border: '1px solid var(--color-gray-300)', borderRadius: '6px',
                                                                         fontSize: '0.75rem', padding: '0.2rem 0.5rem',
@@ -1017,11 +1017,11 @@ export default function RoomManagement({
                                         </tr>
                                     )}
                                     {editingRoom === room.id && commonFees.length > 0 && (
-                                        <tr key={`${room.id}-fees`} style={{ background: 'rgba(96,165,250,0.06)' }}>
+                                        <tr key={`${room.id}-fees`} style={{ background: 'rgba(61, 143, 214,0.06)' }}>
                                             <td colSpan={(hasAnyCommercial ? 10 : 9) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.75rem 2rem', borderTop: 'none' }}>
                                                 <div style={{ background: 'var(--color-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
                                                     <div style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <Building2 size={16} color="#4F46E5" />
+                                                        <Building2 size={16} color="#0A6CC2" />
                                                         ตั้งค่าค่าบริการส่วนกลางรายห้อง
                                                     </div>
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
@@ -1033,8 +1033,8 @@ export default function RoomManagement({
                                                                 <div key={fee.id} style={{
                                                                     display: 'flex', alignItems: 'center', gap: '0.75rem',
                                                                     padding: '0.5rem 0.75rem', borderRadius: '8px',
-                                                                    background: isActive ? 'rgba(16,185,129,0.05)' : 'rgba(107,114,128,0.05)',
-                                                                    border: `1px solid ${isActive ? 'rgba(16,185,129,0.2)' : 'rgba(107,114,128,0.2)'}`,
+                                                                    background: isActive ? 'rgba(34, 163, 90,0.05)' : 'rgba(85, 112, 137,0.05)',
+                                                                    border: `1px solid ${isActive ? 'rgba(34, 163, 90,0.2)' : 'rgba(85, 112, 137,0.2)'}`,
                                                                     opacity: isActive ? 1 : 0.6
                                                                 }}>
                                                                     <input

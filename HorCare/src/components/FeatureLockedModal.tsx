@@ -31,7 +31,7 @@ export default function FeatureLockedModal({ featureName, onClose, onUpgrade }: 
         }}
       >
         <div style={{
-          background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 55%, #38BDF8 100%)',
+          background: 'linear-gradient(135deg, #0A6CC2 0%, #0A6CC2 55%, #3D8FD6 100%)',
           padding: '2rem 1.75rem 1.5rem',
           textAlign: 'center',
           position: 'relative',
@@ -67,15 +67,15 @@ export default function FeatureLockedModal({ featureName, onClose, onUpgrade }: 
 
         <div style={{ padding: '1.5rem 1.75rem', background: '#fff' }}>
           <div style={{
-            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(14, 165, 233, 0.05))',
-            border: '1px solid rgba(2, 132, 199, 0.22)',
+            background: 'linear-gradient(135deg, rgba(10, 108, 194, 0.08), rgba(10, 108, 194, 0.05))',
+            border: '1px solid rgba(10, 108, 194, 0.22)',
             borderRadius: '12px', padding: '0.875rem 1rem',
             marginBottom: '1.25rem',
             display: 'flex', alignItems: 'center', gap: '0.625rem',
           }}>
-            <Zap size={18} color="#0284C7" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: '0.8125rem', color: '#111827', lineHeight: 1.5 }}>
-              เริ่มต้นเพียง <strong style={{ color: '#0284C7' }}>฿399/เดือน</strong> สำหรับแพ็กเกจ Pro
+            <Zap size={18} color="#0A6CC2" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.8125rem', color: '#102A43', lineHeight: 1.5 }}>
+              เริ่มต้นเพียง <strong style={{ color: '#0A6CC2' }}>฿399/เดือน</strong> สำหรับแพ็กเกจ Pro
             </span>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -83,8 +83,8 @@ export default function FeatureLockedModal({ featureName, onClose, onUpgrade }: 
               onClick={onClose}
               style={{
                 flex: 1, padding: '0.75rem', borderRadius: '10px',
-                background: 'none', border: '1px solid #E5E7EB',
-                cursor: 'pointer', fontWeight: 600, color: '#6B7280',
+                background: 'none', border: '1px solid #DCE5EF',
+                cursor: 'pointer', fontWeight: 600, color: '#557089',
               }}
             >
               ปิด
@@ -93,11 +93,11 @@ export default function FeatureLockedModal({ featureName, onClose, onUpgrade }: 
               onClick={onUpgrade}
               style={{
                 flex: 2, padding: '0.75rem', borderRadius: '10px',
-                background: 'linear-gradient(135deg, #0284C7, #0EA5E9)',
+                background: 'linear-gradient(135deg, #0A6CC2, #0A6CC2)',
                 border: 'none', cursor: 'pointer',
                 fontWeight: 700, color: '#fff', fontSize: '0.9rem',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.35)',
+                boxShadow: '0 4px 16px rgba(10, 108, 194, 0.35)',
               }}
             >
               <Zap size={16} />

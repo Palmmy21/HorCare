@@ -173,7 +173,7 @@ export default function ContractTemplatesSettingsSection({
       {/* ── Header Ribbon ── */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+          background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
           borderRadius: '20px',
           padding: '1.5rem 1.75rem',
           color: '#FFFFFF',
@@ -182,7 +182,7 @@ export default function ContractTemplatesSettingsSection({
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '1rem',
-          boxShadow: '0 8px 24px -4px rgba(2, 132, 199, 0.35)',
+          boxShadow: '0 8px 24px -4px rgba(10, 108, 194, 0.35)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -216,7 +216,7 @@ export default function ContractTemplatesSettingsSection({
           onClick={handleOpenCreate}
           style={{
             background: '#FFFFFF',
-            color: '#0369A1',
+            color: '#08589F',
             border: 'none',
             borderRadius: '12px',
             padding: '0.75rem 1.25rem',
@@ -238,7 +238,7 @@ export default function ContractTemplatesSettingsSection({
       <div className="settings-section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <h3 className="settings-title" style={{ margin: 0 }}>
-            <Sparkles size={18} color="#0284C7" />
+            <Sparkles size={18} color="#0A6CC2" />
             เทมเพลตที่คุณสร้างเอง ({customTemplates.length})
           </h3>
         </div>
@@ -247,9 +247,9 @@ export default function ContractTemplatesSettingsSection({
           <div
             style={{
               padding: '2rem',
-              backgroundColor: '#F8FAFC',
+              backgroundColor: '#F4F7FB',
               borderRadius: '16px',
-              border: '1.5px dashed #CBD5E1',
+              border: '1.5px dashed #C3D0DE',
               textAlign: 'center',
               display: 'flex',
               flexDirection: 'column',
@@ -262,8 +262,8 @@ export default function ContractTemplatesSettingsSection({
                 width: 44,
                 height: 44,
                 borderRadius: '50%',
-                background: '#E0F2FE',
-                color: '#0284C7',
+                background: '#E7F0FA',
+                color: '#0A6CC2',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -272,10 +272,10 @@ export default function ContractTemplatesSettingsSection({
               <FileText size={22} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1E293B' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1A3350' }}>
                 ยังไม่มีเทมเพลตที่กำหนดเอง
               </div>
-              <div style={{ fontSize: '0.825rem', color: '#64748B', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.825rem', color: '#557089', marginTop: '0.2rem' }}>
                 คุณสามารถสร้างเทมเพลตใหม่ขึ้นมาเอง หรือคลิก "นำไปเป็นแม่แบบ" จากเทมเพลตมาตรฐานด้านล่างเพื่อปรับแต่ง
               </div>
             </div>
@@ -283,7 +283,7 @@ export default function ContractTemplatesSettingsSection({
               type="button"
               onClick={handleOpenCreate}
               style={{
-                background: '#0284C7',
+                background: '#0A6CC2',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '10px',
@@ -309,7 +309,7 @@ export default function ContractTemplatesSettingsSection({
                   background: '#FFFFFF',
                   borderRadius: '16px',
                   padding: '1.25rem',
-                  border: '1px solid #E2E8F0',
+                  border: '1px solid #DCE5EF',
                   boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                   display: 'flex',
                   flexDirection: 'column',
@@ -325,42 +325,42 @@ export default function ContractTemplatesSettingsSection({
                         borderRadius: '6px',
                         fontSize: '0.72rem',
                         fontWeight: 700,
-                        background: tpl.contract_type === 'market_stall' ? '#FEF3C7' : tpl.contract_type === 'commercial' ? '#E0E7FF' : '#E0F2FE',
-                        color: tpl.contract_type === 'market_stall' ? '#92400E' : tpl.contract_type === 'commercial' ? '#3730A3' : '#0369A1',
+                        background: tpl.contract_type === 'market_stall' ? '#FDEBD3' : tpl.contract_type === 'commercial' ? '#E7F0FA' : '#E7F0FA',
+                        color: tpl.contract_type === 'market_stall' ? '#9A3412' : tpl.contract_type === 'commercial' ? '#08589F' : '#08589F',
                       }}
                     >
                       {tpl.contract_type === 'market_stall' ? 'แผงค้าตลาด' : tpl.contract_type === 'commercial' ? 'พื้นที่พาณิชย์' : 'หอพัก/อพาร์ตเมนต์'}
                     </span>
-                    <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#8FA3B8' }}>
                       {tpl.clauses.length} ข้อสัญญา
                     </span>
                   </div>
 
-                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0F172A' }}>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#102A43' }}>
                     {tpl.name}
                   </h4>
-                  <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#557089', marginTop: '0.25rem' }}>
                     หัวข้อ: {tpl.title}
                   </div>
                   {tpl.custom_terms && (
-                    <div style={{ fontSize: '0.75rem', color: '#475569', fontStyle: 'italic', marginTop: '0.4rem', lineClamp: 2 }}>
+                    <div style={{ fontSize: '0.75rem', color: '#3E5872', fontStyle: 'italic', marginTop: '0.4rem', lineClamp: 2 }}>
                       * {tpl.custom_terms}
                     </div>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #F1F5F9', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #EBF1F7', paddingTop: '0.75rem' }}>
                   <button
                     type="button"
                     onClick={() => handleDuplicate(tpl)}
                     style={{
                       background: 'transparent',
-                      border: '1px solid #CBD5E1',
+                      border: '1px solid #C3D0DE',
                       borderRadius: '8px',
                       padding: '0.4rem 0.65rem',
                       fontSize: '0.775rem',
                       fontWeight: 600,
-                      color: '#475569',
+                      color: '#3E5872',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -374,13 +374,13 @@ export default function ContractTemplatesSettingsSection({
                     type="button"
                     onClick={() => handleOpenEdit(tpl)}
                     style={{
-                      background: '#F0F9FF',
-                      border: '1px solid #BAE6FD',
+                      background: '#F2F7FC',
+                      border: '1px solid #CFE2F6',
                       borderRadius: '8px',
                       padding: '0.4rem 0.75rem',
                       fontSize: '0.775rem',
                       fontWeight: 700,
-                      color: '#0284C7',
+                      color: '#0A6CC2',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -419,7 +419,7 @@ export default function ContractTemplatesSettingsSection({
       {/* ── Section 2: Built-in System Templates ── */}
       <div className="settings-section">
         <h3 className="settings-title" style={{ marginBottom: '1rem' }}>
-          <ShieldCheck size={18} color="#10B981" />
+          <ShieldCheck size={18} color="#22A35A" />
           เทมเพลตมาตรฐาน HorCare (System Presets)
         </h3>
 
@@ -428,10 +428,10 @@ export default function ContractTemplatesSettingsSection({
             <div
               key={tpl.id}
               style={{
-                background: '#F8FAFC',
+                background: '#F4F7FB',
                 borderRadius: '16px',
                 padding: '1.25rem',
-                border: '1px solid #E2E8F0',
+                border: '1px solid #DCE5EF',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -446,37 +446,37 @@ export default function ContractTemplatesSettingsSection({
                       borderRadius: '6px',
                       fontSize: '0.72rem',
                       fontWeight: 700,
-                      background: '#E2E8F0',
-                      color: '#475569',
+                      background: '#DCE5EF',
+                      color: '#3E5872',
                     }}
                   >
                     มาตรฐานระบบ
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#8FA3B8' }}>
                     {tpl.clauses.length} ข้อสัญญา
                   </span>
                 </div>
 
-                <h4 style={{ margin: 0, fontSize: '0.975rem', fontWeight: 800, color: '#0F172A' }}>
+                <h4 style={{ margin: 0, fontSize: '0.975rem', fontWeight: 800, color: '#102A43' }}>
                   {tpl.name}
                 </h4>
-                <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#557089', marginTop: '0.25rem' }}>
                   หัวข้อ: {tpl.title}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #DCE5EF', paddingTop: '0.75rem' }}>
                 <button
                   type="button"
                   onClick={() => handleDuplicate(tpl)}
                   style={{
                     background: '#FFFFFF',
-                    border: '1.5px solid #BAE6FD',
+                    border: '1.5px solid #CFE2F6',
                     borderRadius: '8px',
                     padding: '0.45rem 0.85rem',
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    color: '#0284C7',
+                    color: '#0A6CC2',
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -501,7 +501,7 @@ export default function ContractTemplatesSettingsSection({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backgroundColor: 'rgba(16, 42, 67, 0.75)',
             backdropFilter: 'blur(8px)',
             padding: '1rem',
             overflow: 'hidden',
@@ -528,7 +528,7 @@ export default function ContractTemplatesSettingsSection({
             <div
               style={{
                 padding: '1.25rem 1.5rem',
-                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                 color: '#FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
@@ -643,13 +643,13 @@ export default function ContractTemplatesSettingsSection({
                     type="button"
                     onClick={handleAddClause}
                     style={{
-                      background: '#F0F9FF',
-                      border: '1px solid #BAE6FD',
+                      background: '#F2F7FC',
+                      border: '1px solid #CFE2F6',
                       borderRadius: '8px',
                       padding: '0.35rem 0.75rem',
                       fontSize: '0.8rem',
                       fontWeight: 700,
-                      color: '#0284C7',
+                      color: '#0A6CC2',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -663,7 +663,7 @@ export default function ContractTemplatesSettingsSection({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {formClauses.map((clause, idx) => (
                     <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748B', width: '22px', paddingTop: '0.45rem' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#557089', width: '22px', paddingTop: '0.45rem' }}>
                         {idx + 1}.
                       </span>
                       <textarea
@@ -709,8 +709,8 @@ export default function ContractTemplatesSettingsSection({
             <div
               style={{
                 padding: '1rem 1.5rem',
-                backgroundColor: '#F8FAFC',
-                borderTop: '1px solid #E2E8F0',
+                backgroundColor: '#F4F7FB',
+                borderTop: '1px solid #DCE5EF',
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: '0.75rem',
@@ -722,9 +722,9 @@ export default function ContractTemplatesSettingsSection({
                 style={{
                   padding: '0.65rem 1.25rem',
                   borderRadius: '12px',
-                  border: '1px solid #CBD5E1',
+                  border: '1px solid #C3D0DE',
                   background: '#FFFFFF',
-                  color: '#475569',
+                  color: '#3E5872',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   cursor: 'pointer',
@@ -739,12 +739,12 @@ export default function ContractTemplatesSettingsSection({
                   padding: '0.65rem 1.5rem',
                   borderRadius: '12px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                  background: 'linear-gradient(135deg, #0A6CC2, #08589F)',
                   color: '#FFFFFF',
                   fontWeight: 800,
                   fontSize: '0.875rem',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                  boxShadow: '0 4px 12px rgba(10, 108, 194, 0.25)',
                 }}
               >
                 {editingId ? 'บันทึกการแก้ไข' : 'บันทึกเทมเพลตใหม่'}

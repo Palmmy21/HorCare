@@ -23,8 +23,8 @@ const ERRORS: Record<string, string> = {
     forbidden: 'คุณไม่มีสิทธิ์บันทึกรับชำระ',
     unauthenticated: 'กรุณาเข้าสู่ระบบใหม่',
 };
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.875rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.875rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
 const baht = (n: number) => n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
@@ -113,7 +113,7 @@ export default function RecordPaymentTab({ ownerUid, buildings }: Props) {
                             <button className="btn btn-outline btn-sm" onClick={() => setAmounts({ ...amounts, [key(i)]: String(i.outstanding) })}>เต็มจำนวน</button>
                         </div>
                     ))}
-                    <hr style={{ border: 0, borderTop: '1px solid var(--color-gray-200, #E5E7EB)', width: '100%' }} />
+                    <hr style={{ border: 0, borderTop: '1px solid var(--color-gray-200, #DCE5EF)', width: '100%' }} />
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         <select style={input} value={method} onChange={e => setMethod(e.target.value as 'cash' | 'bank_transfer')} aria-label="วิธีรับเงิน">
                             <option value="cash">เงินสด</option><option value="bank_transfer">เงินโอน</option>

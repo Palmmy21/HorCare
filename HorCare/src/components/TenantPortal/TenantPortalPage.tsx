@@ -61,21 +61,21 @@ function getCurrentMonth() {
 
 // ── Maintenance config ────────────────────────────────────────────────────────
 const PORTAL_CATEGORY_OPTIONS: { value: MaintenanceCategory; Icon: React.ElementType; color: string }[] = [
-  { value: 'electric',    Icon: Zap,      color: '#F59E0B' },
-  { value: 'plumbing',    Icon: Droplets, color: '#0EA5E9' },
-  { value: 'appliance',   Icon: Plug,     color: '#F97316' },
-  { value: 'ac',          Icon: Wind,     color: '#06B6D4' },
+  { value: 'electric',    Icon: Zap,      color: '#F59E2E' },
+  { value: 'plumbing',    Icon: Droplets, color: '#0A6CC2' },
+  { value: 'appliance',   Icon: Plug,     color: '#E8740C' },
+  { value: 'ac',          Icon: Wind,     color: '#0A6CC2' },
   { value: 'door_window', Icon: DoorOpen, color: 'var(--color-gray-500)' },
-  { value: 'bathroom',    Icon: Bath,     color: '#0EA5E9' },
-  { value: 'furniture',   Icon: Armchair, color: '#92400E' },
+  { value: 'bathroom',    Icon: Bath,     color: '#0A6CC2' },
+  { value: 'furniture',   Icon: Armchair, color: '#9A3412' },
   { value: 'other',       Icon: Wrench,   color: 'var(--color-gray-700)' },
 ];
 
 function getStatusCfg(status: string, lang: BillLanguage) {
   const base = {
     open:        { color: '#DC2626', bg: '#FEE2E2' },
-    in_progress: { color: '#D97706', bg: '#FEF3C7' },
-    done:        { color: '#059669', bg: '#D1FAE5' },
+    in_progress: { color: '#E8740C', bg: '#FDEBD3' },
+    done:        { color: '#15803D', bg: '#DCF2E4' },
     rejected:    { color: 'var(--color-gray-500)', bg: 'var(--color-gray-100)' },
   }[status] ?? { color: 'var(--color-gray-500)', bg: 'var(--color-gray-100)' };
 
@@ -186,15 +186,15 @@ export function PortalLanguageSelector({
           alignItems: 'center',
           gap: '0.4rem',
           background: variant === 'hero' ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.95)',
-          border: variant === 'hero' ? '1px solid rgba(255, 255, 255, 0.45)' : '1.5px solid #BAE6FD',
-          color: variant === 'hero' ? '#FFFFFF' : '#0369A1',
+          border: variant === 'hero' ? '1px solid rgba(255, 255, 255, 0.45)' : '1.5px solid #CFE2F6',
+          color: variant === 'hero' ? '#FFFFFF' : '#08589F',
           padding: '0.35rem 0.75rem',
           borderRadius: '9999px',
           fontWeight: 700,
           fontSize: '0.8125rem',
           cursor: 'pointer',
           backdropFilter: 'blur(8px)',
-          boxShadow: variant === 'hero' ? '0 2px 8px rgba(0,0,0,0.06)' : '0 2px 10px rgba(14, 165, 233, 0.12)',
+          boxShadow: variant === 'hero' ? '0 2px 8px rgba(0,0,0,0.06)' : '0 2px 10px rgba(10, 108, 194, 0.12)',
           transition: 'all 0.15s ease',
         }}
       >
@@ -213,8 +213,8 @@ export function PortalLanguageSelector({
           background: '#FFFFFF',
           borderRadius: '16px',
           padding: '0.45rem',
-          boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(0, 0, 0, 0.06)',
-          border: '1px solid #E2E8F0',
+          boxShadow: '0 12px 32px rgba(16, 42, 67, 0.18), 0 2px 6px rgba(0, 0, 0, 0.06)',
+          border: '1px solid #DCE5EF',
           display: 'flex',
           flexDirection: 'column',
           gap: '0.2rem',
@@ -237,8 +237,8 @@ export function PortalLanguageSelector({
                   padding: '0.55rem 0.75rem',
                   borderRadius: '10px',
                   border: 'none',
-                  background: isSelected ? 'rgba(14, 165, 233, 0.1)' : 'transparent',
-                  color: isSelected ? '#0284C7' : '#1E293B',
+                  background: isSelected ? 'rgba(10, 108, 194, 0.1)' : 'transparent',
+                  color: isSelected ? '#0A6CC2' : '#1A3350',
                   fontWeight: isSelected ? 700 : 500,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
@@ -246,7 +246,7 @@ export function PortalLanguageSelector({
                   transition: 'background 0.15s',
                 }}
                 onMouseEnter={e => {
-                  if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#F8FAFC';
+                  if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#F4F7FB';
                 }}
                 onMouseLeave={e => {
                   if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -256,7 +256,7 @@ export function PortalLanguageSelector({
                   <span style={{ fontSize: '1.1rem' }}>{opt.flag}</span>
                   <span>{opt.nativeName}</span>
                 </span>
-                {isSelected && <CheckCircle2 size={15} color="#0EA5E9" />}
+                {isSelected && <CheckCircle2 size={15} color="#0A6CC2" />}
               </button>
             );
           })}
@@ -270,8 +270,8 @@ export function PortalLanguageSelector({
 function PaymentStatus({ status, lang }: { status?: string; lang: BillLanguage }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const cfg = {
-    paid:    { label: t.paid,    Icon: CheckCircle2, bg: '#DCFCE7', color: '#16A34A', border: '#86EFAC' },
-    pending: { label: t.pending, Icon: Clock,        bg: '#FEF9C3', color: '#92400E', border: '#FDE047' },
+    paid:    { label: t.paid,    Icon: CheckCircle2, bg: '#DCF2E4', color: '#15803D', border: '#A7DDBB' },
+    pending: { label: t.pending, Icon: Clock,        bg: '#FEF6EC', color: '#9A3412', border: '#F7B86C' },
     unpaid:  { label: t.unpaid,  Icon: XCircle,      bg: '#FEE2E2', color: '#B91C1C', border: '#FCA5A5' },
   }[status ?? 'unpaid'] ?? { label: t.unpaid, Icon: XCircle, bg: '#FEE2E2', color: '#B91C1C', border: '#FCA5A5' };
   const { Icon } = cfg;
@@ -358,11 +358,11 @@ function SlipUploader({
         onClick={() => fileInputRef.current?.click()}
         style={{
           width: '100%', padding: '0.75rem', borderRadius: '12px',
-          background: 'linear-gradient(135deg, #0EA5E9, #10B981)',
+          background: 'linear-gradient(135deg, #0A6CC2, #22A35A)',
           color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.875rem',
           cursor: loading ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-          boxShadow: '0 4px 14px rgba(14,165,233,0.3)',
+          boxShadow: '0 4px 14px rgba(10, 108, 194,0.3)',
           opacity: loading ? 0.7 : 1
         }}
       >
@@ -370,12 +370,12 @@ function SlipUploader({
         {loading ? t.uploading_slip : t.attach_slip}
       </button>
       {splitOffer && (
-        <div style={{ marginTop: '0.6rem', padding: '0.75rem', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', fontSize: '0.8125rem', color: '#166534' }}>
+        <div style={{ marginTop: '0.6rem', padding: '0.75rem', borderRadius: '12px', background: '#EFF8F2', border: '1px solid #A7DDBB', fontSize: '0.8125rem', color: '#166534' }}>
           <p style={{ margin: '0 0 0.5rem' }}>{fill(t.split_offer, { amount: money(splitOffer.amount), owed: money(splitOffer.owed) })}</p>
           <button
             disabled={loading}
             onClick={confirmSplit}
-            style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: '#16A34A', color: '#fff', border: 'none', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: '#15803D', color: '#fff', border: 'none', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
           >
             {fill(t.split_button, { amount: money(splitOffer.amount) })}
           </button>
@@ -397,8 +397,8 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
   const isUnpaid = !bill.payment_status || bill.payment_status === 'unpaid';
   const isPaid = bill.payment_status === 'paid';
 
-  const accentColor = isPaid ? '#16A34A' : isUnpaid ? '#DC2626' : '#92400E';
-  const borderColor = isPaid ? '#BBF7D0' : isUnpaid ? '#FECACA' : '#FDE047';
+  const accentColor = isPaid ? '#15803D' : isUnpaid ? '#DC2626' : '#9A3412';
+  const borderColor = isPaid ? '#A7DDBB' : isUnpaid ? '#FECACA' : '#F7B86C';
 
   return (
     <div style={{
@@ -428,7 +428,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
           <PaymentStatus status={bill.payment_status} lang={lang} />
-          {open ? <ChevronUp size={16} color="#9CA3AF" /> : <ChevronDown size={16} color="#9CA3AF" />}
+          {open ? <ChevronUp size={16} color="#8FA3B8" /> : <ChevronDown size={16} color="#8FA3B8" />}
         </div>
       </button>
 
@@ -439,11 +439,11 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
           <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.75rem' }}>
             <tbody>
               {[
-                { label: t.room_rent, value: bill.room_rent, icon: <Home size={13} color="#0EA5E9" /> },
-                { label: `${t.elec_bill} (${fmt(bill.elec_units)} ${t.unit})`, value: bill.elec_bill, icon: <Zap size={13} color="#F59E0B" /> },
-                ...(bill.water_flat_amount ? [{ label: t.water_flat, value: bill.water_flat_amount, icon: <Droplets size={13} color="#0EA5E9" /> }] : []),
-                ...(bill.water_excess_amount ? [{ label: `${t.water_excess} (${fmt(bill.water_excess_units)} ${t.unit})`, value: bill.water_excess_amount, icon: <Droplets size={13} color="#0284C7" /> }] : []),
-                ...(!bill.water_flat_amount ? [{ label: `${t.water_bill} (${fmt(bill.water_units)} ${t.unit})`, value: bill.water_bill, icon: <Droplets size={13} color="#0EA5E9" /> }] : []),
+                { label: t.room_rent, value: bill.room_rent, icon: <Home size={13} color="#0A6CC2" /> },
+                { label: `${t.elec_bill} (${fmt(bill.elec_units)} ${t.unit})`, value: bill.elec_bill, icon: <Zap size={13} color="#F59E2E" /> },
+                ...(bill.water_flat_amount ? [{ label: t.water_flat, value: bill.water_flat_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
+                ...(bill.water_excess_amount ? [{ label: `${t.water_excess} (${fmt(bill.water_excess_units)} ${t.unit})`, value: bill.water_excess_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
+                ...(!bill.water_flat_amount ? [{ label: `${t.water_bill} (${fmt(bill.water_units)} ${t.unit})`, value: bill.water_bill, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
               ].map((row, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--color-gray-100)' }}>
                   <td style={{ padding: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>
@@ -458,7 +458,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
             <tfoot>
               <tr>
                 <td style={{ paddingTop: '0.625rem', fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)' }}>{t.grand_total}</td>
-                <td style={{ paddingTop: '0.625rem', textAlign: 'right', fontWeight: 800, fontSize: '0.9375rem', color: '#0EA5E9' }}>{fmtCurrency(bill.total_bill)}</td>
+                <td style={{ paddingTop: '0.625rem', textAlign: 'right', fontWeight: 800, fontSize: '0.9375rem', color: '#0A6CC2' }}>{fmtCurrency(bill.total_bill)}</td>
               </tr>
             </tfoot>
           </table>
@@ -471,7 +471,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: 'var(--color-gray-700)' }}>
-                  <Zap size={13} color="#F59E0B" /> {t.elec_meter}
+                  <Zap size={13} color="#F59E2E" /> {t.elec_meter}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
                   {fmt(bill.prev_elec)} → {fmt(bill.curr_elec)}
@@ -479,7 +479,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8rem', color: 'var(--color-gray-700)' }}>
-                  <Droplets size={13} color="#3B82F6" /> {t.water_meter}
+                  <Droplets size={13} color="#0A6CC2" /> {t.water_meter}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.825rem', color: 'var(--color-gray-800)', fontWeight: 600 }}>
                   {fmt(bill.prev_water)} → {fmt(bill.curr_water)}
@@ -498,16 +498,16 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
 
           {/* Pending confirmation */}
           {bill.payment_status === 'pending' && (
-            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#FEF9C3', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Clock size={16} color="#B45309" />
-              <span style={{ fontSize: '0.8125rem', color: '#92400E', fontWeight: 600 }}>{t.fine_wait_verify}</span>
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#FEF6EC', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock size={16} color="#C2410C" />
+              <span style={{ fontSize: '0.8125rem', color: '#9A3412', fontWeight: 600 }}>{t.fine_wait_verify}</span>
             </div>
           )}
 
           {/* Paid confirmation */}
           {isPaid && (
-            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#F0FDF4', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={16} color="#16A34A" />
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#EFF8F2', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CheckCircle2 size={16} color="#15803D" />
               <span style={{ fontSize: '0.8125rem', color: '#15803D', fontWeight: 600 }}>
                 {t.fine_paid_on} {formatPortalDate(bill.paid_at, lang)}
                 {bill.paid_method === 'auto' ? ` ${t.auto_verified}` : ''}
@@ -527,8 +527,8 @@ function FineCard({ fine, payTo, onChanged, lang }: { fine: Fine; payTo: TenantA
   const isUnpaid = !fine.status || fine.status === 'unpaid';
   const isPaid = fine.status === 'paid';
 
-  const accentColor = isPaid ? '#16A34A' : isUnpaid ? '#DC2626' : '#92400E';
-  const borderColor = isPaid ? '#BBF7D0' : isUnpaid ? '#FECACA' : '#FDE047';
+  const accentColor = isPaid ? '#15803D' : isUnpaid ? '#DC2626' : '#9A3412';
+  const borderColor = isPaid ? '#A7DDBB' : isUnpaid ? '#FECACA' : '#F7B86C';
 
   return (
     <div style={{
@@ -559,7 +559,7 @@ function FineCard({ fine, payTo, onChanged, lang }: { fine: Fine; payTo: TenantA
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
           <PaymentStatus status={fine.status} lang={lang} />
-          {open ? <ChevronUp size={16} color="#9CA3AF" /> : <ChevronDown size={16} color="#9CA3AF" />}
+          {open ? <ChevronUp size={16} color="#8FA3B8" /> : <ChevronDown size={16} color="#8FA3B8" />}
         </div>
       </button>
 
@@ -581,16 +581,16 @@ function FineCard({ fine, payTo, onChanged, lang }: { fine: Fine; payTo: TenantA
 
           {/* Pending confirmation */}
           {fine.status === 'pending' && (
-            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#FEF9C3', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Clock size={16} color="#B45309" />
-              <span style={{ fontSize: '0.8125rem', color: '#92400E', fontWeight: 600 }}>{t.fine_wait_verify}</span>
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#FEF6EC', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock size={16} color="#C2410C" />
+              <span style={{ fontSize: '0.8125rem', color: '#9A3412', fontWeight: 600 }}>{t.fine_wait_verify}</span>
             </div>
           )}
 
           {/* Paid confirmation */}
           {isPaid && (
-            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#F0FDF4', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={16} color="#16A34A" />
+            <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: '#EFF8F2', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CheckCircle2 size={16} color="#15803D" />
               <span style={{ fontSize: '0.8125rem', color: '#15803D', fontWeight: 600 }}>
                 {t.fine_paid_on} {formatPortalDate(fine.paid_at, lang)}
                 {fine.paid_method === 'auto' ? ` ${t.auto_verified}` : ''}
@@ -679,7 +679,7 @@ function TenantProfileSection({ profile, lang, onSaved }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0EA5E9, #10B981)',
+            background: 'linear-gradient(135deg, #0A6CC2, #22A35A)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <User size={16} color="#fff" />
@@ -814,7 +814,7 @@ function TenantProfileSection({ profile, lang, onSaved }: {
                 flex: 2, padding: '0.75rem', borderRadius: '12px', border: 'none',
                 background: saving || !form.full_name.trim() || !form.phone.trim()
                   ? 'var(--color-gray-300)'
-                  : 'linear-gradient(135deg, #0EA5E9, #10B981)',
+                  : 'linear-gradient(135deg, #0A6CC2, #22A35A)',
                 color: '#fff', fontWeight: 700, fontSize: '0.875rem',
                 cursor: saving || !form.full_name.trim() || !form.phone.trim() ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
@@ -873,7 +873,7 @@ export default function TenantPortalPage() {
   // ── Invalid link: none, an old ?uid=&bid=&rid= link (no longer accepted), or one that was reset ──
   if (!hasLink || isLegacyPortalUrl() || error === 'invalid_link') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#F8FAFC', position: 'relative' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: '#F4F7FB', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
           <PortalLanguageSelector lang={lang} onSelect={handleLangChange} variant="card" />
         </div>
@@ -890,13 +890,13 @@ export default function TenantPortalPage() {
   // ── Loading ──
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', fontFamily: 'var(--font-sans)', position: 'relative' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #E7F0FA 0%, #F2F7FC 50%, #F4F7FB 100%)', fontFamily: 'var(--font-sans)', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
           <PortalLanguageSelector lang={lang} onSelect={handleLangChange} variant="card" />
         </div>
-        <img src={horcareLogo} alt="HorCare" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(14, 165, 233, 0.25)' }} />
-        <div style={{ width: 36, height: 36, border: '3px solid rgba(14, 165, 233, 0.25)', borderTopColor: '#0EA5E9', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '1rem' }} />
-        <p style={{ color: '#0369A1', fontWeight: 700, fontSize: '0.95rem' }}>{t.loading}</p>
+        <img src={horcareLogo} alt="HorCare" style={{ width: 80, height: 80, borderRadius: 20, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(10, 108, 194, 0.25)' }} />
+        <div style={{ width: 36, height: 36, border: '3px solid rgba(10, 108, 194, 0.25)', borderTopColor: '#0A6CC2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', marginBottom: '1rem' }} />
+        <p style={{ color: '#08589F', fontWeight: 700, fontSize: '0.95rem' }}>{t.loading}</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -906,7 +906,7 @@ export default function TenantPortalPage() {
   const pinGate = error === 'pin_required' || error === 'pin_incorrect';
   if (!pinGate && (error || !room)) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', color: '#0F172A', fontFamily: 'var(--font-sans)', position: 'relative' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'linear-gradient(180deg, #E7F0FA 0%, #F2F7FC 50%, #F4F7FB 100%)', color: '#102A43', fontFamily: 'var(--font-sans)', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
           <PortalLanguageSelector lang={lang} onSelect={handleLangChange} variant="card" />
         </div>
@@ -914,8 +914,8 @@ export default function TenantPortalPage() {
         <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
           <AlertCircle size={24} color="#EF4444" />
         </div>
-        <h2 style={{ fontWeight: 800, color: '#0F172A', margin: '0 0 0.5rem' }}>{t.error_title}</h2>
-        <p style={{ color: '#64748B', fontSize: '0.875rem' }}>{t.contact_owner_hint}</p>
+        <h2 style={{ fontWeight: 800, color: '#102A43', margin: '0 0 0.5rem' }}>{t.error_title}</h2>
+        <p style={{ color: '#557089', fontSize: '0.875rem' }}>{t.contact_owner_hint}</p>
       </div>
     );
   }
@@ -929,23 +929,23 @@ export default function TenantPortalPage() {
       refresh();
     };
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 50%, #F8FAFC 100%)', fontFamily: 'var(--font-sans)', position: 'relative' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', background: 'linear-gradient(180deg, #E7F0FA 0%, #F2F7FC 50%, #F4F7FB 100%)', fontFamily: 'var(--font-sans)', position: 'relative' }}>
         <div style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}>
           <PortalLanguageSelector lang={lang} onSelect={handleLangChange} variant="card" />
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }`}</style>
-        <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(14, 165, 233, 0.25)' }} />
+        <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(10, 108, 194, 0.25)' }} />
         <div style={{
           background: '#FFFFFF',
           borderRadius: '24px', padding: '2.25rem 2rem 2.5rem',
-          border: '1px solid #BAE6FD',
+          border: '1px solid #CFE2F6',
           width: '100%', maxWidth: 360, textAlign: 'center',
-          boxShadow: '0 20px 40px -10px rgba(14, 165, 233, 0.18), 0 1px 3px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0 20px 40px -10px rgba(10, 108, 194, 0.18), 0 1px 3px rgba(0, 0, 0, 0.05)',
           animation: pinError ? 'shake 0.4s ease' : 'none',
         }}>
-          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}><Lock size={26} color="#0EA5E9" /></div>
-          <h2 style={{ fontWeight: 800, color: '#0F172A', margin: '0 0 0.375rem', fontSize: '1.25rem' }}>{t.verify_pin_title}</h2>
-          <p style={{ color: '#64748B', fontSize: '0.875rem', margin: '0 0 1.5rem' }}>{t.verify_pin_desc}</p>
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(10, 108, 194, 0.1)', border: '1px solid rgba(10, 108, 194, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}><Lock size={26} color="#0A6CC2" /></div>
+          <h2 style={{ fontWeight: 800, color: '#102A43', margin: '0 0 0.375rem', fontSize: '1.25rem' }}>{t.verify_pin_title}</h2>
+          <p style={{ color: '#557089', fontSize: '0.875rem', margin: '0 0 1.5rem' }}>{t.verify_pin_desc}</p>
           <input
             type="password"
             inputMode="numeric"
@@ -956,8 +956,8 @@ export default function TenantPortalPage() {
             onKeyDown={e => e.key === 'Enter' && handlePinSubmit()}
             style={{
               width: '100%', textAlign: 'center', fontSize: '2rem', letterSpacing: '0.5em',
-              padding: '0.75rem 1rem', borderRadius: '14px', border: pinError ? '2px solid #EF4444' : '2px solid #BAE6FD',
-              background: '#F8FAFC', color: '#0F172A', outline: 'none',
+              padding: '0.75rem 1rem', borderRadius: '14px', border: pinError ? '2px solid #EF4444' : '2px solid #CFE2F6',
+              background: '#F4F7FB', color: '#102A43', outline: 'none',
               fontFamily: 'var(--font-mono)', boxSizing: 'border-box', marginBottom: '0.75rem',
             }}
             autoFocus
@@ -968,11 +968,11 @@ export default function TenantPortalPage() {
             disabled={pinInput.length !== 4}
             style={{
               width: '100%', padding: '0.875rem', borderRadius: '14px', border: 'none',
-              background: pinInput.length === 4 ? 'linear-gradient(135deg, #0EA5E9 0%, #10B981 100%)' : '#E2E8F0',
-              color: pinInput.length === 4 ? '#fff' : '#94A3B8',
+              background: pinInput.length === 4 ? 'linear-gradient(135deg, #0A6CC2 0%, #22A35A 100%)' : '#DCE5EF',
+              color: pinInput.length === 4 ? '#fff' : '#8FA3B8',
               fontWeight: 800, fontSize: '1rem', cursor: pinInput.length === 4 ? 'pointer' : 'not-allowed',
               transition: 'all 0.2s',
-              boxShadow: pinInput.length === 4 ? '0 4px 16px rgba(14, 165, 233, 0.35)' : 'none',
+              boxShadow: pinInput.length === 4 ? '0 4px 16px rgba(10, 108, 194, 0.35)' : 'none',
             }}
           >
             {t.enter_portal}
@@ -986,7 +986,7 @@ export default function TenantPortalPage() {
   return (
     <div className="portal-shell" style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #E0F2FE 0%, #F0F9FF 320px, #F8FAFC 100%)',
+      background: 'linear-gradient(180deg, #E7F0FA 0%, #F2F7FC 320px, #F4F7FB 100%)',
       fontFamily: 'var(--font-sans)'
     }}>
       <div style={{
@@ -994,22 +994,22 @@ export default function TenantPortalPage() {
         margin: '0 auto',
         background: '#FFFFFF',
         minHeight: '100vh',
-        boxShadow: '0 20px 40px -10px rgba(14, 165, 233, 0.15)',
-        borderLeft: '1px solid #E2E8F0',
-        borderRight: '1px solid #E2E8F0'
+        boxShadow: '0 20px 40px -10px rgba(10, 108, 194, 0.15)',
+        borderLeft: '1px solid #DCE5EF',
+        borderRight: '1px solid #DCE5EF'
       }}>
 
         {/* ── Hero ── */}
         <div style={{
-          background: 'linear-gradient(135deg, #0284C7 0%, #0EA5E9 40%, #10B981 100%)',
+          background: 'linear-gradient(135deg, #0A6CC2 0%, #0A6CC2 40%, #22A35A 100%)',
           padding: '1.75rem 1.25rem 2rem',
           position: 'relative',
           overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(14, 165, 233, 0.25)',
+          boxShadow: '0 4px 20px rgba(10, 108, 194, 0.25)',
         }}>
           {/* Background glow effects */}
           <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', bottom: -30, left: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: -30, left: -20, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(34, 163, 90, 0.35) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
           {/* Top bar: logo + building name + language switcher */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.625rem', marginBottom: '1.25rem' }}>
@@ -1110,7 +1110,7 @@ export default function TenantPortalPage() {
         </div>
 
         {/* ── Main Body Sections ── */}
-        <div style={{ padding: '0.75rem 1.125rem 3rem', background: '#F8FAFC' }}>
+        <div style={{ padding: '0.75rem 1.125rem 3rem', background: '#F4F7FB' }}>
 
           {/* Parcels waiting at the front desk (hidden when there are none) */}
           <TenantAnnouncementSection uid={uid} buildingId={buildingId} roomId={roomId} Label={SectionLabel} />
@@ -1149,7 +1149,7 @@ export default function TenantPortalPage() {
                 border: '1px solid var(--color-gray-200)', textAlign: 'center',
                 boxShadow: '0 1px 8px rgba(0,0,0,0.04)',
               }}>
-                <Receipt size={28} color="#D1D5DB" style={{ marginBottom: '0.5rem' }} />
+                <Receipt size={28} color="#C3D0DE" style={{ marginBottom: '0.5rem' }} />
                 <p style={{ color: 'var(--color-gray-400)', fontSize: '0.875rem', margin: 0 }}>
                   {t.no_bill_yet} {formatPortalMonth(currentMonth, lang)}
                 </p>
@@ -1200,7 +1200,7 @@ export default function TenantPortalPage() {
                 border: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', gap: '0.75rem',
                 boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
               }}>
-                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#0EA5E9,#10B981)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#0A6CC2,#22A35A)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Phone size={16} color="#fff" />
                 </div>
                 <div style={{ flex: 1 }}>
@@ -1208,7 +1208,7 @@ export default function TenantPortalPage() {
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>{config.bill_customization.dorm_phone}</div>
                 </div>
                 <a href={`tel:${config.bill_customization.dorm_phone}`}
-                  style={{ background: 'linear-gradient(135deg,#0EA5E9,#10B981)', color: 'var(--color-white)', borderRadius: '10px', padding: '0.425rem 1rem', fontWeight: 700, fontSize: '0.8125rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  style={{ background: 'linear-gradient(135deg,#0A6CC2,#22A35A)', color: 'var(--color-white)', borderRadius: '10px', padding: '0.425rem 1rem', fontWeight: 700, fontSize: '0.8125rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <Phone size={13} /> {t.call}
                 </a>
               </div>
@@ -1238,7 +1238,7 @@ export default function TenantPortalPage() {
           {/* Footer */}
           <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', opacity: 0.55 }}>
             <img src={horcareLogo} alt="" style={{ width: 20, height: 20, borderRadius: 5 }} />
-            <span style={{ fontSize: '0.75rem', color: '#0369A1', fontWeight: 700 }}>{t.powered_by}</span>
+            <span style={{ fontSize: '0.75rem', color: '#08589F', fontWeight: 700 }}>{t.powered_by}</span>
           </div>
         </div>
 
@@ -1250,7 +1250,7 @@ export default function TenantPortalPage() {
           }
           @media (min-width: 640px) {
             .portal-shell { padding: 2rem 1rem; }
-            .portal-shell > div { border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px -10px rgba(14, 165, 233, 0.15), 0 1px 3px rgba(0,0,0,0.05); min-height: auto !important; }
+            .portal-shell > div { border-radius: 24px; overflow: hidden; box-shadow: 0 20px 40px -10px rgba(10, 108, 194, 0.15), 0 1px 3px rgba(0,0,0,0.05); min-height: auto !important; }
           }
         `}</style>
       </div>
@@ -1361,8 +1361,8 @@ function MaintenanceSection({ requests, onChanged, lang }: {
                   {req.description}
                 </p>
                 {req.admin_note && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--color-gray-700)', borderLeft: '3px solid #0EA5E9', paddingLeft: '0.625rem', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: '0.3rem' }}>
-                    <Pencil size={11} color="#0EA5E9" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--color-gray-700)', borderLeft: '3px solid #0A6CC2', paddingLeft: '0.625rem', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: '0.3rem' }}>
+                    <Pencil size={11} color="#0A6CC2" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
                     {req.admin_note}
                   </div>
                 )}
@@ -1385,11 +1385,11 @@ function MaintenanceSection({ requests, onChanged, lang }: {
         <button
           onClick={() => setShowForm(true)}
           style={{
-            width: '100%', background: 'linear-gradient(135deg, #0EA5E9, #10B981)',
+            width: '100%', background: 'linear-gradient(135deg, #0A6CC2, #22A35A)',
             color: 'var(--color-white)', border: 'none', borderRadius: '14px',
             padding: '0.875rem', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            boxShadow: '0 2px 12px rgba(14,165,233,0.25)',
+            boxShadow: '0 2px 12px rgba(10, 108, 194,0.25)',
           }}
         >
           <Plus size={18} /> {t.report_repair}
@@ -1397,12 +1397,12 @@ function MaintenanceSection({ requests, onChanged, lang }: {
       ) : (
         <div style={{
           background: 'var(--color-white)', borderRadius: '16px',
-          border: '1.5px solid rgba(14, 165, 233, 0.4)', padding: '1.25rem',
-          boxShadow: '0 4px 20px rgba(14, 165, 233, 0.1)',
+          border: '1.5px solid rgba(10, 108, 194, 0.4)', padding: '1.25rem',
+          boxShadow: '0 4px 20px rgba(10, 108, 194, 0.1)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Wrench size={16} color="#0EA5E9" /> {t.report_repair}
+              <Wrench size={16} color="#0A6CC2" /> {t.report_repair}
             </div>
             <button
               onClick={() => setShowForm(false)}
@@ -1451,13 +1451,13 @@ function MaintenanceSection({ requests, onChanged, lang }: {
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               {([
-                { value: 'normal', label: t.normal, dotColor: '#16A34A' },
+                { value: 'normal', label: t.normal, dotColor: '#15803D' },
                 { value: 'urgent', label: t.urgent, dotColor: '#DC2626' },
               ] as const).map(u => {
                 const active = form.urgency === u.value;
-                const borderColor = active ? (u.value === 'urgent' ? '#DC2626' : '#0EA5E9') : 'var(--color-gray-200)';
-                const bgColor    = active ? (u.value === 'urgent' ? 'rgba(220,38,38,0.08)' : 'rgba(14,165,233,0.08)') : 'var(--color-white)';
-                const textColor  = active ? (u.value === 'urgent' ? '#DC2626' : '#0EA5E9') : 'var(--color-gray-700)';
+                const borderColor = active ? (u.value === 'urgent' ? '#DC2626' : '#0A6CC2') : 'var(--color-gray-200)';
+                const bgColor    = active ? (u.value === 'urgent' ? 'rgba(220,38,38,0.08)' : 'rgba(10, 108, 194,0.08)') : 'var(--color-white)';
+                const textColor  = active ? (u.value === 'urgent' ? '#DC2626' : '#0A6CC2') : 'var(--color-gray-700)';
                 return (
                   <button
                     key={u.value}
@@ -1491,7 +1491,7 @@ function MaintenanceSection({ requests, onChanged, lang }: {
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               style={{
-                width: '100%', borderRadius: '10px', border: '1.5px solid #E5E7EB',
+                width: '100%', borderRadius: '10px', border: '1.5px solid #DCE5EF',
                 padding: '0.75rem', fontSize: '0.875rem', lineHeight: 1.6, outline: 'none',
                 resize: 'vertical', minHeight: '80px',
                 fontFamily: 'var(--font-sans)', boxSizing: 'border-box',
@@ -1517,7 +1517,7 @@ function MaintenanceSection({ requests, onChanged, lang }: {
                 <img
                   src={photo}
                   alt="Maintenance Photo"
-                  style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1.5px solid #E5E7EB' }}
+                  style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1.5px solid #DCE5EF' }}
                 />
                 <button
                   type="button"
@@ -1539,14 +1539,14 @@ function MaintenanceSection({ requests, onChanged, lang }: {
                 disabled={photoLoading}
                 style={{
                   width: '100%', padding: '0.75rem', borderRadius: 10,
-                  border: '1.5px dashed rgba(14, 165, 233, 0.4)', background: 'rgba(14, 165, 233, 0.05)',
-                  color: '#0EA5E9', fontWeight: 600, fontSize: '0.875rem',
+                  border: '1.5px dashed rgba(10, 108, 194, 0.4)', background: 'rgba(10, 108, 194, 0.05)',
+                  color: '#0A6CC2', fontWeight: 600, fontSize: '0.875rem',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                   opacity: photoLoading ? 0.6 : 1,
                 }}
               >
                 {photoLoading
-                  ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(14,165,233,0.3)', borderTopColor: '#0EA5E9', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> {t.loading}</>
+                  ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(10, 108, 194,0.3)', borderTopColor: '#0A6CC2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> {t.loading}</>
                   : <><Camera size={15} /> {t.take_photo}</>
                 }
               </button>
@@ -1559,7 +1559,7 @@ function MaintenanceSection({ requests, onChanged, lang }: {
               onClick={handleSubmit}
               disabled={submitting || !form.description.trim()}
               style={{
-                flex: 1, background: 'linear-gradient(135deg, #0EA5E9, #10B981)',
+                flex: 1, background: 'linear-gradient(135deg, #0A6CC2, #22A35A)',
                 color: 'var(--color-white)', border: 'none', borderRadius: '12px',
                 padding: '0.875rem', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
@@ -1662,11 +1662,11 @@ function CleaningSection({ requests, onChanged, lang }: {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'in_progress':
-        return { label: t.status_in_progress, color: '#D97706', bg: '#FFFBEB' };
+        return { label: t.status_in_progress, color: '#E8740C', bg: '#FEF6EC' };
       case 'completed':
-        return { label: t.status_resolved, color: '#16A34A', bg: '#F0FDF4' };
+        return { label: t.status_resolved, color: '#15803D', bg: '#EFF8F2' };
       case 'cancelled':
-        return { label: t.status_cancelled, color: '#64748B', bg: '#F1F5F9' };
+        return { label: t.status_cancelled, color: '#557089', bg: '#EBF1F7' };
       default:
         return { label: t.status_open, color: '#DC2626', bg: '#FEF2F2' };
     }
@@ -1696,7 +1696,7 @@ function CleaningSection({ requests, onChanged, lang }: {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.375rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0284C7', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0A6CC2', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <Sparkles size={13} /> {typeLabel}
                     </span>
                   </div>
@@ -1731,13 +1731,13 @@ function CleaningSection({ requests, onChanged, lang }: {
                 )}
 
                 {req.assigned_maid_name && (
-                  <div style={{ fontSize: '0.775rem', color: '#0369A1', background: '#F0F9FF', padding: '0.3rem 0.55rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '0.775rem', color: '#08589F', background: '#F2F7FC', padding: '0.3rem 0.55rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
                     <CheckCircle2 size={12} /> ผู้รับผิดชอบ: <strong>{req.assigned_maid_name}</strong>
                   </div>
                 )}
 
                 {req.completed_note && (
-                  <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#15803D', borderLeft: '3px solid #16A34A', paddingLeft: '0.5rem', lineHeight: 1.4 }}>
+                  <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#15803D', borderLeft: '3px solid #15803D', paddingLeft: '0.5rem', lineHeight: 1.4 }}>
                     <strong>ผลการทำความสะอาด:</strong> {req.completed_note}
                   </div>
                 )}
@@ -1761,11 +1761,11 @@ function CleaningSection({ requests, onChanged, lang }: {
         <button
           onClick={() => setShowForm(true)}
           style={{
-            width: '100%', background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+            width: '100%', background: 'linear-gradient(135deg, #0A6CC2, #08589F)',
             color: 'var(--color-white)', border: 'none', borderRadius: '14px',
             padding: '0.875rem', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            boxShadow: '0 2px 12px rgba(2,132,199,0.25)',
+            boxShadow: '0 2px 12px rgba(10, 108, 194,0.25)',
           }}
         >
           <Sparkles size={18} /> {t.request_cleaning}
@@ -1773,12 +1773,12 @@ function CleaningSection({ requests, onChanged, lang }: {
       ) : (
         <div style={{
           background: 'var(--color-white)', borderRadius: '16px',
-          border: '1.5px solid rgba(2, 132, 199, 0.4)', padding: '1.25rem',
-          boxShadow: '0 4px 20px rgba(2, 132, 199, 0.1)',
+          border: '1.5px solid rgba(10, 108, 194, 0.4)', padding: '1.25rem',
+          boxShadow: '0 4px 20px rgba(10, 108, 194, 0.1)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--color-gray-800)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sparkles size={16} color="#0284C7" /> {t.request_cleaning}
+              <Sparkles size={16} color="#0A6CC2" /> {t.request_cleaning}
             </div>
             <button
               onClick={() => setShowForm(false)}
@@ -1802,13 +1802,13 @@ function CleaningSection({ requests, onChanged, lang }: {
                     type="button"
                     onClick={() => setForm(f => ({ ...f, service_type: opt.value }))}
                     style={{
-                      border: `${active ? '2px' : '1px'} solid ${active ? '#0284C7' : 'var(--color-gray-200)'}`,
-                      background: active ? '#F0F9FF' : 'var(--color-gray-50)',
+                      border: `${active ? '2px' : '1px'} solid ${active ? '#0A6CC2' : 'var(--color-gray-200)'}`,
+                      background: active ? '#F2F7FC' : 'var(--color-gray-50)',
                       borderRadius: '10px', padding: '0.5rem 0.35rem', cursor: 'pointer',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
                     }}
                   >
-                    <span style={{ fontSize: '0.8rem', fontWeight: active ? 700 : 500, color: active ? '#0369A1' : 'var(--color-gray-700)' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: active ? 700 : 500, color: active ? '#08589F' : 'var(--color-gray-700)' }}>
                       {opt.label}
                     </span>
                     <span style={{ fontSize: '0.675rem', color: 'var(--color-gray-400)' }}>
@@ -1830,7 +1830,7 @@ function CleaningSection({ requests, onChanged, lang }: {
                 type="date"
                 value={form.preferred_date}
                 onChange={e => setForm(f => ({ ...f, preferred_date: e.target.value }))}
-                style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #E5E7EB', padding: '0.5rem', fontSize: '0.85rem' }}
+                style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #DCE5EF', padding: '0.5rem', fontSize: '0.85rem' }}
               />
             </div>
             <div>
@@ -1840,7 +1840,7 @@ function CleaningSection({ requests, onChanged, lang }: {
               <select
                 value={form.preferred_time_slot}
                 onChange={e => setForm(f => ({ ...f, preferred_time_slot: e.target.value }))}
-                style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #E5E7EB', padding: '0.5rem', fontSize: '0.85rem' }}
+                style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #DCE5EF', padding: '0.5rem', fontSize: '0.85rem' }}
               >
                 <option value="เช้า (09:00 - 12:00)">เช้า (09:00 - 12:00)</option>
                 <option value="บ่าย (13:00 - 16:00)">บ่าย (13:00 - 16:00)</option>
@@ -1861,7 +1861,7 @@ function CleaningSection({ requests, onChanged, lang }: {
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               style={{
-                width: '100%', borderRadius: '10px', border: '1.5px solid #E5E7EB',
+                width: '100%', borderRadius: '10px', border: '1.5px solid #DCE5EF',
                 padding: '0.75rem', fontSize: '0.875rem', lineHeight: 1.6, outline: 'none',
                 resize: 'vertical', minHeight: '65px',
                 fontFamily: 'var(--font-sans)', boxSizing: 'border-box',
@@ -1887,7 +1887,7 @@ function CleaningSection({ requests, onChanged, lang }: {
                 <img
                   src={photo}
                   alt="Cleaning Photo"
-                  style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 10, border: '1.5px solid #E5E7EB' }}
+                  style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 10, border: '1.5px solid #DCE5EF' }}
                 />
                 <button
                   type="button"
@@ -1909,14 +1909,14 @@ function CleaningSection({ requests, onChanged, lang }: {
                 disabled={photoLoading}
                 style={{
                   width: '100%', padding: '0.75rem', borderRadius: 10,
-                  border: '1.5px dashed rgba(2, 132, 199, 0.4)', background: 'rgba(2, 132, 199, 0.05)',
-                  color: '#0284C7', fontWeight: 600, fontSize: '0.875rem',
+                  border: '1.5px dashed rgba(10, 108, 194, 0.4)', background: 'rgba(10, 108, 194, 0.05)',
+                  color: '#0A6CC2', fontWeight: 600, fontSize: '0.875rem',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                   opacity: photoLoading ? 0.6 : 1,
                 }}
               >
                 {photoLoading
-                  ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(2,132,199,0.3)', borderTopColor: '#0284C7', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> {t.loading}</>
+                  ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(10, 108, 194,0.3)', borderTopColor: '#0A6CC2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} /> {t.loading}</>
                   : <><Camera size={15} /> {t.take_photo}</>
                 }
               </button>
@@ -1929,7 +1929,7 @@ function CleaningSection({ requests, onChanged, lang }: {
               onClick={handleSubmit}
               disabled={submitting}
               style={{
-                flex: 1, background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                flex: 1, background: 'linear-gradient(135deg, #0A6CC2, #08589F)',
                 color: 'var(--color-white)', border: 'none', borderRadius: '12px',
                 padding: '0.875rem', fontWeight: 700, fontSize: '0.9375rem', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem',
@@ -1961,8 +1961,8 @@ function CleaningSection({ requests, onChanged, lang }: {
 // ── Section label helper ──────────────────────────────────────────────────────
 function SectionLabel({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '1.5rem 0 0.65rem' }}>
-      <span style={{ color: '#0EA5E9', display: 'flex', alignItems: 'center' }}>{icon}</span> {label}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', fontWeight: 800, color: '#08589F', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '1.5rem 0 0.65rem' }}>
+      <span style={{ color: '#0A6CC2', display: 'flex', alignItems: 'center' }}>{icon}</span> {label}
     </div>
   );
 }

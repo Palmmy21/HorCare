@@ -252,8 +252,8 @@ export default function BulkRoomModal({
                                         style={{
                                             padding: '0.375rem 0.75rem', borderRadius: 999, fontSize: '0.8125rem', cursor: 'pointer',
                                             fontWeight: on ? 700 : 500,
-                                            border: `1px solid ${on ? 'var(--color-primary, #8B5CF6)' : 'var(--color-gray-200)'}`,
-                                            background: on ? 'var(--color-primary, #8B5CF6)' : 'transparent',
+                                            border: `1px solid ${on ? 'var(--color-primary, #0F4C81)' : 'var(--color-gray-200)'}`,
+                                            background: on ? 'var(--color-primary, #0F4C81)' : 'transparent',
                                             color: on ? '#fff' : 'var(--color-gray-700)',
                                         }}
                                     >{a.label}</button>

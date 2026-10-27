@@ -18,7 +18,7 @@ const ERRORS: Record<string, string> = {
 };
 
 const when = (iso: string) => new Date(iso).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 6 };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 6 };
 
 export default function LineBindingsTab({ ownerUid, buildings }: { ownerUid: string; buildings: Building[] }) {
     const ids = useMemo(() => buildings.map(b => b.id), [buildings]);
@@ -85,9 +85,9 @@ export default function LineBindingsTab({ ownerUid, buildings }: { ownerUid: str
                     ทุกครั้งที่มีบัญชี LINE ถูกผูกกับห้อง ระบบจะแจ้งที่นี่ — ถ้าไม่ใช่ผู้เช่าของห้องนั้น ให้ย้ายหรือยกเลิกการผูกด้านล่าง
                 </p>
                 {alerts.length === 0 ? <div style={{ color: 'var(--color-gray-500)' }}>ยังไม่มีการแจ้งเตือน</div> : alerts.slice(0, 30).map(a => (
-                    <div key={a.id} style={{ ...card, borderColor: a.status === 'open' && a.severity === 'warning' ? '#F59E0B' : undefined, opacity: a.status === 'acknowledged' ? 0.6 : 1 }}>
+                    <div key={a.id} style={{ ...card, borderColor: a.status === 'open' && a.severity === 'warning' ? '#F59E2E' : undefined, opacity: a.status === 'acknowledged' ? 0.6 : 1 }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontWeight: 700 }}>
-                            {a.severity === 'warning' ? <AlertTriangle size={15} color="#D97706" /> : <Info size={15} color="#0284C7" />}
+                            {a.severity === 'warning' ? <AlertTriangle size={15} color="#E8740C" /> : <Info size={15} color="#0A6CC2" />}
                             {ALERT_TYPE_LABELS_TH[a.type]}
                             {buildings.length > 1 && <span style={{ fontWeight: 400, fontSize: '0.8rem' }}>· {nameOf.get(a.building_id) ?? a.building_id}</span>}
                         </div>
@@ -106,7 +106,7 @@ export default function LineBindingsTab({ ownerUid, buildings }: { ownerUid: str
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <h2 style={{ margin: 0, fontSize: '1.05rem', flex: 1 }}>แก้ไขการผูกห้อง</h2>
                     {buildings.length > 1 && (
-                        <select value={buildingId} onChange={e => setBuildingId(e.target.value)} aria-label="สถานที่" style={{ padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid var(--color-gray-300, #D1D5DB)' }}>
+                        <select value={buildingId} onChange={e => setBuildingId(e.target.value)} aria-label="สถานที่" style={{ padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid var(--color-gray-300, #C3D0DE)' }}>
                             {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     )}
@@ -119,7 +119,7 @@ export default function LineBindingsTab({ ownerUid, buildings }: { ownerUid: str
                         <strong style={{ minWidth: 70 }}>ห้อง {r.room_number}</strong>
                         <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>LINE …{(r.line_user_id ?? '').slice(-4)}</span>
                         <span style={{ flex: 1 }} />
-                        <select value={target[r.id] ?? ''} onChange={e => setTarget({ ...target, [r.id]: e.target.value })} aria-label={`ย้ายห้อง ${r.room_number} ไปที่`} style={{ padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid var(--color-gray-300, #D1D5DB)' }}>
+                        <select value={target[r.id] ?? ''} onChange={e => setTarget({ ...target, [r.id]: e.target.value })} aria-label={`ย้ายห้อง ${r.room_number} ไปที่`} style={{ padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid var(--color-gray-300, #C3D0DE)' }}>
                             <option value="">ย้ายไปห้อง…</option>
                             {free.map(f => <option key={f.id} value={f.id}>{f.room_number}</option>)}
                         </select>

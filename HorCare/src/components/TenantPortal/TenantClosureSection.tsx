@@ -85,7 +85,7 @@ export default function TenantClosureSection({ uid, buildingId, roomId, Label }:
             <input style={field} placeholder="หมายเหตุ (ถ้ามี)" maxLength={200} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             <AntiBot trap={trap} onTrap={setTrap} onToken={setToken} />
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" disabled={busy || !form.from || !form.to || (captchaRequired && token === '')} onClick={() => void submit()} style={{ flex: 1, padding: '0.6rem', borderRadius: 10, border: 'none', background: '#0F766E', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>{busy ? 'กำลังส่ง…' : 'ส่งแจ้งหยุด'}</button>
+              <button type="button" disabled={busy || !form.from || !form.to || (captchaRequired && token === '')} onClick={() => void submit()} style={{ flex: 1, padding: '0.6rem', borderRadius: 10, border: 'none', background: '#15803D', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>{busy ? 'กำลังส่ง…' : 'ส่งแจ้งหยุด'}</button>
               <button type="button" disabled={busy} onClick={() => setOpen(false)} style={{ padding: '0.6rem 1rem', borderRadius: 10, border: '1px solid rgba(0,0,0,0.2)', background: 'transparent', cursor: 'pointer' }}>ปิด</button>
             </div>
           </div>

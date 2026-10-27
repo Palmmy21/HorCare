@@ -12,10 +12,10 @@ interface Props { ownerUid: string; ledger: Ledger; entries: JournalEntry[] }
 type Report = 'trial' | 'account' | 'receivables' | 'revenue';
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: 0, background: 'var(--color-white, #fff)', overflowX: 'auto' };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit' };
-const th: React.CSSProperties = { padding: '0.5rem', textAlign: 'left', background: 'var(--color-gray-50, #F9FAFB)', fontSize: '0.8rem' };
-const td: React.CSSProperties = { padding: '0.4rem 0.5rem', borderTop: '1px solid var(--color-gray-100, #F3F4F6)', fontSize: '0.85rem' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: 0, background: 'var(--color-white, #fff)', overflowX: 'auto' };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit' };
+const th: React.CSSProperties = { padding: '0.5rem', textAlign: 'left', background: 'var(--color-gray-50, #F4F7FB)', fontSize: '0.8rem' };
+const td: React.CSSProperties = { padding: '0.4rem 0.5rem', borderTop: '1px solid var(--color-gray-100, #EBF1F7)', fontSize: '0.85rem' };
 const num: React.CSSProperties = { textAlign: 'right' };
 
 export default function ReportsTab({ ownerUid, ledger, entries }: Props) {

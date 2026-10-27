@@ -27,9 +27,9 @@ const TAB_FILTER: Record<Tab, (o: WorkOrder) => boolean> = {
 };
 
 const STATUS_COLOR: Record<WorkStatus, string> = {
-    created: '#6B7280', assigned: '#2563EB', accepted: '#7C3AED', in_progress: '#D97706', completed: '#0D9488', closed: '#059669',
+    created: '#557089', assigned: '#0A6CC2', accepted: '#0F4C81', in_progress: '#E8740C', completed: '#15803D', closed: '#15803D',
 };
-const PRIORITY_COLOR: Record<Priority, string> = { low: '#64748B', normal: '#0284C7', high: '#D97706', urgent: '#DC2626' };
+const PRIORITY_COLOR: Record<Priority, string> = { low: '#557089', normal: '#0A6CC2', high: '#E8740C', urgent: '#DC2626' };
 
 const ERRORS: Record<string, string> = {
     forbidden: 'คุณไม่มีสิทธิ์ทำรายการนี้',
@@ -237,7 +237,7 @@ function DetailModal({ order, staff, ownerUid, buildingId, onClose }: { order: W
                         <span>สร้างโดย {order.created_by_name}</span>
                     </div>
                     {order.reopen_note && order.status === 'in_progress' && (
-                        <div style={{ padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.12)', fontSize: '0.8125rem' }}>ส่งกลับแก้ไข: {order.reopen_note}</div>
+                        <div style={{ padding: 8, borderRadius: 8, background: 'rgba(245, 158, 46,0.12)', fontSize: '0.8125rem' }}>ส่งกลับแก้ไข: {order.reopen_note}</div>
                     )}
                     {order.completion_note && <div style={{ fontSize: '0.8125rem' }}><b>หมายเหตุตอนเสร็จงาน:</b> {order.completion_note}</div>}
 
@@ -345,13 +345,13 @@ export default function WorkOrdersPage(props: Props) {
     ];
 
     return (
-        <div style={{ maxWidth: 980, margin: '0 auto' }}>
+        <div>
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardCheck size={28} /> ใบงานช่าง/แม่บ้าน</h1>
                     <p className="page-subtitle">
                         สั่งงานผ่าน LINE ติดตามสถานะ และตรวจงานก่อนปิด
-                        {counts.overdue > 0 && <span style={{ color: '#B45309', fontWeight: 700 }}> · เลยกำหนด {counts.overdue} งาน</span>}
+                        {counts.overdue > 0 && <span style={{ color: '#C2410C', fontWeight: 700 }}> · เลยกำหนด {counts.overdue} งาน</span>}
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -392,13 +392,13 @@ export default function WorkOrdersPage(props: Props) {
                         const late = isOverdue(o, today);
                         return (
                             <button key={o.id} type="button" onClick={() => setOpenId(o.id)} className="card"
-                                style={{ padding: '0.75rem 1rem', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', borderColor: late ? 'rgba(245,158,11,0.5)' : undefined }}>
+                                style={{ padding: '0.75rem 1rem', textAlign: 'left', cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', borderColor: late ? 'rgba(245, 158, 46,0.5)' : undefined }}>
                                 <span style={{ width: 6, alignSelf: 'stretch', borderRadius: 3, background: PRIORITY_COLOR[o.priority] }} aria-label={`ความสำคัญ ${PRIORITY_LABELS_TH[o.priority]}`} />
                                 <div style={{ flex: '1 1 240px', minWidth: 0 }}>
                                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                                         <b>{o.area}</b>
                                         <span style={{ fontSize: '0.78rem', color: 'var(--color-gray-500)' }}>{WORK_TYPE_LABELS_TH[o.work_type]}</span>
-                                        {late && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#B45309', display: 'inline-flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={12} /> เลยกำหนด</span>}
+                                        {late && <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#C2410C', display: 'inline-flex', gap: 3, alignItems: 'center' }}><AlertTriangle size={12} /> เลยกำหนด</span>}
                                     </div>
                                     <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-600)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.description}</div>
                                     <div style={{ fontSize: '0.72rem', color: 'var(--color-gray-500)', marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>

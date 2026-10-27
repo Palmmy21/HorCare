@@ -7,10 +7,10 @@ import { downloadCsv } from '../../utils/csv';
 type View = 'pnl' | 'bs' | 'payables';
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', overflowX: 'auto' };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit' };
-const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 12, padding: '0.3rem 0', borderTop: '1px solid var(--color-gray-100, #F3F4F6)', fontSize: '0.9rem' };
-const total: React.CSSProperties = { ...row, fontWeight: 800, borderTop: '2px solid var(--color-gray-300, #D1D5DB)' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', overflowX: 'auto' };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit' };
+const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 12, padding: '0.3rem 0', borderTop: '1px solid var(--color-gray-100, #EBF1F7)', fontSize: '0.9rem' };
+const total: React.CSSProperties = { ...row, fontWeight: 800, borderTop: '2px solid var(--color-gray-300, #C3D0DE)' };
 
 function Section({ title, rows, sum, sumLabel }: { title: string; rows: { key: string; label: string; satang: number }[]; sum: number; sumLabel: string }) {
   return (

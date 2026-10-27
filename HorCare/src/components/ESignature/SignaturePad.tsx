@@ -33,7 +33,7 @@ export default function SignaturePad({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [isDrawing, setIsDrawing] = useState(false);
-  const [inkColor, setInkColor] = useState<string>('#1D4ED8'); // Default royal blue
+  const [inkColor, setInkColor] = useState<string>('#08589F'); // Default royal blue
   const [strokeWidth, setStrokeWidth] = useState<number>(2.5);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Point[]>([]);
@@ -269,7 +269,7 @@ export default function SignaturePad({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-gray-800)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <PenTool size={16} color="#2563EB" />
+            <PenTool size={16} color="#0A6CC2" />
             {label}
           </div>
           <div style={{ fontSize: '0.78rem', color: 'var(--color-gray-500)', marginTop: '2px' }}>
@@ -282,8 +282,8 @@ export default function SignaturePad({
           {/* Ink color */}
           <div style={{ display: 'flex', background: 'var(--color-gray-100)', padding: '2px', borderRadius: '8px' }}>
             {[
-              { color: '#1D4ED8', label: 'น้ำเงิน' },
-              { color: '#111827', label: 'ดำ' },
+              { color: '#08589F', label: 'น้ำเงิน' },
+              { color: '#102A43', label: 'ดำ' },
             ].map(c => (
               <button
                 key={c.color}
@@ -376,25 +376,25 @@ export default function SignaturePad({
           bottom: '36px',
           left: '24px',
           right: '24px',
-          borderBottom: '1px dashed rgba(156, 163, 175, 0.45)',
+          borderBottom: '1px dashed rgba(143, 163, 184, 0.45)',
           pointerEvents: 'none',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-end',
           paddingBottom: '4px',
         }}>
-          <span style={{ fontSize: '0.7rem', color: 'rgba(156, 163, 175, 0.8)', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.7rem', color: 'rgba(143, 163, 184, 0.8)', fontWeight: 600 }}>
             ✕ ลงลายมือชื่อเหนือเส้นนี้ (Sign above line)
           </span>
           {hasSignature && (
             <span style={{
               fontSize: '0.68rem',
-              color: '#059669',
+              color: '#15803D',
               fontWeight: 700,
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.2rem',
-              background: 'rgba(16, 185, 129, 0.1)',
+              background: 'rgba(34, 163, 90, 0.1)',
               padding: '0.1rem 0.4rem',
               borderRadius: '4px'
             }}>
@@ -475,9 +475,9 @@ export default function SignaturePad({
                 gap: '0.25rem',
                 padding: '0.35rem 0.65rem',
                 borderRadius: '8px',
-                border: '1px solid #BFDBFE',
-                background: '#EFF6FF',
-                color: '#2563EB',
+                border: '1px solid #CFE2F6',
+                background: '#F2F7FC',
+                color: '#0A6CC2',
                 fontSize: '0.78rem',
                 fontWeight: 600,
                 cursor: 'pointer',

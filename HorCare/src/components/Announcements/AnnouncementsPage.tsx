@@ -6,7 +6,7 @@ import {
 } from '../../shared/announcementTemplates';
 
 const TEMPLATE_ICONS = { Zap, Droplets, Wrench, Megaphone } as const;
-const TEMPLATE_COLORS = { Zap: '#F97316', Droplets: '#0EA5E9', Wrench: '#94A3B8', Megaphone: '#E11D48' } as const;
+const TEMPLATE_COLORS = { Zap: '#E8740C', Droplets: '#0A6CC2', Wrench: '#8FA3B8', Megaphone: '#E11D48' } as const;
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { useAnnouncements, useFaqs } from '../../hooks/useChatbotData';
@@ -23,8 +23,8 @@ const ERRORS: Record<string, string> = {
 };
 
 const when = (iso: string) => new Date(iso).toLocaleString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--color-white, #fff)' };
-const input: React.CSSProperties = { padding: '0.5rem 0.65rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, width: '100%', boxSizing: 'border-box' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--color-white, #fff)' };
+const input: React.CSSProperties = { padding: '0.5rem 0.65rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, width: '100%', boxSizing: 'border-box' };
 
 /** Shown instead of "nothing yet" when Firestore refuses the read, which otherwise looks like a publish that never happened. */
 function ReadError() {
@@ -182,7 +182,7 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
                             return (
                                 <button key={t.id} type="button" role="radio" aria-checked={active} onClick={() => pickTemplate(t.id)} style={{
                                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '0.9rem 0.5rem', cursor: 'pointer', font: 'inherit', fontSize: '0.85rem',
-                                    borderRadius: 12, background: active ? '#EFF6FF' : 'var(--color-white, #fff)', border: active ? '2px solid #111827' : '2px solid #E5E7EB',
+                                    borderRadius: 12, background: active ? '#F2F7FC' : 'var(--color-white, #fff)', border: active ? '2px solid #102A43' : '2px solid #DCE5EF',
                                 }}>
                                     <Icon size={26} color={TEMPLATE_COLORS[t.icon]} />
                                     {t.label}
@@ -208,7 +208,7 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
 
                     <input style={input} placeholder="หัวข้อประกาศ" maxLength={ANNOUNCEMENT_LIMITS.title} value={form.title} onChange={e => { setEdited(true); setForm({ ...form, title: e.target.value }); }} />
                     <textarea style={{ ...input, minHeight: 130 }} placeholder="รายละเอียด" maxLength={ANNOUNCEMENT_LIMITS.body} value={form.body} onChange={e => { setEdited(true); setForm({ ...form, body: e.target.value }); }} />
-                    {missing.length > 0 && <div style={{ fontSize: '0.8rem', color: '#B45309' }}>ยังไม่ได้กรอก: {missing.join(', ')}</div>}
+                    {missing.length > 0 && <div style={{ fontSize: '0.8rem', color: '#C2410C' }}>ยังไม่ได้กรอก: {missing.join(', ')}</div>}
                     <label style={{ fontSize: '0.85rem', display: 'flex', gap: 6, alignItems: 'center' }}>
                         แสดงถึงวันที่ (ถ้าไม่ระบุ จะแสดงจนกว่าจะเก็บ)
                         <input type="datetime-local" style={{ ...input, width: 'auto' }} value={form.expires} onChange={e => setForm({ ...form, expires: e.target.value })} />
@@ -253,7 +253,7 @@ function AnnouncementsTab({ ownerUid, buildingId }: Props) {
 export default function AnnouncementsPage({ ownerUid, buildingId }: Props) {
     const [tab, setTab] = useState<'announcements' | 'faq'>('announcements');
     return (
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <h1 style={{ margin: 0, fontSize: '1.4rem' }}>ประกาศ & ตอบอัตโนมัติ</h1>
             <div style={{ display: 'flex', gap: 6 }}>
                 <button className={tab === 'announcements' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'} onClick={() => setTab('announcements')} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Megaphone size={14} /> ประกาศ</button>

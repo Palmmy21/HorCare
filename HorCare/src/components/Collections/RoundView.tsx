@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react';
 import { CalendarCheck, Search, UserPlus, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { CollectionsSnapshot } from '../../hooks/useCollections';
-import { collectionsError } from '../../hooks/useCollections';
-import { buildRound, dayTotals, resolveRate, roundTotals, type Charge, type RoundRow, type RoundStatus } from '../../shared/collections';
-import { closuresOn } from '../../shared/market';
+import { collectionsError, todayRoundOf } from '../../hooks/useCollections';
+import { dayTotals, resolveRate, roundTotals, type Charge, type RoundRow, type RoundStatus } from '../../shared/collections';
 import type { BankAccount } from '../../shared/banks';
 import PayDialog from './PayDialog';
 import DayClosePanel from './DayClosePanel';
@@ -20,9 +19,9 @@ interface Props {
 
 const baht = (s: number) => (s / 100).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const STATUS_LABEL: Record<RoundStatus, string> = { due: 'ค้างเก็บ', partial: 'จ่ายบางส่วน', paid: 'จ่ายแล้ว', closed: 'แจ้งหยุด', absent: 'ไม่มา', not_trading: 'ไม่ขายวันนี้' };
-const STATUS_COLOR: Record<RoundStatus, string> = { due: '#DC2626', partial: '#D97706', paid: '#16A34A', closed: '#6B7280', absent: '#6B7280', not_trading: '#9CA3AF' };
-const field: React.CSSProperties = { padding: '0.7rem 0.8rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 10, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%', fontSize: '1rem' };
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
+const STATUS_COLOR: Record<RoundStatus, string> = { due: '#DC2626', partial: '#E8740C', paid: '#15803D', closed: '#557089', absent: '#557089', not_trading: '#8FA3B8' };
+const field: React.CSSProperties = { padding: '0.7rem 0.8rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 10, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%', fontSize: '1rem' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
 
 type Filter = 'due' | 'paid' | 'all';
 
@@ -34,16 +33,7 @@ export default function RoundView({ data, accounts, canClose, call, act, reload 
   const [walkIn, setWalkIn] = useState<{ name: string; amount: string } | null>(null);
   const [working, setWorking] = useState<string | null>(null);
 
-  const rows = useMemo(() => {
-    const closedToday = new Set(data.rooms.filter(r => closuresOn(data.closures.filter(c => c.room_id === r.id), data.today).length > 0).map(r => r.id));
-    const absentToday = new Set(data.attendance.filter(a => a.visit_date === data.today && !a.present).map(a => a.room_id));
-    const zone = new Map(data.rooms.map(r => [r.id, r.zone]));
-    return buildRound({
-      date: data.today, plans: data.plans, charges: data.charges, closedToday, absentToday, rooms: data.rooms.map(r => ({ id: r.id, room_number: r.room_number })),
-      dayRateOf: id => resolveRate(data.rates, { purpose: 'stall', unit: 'day', roomId: id, zone: zone.get(id), date: data.today })?.amount_satang ?? null,
-      weekRateOf: id => resolveRate(data.rates, { purpose: 'stall', unit: 'week', roomId: id, zone: zone.get(id), date: data.today })?.amount_satang ?? null,
-    });
-  }, [data]);
+  const rows = useMemo(() => todayRoundOf(data), [data]);
 
   const totals = roundTotals(rows);
   const today = useMemo(() => dayTotals(data.payments, data.today), [data.payments, data.today]);
@@ -82,7 +72,7 @@ export default function RoundView({ data, accounts, canClose, call, act, reload 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div style={{ ...card, background: '#FEF2F2' }}><div style={{ fontSize: '0.75rem' }}>ค้างเก็บ ({totals.unpaid} แผง)</div><strong style={{ fontSize: '1.4rem' }}>฿{baht(totals.to_collect_satang)}</strong></div>
-        <div style={{ ...card, background: '#F0FDF4' }}><div style={{ fontSize: '0.75rem' }}>เก็บได้วันนี้</div><strong style={{ fontSize: '1.4rem' }}>฿{baht(today.cash_satang + today.transfer_satang)}</strong><div style={{ fontSize: '0.7rem' }}>สด {baht(today.cash_satang)} · โอน {baht(today.transfer_satang)}</div></div>
+        <div style={{ ...card, background: '#EFF8F2' }}><div style={{ fontSize: '0.75rem' }}>เก็บได้วันนี้</div><strong style={{ fontSize: '1.4rem' }}>฿{baht(today.cash_satang + today.transfer_satang)}</strong><div style={{ fontSize: '0.7rem' }}>สด {baht(today.cash_satang)} · โอน {baht(today.transfer_satang)}</div></div>
       </div>
 
       <div style={{ position: 'relative' }}>
@@ -132,7 +122,7 @@ export default function RoundView({ data, accounts, canClose, call, act, reload 
                   </button>
                 </>
               )}
-              {r.status === 'paid' && <strong style={{ color: '#16A34A' }}>฿{baht(r.paid_satang)}</strong>}
+              {r.status === 'paid' && <strong style={{ color: '#15803D' }}>฿{baht(r.paid_satang)}</strong>}
             </div>
           );
         })}

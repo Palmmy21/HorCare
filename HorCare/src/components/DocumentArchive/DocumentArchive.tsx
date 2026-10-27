@@ -125,7 +125,7 @@ export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrad
                                 <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
                                     {formatMonthThai(month)}
                                 </h3>
-                                <span className="badge" style={{ background: hasData ? '#ECFDF5' : '#F3F4F6', color: hasData ? '#059669' : '#6B7280', fontWeight: 600 }}>
+                                <span className="badge" style={{ background: hasData ? '#EFF8F2' : '#EBF1F7', color: hasData ? '#15803D' : '#557089', fontWeight: 600 }}>
                                     {hasData ? `${monthBills.length} ห้อง` : 'ไม่มีข้อมูล'}
                                 </span>
                             </div>

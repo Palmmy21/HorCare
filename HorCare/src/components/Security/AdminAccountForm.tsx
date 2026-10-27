@@ -79,7 +79,7 @@ export default function AdminAccountForm({ ownerUid, buildings, onCreated }: { o
               <input type="checkbox" disabled={all} checked={all || scope.includes(b.id)} onChange={() => toggle(b.id)} /> {b.name}
             </label>
           ))}
-          <label style={{ fontSize: '0.8125rem', display: 'flex', gap: 4, alignItems: 'center', color: '#B45309' }}>
+          <label style={{ fontSize: '0.8125rem', display: 'flex', gap: 4, alignItems: 'center', color: '#C2410C' }}>
             <input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)} /> ทุกอาคาร (รวมอาคารที่เพิ่มในอนาคต)
           </label>
         </div>
@@ -89,7 +89,7 @@ export default function AdminAccountForm({ ownerUid, buildings, onCreated }: { o
       </button>
 
       {done && (
-        <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: 10, background: '#F0FDF4', border: '1px solid #BBF7D0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: 10, background: '#EFF8F2', border: '1px solid #A7DDBB', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <strong>สร้างบัญชีให้ {done.name} แล้ว — ส่งข้อมูลนี้ให้เขา (รหัสผ่านจะไม่แสดงอีก)</strong>
           <pre className="mono" style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '0.8125rem', userSelect: 'text' }}>{message}</pre>
           <div><button className="btn btn-outline btn-sm" onClick={() => void copy()}><Copy size={12} /> คัดลอกข้อความ</button></div>
@@ -121,7 +121,7 @@ export function ScopeEditor({ ownerUid, memberUid, buildings, current, onSaved }
               <input type="checkbox" disabled={all} checked={all || scope.includes(b.id)} onChange={() => setScope(s => (s.includes(b.id) ? s.filter(x => x !== b.id) : [...s.filter(x => x !== '*'), b.id]))} /> {b.name}
             </label>
           ))}
-          <label style={{ fontSize: '0.8125rem', display: 'flex', gap: 4, alignItems: 'center', color: '#B45309' }}><input type="checkbox" checked={all} onChange={e => setScope(e.target.checked ? ['*'] : [])} /> ทุกอาคาร</label>
+          <label style={{ fontSize: '0.8125rem', display: 'flex', gap: 4, alignItems: 'center', color: '#C2410C' }}><input type="checkbox" checked={all} onChange={e => setScope(e.target.checked ? ['*'] : [])} /> ทุกอาคาร</label>
           <div><button className="btn btn-primary btn-sm" disabled={busy || scope.length === 0} onClick={() => void save()}>บันทึก</button></div>
         </div>
       )}

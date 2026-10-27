@@ -20,8 +20,8 @@ const ERRORS: Record<string, string> = {
 };
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const field: React.CSSProperties = { padding: '0.5rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
+const field: React.CSSProperties = { padding: '0.5rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8 };
 
 /** "What happened?" instead of debit/credit: the lines, VAT and withholding tax are worked out and shown before saving. */
 export default function GuidedEntryTab({ ownerUid, ledger }: { ownerUid: string; ledger: Ledger }) {
@@ -152,7 +152,7 @@ export default function GuidedEntryTab({ ownerUid, ledger }: { ownerUid: string;
             <thead><tr style={{ textAlign: 'left' }}><th>บัญชี</th><th style={{ textAlign: 'right' }}>เดบิต</th><th style={{ textAlign: 'right' }}>เครดิต</th></tr></thead>
             <tbody>
               {lines.map((l, i) => (
-                <tr key={i} style={{ borderTop: '1px solid var(--color-gray-100, #F3F4F6)' }}>
+                <tr key={i} style={{ borderTop: '1px solid var(--color-gray-100, #EBF1F7)' }}>
                   <td style={{ padding: '0.25rem 0' }}>{l.account} {nameOf(l.account)}{l.party_id ? <small style={{ color: 'var(--color-gray-500)' }}> · {l.party_id}</small> : null}</td>
                   <td style={{ textAlign: 'right' }}>{l.dr_satang ? baht(l.dr_satang) : ''}</td><td style={{ textAlign: 'right' }}>{l.cr_satang ? baht(l.cr_satang) : ''}</td>
                 </tr>

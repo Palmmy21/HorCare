@@ -114,7 +114,7 @@ export default function MeterCalculator() {
                     }}
                 >
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <SettingsIcon size={18} color="#6366F1" />
+                        <SettingsIcon size={18} color="#0A6CC2" />
                         ตั้งค่าอัตรา
                     </span>
                     {showSettings ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -127,7 +127,7 @@ export default function MeterCalculator() {
                             {/* Electricity Rate */}
                             <div className="form-group">
                                 <label className="form-label">
-                                    <Zap size={14} color="#F59E0B" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                                    <Zap size={14} color="#F59E2E" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
                                     ค่าไฟฟ้า (บาท/หน่วย)
                                 </label>
                                 <input
@@ -144,7 +144,7 @@ export default function MeterCalculator() {
                             {/* Water Mode */}
                             <div className="form-group">
                                 <label className="form-label">
-                                    <Droplets size={14} color="#2563EB" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                                    <Droplets size={14} color="#0A6CC2" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
                                     รูปแบบคิดค่าน้ำ
                                 </label>
                                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -243,7 +243,7 @@ export default function MeterCalculator() {
                 <div className="card">
                     <div className="card-header">
                         <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Zap size={20} color="#F59E0B" />
+                            <Zap size={20} color="#F59E2E" />
                             ค่าไฟฟ้า
                         </span>
                         <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-400)' }}>
@@ -280,22 +280,22 @@ export default function MeterCalculator() {
 
                         {elecBill !== null && (
                             <div style={{
-                                background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-                                border: '1px solid #FDE68A',
+                                background: 'linear-gradient(135deg, #FEF6EC 0%, #FDEBD3 100%)',
+                                border: '1px solid #FBD9A8',
                                 borderRadius: '10px',
                                 padding: '1rem',
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.875rem', color: '#92400E' }}>หน่วยที่ใช้</span>
-                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.1rem', color: '#92400E' }}>{elecUnits} หน่วย</span>
+                                    <span style={{ fontSize: '0.875rem', color: '#9A3412' }}>หน่วยที่ใช้</span>
+                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.1rem', color: '#9A3412' }}>{elecUnits} หน่วย</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.875rem', color: '#92400E' }}>ค่าไฟฟ้า</span>
-                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.5rem', color: '#D97706' }}>
+                                    <span style={{ fontSize: '0.875rem', color: '#9A3412' }}>ค่าไฟฟ้า</span>
+                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.5rem', color: '#E8740C' }}>
                                         {elecBill.toFixed(2)} บาท
                                     </span>
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#B45309', marginTop: '0.5rem', opacity: 0.8 }}>
+                                <div style={{ fontSize: '0.75rem', color: '#C2410C', marginTop: '0.5rem', opacity: 0.8 }}>
                                     {elecUnits} × {settings.elec_rate} บาท/หน่วย
                                 </div>
                             </div>
@@ -319,7 +319,7 @@ export default function MeterCalculator() {
                 <div className="card">
                     <div className="card-header">
                         <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Droplets size={20} color="#2563EB" />
+                            <Droplets size={20} color="#0A6CC2" />
                             ค่าน้ำประปา
                         </span>
                         <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-400)' }}>
@@ -356,22 +356,22 @@ export default function MeterCalculator() {
 
                         {waterResult !== null && (
                             <div style={{
-                                background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-                                border: '1px solid #BFDBFE',
+                                background: 'linear-gradient(135deg, #F2F7FC 0%, #E7F0FA 100%)',
+                                border: '1px solid #CFE2F6',
                                 borderRadius: '10px',
                                 padding: '1rem',
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.875rem', color: '#1E3A8A' }}>หน่วยที่ใช้</span>
-                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1E3A8A' }}>{waterUnits} หน่วย</span>
+                                    <span style={{ fontSize: '0.875rem', color: '#102A43' }}>หน่วยที่ใช้</span>
+                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.1rem', color: '#102A43' }}>{waterUnits} หน่วย</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '0.875rem', color: '#1E3A8A' }}>ค่าน้ำ</span>
-                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.5rem', color: '#2563EB' }}>
+                                    <span style={{ fontSize: '0.875rem', color: '#102A43' }}>ค่าน้ำ</span>
+                                    <span className="mono" style={{ fontWeight: 700, fontSize: '1.5rem', color: '#0A6CC2' }}>
                                         {waterResult.bill.toFixed(2)} บาท
                                     </span>
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#1D4ED8', marginTop: '0.5rem', opacity: 0.8, lineHeight: 1.5 }}>
+                                <div style={{ fontSize: '0.75rem', color: '#08589F', marginTop: '0.5rem', opacity: 0.8, lineHeight: 1.5 }}>
                                     {waterResult.detail}
                                 </div>
                             </div>
@@ -395,19 +395,19 @@ export default function MeterCalculator() {
             {/* Summary total (only when both are filled) */}
             {elecBill !== null && waterResult !== null && (
                 <div className="card" style={{
-                    background: 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)',
-                    border: '1px solid #C4B5FD',
+                    background: 'linear-gradient(135deg, #F2F7FC 0%, #E7F0FA 100%)',
+                    border: '1px solid #CFE2F6',
                 }}>
                     <div style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                         <div>
-                            <div style={{ fontWeight: 700, fontSize: '1rem', color: '#4C1D95', marginBottom: '0.25rem' }}>
+                            <div style={{ fontWeight: 700, fontSize: '1rem', color: '#0F4C81', marginBottom: '0.25rem' }}>
                                 <Banknote size={18} style={{ display: 'inline', marginRight: 4 }} /> ยอดรวมทั้งหมด
                             </div>
-                            <div style={{ fontSize: '0.8125rem', color: '#7C3AED', opacity: 0.8 }}>
+                            <div style={{ fontSize: '0.8125rem', color: '#0F4C81', opacity: 0.8 }}>
                                 ค่าไฟ {elecBill.toFixed(2)} + ค่าน้ำ {waterResult.bill.toFixed(2)}
                             </div>
                         </div>
-                        <div className="mono" style={{ fontWeight: 800, fontSize: '2rem', color: '#7C3AED' }}>
+                        <div className="mono" style={{ fontWeight: 800, fontSize: '2rem', color: '#0F4C81' }}>
                             {(elecBill + waterResult.bill).toFixed(2)} บาท
                         </div>
                     </div>

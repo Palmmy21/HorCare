@@ -272,7 +272,7 @@ export default function ContractSignModal({
       toast.success('บันทึกสัญญาเช่าดิจิทัลเรียบร้อยแล้ว 🎉', {
         duration: 3500,
         style: {
-          background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+          background: 'linear-gradient(135deg, #15803D 0%, #22A35A 100%)',
           color: '#ffffff',
           fontWeight: 700,
           borderRadius: '12px',
@@ -395,7 +395,7 @@ export default function ContractSignModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(15, 23, 42, 0.75)',
+        background: 'rgba(16, 42, 67, 0.75)',
         backdropFilter: 'blur(6px)',
         zIndex: 9999,
         display: 'flex',
@@ -408,7 +408,7 @@ export default function ContractSignModal({
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#F8FAFC',
+          background: '#F4F7FB',
           width: '100%',
           maxWidth: '1000px',
           height: '92vh',
@@ -434,7 +434,7 @@ export default function ContractSignModal({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
-              background: terms.isMarket ? '#FEF3C7' : '#E0F2FE',
+              background: terms.isMarket ? '#FDEBD3' : '#E7F0FA',
               width: 44,
               height: 44,
               borderRadius: '12px',
@@ -443,7 +443,7 @@ export default function ContractSignModal({
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              {terms.isMarket ? <Store size={22} color="#D97706" /> : <PenTool size={22} color="#0284C7" />}
+              {terms.isMarket ? <Store size={22} color="#E8740C" /> : <PenTool size={22} color="#0A6CC2" />}
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -452,9 +452,9 @@ export default function ContractSignModal({
                 </h2>
                 {isBothSigned ? (
                   <span style={{
-                    background: 'rgba(16, 185, 129, 0.12)',
-                    color: '#059669',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    background: 'rgba(34, 163, 90, 0.12)',
+                    color: '#15803D',
+                    border: '1px solid rgba(34, 163, 90, 0.3)',
                     padding: '0.15rem 0.55rem',
                     borderRadius: '999px',
                     fontSize: '0.725rem',
@@ -467,9 +467,9 @@ export default function ContractSignModal({
                   </span>
                 ) : (
                   <span style={{
-                    background: 'rgba(245, 158, 11, 0.12)',
-                    color: '#D97706',
-                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    background: 'rgba(245, 158, 46, 0.12)',
+                    color: '#E8740C',
+                    border: '1px solid rgba(245, 158, 46, 0.3)',
                     padding: '0.15rem 0.55rem',
                     borderRadius: '999px',
                     fontSize: '0.725rem',
@@ -500,7 +500,7 @@ export default function ContractSignModal({
                 borderRadius: '10px',
                 border: '1px solid var(--color-gray-200)',
                 background: '#FFFFFF',
-                color: linkCopied ? '#059669' : 'var(--color-gray-700)',
+                color: linkCopied ? '#15803D' : 'var(--color-gray-700)',
                 fontSize: '0.825rem',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -569,8 +569,8 @@ export default function ContractSignModal({
                   padding: '0.85rem 0.25rem',
                   background: 'none',
                   border: 'none',
-                  borderBottom: active ? '3px solid var(--color-primary, #8B5CF6)' : '3px solid transparent',
-                  color: active ? 'var(--color-primary, #8B5CF6)' : 'var(--color-gray-500)',
+                  borderBottom: active ? '3px solid var(--color-primary, #0F4C81)' : '3px solid transparent',
+                  color: active ? 'var(--color-primary, #0F4C81)' : 'var(--color-gray-500)',
                   fontWeight: active ? 700 : 500,
                   fontSize: '0.9rem',
                   cursor: 'pointer',
@@ -596,8 +596,8 @@ export default function ContractSignModal({
                 background: '#FFFFFF',
                 borderRadius: '16px',
                 padding: '1rem 1.25rem',
-                border: '1px solid #BAE6FD',
-                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.06)',
+                border: '1px solid #CFE2F6',
+                boxShadow: '0 2px 8px rgba(10, 108, 194, 0.06)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -607,15 +607,15 @@ export default function ContractSignModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flex: 1, minWidth: '280px' }}>
                   <div style={{
                     width: 38, height: 38, borderRadius: '10px',
-                    background: 'rgba(2, 132, 199, 0.12)',
-                    color: '#0284C7',
+                    background: 'rgba(10, 108, 194, 0.12)',
+                    color: '#0A6CC2',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
                   }}>
                     <FileText size={20} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#08589F', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       📋 รูปแบบสัญญา (Contract Template)
                     </label>
                     <select
@@ -626,9 +626,9 @@ export default function ContractSignModal({
                         marginTop: '0.25rem',
                         padding: '0.5rem 0.75rem',
                         borderRadius: '10px',
-                        border: '1.5px solid #BAE6FD',
-                        backgroundColor: '#F0F9FF',
-                        color: '#0369A1',
+                        border: '1.5px solid #CFE2F6',
+                        backgroundColor: '#F2F7FC',
+                        color: '#08589F',
                         fontWeight: 700,
                         fontSize: '0.875rem',
                         outline: 'none',
@@ -683,9 +683,9 @@ export default function ContractSignModal({
                     style={{
                       padding: '0.5rem 0.95rem',
                       borderRadius: '10px',
-                      border: '1px solid #BAE6FD',
+                      border: '1px solid #CFE2F6',
                       background: '#FFFFFF',
-                      color: '#0284C7',
+                      color: '#0A6CC2',
                       fontSize: '0.8125rem',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -708,7 +708,7 @@ export default function ContractSignModal({
               }}>
                 {/* Lessor Box */}
                 <div className="card" style={{ padding: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#1E40AF', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#08589F', fontWeight: 700 }}>
                     <Building2 size={18} /> ฝ่ายผู้ให้เช่า (Lessor / ผู้ดูแล)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -759,7 +759,7 @@ export default function ContractSignModal({
 
                 {/* Lessee Box */}
                 <div className="card" style={{ padding: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#059669', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#15803D', fontWeight: 700 }}>
                     <User size={18} /> ฝ่ายผู้เช่า / ผู้ค้า (Lessee)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -945,7 +945,7 @@ export default function ContractSignModal({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.45rem',
-                    background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                    background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                     color: '#FFFFFF',
                     border: 'none',
                     padding: '0.75rem 1.25rem',
@@ -953,7 +953,7 @@ export default function ContractSignModal({
                     fontWeight: 700,
                     fontSize: '0.9rem',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                    boxShadow: '0 4px 12px rgba(10, 108, 194, 0.25)',
                   }}
                 >
                   <Send size={15} /> บันทึก & ส่งร่างให้ผู้เช่าเซ็น
@@ -992,7 +992,7 @@ export default function ContractSignModal({
                     border: 'none',
                     borderRadius: '9px',
                     background: activeSigner === 'lessee' ? '#FFFFFF' : 'transparent',
-                    color: activeSigner === 'lessee' ? '#059669' : 'var(--color-gray-600)',
+                    color: activeSigner === 'lessee' ? '#15803D' : 'var(--color-gray-600)',
                     fontWeight: activeSigner === 'lessee' ? 800 : 500,
                     fontSize: '0.875rem',
                     cursor: 'pointer',
@@ -1005,7 +1005,7 @@ export default function ContractSignModal({
                 >
                   <User size={15} />
                   ฝ่าย{terms.tenantLabel}
-                  {form.lessee_signature && <CheckCircle2 size={13} color="#059669" />}
+                  {form.lessee_signature && <CheckCircle2 size={13} color="#15803D" />}
                 </button>
 
                 <button
@@ -1017,7 +1017,7 @@ export default function ContractSignModal({
                     border: 'none',
                     borderRadius: '9px',
                     background: activeSigner === 'lessor' ? '#FFFFFF' : 'transparent',
-                    color: activeSigner === 'lessor' ? '#1D4ED8' : 'var(--color-gray-600)',
+                    color: activeSigner === 'lessor' ? '#08589F' : 'var(--color-gray-600)',
                     fontWeight: activeSigner === 'lessor' ? 800 : 500,
                     fontSize: '0.875rem',
                     cursor: 'pointer',
@@ -1030,7 +1030,7 @@ export default function ContractSignModal({
                 >
                   <Building2 size={15} />
                   ฝ่ายผู้ให้เช่า
-                  {form.lessor_signature && <CheckCircle2 size={13} color="#059669" />}
+                  {form.lessor_signature && <CheckCircle2 size={13} color="#15803D" />}
                 </button>
               </div>
 
@@ -1046,7 +1046,7 @@ export default function ContractSignModal({
                     height={210}
                   />
                   {form.lessee_signed_at && (
-                    <div style={{ fontSize: '0.8rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#15803D', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={14} /> ลงนามเมื่อ: {formatThaiDate(form.lessee_signed_at)}
                     </div>
                   )}
@@ -1064,7 +1064,7 @@ export default function ContractSignModal({
                     height={210}
                   />
                   {form.lessor_signed_at && (
-                    <div style={{ fontSize: '0.8rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#15803D', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={14} /> ลงนามเมื่อ: {formatThaiDate(form.lessor_signed_at)}
                     </div>
                   )}
@@ -1074,8 +1074,8 @@ export default function ContractSignModal({
               {/* Dual Signature Summary Card */}
               <div className="card" style={{
                 padding: '1.25rem',
-                background: 'linear-gradient(135deg, rgba(240, 253, 244, 0.5), rgba(239, 246, 255, 0.5))',
-                border: '1px solid rgba(16, 185, 129, 0.25)'
+                background: 'linear-gradient(135deg, rgba(239, 248, 242, 0.5), rgba(242, 247, 252, 0.5))',
+                border: '1px solid rgba(34, 163, 90, 0.25)'
               }}>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-gray-800)', marginBottom: '0.75rem' }}>
                   สถานะการลงนามคู่สัญญา:
@@ -1084,11 +1084,11 @@ export default function ContractSignModal({
                   <div style={{
                     padding: '0.75rem', borderRadius: '10px',
                     background: form.lessee_signature ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
-                    border: form.lessee_signature ? '1.5px solid #10B981' : '1px dashed var(--color-gray-300)'
+                    border: form.lessee_signature ? '1.5px solid #22A35A' : '1px dashed var(--color-gray-300)'
                   }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>ฝ่าย{terms.tenantLabel}</div>
                     <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-gray-800)' }}>{form.lessee_name || '—'}</div>
-                    <div style={{ marginTop: '4px', fontSize: '0.75rem', color: form.lessee_signature ? '#059669' : '#DC2626', fontWeight: 600 }}>
+                    <div style={{ marginTop: '4px', fontSize: '0.75rem', color: form.lessee_signature ? '#15803D' : '#DC2626', fontWeight: 600 }}>
                       {form.lessee_signature ? '✓ ลงนามแล้ว' : '○ ยังไม่ได้ลงนาม'}
                     </div>
                   </div>
@@ -1096,11 +1096,11 @@ export default function ContractSignModal({
                   <div style={{
                     padding: '0.75rem', borderRadius: '10px',
                     background: form.lessor_signature ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
-                    border: form.lessor_signature ? '1.5px solid #10B981' : '1px dashed var(--color-gray-300)'
+                    border: form.lessor_signature ? '1.5px solid #22A35A' : '1px dashed var(--color-gray-300)'
                   }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>ฝ่ายผู้ให้เช่า</div>
                     <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-gray-800)' }}>{form.lessor_name || '—'}</div>
-                    <div style={{ marginTop: '4px', fontSize: '0.75rem', color: form.lessor_signature ? '#059669' : '#DC2626', fontWeight: 600 }}>
+                    <div style={{ marginTop: '4px', fontSize: '0.75rem', color: form.lessor_signature ? '#15803D' : '#DC2626', fontWeight: 600 }}>
                       {form.lessor_signature ? '✓ ลงนามแล้ว' : '○ ยังไม่ได้ลงนาม'}
                     </div>
                   </div>
@@ -1126,7 +1126,7 @@ export default function ContractSignModal({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.45rem',
-                      background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                      background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
                       color: '#FFFFFF',
                       border: 'none',
                       padding: '0.75rem 1.25rem',
@@ -1134,7 +1134,7 @@ export default function ContractSignModal({
                       fontWeight: 700,
                       fontSize: '0.9rem',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                      boxShadow: '0 4px 12px rgba(10, 108, 194, 0.25)',
                     }}
                   >
                     <Send size={15} /> บันทึก & ส่งร่างให้ผู้เช่าเซ็น
@@ -1199,7 +1199,7 @@ export default function ContractSignModal({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.35rem',
-                      background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                      background: 'linear-gradient(135deg, #0A6CC2, #08589F)',
                       color: '#FFFFFF',
                       border: 'none',
                       fontWeight: 700,
@@ -1238,7 +1238,7 @@ export default function ContractSignModal({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.35rem',
-                      background: 'linear-gradient(135deg, #059669, #10B981)',
+                      background: 'linear-gradient(135deg, #15803D, #22A35A)',
                       border: 'none',
                       fontWeight: 700
                     }}
@@ -1261,13 +1261,13 @@ export default function ContractSignModal({
                   borderRadius: '16px',
                   boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
                   border: '1px solid var(--color-gray-200)',
-                  color: '#111827',
+                  color: '#102A43',
                   fontFamily: 'var(--font-sans)',
                   lineHeight: 1.75,
                 }}
               >
                 {/* Official Document Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '2px solid #111827', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '2px solid #102A43', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     {config.bill_customization?.dorm_logo ? (
                       <img
@@ -1283,13 +1283,13 @@ export default function ContractSignModal({
                       />
                     )}
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.25rem', color: '#0F172A' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.25rem', color: '#102A43' }}>
                         {form.lessor_name || config.bill_customization?.dorm_name || 'HorCare Asset Management'}
                       </div>
-                      <div style={{ fontSize: '0.85rem', color: '#475569' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#3E5872' }}>
                         {form.lessor_address || config.bill_customization?.dorm_address || '—'}
                       </div>
-                      <div style={{ fontSize: '0.85rem', color: '#475569' }}>
+                      <div style={{ fontSize: '0.85rem', color: '#3E5872' }}>
                         โทร: {form.lessor_phone || config.bill_customization?.dorm_phone || '—'}
                       </div>
                     </div>
@@ -1302,7 +1302,7 @@ export default function ContractSignModal({
                       size={60}
                       level="M"
                     />
-                    <div className="mono" style={{ fontSize: '0.65rem', color: '#64748B', fontWeight: 700 }}>
+                    <div className="mono" style={{ fontSize: '0.65rem', color: '#557089', fontWeight: 700 }}>
                       {verificationCode}
                     </div>
                   </div>
@@ -1310,11 +1310,11 @@ export default function ContractSignModal({
 
                 {/* Contract Title */}
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                  <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.02em', color: '#0F172A' }}>
+                  <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.02em', color: '#102A43' }}>
                     {form.title}
                   </h1>
-                  <div style={{ fontSize: '0.875rem', color: '#64748B', marginTop: '4px' }}>
-                    สัญญาเลขที่: <span className="mono" style={{ fontWeight: 700, color: '#1E293B' }}>{form.contract_number}</span>
+                  <div style={{ fontSize: '0.875rem', color: '#557089', marginTop: '4px' }}>
+                    สัญญาเลขที่: <span className="mono" style={{ fontWeight: 700, color: '#1A3350' }}>{form.contract_number}</span>
                   </div>
                 </div>
 
@@ -1336,8 +1336,8 @@ export default function ContractSignModal({
 
                 {/* Terms Breakdown */}
                 <div style={{
-                  background: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
+                  background: '#F4F7FB',
+                  border: '1px solid #DCE5EF',
                   borderRadius: '10px',
                   padding: '1rem 1.25rem',
                   fontSize: '0.875rem',
@@ -1387,7 +1387,7 @@ export default function ContractSignModal({
                   gridTemplateColumns: '1fr 1fr',
                   gap: '2rem',
                   paddingTop: '1.25rem',
-                  borderTop: '1px solid #E2E8F0',
+                  borderTop: '1px solid #DCE5EF',
                   pageBreakInside: 'avoid',
                 }}>
                   {/* Lessor Signature column */}
@@ -1400,19 +1400,19 @@ export default function ContractSignModal({
                           style={{ maxHeight: '65px', maxWidth: '180px', objectFit: 'contain' }}
                         />
                       ) : (
-                        <div style={{ color: '#94A3B8', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                        <div style={{ color: '#8FA3B8', fontSize: '0.8rem', fontStyle: 'italic' }}>
                           (ยังไม่ได้ลงลายมือชื่อ)
                         </div>
                       )}
                     </div>
-                    <div style={{ borderTop: '1px dotted #64748B', width: '200px', margin: '6px 0' }} />
+                    <div style={{ borderTop: '1px dotted #557089', width: '200px', margin: '6px 0' }} />
                     <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
                       ( {form.lessor_name || 'ผู้ให้เช่า'} )
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#3E5872' }}>
                       ผู้ให้เช่า
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#557089', marginTop: '2px' }}>
                       วันที่ {formatThaiDate(form.lessor_signed_at || form.start_date)}
                     </div>
                   </div>
@@ -1427,19 +1427,19 @@ export default function ContractSignModal({
                           style={{ maxHeight: '65px', maxWidth: '180px', objectFit: 'contain' }}
                         />
                       ) : (
-                        <div style={{ color: '#94A3B8', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                        <div style={{ color: '#8FA3B8', fontSize: '0.8rem', fontStyle: 'italic' }}>
                           (ยังไม่ได้ลงลายมือชื่อ)
                         </div>
                       )}
                     </div>
-                    <div style={{ borderTop: '1px dotted #64748B', width: '200px', margin: '6px 0' }} />
+                    <div style={{ borderTop: '1px dotted #557089', width: '200px', margin: '6px 0' }} />
                     <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
                       ( {form.lessee_name || '...................................................'} )
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#475569' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#3E5872' }}>
                       ผู้เช่า / {terms.tenantLabel}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#557089', marginTop: '2px' }}>
                       วันที่ {formatThaiDate(form.lessee_signed_at || form.start_date)}
                     </div>
                   </div>
@@ -1449,17 +1449,17 @@ export default function ContractSignModal({
                 <div style={{
                   marginTop: '2.5rem',
                   paddingTop: '0.75rem',
-                  borderTop: '1px solid #F1F5F9',
+                  borderTop: '1px solid #EBF1F7',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   fontSize: '0.7rem',
-                  color: '#94A3B8',
+                  color: '#8FA3B8',
                   flexWrap: 'wrap',
                   gap: '0.5rem'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <ShieldCheck size={14} color="#059669" />
+                    <ShieldCheck size={14} color="#15803D" />
                     <span>รับรองการลงนามอิเล็กทรอนิกส์ตาม พ.ร.บ. ธุรกรรมทางอิเล็กทรอนิกส์ พ.ศ. 2544</span>
                   </div>
                   <div className="mono">
@@ -1484,7 +1484,7 @@ export default function ContractSignModal({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backgroundColor: 'rgba(16, 42, 67, 0.65)',
           backdropFilter: 'blur(6px)',
           padding: '1rem',
         }}
@@ -1508,23 +1508,23 @@ export default function ContractSignModal({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '10px', background: '#E0F2FE', color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '10px', background: '#E7F0FA', color: '#0A6CC2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Plus size={18} />
               </div>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#102A43' }}>
                 บันทึกเป็นเทมเพลตใหม่
               </h3>
             </div>
             <button
               type="button"
               onClick={() => setShowSaveTemplateModal(false)}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B' }}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#557089' }}
             >
               <X size={18} />
             </button>
           </div>
 
-          <p style={{ margin: 0, fontSize: '0.825rem', color: '#64748B', lineHeight: 1.45 }}>
+          <p style={{ margin: 0, fontSize: '0.825rem', color: '#557089', lineHeight: 1.45 }}>
             ระบบจะบันทึกข้อกำหนด เงื่อนไข และอัตราค่าบริการของสัญญานี้ไว้ เพื่อให้ท่านสามารถเลือกใช้กับห้องหรือแผงอื่นได้อย่างสะดวกรวดเร็ว
           </p>
 
@@ -1552,9 +1552,9 @@ export default function ContractSignModal({
               style={{
                 padding: '0.625rem 1rem',
                 borderRadius: '10px',
-                border: '1px solid #CBD5E1',
+                border: '1px solid #C3D0DE',
                 background: '#FFFFFF',
-                color: '#475569',
+                color: '#3E5872',
                 fontWeight: 600,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
@@ -1569,12 +1569,12 @@ export default function ContractSignModal({
                 padding: '0.625rem 1.25rem',
                 borderRadius: '10px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #0284C7, #0369A1)',
+                background: 'linear-gradient(135deg, #0A6CC2, #08589F)',
                 color: '#FFFFFF',
                 fontWeight: 700,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                boxShadow: '0 2px 8px rgba(10, 108, 194, 0.25)',
               }}
             >
               บันทึกเทมเพลต

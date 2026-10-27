@@ -138,6 +138,8 @@ export interface Room {
   // Market / Commercial extensions
   zone?: string;               // โซนแผงค้า เช่น 'โซน A', 'โซน B' หรือชั้น 'ชั้น 1'
   stall_size?: string;         // ขนาดแผง เช่น '2x2 ม.'
+  /** Usable area in square metres; shown on the plan and used for rent per ตร.ม. and occupancy by area. */
+  area_sqm?: number | null;
   business_type?: string;      // ประเภทสินค้า/ร้าน เช่น 'ข้าวมันไก่', 'เสื้อผ้า'
   // Per-room rate overrides (used in commercial mode)
   custom_electricity_rate?: number | null;

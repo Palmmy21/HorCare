@@ -106,7 +106,7 @@ export default function ExpensesTab({ uid, buildingId }: Props) {
           {months.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
         <div style={{
-          flex: 1, background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', color: '#fff',
+          flex: 1, background: 'linear-gradient(135deg,#0A6CC2,#0F4C81)', color: '#fff',
           borderRadius: '10px', padding: '0.5rem 1rem', textAlign: 'right',
         }}>
           <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>รวมเดือนนี้</span>
@@ -209,13 +209,13 @@ export default function ExpensesTab({ uid, buildingId }: Props) {
                     <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
                         <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>{e.description}</span>
-                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#EBF1F7)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
                           {e.category}
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{fmtDate(e.date)}</span>
-                        {e.vendor_name && <span style={{ fontSize: '0.875rem', color: '#4F46E5', fontWeight: 600 }}>{e.vendor_name}</span>}
+                        {e.vendor_name && <span style={{ fontSize: '0.875rem', color: '#0A6CC2', fontWeight: 600 }}>{e.vendor_name}</span>}
                         {e.note && <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>{e.note}</span>}
                       </div>
                     </div>

@@ -183,7 +183,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                         <div style={{ textAlign: 'center', padding: '1rem 0' }}>
                             <CheckCircle2
                                 size={52}
-                                style={{ color: '#22c55e', margin: '0 auto 1rem' }}
+                                style={{ color: '#22a35a', margin: '0 auto 1rem' }}
                             />
                             <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.5rem' }}>
                                 ส่งอีเมลแล้ว!
@@ -278,9 +278,9 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                     <p className="login-subtitle">จัดการหอพักครบวงจร</p>
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                        background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.28)',
+                        background: 'rgba(34, 163, 90,0.12)', border: '1px solid rgba(34, 163, 90,0.28)',
                         borderRadius: '999px', padding: '0.3rem 0.9rem', marginTop: '0.4rem',
-                        fontSize: '0.78rem', fontWeight: 700, color: '#059669',
+                        fontSize: '0.78rem', fontWeight: 700, color: '#15803D',
                     }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle2 size={12} /> ใช้ฟรี</span>
                         <span style={{ opacity: 0.4 }}>|</span>
@@ -289,14 +289,14 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', width: '100%', marginBottom: '1.5rem', borderBottom: '2px solid var(--color-gray-200, #e2e8f0)' }}>
+                <div style={{ display: 'flex', width: '100%', marginBottom: '1.5rem', borderBottom: '2px solid var(--color-gray-200, #dce5ef)' }}>
                     <button
                         type="button"
                         onClick={() => switchMode('login')}
                         style={{
                             flex: 1, padding: '0.65rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer',
-                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'login' ? 'var(--color-primary, #0ea5e9)' : 'var(--color-text-muted, #64748b)',
-                            borderBottom: mode === 'login' ? '2px solid var(--color-primary, #0ea5e9)' : 'none',
+                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'login' ? 'var(--color-primary, #0a6cc2)' : 'var(--color-text-muted, #557089)',
+                            borderBottom: mode === 'login' ? '2px solid var(--color-primary, #0a6cc2)' : 'none',
                             marginBottom: '-2px', whiteSpace: 'nowrap',
                         }}
                     >
@@ -307,13 +307,13 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                         onClick={() => switchMode('maid')}
                         style={{
                             flex: 1, padding: '0.65rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer',
-                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'maid' ? 'var(--color-primary, #0ea5e9)' : 'var(--color-text-muted, #64748b)',
-                            borderBottom: mode === 'maid' ? '2px solid var(--color-primary, #0ea5e9)' : 'none',
+                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'maid' ? 'var(--color-primary, #0a6cc2)' : 'var(--color-text-muted, #557089)',
+                            borderBottom: mode === 'maid' ? '2px solid var(--color-primary, #0a6cc2)' : 'none',
                             marginBottom: '-2px', whiteSpace: 'nowrap',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem'
                         }}
                     >
-                        <Sparkles size={14} color={mode === 'maid' ? 'var(--color-primary, #0ea5e9)' : '#64748b'} />
+                        <Sparkles size={14} color={mode === 'maid' ? 'var(--color-primary, #0a6cc2)' : '#557089'} />
                         แอดมิน หรือ staff
                     </button>
                     <button
@@ -321,8 +321,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                         onClick={() => switchMode('register')}
                         style={{
                             flex: 1, padding: '0.65rem 0.25rem', background: 'none', border: 'none', cursor: 'pointer',
-                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'register' ? 'var(--color-primary, #0ea5e9)' : 'var(--color-text-muted, #64748b)',
-                            borderBottom: mode === 'register' ? '2px solid var(--color-primary, #0ea5e9)' : 'none',
+                            fontSize: '0.9rem', fontWeight: 600, color: mode === 'register' ? 'var(--color-primary, #0a6cc2)' : 'var(--color-text-muted, #557089)',
+                            borderBottom: mode === 'register' ? '2px solid var(--color-primary, #0a6cc2)' : 'none',
                             marginBottom: '-2px', whiteSpace: 'nowrap',
                         }}
                     >
@@ -333,12 +333,12 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                 {/* Form */}
                 {mode === 'maid' ? (
                     <form onSubmit={handleMaidSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <div style={{ background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.25)', borderRadius: 10, padding: '0.75rem 0.875rem', fontSize: '0.825rem', color: 'var(--color-primary, #0284c7)', lineHeight: 1.4 }}>
+                        <div style={{ background: 'rgba(10, 108, 194, 0.08)', border: '1px solid rgba(10, 108, 194, 0.25)', borderRadius: 10, padding: '0.75rem 0.875rem', fontSize: '0.825rem', color: 'var(--color-primary, #0a6cc2)', lineHeight: 1.4 }}>
                             สำหรับแอดมินหรือ staff ประจำหอพัก เข้าสู่ระบบด้วยเบอร์โทรศัพท์และรหัสผ่านที่เจ้าของหอพักกำหนดให้
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>เบอร์โทรศัพท์</label>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>เบอร์โทรศัพท์</label>
                             <div style={{ position: 'relative' }}>
                                 <input
                                     type="tel"
@@ -349,15 +349,15 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                     autoComplete="tel"
                                     style={{
                                         width: '100%', padding: '0.75rem 1rem', borderRadius: '10px',
-                                        border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                        color: 'var(--color-text, #1e293b)', outline: 'none'
+                                        border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                        color: 'var(--color-text, #1a3350)', outline: 'none'
                                     }}
                                 />
                             </div>
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>รหัสผ่าน (Passcode)</label>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>รหัสผ่าน (Passcode)</label>
                             <div style={{ position: 'relative' }}>
                                 <input
                                     type={showPassword ? "text" : "password"}
@@ -367,8 +367,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                     required
                                     style={{
                                         width: '100%', padding: '0.75rem 2.5rem 0.75rem 1rem', borderRadius: '10px',
-                                        border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                        color: 'var(--color-text, #1e293b)', outline: 'none'
+                                        border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                        color: 'var(--color-text, #1a3350)', outline: 'none'
                                     }}
                                 />
                                 <button
@@ -377,7 +377,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                     style={{
                                         position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
                                         background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-                                        color: 'var(--color-text-muted, #6B7280)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        color: 'var(--color-text-muted, #557089)', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -414,7 +414,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                             {/* ข้อมูลเจ้าของ */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>ชื่อ <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>ชื่อ <span style={{ color: '#ef4444' }}>*</span></label>
                                     <input
                                         type="text"
                                         placeholder="สมชาย"
@@ -423,13 +423,13 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                         required
                                         style={{
                                             width: '100%', padding: '0.7rem 0.875rem', borderRadius: '10px',
-                                            border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                            color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.9rem'
+                                            border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                            color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.9rem'
                                         }}
                                     />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>นามสกุล <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>นามสกุล <span style={{ color: '#ef4444' }}>*</span></label>
                                     <input
                                         type="text"
                                         placeholder="ใจดี"
@@ -438,15 +438,15 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                         required
                                         style={{
                                             width: '100%', padding: '0.7rem 0.875rem', borderRadius: '10px',
-                                            border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                            color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.9rem'
+                                            border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                            color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.9rem'
                                         }}
                                     />
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>เบอร์โทรศัพท์ <span style={{ color: '#ef4444' }}>*</span></label>
+                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>เบอร์โทรศัพท์ <span style={{ color: '#ef4444' }}>*</span></label>
                                 <input
                                     type="tel"
                                     placeholder="08X-XXX-XXXX"
@@ -455,8 +455,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                     required
                                     style={{
                                         width: '100%', padding: '0.7rem 0.875rem', borderRadius: '10px',
-                                        border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                        color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.9rem'
+                                        border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                        color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.9rem'
                                     }}
                                 />
                             </div>
@@ -466,20 +466,20 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                 marginTop: '0.25rem',
                                 padding: '1rem',
                                 borderRadius: '14px',
-                                background: 'rgba(14, 165, 233, 0.05)',
-                                border: '1.5px solid rgba(14, 165, 233, 0.22)',
+                                background: 'rgba(10, 108, 194, 0.05)',
+                                border: '1.5px solid rgba(10, 108, 194, 0.22)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '0.875rem'
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary, #0ea5e9)', fontWeight: 700, fontSize: '0.9rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-primary, #0a6cc2)', fontWeight: 700, fontSize: '0.9rem' }}>
                                     <Building2 size={18} />
                                     <span>ข้อมูลสาขาแรก & กำหนดค่าเริ่มต้น</span>
                                 </div>
 
                                 {/* ชื่อหอพัก / สาขา */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>
+                                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>
                                         ชื่อหอพัก / สาขา <span style={{ color: '#ef4444' }}>*</span>
                                     </label>
                                     <input
@@ -490,15 +490,15 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                         required
                                         style={{
                                             width: '100%', padding: '0.65rem 0.875rem', borderRadius: '10px',
-                                            border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                            color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.9rem'
+                                            border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                            color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.9rem'
                                         }}
                                     />
                                 </div>
 
                                 {/* ประเภทอาคาร */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>ประเภทอาคาร</label>
+                                    <label style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>ประเภทอาคาร</label>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
                                         {BUILDING_TYPES.map(bt => {
                                             const isSelected = buildingType === bt.type;
@@ -510,9 +510,9 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                                     style={{
                                                         padding: '0.5rem 0.25rem',
                                                         borderRadius: '10px',
-                                                        border: isSelected ? '1.5px solid var(--color-primary, #0ea5e9)' : '1px solid var(--color-gray-200, #e2e8f0)',
-                                                        background: isSelected ? 'rgba(14, 165, 233, 0.14)' : 'var(--color-white, #fff)',
-                                                        color: isSelected ? 'var(--color-primary, #0ea5e9)' : 'var(--color-text-muted, #64748b)',
+                                                        border: isSelected ? '1.5px solid var(--color-primary, #0a6cc2)' : '1px solid var(--color-gray-200, #dce5ef)',
+                                                        background: isSelected ? 'rgba(10, 108, 194, 0.14)' : 'var(--color-white, #fff)',
+                                                        color: isSelected ? 'var(--color-primary, #0a6cc2)' : 'var(--color-text-muted, #557089)',
                                                         display: 'flex',
                                                         flexDirection: 'column',
                                                         alignItems: 'center',
@@ -534,8 +534,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                 {/* ค่าไฟ & ค่าน้ำ */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1e293b)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <Zap size={14} color="#f59e0b" /> ค่าไฟ (฿/หน่วย)
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1a3350)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Zap size={14} color="#f59e2e" /> ค่าไฟ (฿/หน่วย)
                                         </label>
                                         <input
                                             type="number"
@@ -546,17 +546,17 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                             required
                                             style={{
                                                 width: '100%', padding: '0.6rem 0.75rem', borderRadius: '10px',
-                                                border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                                color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.875rem'
+                                                border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                                color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.875rem'
                                             }}
                                         />
                                     </div>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1e293b)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <Droplets size={14} color="#0ea5e9" /> รูปแบบค่าน้ำ
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1a3350)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Droplets size={14} color="#0a6cc2" /> รูปแบบค่าน้ำ
                                         </label>
-                                        <div style={{ display: 'flex', background: 'rgba(148, 163, 184, 0.15)', borderRadius: '8px', padding: '2px', gap: '2px' }}>
+                                        <div style={{ display: 'flex', background: 'rgba(143, 163, 184, 0.15)', borderRadius: '8px', padding: '2px', gap: '2px' }}>
                                             <button
                                                 type="button"
                                                 onClick={() => setWaterMode('normal')}
@@ -564,7 +564,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                                     flex: 1, padding: '0.4rem 0.2rem', borderRadius: '6px', border: 'none',
                                                     fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
                                                     background: waterMode === 'normal' ? 'var(--color-white, #fff)' : 'transparent',
-                                                    color: waterMode === 'normal' ? 'var(--color-primary, #0ea5e9)' : 'var(--color-text-muted, #64748b)',
+                                                    color: waterMode === 'normal' ? 'var(--color-primary, #0a6cc2)' : 'var(--color-text-muted, #557089)',
                                                     boxShadow: waterMode === 'normal' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
                                                 }}
                                             >
@@ -577,7 +577,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                                     flex: 1, padding: '0.4rem 0.2rem', borderRadius: '6px', border: 'none',
                                                     fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
                                                     background: waterMode === 'flat' ? 'var(--color-white, #fff)' : 'transparent',
-                                                    color: waterMode === 'flat' ? 'var(--color-primary, #0ea5e9)' : 'var(--color-text-muted, #64748b)',
+                                                    color: waterMode === 'flat' ? 'var(--color-primary, #0a6cc2)' : 'var(--color-text-muted, #557089)',
                                                     boxShadow: waterMode === 'flat' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none'
                                                 }}
                                             >
@@ -589,7 +589,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
 
                                 {/* ช่องกรอกค่าน้ำ */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>
+                                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>
                                         {waterMode === 'normal' ? 'ค่าน้ำต่อหน่วย (บาท/หน่วย)' : 'ค่าเหมาจ่ายน้ำ (บาท/เดือน)'}
                                     </label>
                                     <input
@@ -605,8 +605,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                         required
                                         style={{
                                             width: '100%', padding: '0.6rem 0.75rem', borderRadius: '10px',
-                                            border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                            color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.875rem'
+                                            border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                            color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.875rem'
                                         }}
                                     />
                                 </div>
@@ -614,8 +614,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                 {/* ค่าเช่าห้อง & กำหนดชำระ */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1e293b)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <DollarSign size={14} color="#10b981" /> ค่าเช่าเริ่มต้น (฿/ด.)
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1a3350)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <DollarSign size={14} color="#22a35a" /> ค่าเช่าเริ่มต้น (฿/ด.)
                                         </label>
                                         <input
                                             type="number"
@@ -626,14 +626,14 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                             required
                                             style={{
                                                 width: '100%', padding: '0.6rem 0.75rem', borderRadius: '10px',
-                                                border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                                color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.875rem'
+                                                border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                                color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.875rem'
                                             }}
                                         />
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1e293b)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <Calendar size={14} color="#0ea5e9" /> กำหนดชำระทุกวันที่
+                                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text, #1a3350)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Calendar size={14} color="#0a6cc2" /> กำหนดชำระทุกวันที่
                                         </label>
                                         <input
                                             type="number"
@@ -644,8 +644,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                             required
                                             style={{
                                                 width: '100%', padding: '0.6rem 0.75rem', borderRadius: '10px',
-                                                border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                                color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.875rem'
+                                                border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                                color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.875rem'
                                             }}
                                         />
                                     </div>
@@ -655,7 +655,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>อีเมล <span style={{ color: '#ef4444' }}>*</span></label>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>อีเมล <span style={{ color: '#ef4444' }}>*</span></label>
                         <input
                             type="email"
                             placeholder="email@example.com"
@@ -665,14 +665,14 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                             autoComplete="email"
                             style={{
                                 width: '100%', padding: '0.75rem 1rem', borderRadius: '10px',
-                                border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.9rem'
+                                border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.9rem'
                             }}
                         />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>รหัสผ่าน <span style={{ color: '#ef4444' }}>*</span></label>
+                        <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>รหัสผ่าน <span style={{ color: '#ef4444' }}>*</span></label>
                         <div style={{ position: 'relative' }}>
                             <input
                                 type={showPassword ? "text" : "password"}
@@ -684,8 +684,8 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                 autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                                 style={{
                                     width: '100%', padding: '0.75rem 2.5rem 0.75rem 1rem', borderRadius: '10px',
-                                    border: '1px solid var(--color-gray-200, #e2e8f0)', background: 'var(--color-white, #fff)',
-                                    color: 'var(--color-text, #1e293b)', outline: 'none', fontSize: '0.9rem'
+                                    border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
+                                    color: 'var(--color-text, #1a3350)', outline: 'none', fontSize: '0.9rem'
                                 }}
                             />
                             <button
@@ -694,7 +694,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                 style={{
                                     position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
                                     background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-                                    color: 'var(--color-text-muted, #6B7280)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    color: 'var(--color-text-muted, #557089)', display: 'flex', alignItems: 'center', justifyContent: 'center'
                                 }}
                             >
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -704,15 +704,15 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
 
                     {mode === 'register' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '0.25rem' }}>
-                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1e293b)' }}>
-                                คุณรู้จักเราได้อย่างไร? <span style={{ color: 'var(--color-text-muted, #64748b)', fontWeight: 400, fontSize: '0.78rem' }}>(เลือกได้หลายข้อ)</span>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>
+                                คุณรู้จักเราได้อย่างไร? <span style={{ color: 'var(--color-text-muted, #557089)', fontWeight: 400, fontSize: '0.78rem' }}>(เลือกได้หลายข้อ)</span>
                             </label>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                 {['Google', 'Facebook', 'เพื่อนแนะนำ', 'LINE', 'TikTok', 'อื่นๆ'].map(source => (
                                     <label key={source} style={{
                                         display: 'flex', alignItems: 'center', gap: '0.5rem',
-                                        padding: '0.55rem 0.85rem', border: '1px solid var(--color-gray-200, #e2e8f0)',
-                                        background: 'var(--color-white, #fff)', color: 'var(--color-text, #1e293b)',
+                                        padding: '0.55rem 0.85rem', border: '1px solid var(--color-gray-200, #dce5ef)',
+                                        background: 'var(--color-white, #fff)', color: 'var(--color-text, #1a3350)',
                                         borderRadius: '10px', cursor: 'pointer', fontSize: '0.825rem', fontWeight: 500,
                                         transition: 'all 0.15s ease'
                                     }}>
@@ -726,7 +726,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                                     setReferralSources(prev => prev.filter(s => s !== source));
                                                 }
                                             }}
-                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--color-primary, #0ea5e9)' }}
+                                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--color-primary, #0a6cc2)' }}
                                         />
                                         {source}
                                     </label>
@@ -807,15 +807,15 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                 {mode === 'register' && localStorage.getItem('horcare_pending_plan') && (
                     <div style={{
                         marginTop: '0.75rem',
-                        background: 'rgba(139,92,246,0.12)',
-                        border: '1px solid rgba(139,92,246,0.35)',
+                        background: 'rgba(15, 76, 129,0.12)',
+                        border: '1px solid rgba(15, 76, 129,0.35)',
                         borderRadius: '10px',
                         padding: '0.6rem 0.875rem',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
                         fontSize: '0.82rem',
-                        color: '#C4B5FD',
+                        color: '#CFE2F6',
                     }}>
                         <Zap size={14} style={{ flexShrink: 0 }} />
                         สมัครแล้วจะพาไปหน้าชำระเงินทันที

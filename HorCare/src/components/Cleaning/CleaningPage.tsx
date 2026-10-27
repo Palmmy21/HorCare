@@ -48,7 +48,7 @@ function CleaningPhoto({ uid, buildingId, req }: { uid: string; buildingId: stri
         style={{
           display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
           fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)',
-          background: 'var(--color-primary-50, #EFF6FF)', border: '1px solid var(--color-primary-200, #BFDBFE)',
+          background: 'var(--color-primary-50, #F2F7FC)', border: '1px solid var(--color-primary-200, #CFE2F6)',
           padding: '0.25rem 0.625rem', borderRadius: '6px', cursor: 'pointer',
         }}
       >
@@ -58,7 +58,7 @@ function CleaningPhoto({ uid, buildingId, req }: { uid: string; buildingId: stri
         <img
           src={src}
           alt="รูปงานทำความสะอาด"
-          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #E2E8F0' }}
+          style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #DCE5EF' }}
         />
       )}
     </div>
@@ -67,27 +67,27 @@ function CleaningPhoto({ uid, buildingId, req }: { uid: string; buildingId: stri
 
 // ── Constants & Helpers ────────────────────────────────────────────────────────
 export const CLEANING_SERVICE_CONFIG: Record<string, { label: string; desc: string; color: string; bg: string }> = {
-  general:           { label: 'ทำความสะอาดทั่วไป', desc: 'กวาด ถู ปัดฝุ่น เช็ดกระจก', color: '#0284C7', bg: '#E0F2FE' },
-  general_cleaning:  { label: 'ทำความสะอาดทั่วไป', desc: 'กวาด ถู ปัดฝุ่น เช็ดกระจก', color: '#0284C7', bg: '#E0F2FE' },
-  deep:              { label: 'บิ๊กคลีนนิ่ง (Big Clean)', desc: 'ทำความสะอาดละเอียดทั้งห้อง', color: '#7C3AED', bg: '#F5F3FF' },
-  deep_cleaning:     { label: 'บิ๊กคลีนนิ่ง (Big Clean)', desc: 'ทำความสะอาดละเอียดทั้งห้อง', color: '#7C3AED', bg: '#F5F3FF' },
-  bathroom:          { label: 'ขัดล้างห้องน้ำ', desc: 'ล้างพื้น สุขภัณฑ์ กระจก ผนังห้องน้ำ', color: '#0D9488', bg: '#CCFBF1' },
-  bathroom_cleaning: { label: 'ขัดล้างห้องน้ำ', desc: 'ล้างพื้น สุขภัณฑ์ กระจก ผนังห้องน้ำ', color: '#0D9488', bg: '#CCFBF1' },
-  balcony:           { label: 'ล้างระเบียง / ซักล้าง', desc: 'ขัดพื้นระเบียง ราวระเบียง', color: '#D97706', bg: '#FEF3C7' },
+  general:           { label: 'ทำความสะอาดทั่วไป', desc: 'กวาด ถู ปัดฝุ่น เช็ดกระจก', color: '#0A6CC2', bg: '#E7F0FA' },
+  general_cleaning:  { label: 'ทำความสะอาดทั่วไป', desc: 'กวาด ถู ปัดฝุ่น เช็ดกระจก', color: '#0A6CC2', bg: '#E7F0FA' },
+  deep:              { label: 'บิ๊กคลีนนิ่ง (Big Clean)', desc: 'ทำความสะอาดละเอียดทั้งห้อง', color: '#0F4C81', bg: '#F2F7FC' },
+  deep_cleaning:     { label: 'บิ๊กคลีนนิ่ง (Big Clean)', desc: 'ทำความสะอาดละเอียดทั้งห้อง', color: '#0F4C81', bg: '#F2F7FC' },
+  bathroom:          { label: 'ขัดล้างห้องน้ำ', desc: 'ล้างพื้น สุขภัณฑ์ กระจก ผนังห้องน้ำ', color: '#15803D', bg: '#DCF2E4' },
+  bathroom_cleaning: { label: 'ขัดล้างห้องน้ำ', desc: 'ล้างพื้น สุขภัณฑ์ กระจก ผนังห้องน้ำ', color: '#15803D', bg: '#DCF2E4' },
+  balcony:           { label: 'ล้างระเบียง / ซักล้าง', desc: 'ขัดพื้นระเบียง ราวระเบียง', color: '#E8740C', bg: '#FDEBD3' },
   checkout:          { label: 'เคลียร์ห้องก่อนย้ายออก', desc: 'ทำความสะอาดเตรียมส่งมอบห้อง', color: '#E11D48', bg: '#FFE4E6' },
   move_out_cleaning: { label: 'เคลียร์ห้องก่อนย้ายออก', desc: 'ทำความสะอาดเตรียมส่งมอบห้อง', color: '#E11D48', bg: '#FFE4E6' },
-  bed_linen:         { label: 'เปลี่ยนผ้าปู / ซักรีด', desc: 'เปลี่ยนชุดเครื่องนอน', color: '#6366F1', bg: '#EEF2FF' },
-  other:             { label: 'อื่นๆ', desc: 'บริการอื่นๆ', color: '#64748B', bg: '#F1F5F9' },
+  bed_linen:         { label: 'เปลี่ยนผ้าปู / ซักรีด', desc: 'เปลี่ยนชุดเครื่องนอน', color: '#0A6CC2', bg: '#F2F7FC' },
+  other:             { label: 'อื่นๆ', desc: 'บริการอื่นๆ', color: '#557089', bg: '#EBF1F7' },
 };
 
 export const CLEANING_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   open:        { label: 'รอดำเนินการ',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
   pending:     { label: 'รอดำเนินการ',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  assigned:    { label: 'มอบหมายแล้ว',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-  in_progress: { label: 'กำลังดำเนินการ',  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  done:        { label: 'เสร็จสิ้น',       color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0' },
-  completed:   { label: 'เสร็จสิ้น',       color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0' },
-  cancelled:   { label: 'ยกเลิก',          color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0' },
+  assigned:    { label: 'มอบหมายแล้ว',      color: '#0A6CC2', bg: '#F2F7FC', border: '#CFE2F6' },
+  in_progress: { label: 'กำลังดำเนินการ',  color: '#E8740C', bg: '#FEF6EC', border: '#FBD9A8' },
+  done:        { label: 'เสร็จสิ้น',       color: '#15803D', bg: '#EFF8F2', border: '#A7DDBB' },
+  completed:   { label: 'เสร็จสิ้น',       color: '#15803D', bg: '#EFF8F2', border: '#A7DDBB' },
+  cancelled:   { label: 'ยกเลิก',          color: '#557089', bg: '#F4F7FB', border: '#DCE5EF' },
 };
 
 function fmtRelative(iso?: string): string {
@@ -292,12 +292,12 @@ export default function CleaningPage({ uid, buildingId }: Props) {
   };
 
   return (
-    <div style={{ padding: '1.25rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div>
       {/* ── Top Header ────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #0284C7, #0369A1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #0A6CC2, #08589F)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(10, 108, 194, 0.25)' }}>
               <Sparkles size={22} />
             </div>
             <div>
@@ -552,12 +552,12 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                       <CleaningPhoto uid={uid} buildingId={buildingId} req={req} />
 
                       {/* Assigned Maid */}
-                      <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.625rem', borderRadius: 8, background: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.625rem', borderRadius: 8, background: '#F4F7FB', border: '1px solid #DCE5EF', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}>
-                          <UserCheck size={15} style={{ color: req.assigned_maid_name ? '#0284C7' : 'var(--color-gray-400)' }} />
+                          <UserCheck size={15} style={{ color: req.assigned_maid_name ? '#0A6CC2' : 'var(--color-gray-400)' }} />
                           {req.assigned_maid_name ? (
                             <div>
-                              <span style={{ fontWeight: 600, color: '#0F172A' }}>{req.assigned_maid_name}</span>
+                              <span style={{ fontWeight: 600, color: '#102A43' }}>{req.assigned_maid_name}</span>
                               {req.assigned_maid_phone && (
                                 <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', marginLeft: '0.4rem' }}>
                                   ({req.assigned_maid_phone})
@@ -588,7 +588,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
 
                       {/* Completed note if any */}
                       {(req.completed_note || req.completion_notes) && (
-                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#16A34A', background: '#F0FDF4', padding: '0.4rem 0.6rem', borderRadius: 6 }}>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#15803D', background: '#EFF8F2', padding: '0.4rem 0.6rem', borderRadius: 6 }}>
                           <strong>บันทึกปิดงาน:</strong> {req.completed_note || req.completion_notes}
                         </div>
                       )}
@@ -610,7 +610,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
                               padding: '0.3rem 0.65rem', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600,
-                              background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A', cursor: 'pointer',
+                              background: '#FDEBD3', color: '#C2410C', border: '1px solid #FBD9A8', cursor: 'pointer',
                             }}
                           >
                             <Clock size={13} />
@@ -629,7 +629,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
                               padding: '0.3rem 0.65rem', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600,
-                              background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0', cursor: 'pointer',
+                              background: '#DCF2E4', color: '#15803D', border: '1px solid #A7DDBB', cursor: 'pointer',
                             }}
                           >
                             <CheckCircle2 size={13} />
@@ -645,7 +645,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                             title="ยกเลิกคำขอ"
                             style={{
                               padding: '0.3rem 0.5rem', borderRadius: 6, fontSize: '0.75rem',
-                              background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0', cursor: 'pointer',
+                              background: '#EBF1F7', color: '#557089', border: '1px solid #DCE5EF', cursor: 'pointer',
                             }}
                           >
                             <XCircle size={13} />
@@ -664,7 +664,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                             <button
                               onClick={() => setConfirmDeleteId(null)}
                               type="button"
-                              style={{ padding: '0.25rem 0.4rem', background: '#E2E8F0', color: '#475569', border: 'none', borderRadius: 4, fontSize: '0.725rem', cursor: 'pointer' }}
+                              style={{ padding: '0.25rem 0.4rem', background: '#DCE5EF', color: '#3E5872', border: 'none', borderRadius: 4, fontSize: '0.725rem', cursor: 'pointer' }}
                             >
                               ยกเลิก
                             </button>
@@ -697,11 +697,11 @@ export default function CleaningPage({ uid, buildingId }: Props) {
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'housekeepers' && (
         <div>
-          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '0.875rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-            <KeyRound size={20} style={{ color: '#0284C7', flexShrink: 0, marginTop: 2 }} />
-            <div style={{ fontSize: '0.85rem', color: '#1E40AF', lineHeight: 1.4 }}>
+          <div style={{ background: '#F2F7FC', border: '1px solid #CFE2F6', borderRadius: 10, padding: '0.875rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+            <KeyRound size={20} style={{ color: '#0A6CC2', flexShrink: 0, marginTop: 2 }} />
+            <div style={{ fontSize: '0.85rem', color: '#08589F', lineHeight: 1.4 }}>
               <strong>ระบบเข้าสู่ระบบของแม่บ้าน (Housekeeper Login):</strong>
-              <div style={{ marginTop: '0.25rem', color: '#1E3A8A' }}>
+              <div style={{ marginTop: '0.25rem', color: '#102A43' }}>
                 เจ้าของหอสามารถบันทึกแม่บ้าน พร้อมตั้งเบอร์โทรศัพท์และรหัสผ่าน (Passcode) แล้วส่งมอบให้แม่บ้านใช้ Login ได้ที่หน้าแรก โดยแม่บ้านจะเห็นเฉพาะ <strong>งานแม่บ้าน</strong> และ <strong>จดมิเตอร์น้ำไฟ</strong> เท่านั้น
               </div>
             </div>
@@ -739,11 +739,11 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#F0F9FF', border: '1px solid #BAE6FD', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284C7', fontWeight: 700 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#F2F7FC', border: '1px solid #CFE2F6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0A6CC2', fontWeight: 700 }}>
                             {m.name.slice(0, 1)}
                           </div>
                           <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0F172A' }}>{m.name}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#102A43' }}>{m.name}</div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                               <Phone size={11} /> {m.phone}
                             </div>
@@ -756,9 +756,9 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                             fontWeight: 700,
                             padding: '0.15rem 0.55rem',
                             borderRadius: 12,
-                            background: m.is_active !== false ? '#DCFCE7' : '#F1F5F9',
-                            color: m.is_active !== false ? '#15803D' : '#64748B',
-                            border: `1px solid ${m.is_active !== false ? '#BBF7D0' : '#E2E8F0'}`,
+                            background: m.is_active !== false ? '#DCF2E4' : '#EBF1F7',
+                            color: m.is_active !== false ? '#15803D' : '#557089',
+                            border: `1px solid ${m.is_active !== false ? '#A7DDBB' : '#DCE5EF'}`,
                           }}
                         >
                           {m.is_active !== false ? 'พร้อมทำงาน' : 'พักงาน'}
@@ -766,14 +766,14 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                       </div>
 
                       {/* Login Credential Box */}
-                      <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 8, padding: '0.625rem 0.75rem', marginBottom: '0.75rem' }}>
+                      <div style={{ background: '#F4F7FB', border: '1px solid #DCE5EF', borderRadius: 8, padding: '0.625rem 0.75rem', marginBottom: '0.75rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <ShieldCheck size={13} style={{ color: '#0284C7' }} /> ข้อมูลสำหรับเข้าสู่ระบบแม่บ้าน:
+                          <ShieldCheck size={13} style={{ color: '#0A6CC2' }} /> ข้อมูลสำหรับเข้าสู่ระบบแม่บ้าน:
                         </div>
-                        <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#334155' }}>
+                        <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#29435E' }}>
                           <span>เบอร์โทร: <strong>{m.phone}</strong></span>
                           {m.needs_passcode ? (
-                            <span style={{ color: '#B45309', fontWeight: 700 }}>ต้องตั้งรหัสใหม่ (กด "แก้ไข")</span>
+                            <span style={{ color: '#C2410C', fontWeight: 700 }}>ต้องตั้งรหัสใหม่ (กด "แก้ไข")</span>
                           ) : (
                             <span>รหัส: <strong>ตั้งไว้แล้ว</strong></span>
                           )}
@@ -1117,7 +1117,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
                   onClick={handleConfirmComplete}
                   disabled={savingId === completingReq.id}
                   className="btn btn-primary"
-                  style={{ padding: '0.5rem 1.25rem', background: '#16A34A', borderColor: '#16A34A' }}
+                  style={{ padding: '0.5rem 1.25rem', background: '#15803D', borderColor: '#15803D' }}
                 >
                   {savingId === completingReq.id ? 'กำลังบันทึก...' : 'ยืนยันเสร็จสิ้น'}
                 </button>

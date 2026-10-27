@@ -16,6 +16,8 @@ import { formatMonthLabel } from './_translations.js';
 import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
 import type { MonthlyBill } from '../src/types/index.js';
 import { autoPostSafe } from './_ledger-auto.js';
+import { invoicePay, loadPayAccount } from './_payment-qr.js';
+import { appBaseUrl } from './_notify.js';
 
 export const config = {
     api: {
@@ -459,7 +461,8 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
     }
 
     const bill = billDoc.data();
-    await lineReply(replyToken, [buildBillFlex(bill as MonthlyBill, dorm_name || '-', due_day ?? 5, bill.month as string)]);
+    const pay = invoicePay(await loadPayAccount(uid, building_id), bill.total_bill as number, appBaseUrl());
+    await lineReply(replyToken, [buildBillFlex(bill as MonthlyBill, dorm_name || '-', due_day ?? 5, bill.month as string, { pay })]);
 }
 
 /** ส่งลิงก์พอร์ทัลส่วนตัวของลูกหอ */

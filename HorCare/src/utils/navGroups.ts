@@ -12,7 +12,7 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
   return [
     // Real-estate ERP modules: property → leasing → billing → accounting → operations → residents → system
     { id: 'overview', label: 'ภาพรวม', items: ['dashboard'] },
-    { id: 'property', label: isMarket ? 'แผงค้า' : 'ทรัพย์สิน', items: ['rooms', 'collections', 'recording', 'summary'] },
+    { id: 'property', label: isMarket ? 'แผงค้า' : 'ทรัพย์สิน', items: ['floorplan', 'rooms', 'collections', 'recording', 'summary'] },
     { id: 'leasing', label: 'ปล่อยเช่า', items: ['leasing', 'tenants'] },
     { id: 'billing', label: 'เรียกเก็บและรับเงิน', items: ['payments'] },
     { id: 'accounting', label: 'บัญชี', items: ['ledger', 'accounting', 'archives'] },

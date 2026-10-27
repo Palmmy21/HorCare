@@ -137,7 +137,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                             {t('units_used', lang)} {bill.water_units} {t('unit_label', lang)} ({adjustedFlatLimit} {t('unit_label', lang)})
                                         </div>
                                         {tenants > 1 && (
-                                            <div className="invoice-detail" style={{ color: 'var(--color-info, #3B82F6)' }}>
+                                            <div className="invoice-detail" style={{ color: 'var(--color-info, #0A6CC2)' }}>
                                                 {tenants} {t('person_unit', lang)} ({waterCfg.flat_limit_unit}×{tenants}={adjustedFlatLimit} {t('unit_label', lang)}, {waterCfg.flat_price?.toLocaleString()}×{tenants}={bill.water_flat_amount.toLocaleString()} {t('baht_label', lang)})
                                             </div>
                                         )}
@@ -150,7 +150,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                 {bill.water_excess_units > 0 && (
                                     <tr className="invoice-row">
                                         <td className="invoice-td">
-                                            <div style={{ fontWeight: 500, color: 'var(--color-warning, #F59E0B)' }}>
+                                            <div style={{ fontWeight: 500, color: 'var(--color-warning, #F59E2E)' }}>
                                                 {tBilingual('water_excess', lang, isBilingual, secLang)}
                                             </div>
                                             <div className="invoice-detail">
@@ -214,7 +214,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                             <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', display: 'inline-block' }}>
                                 <QRCodeSVG value={qrPayload} size={140} level="M" />
                             </div>
-                            <div style={{ fontSize: '13px', marginTop: '8px', textAlign: 'center', color: '#475569', fontWeight: 500 }}>
+                            <div style={{ fontSize: '13px', marginTop: '8px', textAlign: 'center', color: '#3E5872', fontWeight: 500 }}>
                                 {bankByCode(payTo.bank_code)?.name_th ?? payTo.bank_short} · {payTo.account_name}
                             </div>
                         </div>

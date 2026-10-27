@@ -39,7 +39,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                     padding: '2rem',
                     textAlign: 'center',
                     fontFamily: "var(--font-sans)",
-                    background: '#F9FAFB',
+                    background: '#F4F7FB',
                 }}>
                     <div><AlertTriangle size={64} color="#EF4444" /></div>
                     <h2 style={{ color: '#EF4444', margin: 0 }}>เกิดข้อผิดพลาด</h2>
@@ -48,7 +48,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                     </p>
                     {isDev && msg && (
                         <pre style={{
-                            background: '#1F2937', color: '#FCA5A5',
+                            background: '#1A3350', color: '#FCA5A5',
                             padding: '0.75rem 1rem', borderRadius: '8px',
                             fontSize: '0.75rem', textAlign: 'left',
                             maxWidth: '90vw', overflowX: 'auto', margin: 0,
@@ -60,7 +60,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                         <button
                             onClick={() => this.setState({ hasError: false, error: null })}
                             style={{
-                                padding: '0.75rem 1.5rem', background: '#6B7280',
+                                padding: '0.75rem 1.5rem', background: '#557089',
                                 color: 'white', border: 'none', borderRadius: '0.5rem',
                                 cursor: 'pointer', fontWeight: 500,
                             }}
@@ -70,7 +70,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                         <button
                             onClick={() => window.location.reload()}
                             style={{
-                                padding: '0.75rem 1.5rem', background: '#3B82F6',
+                                padding: '0.75rem 1.5rem', background: '#0A6CC2',
                                 color: 'white', border: 'none', borderRadius: '0.5rem',
                                 cursor: 'pointer', fontWeight: 500,
                             }}

@@ -451,32 +451,32 @@ export default function SlipNotificationToast({
         }
       `}</style>
       {toasts.map(toast => {
-        let accent = '#059669';
-        let bg = '#d1fae5';
+        let accent = '#15803D';
+        let bg = '#dcf2e4';
         let IconComponent = CreditCard;
 
         if (toast.kind === 'maintenance_new') {
-          accent = '#D97706';
-          bg = '#FEF3C7';
+          accent = '#E8740C';
+          bg = '#FDEBD3';
           IconComponent = Wrench;
         } else if (toast.kind === 'maintenance_status') {
-          accent = '#2563EB';
-          bg = '#DBEAFE';
+          accent = '#0A6CC2';
+          bg = '#E7F0FA';
           IconComponent = AlertCircle;
         } else if (toast.kind === 'cleaning_new') {
-          accent = '#0284C7';
-          bg = '#E0F2FE';
+          accent = '#0A6CC2';
+          bg = '#E7F0FA';
           IconComponent = Sparkles;
         } else if (toast.kind === 'cleaning_status') {
-          accent = '#7C3AED';
-          bg = '#EDE9FE';
+          accent = '#0F4C81';
+          bg = '#E7F0FA';
           IconComponent = CheckCircle2;
         }
 
         return (
           <div key={toast.id} style={{
             background: '#ffffff',
-            border: '1px solid #e2e8f0',
+            border: '1px solid #dce5ef',
             borderLeft: `4.5px solid ${accent}`,
             borderRadius: 14,
             boxShadow: '0 10px 28px -4px rgba(0,0,0,0.14), 0 0 0 1px rgba(0,0,0,0.04)',
@@ -494,16 +494,16 @@ export default function SlipNotificationToast({
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0f172a', lineHeight: 1.3 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#102a43', lineHeight: 1.3 }}>
                 {toast.title}
               </div>
-              <div style={{ fontSize: '0.8125rem', color: '#475569', marginTop: 3 }}>
+              <div style={{ fontSize: '0.8125rem', color: '#3E5872', marginTop: 3 }}>
                 ห้อง <strong>{toast.roomNumber}</strong>
                 {toast.description && (
                   <span style={{
                     display: 'block',
                     fontSize: '0.75rem',
-                    color: '#64748b',
+                    color: '#557089',
                     marginTop: 3,
                     lineHeight: 1.35,
                     overflow: 'hidden',
@@ -532,7 +532,7 @@ export default function SlipNotificationToast({
               onClick={() => dismiss(toast.id)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: 4, color: '#94a3b8', flexShrink: 0,
+                padding: 4, color: '#8fa3b8', flexShrink: 0,
                 borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
               aria-label="ปิด"

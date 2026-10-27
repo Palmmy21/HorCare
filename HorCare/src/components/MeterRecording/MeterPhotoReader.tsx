@@ -126,10 +126,10 @@ export default function MeterPhotoReader({ roomNumber, onConfirm, onClose }: Met
             : 'ไม่ทราบประเภท';
 
     const meterTypeIcon = result?.meterType === 'electric'
-        ? <Zap size={14} color="#F59E0B" />
+        ? <Zap size={14} color="#F59E2E" />
         : result?.meterType === 'water'
-            ? <Droplets size={14} color="#3B82F6" />
-            : <HelpCircle size={14} color="#9CA3AF" />;
+            ? <Droplets size={14} color="#0A6CC2" />
+            : <HelpCircle size={14} color="#8FA3B8" />;
 
     return (
         <div className="meter-photo-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -153,7 +153,7 @@ export default function MeterPhotoReader({ roomNumber, onConfirm, onClose }: Met
                     {/* ยังไม่มีรูป */}
                     {!previewUrl && (
                         <div className="meter-photo-upload-zone">
-                            <div className="meter-photo-upload-icon"><Camera size={32} color="#6B7280" /></div>
+                            <div className="meter-photo-upload-icon"><Camera size={32} color="#557089" /></div>
                             <p className="meter-photo-upload-hint">เลือกวิธีถ่าย/อัปโหลดรูปมิเตอร์</p>
                             <div className="meter-photo-btn-row">
                                 <button
@@ -174,7 +174,7 @@ export default function MeterPhotoReader({ roomNumber, onConfirm, onClose }: Met
                                 </button>
                             </div>
                             <p className="meter-photo-tip" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                                <AlertCircle size={14} color="#F59E0B" /> ถ่ายให้ชัด ไม่สั่น หน้าปัทม์เห็นตัวเลขครบ
+                                <AlertCircle size={14} color="#F59E2E" /> ถ่ายให้ชัด ไม่สั่น หน้าปัทม์เห็นตัวเลขครบ
                             </p>
                         </div>
                     )}

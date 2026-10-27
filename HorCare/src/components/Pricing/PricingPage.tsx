@@ -39,11 +39,11 @@ const CSS = `
   min-height: 100vh;
   margin: 0;
   padding: 3rem 1.5rem 5rem;
-  background-color: #090D16;
-  background-image: radial-gradient(circle at 50% -10%, rgba(14, 165, 233, 0.12) 0%, rgba(9, 13, 22, 0) 65%);
+  background-color: #102A43;
+  background-image: radial-gradient(circle at 50% -10%, rgba(10, 108, 194, 0.12) 0%, rgba(16, 42, 67, 0) 65%);
   position: relative;
   overflow-x: hidden;
-  color: #F8FAFC;
+  color: #F4F7FB;
   font-family: var(--font-sans);
 }
 
@@ -79,7 +79,7 @@ const CSS = `
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(16, 42, 67, 0.65);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6);
@@ -89,18 +89,18 @@ const CSS = `
 }
 .plan-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(14, 165, 233, 0.32);
-  box-shadow: 0 20px 44px -10px rgba(14, 165, 233, 0.12), 0 12px 28px -6px rgba(0, 0, 0, 0.5);
+  border-color: rgba(10, 108, 194, 0.32);
+  box-shadow: 0 20px 44px -10px rgba(10, 108, 194, 0.12), 0 12px 28px -6px rgba(0, 0, 0, 0.5);
 }
 .plan-card.popular {
-  border-color: rgba(14, 165, 233, 0.25);
+  border-color: rgba(10, 108, 194, 0.25);
 }
 .plan-card.popular::before {
   content: '';
   position: absolute;
   top: 0; left: 15%; right: 15%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #38BDF8, transparent);
+  background: linear-gradient(90deg, transparent, #3D8FD6, transparent);
 }
 
 /* -- Popular micro-badge -- */
@@ -108,9 +108,9 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(14, 165, 233, 0.1);
-  border: 1px solid rgba(14, 165, 233, 0.25);
-  color: #38BDF8;
+  background: rgba(10, 108, 194, 0.1);
+  border: 1px solid rgba(10, 108, 194, 0.25);
+  color: #3D8FD6;
   border-radius: 999px;
   padding: 0.25rem 0.75rem;
   font-size: 0.72rem;
@@ -134,14 +134,14 @@ const CSS = `
   justify-content: center;
   gap: 0.5rem;
   color: #FFFFFF;
-  background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
-  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.3);
+  background: linear-gradient(135deg, #0A6CC2 0%, #0A6CC2 100%);
+  box-shadow: 0 4px 16px rgba(10, 108, 194, 0.3);
   transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   text-decoration: none;
 }
 .plan-cta:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+  box-shadow: 0 6px 20px rgba(10, 108, 194, 0.45);
   opacity: 0.96;
 }
 .plan-cta:active {
@@ -171,14 +171,14 @@ const CSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14, 165, 233, 0.12);
-  border: 1px solid rgba(14, 165, 233, 0.24);
-  color: #38BDF8;
+  background: rgba(10, 108, 194, 0.12);
+  border: 1px solid rgba(10, 108, 194, 0.24);
+  color: #3D8FD6;
 }
 .feat-check.unavailable {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #64748B;
+  color: #557089;
 }
 
 /* -- Minimal Billing Toggle -- */
@@ -198,7 +198,7 @@ const CSS = `
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  color: #94A3B8;
+  color: #8FA3B8;
   background: transparent;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
@@ -206,12 +206,12 @@ const CSS = `
   gap: 0.5rem;
 }
 .billing-btn:hover {
-  color: #F8FAFC;
+  color: #F4F7FB;
 }
 .billing-btn.active {
-  background: #0284C7;
+  background: #0A6CC2;
   color: #FFFFFF;
-  box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 2px 10px rgba(10, 108, 194, 0.35);
 }
 
 /* -- Back button -- */
@@ -219,7 +219,7 @@ const CSS = `
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  color: #94A3B8;
+  color: #8FA3B8;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -245,21 +245,21 @@ const CSS = `
 }
 .pricing-modal {
   position: fixed; top: 50%; left: 50%; z-index: 301;
-  background: #0F172A;
+  background: #102A43;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;
   padding: 2rem;
   width: min(420px, 92vw);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
   animation: p-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
-  color: #F8FAFC;
+  color: #F4F7FB;
 }
 .modal-close {
   position: absolute; top: 1rem; right: 1rem;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px; padding: 0.375rem; cursor: pointer;
-  display: flex; color: #94A3B8;
+  display: flex; color: #8FA3B8;
   transition: all 0.15s;
 }
 .modal-close:hover { color: #FFFFFF; background: rgba(255, 255, 255, 0.12); }
@@ -267,16 +267,16 @@ const CSS = `
   flex: 1; padding: 0.8rem; border-radius: 12px; cursor: pointer;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #94A3B8; font-weight: 600; font-size: 0.9rem;
+  color: #8FA3B8; font-weight: 600; font-size: 0.9rem;
   transition: all 0.15s;
 }
 .modal-cancel:hover { background: rgba(255, 255, 255, 0.09); color: #FFFFFF; }
 .modal-confirm {
   flex: 2; padding: 0.8rem; border-radius: 12px; border: none;
-  background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+  background: linear-gradient(135deg, #0A6CC2 0%, #0A6CC2 100%);
   color: #FFFFFF; font-weight: 600; font-size: 0.9rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-  box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+  box-shadow: 0 4px 16px rgba(10, 108, 194, 0.35);
   transition: all 0.15s;
 }
 .modal-confirm:hover { opacity: 0.92; transform: translateY(-1px); }
@@ -284,8 +284,8 @@ const CSS = `
 /* -- Processing spinner -- */
 .pricing-spinner {
   width: 44px; height: 44px;
-  border: 3px solid rgba(14, 165, 233, 0.2);
-  border-top-color: #0EA5E9;
+  border: 3px solid rgba(10, 108, 194, 0.2);
+  border-top-color: #0A6CC2;
   border-radius: 50%;
   animation: p-spin 0.7s linear infinite;
 }
@@ -293,9 +293,9 @@ const CSS = `
 /* -- Success check -- */
 .success-check {
   width: 80px; height: 80px; border-radius: 50%;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #34D399;
+  background: rgba(34, 163, 90, 0.15);
+  border: 1px solid rgba(34, 163, 90, 0.3);
+  color: #22A35A;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 1.5rem;
   animation: p-check 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -338,8 +338,8 @@ const PLANS: Plan[] = [
     {
         id: 'small', name: 'Start', icon: Home, roomRange: 'สูงสุด 50 ห้อง · 1 หอ',
         monthlyPrice: 149, yearlyPrice: 950, originalYearlyPrice: 1788,
-        gradient: 'linear-gradient(135deg,#0EA5E9,#0284C7)',
-        glowColor: 'rgba(14,165,233,0.3)',
+        gradient: 'linear-gradient(135deg,#0A6CC2,#0A6CC2)',
+        glowColor: 'rgba(10, 108, 194,0.3)',
         features: [
             'ห้องสูงสุด 50 ห้อง · 1 หอพัก',
             'จดมิเตอร์ไฟ / น้ำ + ออกบิลอัตโนมัติ',
@@ -356,8 +356,8 @@ const PLANS: Plan[] = [
     {
         id: 'medium', name: 'Plus', icon: Building, roomRange: 'สูงสุด 150 ห้อง · 5 หอ',
         monthlyPrice: 259, yearlyPrice: 1590, originalYearlyPrice: 3108,
-        gradient: 'linear-gradient(135deg,#0EA5E9,#0284C7)',
-        glowColor: 'rgba(14,165,233,0.3)',
+        gradient: 'linear-gradient(135deg,#0A6CC2,#0A6CC2)',
+        glowColor: 'rgba(10, 108, 194,0.3)',
         features: [
             'ห้องสูงสุด 150 ห้อง · 5 หอพัก',
             'ทุกอย่างของ Start',
@@ -373,8 +373,8 @@ const PLANS: Plan[] = [
     {
         id: 'large', name: 'HorCare', icon: Building2, roomRange: 'ไม่จำกัดห้อง · 10 หอ',
         monthlyPrice: 399, yearlyPrice: 2990, originalYearlyPrice: 4788,
-        gradient: 'linear-gradient(135deg,#0EA5E9,#0284C7)',
-        glowColor: 'rgba(14,165,233,0.3)',
+        gradient: 'linear-gradient(135deg,#0A6CC2,#0A6CC2)',
+        glowColor: 'rgba(10, 108, 194,0.3)',
         popular: true,
         features: [
             'ห้องไม่จำกัด · สูงสุด 10 หอพัก',
@@ -409,10 +409,10 @@ const PlanCard = memo(function PlanCard({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                 <div style={{
                     width: 44, height: 44, borderRadius: '12px',
-                    background: 'rgba(14, 165, 233, 0.1)',
-                    border: '1px solid rgba(14, 165, 233, 0.22)',
+                    background: 'rgba(10, 108, 194, 0.1)',
+                    border: '1px solid rgba(10, 108, 194, 0.22)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#38BDF8',
+                    color: '#3D8FD6',
                 }}>
                     <plan.icon size={22} />
                 </div>
@@ -431,9 +431,9 @@ const PlanCard = memo(function PlanCard({
                 </div>
                 <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                    color: '#94A3B8', fontSize: '0.8125rem',
+                    color: '#8FA3B8', fontSize: '0.8125rem',
                 }}>
-                    <Package size={13} color="#38BDF8" /> {plan.roomRange}
+                    <Package size={13} color="#3D8FD6" /> {plan.roomRange}
                 </div>
             </div>
 
@@ -442,29 +442,29 @@ const PlanCard = memo(function PlanCard({
                 <div key={cycle} className="price-pop" style={{
                     display: 'flex', alignItems: 'baseline', gap: '0.3rem',
                 }}>
-                    <span style={{ fontSize: '1.35rem', fontWeight: 700, color: '#38BDF8' }}>฿</span>
+                    <span style={{ fontSize: '1.35rem', fontWeight: 700, color: '#3D8FD6' }}>฿</span>
                     <span className="price-number">{price.toLocaleString()}</span>
-                    <span style={{ fontSize: '0.9rem', color: '#94A3B8', marginLeft: '0.2rem' }}>
+                    <span style={{ fontSize: '0.9rem', color: '#8FA3B8', marginLeft: '0.2rem' }}>
                         {cycle === 'monthly' ? '/ เดือน' : '/ ปี'}
                     </span>
                 </div>
                 {cycle === 'yearly' ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ textDecoration: 'line-through', color: '#64748B', fontSize: '0.85rem' }}>
+                        <span style={{ textDecoration: 'line-through', color: '#557089', fontSize: '0.85rem' }}>
                             ฿{plan.originalYearlyPrice.toLocaleString()}
                         </span>
                         <span style={{
-                            background: 'rgba(16,185,129,0.14)', border: '1px solid rgba(16,185,129,0.28)',
-                            color: '#34D399', borderRadius: '999px', padding: '0.12rem 0.55rem',
+                            background: 'rgba(34, 163, 90,0.14)', border: '1px solid rgba(34, 163, 90,0.28)',
+                            color: '#22A35A', borderRadius: '999px', padding: '0.12rem 0.55rem',
                             fontSize: '0.72rem', fontWeight: 700,
                         }}>ประหยัด {savings}%</span>
-                        <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
+                        <span style={{ color: '#8FA3B8', fontSize: '0.8rem' }}>
                             (เฉลี่ยเพียง ฿{Math.round(plan.yearlyPrice / 12).toLocaleString()} / ด.)
                         </span>
                     </div>
                 ) : (
-                    <div style={{ fontSize: '0.8125rem', color: '#94A3B8', marginTop: '0.45rem' }}>
-                        หรือจ่ายรายปี <span style={{ color: '#38BDF8', fontWeight: 600 }}>฿{plan.yearlyPrice.toLocaleString()}</span> / ปี (ประหยัดกว่า 49%)
+                    <div style={{ fontSize: '0.8125rem', color: '#8FA3B8', marginTop: '0.45rem' }}>
+                        หรือจ่ายรายปี <span style={{ color: '#3D8FD6', fontWeight: 600 }}>฿{plan.yearlyPrice.toLocaleString()}</span> / ปี (ประหยัดกว่า 49%)
                     </div>
                 )}
             </div>
@@ -489,16 +489,16 @@ const PlanCard = memo(function PlanCard({
                         <li key={f} style={{
                             display: 'flex', alignItems: 'center',
                             gap: '0.75rem', fontSize: '0.875rem', fontWeight: 450,
-                            color: (unavailable || coming) ? '#64748B' : '#E2E8F0',
+                            color: (unavailable || coming) ? '#557089' : '#DCE5EF',
                         }}>
                             {coming ? (
                                 <div style={{
-                                    background: 'rgba(245,158,11,0.12)',
-                                    border: '1px solid rgba(245,158,11,0.25)',
+                                    background: 'rgba(245, 158, 46,0.12)',
+                                    border: '1px solid rgba(245, 158, 46,0.25)',
                                     borderRadius: '50%', width: 20, height: 20,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                                 }}>
-                                    <Clock size={10} color="#FBBF24" strokeWidth={2.5} />
+                                    <Clock size={10} color="#F7B86C" strokeWidth={2.5} />
                                 </div>
                             ) : unavailable ? (
                                 <div className="feat-check unavailable">
@@ -514,9 +514,9 @@ const PlanCard = memo(function PlanCard({
                                 {coming && (
                                     <span style={{
                                         marginLeft: '0.4rem', fontSize: '0.65rem', fontWeight: 700,
-                                        background: 'rgba(245,158,11,0.12)',
-                                        border: '1px solid rgba(245,158,11,0.25)',
-                                        color: '#FBBF24', borderRadius: '999px',
+                                        background: 'rgba(245, 158, 46,0.12)',
+                                        border: '1px solid rgba(245, 158, 46,0.25)',
+                                        color: '#F7B86C', borderRadius: '999px',
                                         padding: '0.1rem 0.45rem', verticalAlign: 'middle',
                                     }}>เร็วๆ นี้</span>
                                 )}
@@ -556,9 +556,9 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                     <div style={{
                         width: 48, height: 48, borderRadius: '14px',
-                        background: 'rgba(14, 165, 233, 0.1)',
-                        border: '1px solid rgba(14, 165, 233, 0.25)',
-                        color: '#38BDF8', display: 'flex', alignItems: 'center',
+                        background: 'rgba(10, 108, 194, 0.1)',
+                        border: '1px solid rgba(10, 108, 194, 0.25)',
+                        color: '#3D8FD6', display: 'flex', alignItems: 'center',
                         justifyContent: 'center', margin: '0 auto 1rem',
                     }}>
                         <plan.icon size={26} />
@@ -567,25 +567,25 @@ const DemoModal = memo(function DemoModal({ plan, cycle, onClose, onConfirm }: {
                         {plan.name} ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'})
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '0.25rem', marginTop: '0.5rem' }}>
-                        <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#38BDF8' }}>฿</span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#3D8FD6' }}>฿</span>
                         <span className="price-number" style={{ fontSize: '2.5rem' }}>
                             {price.toLocaleString()}
                         </span>
-                        <span style={{ fontSize: '0.875rem', color: '#94A3B8' }}>
+                        <span style={{ fontSize: '0.875rem', color: '#8FA3B8' }}>
                             {cycle === 'monthly' ? '/ เดือน' : '/ ปี'}
                         </span>
                     </div>
                 </div>
 
                 <div style={{
-                    background: 'rgba(14, 165, 233, 0.06)', border: '1px solid rgba(14, 165, 233, 0.18)',
+                    background: 'rgba(10, 108, 194, 0.06)', border: '1px solid rgba(10, 108, 194, 0.18)',
                     borderRadius: '12px', padding: '0.875rem 1rem', marginBottom: '1.5rem',
                     display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
                 }}>
-                    <QrCode size={16} color="#38BDF8" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
+                    <QrCode size={16} color="#3D8FD6" style={{ flexShrink: 0, marginTop: '0.15rem' }} />
                     <div>
-                        <div style={{ fontWeight: 600, color: '#F8FAFC', fontSize: '0.825rem', marginBottom: '0.2rem' }}>ชำระผ่าน QR PromptPay หรือ บัตรเครดิต</div>
-                        <div style={{ fontSize: '0.775rem', color: '#94A3B8', lineHeight: 1.5 }}>
+                        <div style={{ fontWeight: 600, color: '#F4F7FB', fontSize: '0.825rem', marginBottom: '0.2rem' }}>ชำระผ่าน QR PromptPay หรือ บัตรเครดิต</div>
+                        <div style={{ fontSize: '0.775rem', color: '#8FA3B8', lineHeight: 1.5 }}>
                             กด "ไปหน้าชำระเงิน" เพื่อดำเนินการผ่านระบบที่ปลอดภัยของ Stripe
                         </div>
                     </div>
@@ -614,18 +614,18 @@ function SuccessScreen({ plan, cycle, onBack }: { plan: Plan; cycle: BillingCycl
             </div>
             <h2 style={{
                 fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em',
-                color: '#34D399', marginBottom: '0.5rem',
+                color: '#22A35A', marginBottom: '0.5rem',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
             }}>
-                <PartyPopper size={24} color="#10B981" />
+                <PartyPopper size={24} color="#22A35A" />
                 ชำระเงินสำเร็จ!
             </h2>
-            <p style={{ color: '#94A3B8', maxWidth: 360, lineHeight: 1.6, marginBottom: '0.5rem', fontSize: '0.925rem' }}>
+            <p style={{ color: '#8FA3B8', maxWidth: 360, lineHeight: 1.6, marginBottom: '0.5rem', fontSize: '0.925rem' }}>
                 อัปเกรดเป็นแผน <strong style={{ color: '#FFFFFF' }}>{plan.name}</strong>{' '}
                 ({cycle === 'monthly' ? 'รายเดือน' : 'รายปี'}) เรียบร้อยแล้ว
             </p>
-            <p style={{ color: '#64748B', fontSize: '0.8rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
-                ขอบคุณที่ไว้วางใจ HorCare <Heart size={13} color="#0EA5E9" fill="#0EA5E9" />
+            <p style={{ color: '#557089', fontSize: '0.8rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                ขอบคุณที่ไว้วางใจ HorCare <Heart size={13} color="#0A6CC2" fill="#0A6CC2" />
             </p>
             <button onClick={onBack} className="plan-cta" style={{ maxWidth: 220 }}>
                 <Zap size={16} /> เริ่มใช้งานเลย
@@ -726,11 +726,11 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                         <div className="p-anim-0" style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
                             <div style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
-                                background: 'rgba(14, 165, 233, 0.08)', border: '1px solid rgba(14, 165, 233, 0.22)',
+                                background: 'rgba(10, 108, 194, 0.08)', border: '1px solid rgba(10, 108, 194, 0.22)',
                                 borderRadius: '999px', padding: '0.35rem 0.95rem', marginBottom: '1rem',
                             }}>
-                                <Sparkles size={12} color="#38BDF8" />
-                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#38BDF8', letterSpacing: '0.02em' }}>
+                                <Sparkles size={12} color="#3D8FD6" />
+                                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#3D8FD6', letterSpacing: '0.02em' }}>
                                     {currentPlanId ? 'ต่ออายุหรือเปลี่ยนแพ็กเกจ' : 'เลือกแผนที่เหมาะสำหรับคุณ'}
                                 </span>
                             </div>
@@ -741,19 +741,19 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                             }}>
                                 {currentPlanId ? 'จัดการแพ็กเกจ ' : 'แพ็กเกจ '}
                                 <span style={{
-                                    background: 'linear-gradient(135deg, #FFFFFF 40%, #38BDF8 100%)',
+                                    background: 'linear-gradient(135deg, #FFFFFF 40%, #3D8FD6 100%)',
                                     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                                 }}>HorCare</span>
                             </h1>
-                            <p style={{ color: '#94A3B8', fontSize: '1rem', maxWidth: 460, margin: '0 auto', lineHeight: 1.6 }}>
+                            <p style={{ color: '#8FA3B8', fontSize: '1rem', maxWidth: 460, margin: '0 auto', lineHeight: 1.6 }}>
                                 {currentPlanId ? 'ต่ออายุแพ็กเกจปัจจุบัน หรืออัปเกรดเพื่อรับฟีเจอร์ที่มากขึ้น' : 'ยกระดับการบริหารหอพักด้วยระบบอัตโนมัติ AI และ LINE แจ้งเตือนครบวงจร'}
                             </p>
                             {currentPlanId && currentPlan && (
                                 <div style={{
                                     marginTop: '1rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-                                    background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)',
+                                    background: 'rgba(34, 163, 90,0.1)', border: '1px solid rgba(34, 163, 90,0.22)',
                                     borderRadius: '999px', padding: '0.3rem 0.85rem',
-                                    fontSize: '0.8rem', color: '#34D399', fontWeight: 600,
+                                    fontSize: '0.8rem', color: '#22A35A', fontWeight: 600,
                                 }}>
                                     <InfinityIcon size={13} />
                                     แผนปัจจุบันของคุณ: {currentPlan.name}
@@ -774,8 +774,8 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                         {c === 'monthly' ? 'รายเดือน' : 'รายปี'}
                                         {c === 'yearly' && (
                                             <span style={{
-                                                background: 'rgba(16,185,129,0.18)', border: '1px solid rgba(16,185,129,0.32)',
-                                                color: '#34D399', borderRadius: '999px',
+                                                background: 'rgba(34, 163, 90,0.18)', border: '1px solid rgba(34, 163, 90,0.32)',
+                                                color: '#22A35A', borderRadius: '999px',
                                                 padding: '0.1rem 0.5rem', fontSize: '0.68rem', fontWeight: 700,
                                             }}>ประหยัด 49%</span>
                                         )}
@@ -787,7 +787,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                         {currentPlanId && currentPlan ? (
                             <>
                                 <div className="pricing-section" style={{ marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <h3 style={{ color: '#CBD5E1', fontSize: '1rem', marginBottom: '1.25rem', fontWeight: 600 }}>
+                                    <h3 style={{ color: '#C3D0DE', fontSize: '1rem', marginBottom: '1.25rem', fontWeight: 600 }}>
                                         แพ็กเกจปัจจุบันของคุณ
                                     </h3>
                                     <div style={{ maxWidth: '460px', width: '100%' }}>
@@ -803,7 +803,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
 
                                 {currentPlanId !== 'large' && (
                                     <div className="pricing-section" style={{ marginBottom: '2rem' }}>
-                                        <h3 style={{ color: '#94A3B8', fontSize: '0.95rem', marginBottom: '1.25rem', fontWeight: 500, textAlign: 'center' }}>
+                                        <h3 style={{ color: '#8FA3B8', fontSize: '0.95rem', marginBottom: '1.25rem', fontWeight: 500, textAlign: 'center' }}>
                                             อัปเกรดเป็นแพ็กเกจ HorCare เพื่อฟีเจอร์ที่ครบกว่า
                                         </h3>
                                         <div className="pricing-grid" style={{ maxWidth: 460, margin: '0 auto' }}>
@@ -839,9 +839,9 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                             ].map(item => (
                                 <div key={item.text} style={{
                                     display: 'flex', alignItems: 'center', gap: '0.45rem',
-                                    color: '#64748B', fontSize: '0.8125rem', fontWeight: 500,
+                                    color: '#557089', fontSize: '0.8125rem', fontWeight: 500,
                                 }}>
-                                    <item.icon size={14} color="#38BDF8" />
+                                    <item.icon size={14} color="#3D8FD6" />
                                     <span>{item.text}</span>
                                 </div>
                             ))}
@@ -869,7 +869,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                     backdropFilter: 'blur(6px)',
                 }}>
                     <div className="pricing-spinner" />
-                    <p style={{ color: '#CBD5E1', fontWeight: 500, fontSize: '0.95rem' }}>
+                    <p style={{ color: '#C3D0DE', fontWeight: 500, fontSize: '0.95rem' }}>
                         กำลังดำเนินการ...
                     </p>
                 </div>

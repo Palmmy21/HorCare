@@ -107,9 +107,9 @@ export default function PaymentMethodModal({
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.75rem',
                                         borderRadius: 10, cursor: 'pointer', fontSize: '0.875rem', fontWeight: on ? 700 : 500, textAlign: 'left',
-                                        border: `1.5px solid ${on ? '#6366F1' : 'var(--color-gray-200)'}`,
-                                        background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
-                                        color: on ? '#4F46E5' : 'var(--color-gray-700)',
+                                        border: `1.5px solid ${on ? '#0A6CC2' : 'var(--color-gray-200)'}`,
+                                        background: on ? 'rgba(10, 108, 194,0.08)' : 'transparent',
+                                        color: on ? '#0A6CC2' : 'var(--color-gray-700)',
                                     }}
                                 >
                                     <Icon size={18} /> {PAYMENT_METHOD_LABELS[m]}
@@ -124,7 +124,7 @@ export default function PaymentMethodModal({
                             <input className="form-input mono" inputMode="decimal" value={paidAmount} onChange={e => setPaidAmount(e.target.value)} />
                             {!amountOk && <span style={{ color: '#DC2626', fontSize: '0.75rem' }}>กรอกจำนวนเงินมากกว่า 0</span>}
                             {amountOk && amount !== undefined && amountNum !== amount && (
-                                <span style={{ color: '#D97706', fontSize: '0.75rem' }}>ไม่ตรงกับยอดบิล ฿{amount.toLocaleString()}</span>
+                                <span style={{ color: '#E8740C', fontSize: '0.75rem' }}>ไม่ตรงกับยอดบิล ฿{amount.toLocaleString()}</span>
                             )}
                         </label>
                     )}
@@ -158,7 +158,7 @@ export default function PaymentMethodModal({
                                                 <button key={a.id} type="button" role="radio" aria-checked={on} onClick={() => setAccountId(a.id)}
                                                     style={{
                                                         display: 'flex', alignItems: 'center', gap: 10, padding: '0.5rem 0.625rem', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                                                        border: `1.5px solid ${on ? '#6366F1' : 'var(--color-gray-200)'}`, background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                                        border: `1.5px solid ${on ? '#0A6CC2' : 'var(--color-gray-200)'}`, background: on ? 'rgba(10, 108, 194,0.08)' : 'transparent',
                                                         color: 'var(--color-gray-800)',
                                                     }}>
                                                     <BankLogo short={a.bank_short} size={30} />
@@ -172,7 +172,7 @@ export default function PaymentMethodModal({
                                         <button type="button" role="radio" aria-checked={accountId === ''} onClick={() => setAccountId('')}
                                             style={{
                                                 padding: '0.4rem 0.625rem', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: '0.8125rem',
-                                                border: `1.5px solid ${accountId === '' ? '#6366F1' : 'var(--color-gray-200)'}`, background: accountId === '' ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                                border: `1.5px solid ${accountId === '' ? '#0A6CC2' : 'var(--color-gray-200)'}`, background: accountId === '' ? 'rgba(10, 108, 194,0.08)' : 'transparent',
                                                 color: 'var(--color-gray-700)',
                                             }}>บัญชีอื่น (พิมพ์เอง)</button>
                                     </div>

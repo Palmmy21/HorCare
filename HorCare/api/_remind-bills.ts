@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { linePush, buildBillFlex, thaiMonthLabel, runPooled } from './_line.js';
+import { invoicePay, loadPayAccount } from './_payment-qr.js';
+import { appBaseUrl } from './_notify.js';
 import type { BillLanguage, MonthlyBill } from '../src/types/index.js';
 
 /**
@@ -78,9 +80,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const [uid, bid] = key.split('/');
             const base = `users/${uid}/buildings/${bid}`;
 
-            const [cfgSnap, roomsSnap] = await Promise.all([
+            const [cfgSnap, roomsSnap, payAccount] = await Promise.all([
                 db.doc(`${base}/data/config`).get(),
                 db.collection(`${base}/rooms`).get(),
+                loadPayAccount(uid, bid),
             ]);
             const cfg = cfgSnap.data() ?? {};
             const dormName = cfg.bill_customization?.dorm_name || 'หอพัก';
@@ -135,7 +138,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 try {
                     await linePush(lineUserId, [
                         { type: 'text', text },
-                        buildBillFlex(bill as MonthlyBill, dormName, dueDay, bill.month as string, { lang: roomLang, bilingual, secLang }),
+                        buildBillFlex(bill as MonthlyBill, dormName, dueDay, bill.month as string, {
+                            lang: roomLang, bilingual, secLang, pay: invoicePay(payAccount, bill.total_bill as number, appBaseUrl()),
+                        }),
                     ]);
                     await billDoc.ref.update({
                         last_reminded_at: new Date().toISOString(),

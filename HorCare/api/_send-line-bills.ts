@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildBillFlex, linePush, runPooled } from './_line.js';
-import { loadPayAccount, paymentQrMessages } from './_payment-qr.js';
+import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { portalLinkFor } from './_portal-link.js';
 
@@ -117,8 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';
                 const bilingual = !!cfg.bill_customization?.bilingual_mode;
                 const secLang = cfg.bill_customization?.secondary_language || 'en';
-                const messages: object[] = [buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang })];
-                messages.push(...paymentQrMessages(payAccount, bill.total_bill as number, appUrl || appBaseUrl(), roomLang));
+                const pay = invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl());
+                const messages: object[] = [buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay })];
                 await linePush(lineUserId, messages);
                 await billDoc.ref.update({ is_notified: true });
                 sent++;

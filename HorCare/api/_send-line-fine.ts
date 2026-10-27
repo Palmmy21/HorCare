@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { buildFineFlex, linePush } from './_line.js';
-import { loadPayAccount, paymentQrMessages } from './_payment-qr.js';
+import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { portalLinkFor } from './_portal-link.js';
 
@@ -84,8 +84,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ? `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: fine.room_id }))}`
             : undefined;
 
-        const messages: object[] = [buildFineFlex(fine as Fine, dormName, { portalUrl })];
-        messages.push(...paymentQrMessages(payAccount, fine.amount, appUrl || appBaseUrl()));
+        const messages: object[] = [buildFineFlex(fine as Fine, dormName, {
+            portalUrl,
+            lang: roomData?.language || cfg.bill_customization?.default_language || 'th',
+            bilingual: !!cfg.bill_customization?.bilingual_mode,
+            secLang: cfg.bill_customization?.secondary_language || 'en',
+            pay: invoicePay(payAccount, Number(fine.amount), appUrl || appBaseUrl()),
+        })];
 
         await linePush(lineUserId, messages);
 

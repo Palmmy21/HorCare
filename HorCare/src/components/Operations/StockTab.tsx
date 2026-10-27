@@ -80,10 +80,10 @@ export default function StockTab({ uid, buildingId }: Props) {
     <div>
       {lowStock.length > 0 && (
         <div style={{
-          background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '12px',
+          background: '#FDEBD3', border: '1px solid #FBD9A8', borderRadius: '12px',
           padding: '0.75rem 1rem', marginBottom: '1rem',
           display: 'flex', alignItems: 'center', gap: '0.5rem',
-          fontSize: '0.875rem', color: '#D97706', fontWeight: 600,
+          fontSize: '0.875rem', color: '#E8740C', fontWeight: 600,
         }}>
           <AlertTriangle size={16} />
           สต็อกใกล้หมด {lowStock.length} รายการ: {lowStock.map(it => it.name).join(', ')}
@@ -172,8 +172,8 @@ export default function StockTab({ uid, buildingId }: Props) {
             return (
               <div key={it.id} className="card" style={{
                 padding: '1rem 1.125rem',
-                border: isLow ? '1px solid #FDE68A' : undefined,
-                background: isLow ? 'rgba(254,243,199,0.3)' : undefined,
+                border: isLow ? '1px solid #FBD9A8' : undefined,
+                background: isLow ? 'rgba(253, 235, 211,0.3)' : undefined,
               }}>
                 {deleteId === it.id ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -188,11 +188,11 @@ export default function StockTab({ uid, buildingId }: Props) {
                       <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text)' }}>{it.name}</span>
-                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#F3F4F6)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', background: 'var(--color-gray-100,#EBF1F7)', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
                             {it.category}
                           </span>
                           {isLow && (
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#D97706', background: '#FEF3C7', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#E8740C', background: '#FDEBD3', padding: '0.25rem 0.625rem', borderRadius: '6px' }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={14} /> ใกล้หมด</span>
                             </span>
                           )}
@@ -200,7 +200,7 @@ export default function StockTab({ uid, buildingId }: Props) {
                         {it.note && <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', margin: '0.375rem 0 0' }}>{it.note}</p>}
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: isLow ? '#D97706' : 'var(--color-text)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
+                        <div style={{ fontSize: '1.75rem', fontWeight: 800, color: isLow ? '#E8740C' : 'var(--color-text)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>
                           {it.quantity}
                         </div>
                         <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>{it.unit}</div>

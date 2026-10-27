@@ -64,9 +64,9 @@ export default function OperationsPage({
               style={{
                 flex: 1, minWidth: 'calc(33.333% - 0.5rem)',
                 padding: '0.625rem 0.5rem', borderRadius: '10px', cursor: 'pointer',
-                border: active ? '1.5px solid var(--color-primary, #8B5CF6)' : '1.5px solid transparent',
-                background: active ? 'rgba(139,92,246,0.1)' : 'none',
-                color: active ? 'var(--color-primary, #8B5CF6)' : 'var(--color-text-muted, #6B7280)',
+                border: active ? '1.5px solid var(--color-primary, #0F4C81)' : '1.5px solid transparent',
+                background: active ? 'rgba(15, 76, 129,0.1)' : 'none',
+                color: active ? 'var(--color-primary, #0F4C81)' : 'var(--color-text-muted, #557089)',
                 fontWeight: active ? 700 : 500, fontSize: '0.8125rem',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
                 transition: 'all 0.15s', position: 'relative',

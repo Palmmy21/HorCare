@@ -61,13 +61,13 @@ export default function VerifyEmailWall({ email, onResend, onRefresh, onLogout }
         }}>
             <div style={{
                 width: 80, height: 80, borderRadius: '50%',
-                background: 'rgba(59,130,246,0.15)', border: '2px solid rgba(59,130,246,0.3)',
+                background: 'rgba(10, 108, 194,0.15)', border: '2px solid rgba(10, 108, 194,0.3)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}><MailCheck size={40} color="#60A5FA" /></div>
+            }}><MailCheck size={40} color="#3D8FD6" /></div>
 
             <h2 style={{ color: '#fff', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>ยืนยันอีเมลของคุณ</h2>
 
-            <p style={{ color: '#9CA3AF', maxWidth: '420px', lineHeight: 1.7, margin: 0 }}>
+            <p style={{ color: '#8FA3B8', maxWidth: '420px', lineHeight: 1.7, margin: 0 }}>
                 เราได้ส่งลิงก์ยืนยันไปที่<br />
                 <strong style={{ color: '#fff', wordBreak: 'break-all' }}>{email}</strong><br />
                 กดลิงก์ในอีเมลเพื่อเปิดใช้งานบัญชี แล้วกด "ฉันยืนยันแล้ว"
@@ -76,7 +76,7 @@ export default function VerifyEmailWall({ email, onResend, onRefresh, onLogout }
             {msg && (
                 <div style={{
                     fontSize: '0.85rem', lineHeight: 1.5, maxWidth: '420px',
-                    color: msg.tone === 'ok' ? '#34D399' : '#F87171',
+                    color: msg.tone === 'ok' ? '#22A35A' : '#F87171',
                 }}>{msg.text}</div>
             )}
 
@@ -85,11 +85,11 @@ export default function VerifyEmailWall({ email, onResend, onRefresh, onLogout }
                     onClick={handleRefresh}
                     disabled={checking}
                     style={{
-                        background: 'linear-gradient(135deg, #3B82F6, #6366F1)',
+                        background: 'linear-gradient(135deg, #0A6CC2, #0A6CC2)',
                         border: 'none', padding: '0.875rem 2rem', borderRadius: '14px', color: '#fff',
                         fontWeight: 700, fontSize: '1rem', cursor: checking ? 'wait' : 'pointer',
                         display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        boxShadow: '0 4px 24px rgba(59,130,246,0.4)', opacity: checking ? 0.7 : 1,
+                        boxShadow: '0 4px 24px rgba(10, 108, 194,0.4)', opacity: checking ? 0.7 : 1,
                     }}
                 >
                     <RefreshCw size={18} className={checking ? 'spin' : ''} /> ฉันยืนยันแล้ว

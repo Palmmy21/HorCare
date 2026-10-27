@@ -5,15 +5,21 @@ import {
 } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import type { DormConfig, MonthlyBill, PaymentStatus, Expense, Room } from '../../types';
+import type { DormConfig, MonthlyBill, PaymentStatus, Expense, Room, MaintenanceRequest, CleaningRequest } from '../../types';
 import { formatCurrency, formatMonthThai, getPreviousMonth } from '../../utils/calculations';
 import { useDashboardPrefs, WIDGET_LABELS, type WidgetId } from '../../hooks/useDashboardPrefs';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import NongCarePanel from '../NongCare/NongCarePanel';
 import RoomStatusDashboard from '../RoomManagement/RoomStatusDashboard';
-import { BarChart, DonutChart, Legend } from '../Accounting/charts';
+import { BarChart, DonutChart, Legend, NetChart } from '../Accounting/charts';
 import { useCountUp } from '../../hooks/useCountUp';
 import { useRoomOccupancy } from '../../hooks/useRoomOccupancy';
+import { useLedgerEntries, useLedgers } from '../../hooks/useLedgerData';
+import { profitAndLoss } from '../../shared/ledger';
+import { useFloorPlan } from '../../hooks/useFloorPlan';
+import { planKindOf } from '../../shared/floorPlan';
+import FloorPlanBoard from '../FloorPlan/FloorPlanBoard';
+import { usePlanView } from '../FloorPlan/usePlanView';
 import { canOpenView } from '../../shared/viewAccess';
 import type { Permission } from '../../shared/permissions';
 
@@ -38,6 +44,10 @@ interface DashboardProps {
     buildingId?: string;
     buildingName?: string;
     onGoToPayments?: () => void;
+    /** Opens the full plan page. */
+    onGoToPlan?: () => void;
+    /** Opens the ledger (accounting system). Omitted when the account cannot open that page. */
+    onGoToAccounting?: () => void;
     license?: string;
     onUpgrade?: () => void;
 }
@@ -60,10 +70,16 @@ const axisBaht = (satang: number) => {
 };
 const tipBaht = (satang: number) => formatCurrency(satang / 100);
 
+// stable empties so the plan view memo does not recompute every render
+const NO_ROOMS: Room[] = [];
+const NO_BILLS: MonthlyBill[] = [];
+const NO_JOBS: MaintenanceRequest[] = [];
+const NO_CLEANING: CleaningRequest[] = [];
+
 export default function Dashboard({
     config, stats, currentMonth, recentBills, allBills = [],
     rooms, onOpenRoom, permissions = null,
-    uid, buildingId, buildingName, onGoToPayments, license, onUpgrade
+    uid, buildingId, buildingName, onGoToPayments, onGoToPlan, onGoToAccounting, license, onUpgrade
 }: DashboardProps) {
     const [showCustomize, setShowCustomize] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'ai'>('overview');
@@ -71,9 +87,17 @@ export default function Dashboard({
     const dormLogo = config?.bill_customization?.dorm_logo;
     const terms = getWorkspaceTerms(config?.building_type);
     const showRoomMap = isEnabled('room_status') && !!rooms && rooms.length > 0;
-    const { byRoom: occupancy } = useRoomOccupancy(uid, buildingId, showRoomMap ? rooms! : [], {
+    const { byRoom: occupancy, termsByRoom } = useRoomOccupancy(uid, buildingId, showRoomMap ? rooms! : [], {
         leasing: showRoomMap && canOpenView('leasing', permissions),
         tenants: showRoomMap && canOpenView('tenants', permissions),
+    });
+
+    // Mini plan: the same plan as the plan page, occupancy layer, number + icon only
+    const planKind = planKindOf(config?.building_type);
+    const { plan } = useFloorPlan(showRoomMap ? uid : null, buildingId, showRoomMap ? rooms! : NO_ROOMS, planKind);
+    const planView = usePlanView({
+        plan, rooms: showRoomMap ? rooms! : NO_ROOMS, occupancy, termsByRoom, monthBills: NO_BILLS, maintenance: NO_JOBS, cleaning: NO_CLEANING,
+        layer: 'occupancy', terms,
     });
 
     // ── Fetch expenses (last 6+ months) ──────────────────────────────────────
@@ -143,6 +167,38 @@ export default function Dashboard({
             return { month, projected, collected, expense };
         });
     }, [allBills, expenses, currentMonth]);
+
+    // ── 6-month occupancy: share of active rooms that were billed rent each month ──
+    // The current month is replaced inside RoomStatusDashboard with today's contract-based rate.
+    const occupancyHistory = useMemo(() => {
+        if (!showRoomMap) return undefined;
+        const activeIds = new Set(rooms!.filter(r => r.is_active).map(r => r.id));
+        if (activeIds.size === 0) return undefined;
+        return {
+            labels: trend.map(r => formatMonthThai(r.month)),
+            values: trend.map(r => {
+                const saved = allBills.filter(b => b.month === r.month && b.is_saved);
+                if (saved.length === 0) return null;
+                const billed = new Set(saved.filter(b => b.room_rent > 0 && activeIds.has(b.room_id)).map(b => b.room_id));
+                return billed.size / activeIds.size;
+            }),
+        };
+    }, [showRoomMap, rooms, trend, allBills]);
+
+    // ── 6-month net profit from the ledger (posted journal entries) this property posts into ──
+    const showProfit = isEnabled('revenue_trend') && !!uid && !!buildingId && canOpenView('ledger', permissions);
+    const { ledgers, loading: ledgersLoading } = useLedgers(showProfit ? uid! : null);
+    const ledger = ledgers.find(l => l.property_ids.includes(buildingId ?? ''));
+    const { entries: ledgerEntries, loading: entriesLoading } = useLedgerEntries(showProfit ? uid! : null, ledger?.id ?? null);
+    const profitTrend = useMemo(() => {
+        if (!ledger) return null;
+        const rows = trend.map(r => {
+            const pnl = profitAndLoss(ledgerEntries, ledger.accounts, `${r.month}-01`, `${r.month}-31`);
+            const any = pnl.revenue_satang !== 0 || pnl.expense_satang !== 0;
+            return { month: r.month, revenue: any ? pnl.revenue_satang : null, expense: any ? pnl.expense_satang : null, net: any ? pnl.net_satang : null };
+        });
+        return rows.some(r => r.net !== null) ? rows : null;
+    }, [ledger, ledgerEntries, trend]);
 
     const hasTrend = trend.some(r => r.projected > 0 || r.expense > 0);
     const hasExpenseHistory = trend.some(r => r.expense > 0);
@@ -346,7 +402,13 @@ export default function Dashboard({
                 {/* ── Room status overview ── */}
                 {showRoomMap && (
                     <div className="span-12">
-                        <RoomStatusDashboard rooms={rooms!} occupancy={occupancy} onOpenRoom={onOpenRoom} buildingType={config?.building_type} />
+                        <RoomStatusDashboard rooms={rooms!} occupancy={occupancy} onOpenRoom={onOpenRoom} buildingType={config?.building_type} history={occupancyHistory}
+                            onOpenPlan={onGoToPlan}
+                            map={plan.groups.length > 0 ? (
+                                <FloorPlanBoard compact plan={plan} units={planView.units} marks={planView.marks} tenantGroups={planView.groups}
+                                    groupLabel="" unitLabel={terms.unitName} selected={[]}
+                                    onUnitClick={onOpenRoom ? id => { const r = rooms!.find(x => x.id === id); if (r) onOpenRoom(r); } : undefined} />
+                            ) : undefined} />
                     </div>
                 )}
 
@@ -377,12 +439,19 @@ export default function Dashboard({
                 {/* ── Revenue vs Expense Trend ── */}
                 {isEnabled('revenue_trend') && hasTrend && (
                     <section className="panel span-7" aria-labelledby="dash-trend-title">
-                        <div className="panel-head panel-head-wrap">
+                        <div className="panel-head">
                             <h2 id="dash-trend-title" className="panel-title">รายได้ย้อนหลัง 6 เดือน</h2>
+                            {onGoToAccounting && (
+                                <button className="link-btn" onClick={onGoToAccounting}>
+                                    ระบบบัญชี <ChevronRight size={15} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="panel-legend">
                             <Legend items={[
                                 { label: 'เก็บได้จริง', color: 'var(--series-1)' },
                                 ...(hasExpenseHistory ? [{ label: 'ค่าใช้จ่าย', color: 'var(--series-2)' }] : []),
-                                { label: 'ยอดที่ต้องเก็บ', color: 'var(--color-gray-500)', dashed: true },
+                                { label: 'ยอดที่ต้องเก็บ', color: 'var(--series-1)', ghost: true },
                             ]} />
                         </div>
                         <BarChart
@@ -397,7 +466,7 @@ export default function Dashboard({
                                 trend.map(r => r.collected * 100),
                                 ...(hasExpenseHistory ? [trend.map(r => r.expense * 100)] : []),
                             ]}
-                            line={{ label: 'ยอดที่ต้องเก็บ', color: 'var(--color-gray-500)', area: true, values: trend.map(r => (r.projected > 0 ? r.projected * 100 : null)) }}
+                            target={{ label: 'ยอดที่ต้องเก็บ', values: trend.map(r => (r.projected > 0 ? r.projected * 100 : null)) }}
                             format={axisBaht}
                             formatTip={tipBaht}
                             highlight={trend.length - 1}
@@ -437,6 +506,51 @@ export default function Dashboard({
                             <p className="panel-note">
                                 ยังไม่มีค่าใช้จ่ายเดือนนี้{!buildingId && ' — บันทึกได้ที่หน้า "ระบบจัดการ"'}
                             </p>
+                        )}
+                    </section>
+                )}
+
+                {/* ── Net profit from the ledger ── */}
+                {showProfit && !ledgersLoading && (
+                    <section className="panel span-12" aria-labelledby="dash-profit-title">
+                        <div className="panel-head">
+                            <h2 id="dash-profit-title" className="panel-title">กำไรสุทธิย้อนหลัง 6 เดือน</h2>
+                            {onGoToAccounting && (
+                                <button className="link-btn" onClick={onGoToAccounting}>
+                                    ดูงบกำไรขาดทุน <ChevronRight size={15} />
+                                </button>
+                            )}
+                        </div>
+                        {!ledger ? (
+                            <p className="panel-note">
+                                {terms.isMarket ? 'ตลาดนี้' : 'หอนี้'}ยังไม่ได้ผูกกับสมุดบัญชี กราฟกำไรสุทธิจะขึ้นเมื่อตั้งสมุดบัญชีและลงบัญชีแล้ว
+                            </p>
+                        ) : entriesLoading ? (
+                            <p className="panel-note">กำลังโหลดข้อมูลบัญชี…</p>
+                        ) : !profitTrend ? (
+                            <p className="panel-note">ยังไม่มีรายการที่ลงสมุดบัญชี “{ledger.name}” ใน 6 เดือนนี้ · กดลงบัญชีที่หน้าระบบบัญชีก่อน กราฟจึงจะขึ้น</p>
+                        ) : (
+                            <>
+                                <div className="panel-legend">
+                                    <Legend items={[
+                                        { label: 'กำไร', color: 'var(--series-1)' },
+                                        { label: 'ขาดทุน', color: 'var(--series-2)' },
+                                    ]} />
+                                    <span className="panel-meta">จากสมุดบัญชี “{ledger.name}” · รายการที่ลงบัญชีแล้ว</span>
+                                </div>
+                                <NetChart
+                                    title="กำไรสุทธิ"
+                                    labels={profitTrend.map(r => formatMonthThai(r.month))}
+                                    values={profitTrend.map(r => r.net)}
+                                    details={[
+                                        { label: 'รายได้', values: profitTrend.map(r => r.revenue) },
+                                        { label: 'ค่าใช้จ่าย', values: profitTrend.map(r => r.expense) },
+                                    ]}
+                                    formatTip={tipBaht}
+                                    highlight={profitTrend.length - 1}
+                                    height={200}
+                                />
+                            </>
                         )}
                     </section>
                 )}

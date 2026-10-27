@@ -118,8 +118,8 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                                             <div style={{ minWidth: 0, flex: 1 }}>
                                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                                                     <b>{bank?.name_th ?? a.bank_short}</b>
-                                                    {a.is_default && <span title="บัญชีหลัก" style={{ fontSize: '0.68rem', fontWeight: 800, color: '#B45309', display: 'inline-flex', gap: 2, alignItems: 'center' }}><Star size={11} fill="currentColor" /> หลัก</span>}
-                                                    {a.status !== 'active' && <span style={{ fontSize: '0.68rem', color: '#6B7280', fontWeight: 700 }}>ปิดใช้งาน</span>}
+                                                    {a.is_default && <span title="บัญชีหลัก" style={{ fontSize: '0.68rem', fontWeight: 800, color: '#C2410C', display: 'inline-flex', gap: 2, alignItems: 'center' }}><Star size={11} fill="currentColor" /> หลัก</span>}
+                                                    {a.status !== 'active' && <span style={{ fontSize: '0.68rem', color: '#557089', fontWeight: 700 }}>ปิดใช้งาน</span>}
                                                 </div>
                                                 <div style={{ fontSize: '0.8125rem', color: 'var(--color-gray-600)' }}>
                                                     {a.account_name}{a.nickname ? ` · ${a.nickname}` : ' · ⚠️ ยังไม่ตั้งชื่อเรียก — กดแก้ไขเพื่อตั้ง (จำเป็นสำหรับการชนยอด)'}{a.promptpay_id ? ` · PromptPay ${maskPromptPayId(a.promptpay_id)}` : ''}
@@ -171,7 +171,7 @@ export default function BankAccountsModal({ ownerUid, buildingId, accounts, load
                                             <button key={b.code} type="button" role="option" aria-selected={on} onClick={() => setForm(f => ({ ...f, bank_code: b.code }))}
                                                 style={{
                                                     display: 'flex', alignItems: 'center', gap: 8, padding: '0.4rem 0.5rem', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                                                    border: `1.5px solid ${on ? '#6366F1' : 'var(--color-gray-200)'}`, background: on ? 'rgba(99,102,241,0.08)' : 'transparent',
+                                                    border: `1.5px solid ${on ? '#0A6CC2' : 'var(--color-gray-200)'}`, background: on ? 'rgba(10, 108, 194,0.08)' : 'transparent',
                                                     color: 'var(--color-gray-800)', fontSize: '0.78rem', fontWeight: on ? 700 : 500,
                                                 }}>
                                                 <BankLogo short={b.short} size={26} />

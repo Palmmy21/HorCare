@@ -33,8 +33,8 @@ const ERRORS: Record<string, string> = {
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 const day = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 6 };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 6 };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
 const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 6 };
 
 export default function LeasingPage({ ownerUid, buildingId }: Props) {
@@ -127,7 +127,7 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
     const tabs: [Tab, string][] = [['leads', `ผู้สนใจ (${data?.leads.filter(l => l.status !== 'won' && l.status !== 'lost').length ?? 0})`], ['reservations', `การจอง (${data?.reservations.filter(r => r.status === 'active').length ?? 0})`], ['leases', `สัญญาเช่า (${data?.leases.filter(l => l.status === 'active').length ?? 0})`]];
 
     return (
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1 }}>
                     <h1 style={{ margin: 0, fontSize: '1.4rem' }}>ปล่อยเช่า</h1>
@@ -144,7 +144,7 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         <div style={{ ...card, flex: '1 1 160px' }}><span style={{ fontSize: '0.75rem' }}>ห้องที่มีสัญญา</span><strong style={{ fontSize: '1.3rem' }}>{data.leases.filter(l => l.status === 'active').length}</strong></div>
                         <div style={{ ...card, flex: '1 1 160px' }}><span style={{ fontSize: '0.75rem' }}>เงินมัดจำที่ถือไว้</span><strong style={{ fontSize: '1.3rem' }}>{baht(depositsHeld(data.leases))}</strong></div>
-                        <div style={{ ...card, flex: '1 1 160px', background: expiring.length ? '#FEF3C7' : undefined }}>
+                        <div style={{ ...card, flex: '1 1 160px', background: expiring.length ? '#FDEBD3' : undefined }}>
                             <span style={{ fontSize: '0.75rem' }}>สัญญาใกล้หมด / หมดแล้ว</span><strong style={{ fontSize: '1.3rem' }}>{expiring.length}</strong>
                         </div>
                     </div>
@@ -192,13 +192,13 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
                     {tab === 'reservations' && (data.reservations.length === 0 ? <div style={{ color: 'var(--color-gray-500)' }}>ยังไม่มีการจอง</div> : data.reservations.map(r => {
                         const lapsed = isReservationLapsed(r, today);
                         return (
-                            <div key={r.id} style={{ ...card, borderColor: lapsed ? '#F59E0B' : undefined, opacity: r.status === 'active' ? 1 : 0.6 }}>
+                            <div key={r.id} style={{ ...card, borderColor: lapsed ? '#F59E2E' : undefined, opacity: r.status === 'active' ? 1 : 0.6 }}>
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                                     <strong style={{ flex: 1 }}>ห้อง {r.room_number} · {leadName.get(r.lead_id) ?? '-'}</strong>
                                     <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{lapsed ? 'เลยกำหนดจอง' : RESERVATION_STATUS_LABELS_TH[r.status]}</span>
                                 </div>
                                 <div style={{ fontSize: '0.82rem', color: 'var(--color-gray-500)' }}>มัดจำจอง {baht(r.deposit_satang)} · จองถึง {day(r.reserved_until)}{r.cancel_reason ? ` · ${r.cancel_reason}` : ''}</div>
-                                {lapsed && <div style={{ fontSize: '0.8rem', color: '#92400E', display: 'flex', gap: 4, alignItems: 'center' }}><AlertTriangle size={13} /> เลยกำหนดแล้ว ห้องยังถูกกันไว้ — ทำสัญญาหรือยกเลิกการจอง</div>}
+                                {lapsed && <div style={{ fontSize: '0.8rem', color: '#9A3412', display: 'flex', gap: 4, alignItems: 'center' }}><AlertTriangle size={13} /> เลยกำหนดแล้ว ห้องยังถูกกันไว้ — ทำสัญญาหรือยกเลิกการจอง</div>}
                                 {r.status === 'active' && (
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => openConvert(r)}>ทำสัญญา</button>
@@ -232,13 +232,13 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
                             {data.leases.length === 0 ? <div style={{ color: 'var(--color-gray-500)' }}>ยังไม่มีสัญญา</div> : data.leases.map(l => {
                                 const alert = leaseAlert(l, today);
                                 return (
-                                    <div key={l.id} style={{ ...card, borderColor: alert ? '#F59E0B' : undefined, opacity: l.status === 'ended' || l.status === 'terminated' ? 0.6 : 1 }}>
+                                    <div key={l.id} style={{ ...card, borderColor: alert ? '#F59E2E' : undefined, opacity: l.status === 'ended' || l.status === 'terminated' ? 0.6 : 1 }}>
                                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                                             <strong style={{ flex: 1, overflowWrap: 'anywhere' }}>ห้อง {l.room_number} · {l.tenant_name}</strong>
                                             <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{LEASE_STATUS_LABELS_TH[l.status]}</span>
                                         </div>
                                         <div style={{ fontSize: '0.82rem', color: 'var(--color-gray-500)' }}>{day(l.start_date)} – {day(l.end_date)} · ค่าเช่า {baht(l.rent_satang)} · มัดจำ {baht(l.deposit_satang)}{l.renewal_of ? ' · ต่อสัญญา' : ''}{l.end_reason ? ` · ${l.end_reason}` : ''}</div>
-                                        {alert && <div style={{ fontSize: '0.8rem', color: '#92400E', display: 'flex', gap: 4, alignItems: 'center' }}><CalendarClock size={13} /> {alert === 'expired' ? 'เลยวันสิ้นสุดสัญญาแล้ว' : 'ใกล้สิ้นสุดสัญญา'}</div>}
+                                        {alert && <div style={{ fontSize: '0.8rem', color: '#9A3412', display: 'flex', gap: 4, alignItems: 'center' }}><CalendarClock size={13} /> {alert === 'expired' ? 'เลยวันสิ้นสุดสัญญาแล้ว' : 'ใกล้สิ้นสุดสัญญา'}</div>}
                                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                             {l.status === 'active' && <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => renew(l)}>ต่อสัญญา</button>}
                                             {l.status === 'active' && <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => endLease(l)}>สิ้นสุดสัญญา</button>}

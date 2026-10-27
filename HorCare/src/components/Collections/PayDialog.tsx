@@ -44,8 +44,8 @@ function fileToJpegDataUrl(file: File): Promise<string> {
   });
 }
 
-const box: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 };
-const field: React.CSSProperties = { padding: '0.6rem 0.7rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 10, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%', fontSize: '1rem' };
+const box: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 };
+const field: React.CSSProperties = { padding: '0.6rem 0.7rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 10, font: 'inherit', minWidth: 0, boxSizing: 'border-box', width: '100%', fontSize: '1rem' };
 
 export default function PayDialog({ charge, accounts, call, onDone, onClose }: Props) {
   const left = outstanding(charge);
@@ -100,7 +100,7 @@ export default function PayDialog({ charge, accounts, call, onDone, onClose }: P
           <button className="btn-icon" onClick={onClose} disabled={busy} aria-label="ปิด"><X size={18} /></button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ ...box, background: 'var(--color-gray-50, #F9FAFB)' }}>
+          <div style={{ ...box, background: 'var(--color-gray-50, #F4F7FB)' }}>
             <span style={{ fontSize: '0.85rem' }}>{charge.description || charge.party_name}</span>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>ยอดทั้งหมด {baht(charge.amount_satang)} · รับแล้ว {baht(charge.paid_satang)}</span>
@@ -127,7 +127,7 @@ export default function PayDialog({ charge, accounts, call, onDone, onClose }: P
 
           {method === 'transfer' && (
             accounts.length === 0 ? (
-              <div style={{ ...box, borderColor: '#F59E0B', background: '#FFFBEB' }}>ยังไม่มีบัญชีรับเงิน — เพิ่มที่หน้า "การชำระเงิน → บัญชีรับเงิน" ก่อน</div>
+              <div style={{ ...box, borderColor: '#F59E2E', background: '#FEF6EC' }}>ยังไม่มีบัญชีรับเงิน — เพิ่มที่หน้า "การชำระเงิน → บัญชีรับเงิน" ก่อน</div>
             ) : (
               <>
                 {accounts.length > 1 && (
@@ -143,7 +143,7 @@ export default function PayDialog({ charge, accounts, call, onDone, onClose }: P
                 </button>
 
                 {review && (
-                  <div style={{ ...box, borderColor: '#F59E0B', background: '#FFFBEB' }}>
+                  <div style={{ ...box, borderColor: '#F59E2E', background: '#FEF6EC' }}>
                     <strong>AI ยังยืนยันอัตโนมัติไม่ได้ — โปรดตรวจสลิปด้วยตา</strong>
                     <span style={{ fontSize: '0.85rem' }}>{review.note}</span>
                     <span style={{ fontSize: '0.85rem' }}>

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
-  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store
+  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -21,6 +21,7 @@ import { useTheme } from './hooks/useTheme';
 import { getCurrentMonth } from './utils/calculations';
 import { collectionStyleOf, getWorkspaceTerms } from './utils/workspaceTerminology';
 import { HIDDEN_VIEWS } from './shared/erpModules';
+import { PLAN_LABELS, planKindOf } from './shared/floorPlan';
 import { isAdminUser } from './shared/admin';
 import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
 // Core pages — always needed, load eagerly
@@ -53,6 +54,7 @@ const AnnouncementsPage = lazy(() => import('./components/Announcements/Announce
 const MarketPage = lazy(() => import('./components/Market/MarketPage'));
 const AccountingPage = lazy(() => import('./components/Accounting/AccountingPage'));
 const LedgerPage = lazy(() => import('./components/Ledger/LedgerPage'));
+const FloorPlanPage = lazy(() => import('./components/FloorPlan/FloorPlanPage'));
 const LeasingPage = lazy(() => import('./components/Leasing/LeasingPage'));
 const CollectionsPage = lazy(() => import('./components/Collections/CollectionsPage'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
@@ -77,7 +79,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
       height: fullScreen ? '100dvh' : 'auto',
       width: '100%',
       gap: '0.875rem',
-      color: 'var(--text-secondary, #64748b)',
+      color: 'var(--text-secondary, #557089)',
       fontSize: '0.9375rem',
       fontWeight: 500
     }}>
@@ -88,7 +90,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'rooms' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'floorplan' | 'rooms' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -443,6 +445,7 @@ function App() {
 
   const navItems = [
     { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'floorplan'   as ViewMode, icon: MapIcon, label: PLAN_LABELS[planKindOf(config?.building_type)].title },
     { id: 'rooms'       as ViewMode, icon: terms.isMarket ? Store : Home, label: terms.manageUnitsLabel || 'จัดการห้อง' },
     ...(collectionStyle !== 'monthly' ? [{ id: 'collections' as ViewMode, icon: Wallet, label: collectionStyle === 'stall' ? 'เก็บเงินแผง' : 'เก็บค่าห้อง' }] : []),
     ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
@@ -584,7 +587,7 @@ function App() {
             {badgeCount > 99 ? '99+' : badgeCount}
           </span>
         )}
-        {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', color: '#BAE6FD', opacity: 0.8 }} />}
+        {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', color: '#CFE2F6', opacity: 0.8 }} />}
       </button>
     );
   };
@@ -653,7 +656,7 @@ function App() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}><Ban size={40} color="#F87171" /></div>
         <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.25rem' }}>บัญชีถูกระงับ</h2>
-        <p style={{ color: '#9CA3AF', maxWidth: '380px', lineHeight: 1.7 }}>
+        <p style={{ color: '#8FA3B8', maxWidth: '380px', lineHeight: 1.7 }}>
           บัญชีของคุณถูกระงับโดยผู้ดูแลระบบ
           หากคิดว่าเป็นการผิดพลาด กรุณาติดต่อทีมสนับสนุน
         </p>
@@ -681,13 +684,13 @@ function App() {
       }}>
         <div style={{
           width: 80, height: 80, borderRadius: '50%',
-          background: 'rgba(139,92,246,0.15)', border: '2px solid rgba(139,92,246,0.3)',
+          background: 'rgba(15, 76, 129,0.15)', border: '2px solid rgba(15, 76, 129,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><Clock size={40} color="#A78BFA" /></div>
+        }}><Clock size={40} color="#3D8FD6" /></div>
         <h2 style={{ color: '#F87171', fontWeight: 800, fontSize: '1.6rem', margin: 0 }}>
           แพ็กเกจหมดอายุแล้ว
         </h2>
-        <p style={{ color: '#9CA3AF', maxWidth: '400px', lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: '#8FA3B8', maxWidth: '400px', lineHeight: 1.7, margin: 0 }}>
           แพ็กเกจของคุณครบรอบการใช้งานแล้ว<br />ต่ออายุเพื่อใช้งานต่อได้เลย
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
@@ -700,12 +703,12 @@ function App() {
               if (overlay) overlay.style.display = 'block';
             }}
             style={{
-              background: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+              background: 'linear-gradient(135deg, #0F4C81, #E8740C)',
               border: 'none', padding: '0.875rem 2rem',
               borderRadius: '14px', color: '#fff',
               fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: '0.5rem',
-              boxShadow: '0 4px 24px rgba(139,92,246,0.4)',
+              boxShadow: '0 4px 24px rgba(15, 76, 129,0.4)',
             }}
           >
             <Zap size={18} /> ดูแพ็กเกจ
@@ -977,11 +980,11 @@ function App() {
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
-              <Building2 size={15} style={{ flexShrink: 0, color: '#BAE6FD' }} />
+              <Building2 size={15} style={{ flexShrink: 0, color: '#CFE2F6' }} />
               <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {activeBuilding?.name ?? '—'}
               </span>
-              <ChevronDown size={14} style={{ flexShrink: 0, color: '#BAE6FD', transform: 'rotate(-90deg)' }} />
+              <ChevronDown size={14} style={{ flexShrink: 0, color: '#CFE2F6', transform: 'rotate(-90deg)' }} />
             </button>
             {/* Manage branches (rename / delete / add) — the old dropdown, kept reachable. Owner only. */}
             {!isStaff && <button
@@ -991,7 +994,7 @@ function App() {
               title="จัดการสาขา (เปลี่ยนชื่อ / ลบ / เพิ่ม)"
               style={{
                 flexShrink: 0, width: 38, background: 'rgba(255, 255, 255, 0.18)',
-                border: '1px solid rgba(255, 255, 255, 0.35)', borderRadius: '12px', color: '#BAE6FD',
+                border: '1px solid rgba(255, 255, 255, 0.35)', borderRadius: '12px', color: '#CFE2F6',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
@@ -1002,7 +1005,7 @@ function App() {
             {buildingMenuOpen && !isStaff && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 4px)', left: 'var(--space-3)', right: 'var(--space-3)',
-                background: '#0369A1', border: '1.5px solid rgba(255,255,255,0.3)',
+                background: '#08589F', border: '1.5px solid rgba(255,255,255,0.3)',
                 borderRadius: '12px', overflow: 'hidden', zIndex: 200,
                 boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
               }}>
@@ -1040,14 +1043,14 @@ function App() {
                             title="บันทึก"
                             style={{
                               flexShrink: 0,
-                              background: '#10B981', border: 'none', color: '#FFFFFF',
+                              background: '#22A35A', border: 'none', color: '#FFFFFF',
                               borderRadius: '8px', cursor: 'pointer', width: 32, height: 32,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+                              boxShadow: '0 2px 8px rgba(34, 163, 90, 0.4)',
                               transition: 'all 0.15s ease',
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#059669'; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#10B981'; }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#15803D'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#22A35A'; }}
                           >
                             <Check size={16} strokeWidth={3} />
                           </button>
@@ -1082,7 +1085,7 @@ function App() {
                             }}
                           >
                             {b.id === activeBuildingId ? (
-                              <Check size={16} color="#38BDF8" style={{ flexShrink: 0 }} />
+                              <Check size={16} color="#3D8FD6" style={{ flexShrink: 0 }} />
                             ) : (
                               <span style={{ width: 16, flexShrink: 0 }} />
                             )}
@@ -1178,14 +1181,14 @@ function App() {
                     flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     width: 32, height: 32,
-                    background: '#10B981',
+                    background: '#22A35A',
                     border: 'none',
                     borderRadius: '8px', color: '#FFFFFF',
                     cursor: 'pointer', transition: 'all 0.15s ease',
-                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+                    boxShadow: '0 2px 8px rgba(34, 163, 90, 0.4)',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#059669'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#10B981'; }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#15803D'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#22A35A'; }}
                 >
                   <Check size={16} strokeWidth={3} />
                 </button>
@@ -1223,8 +1226,8 @@ function App() {
                 }}
                 title="คลิกเพื่อเปลี่ยนชื่อหอพัก"
               >
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981', flexShrink: 0 }} />
-                <Building2 size={15} style={{ flexShrink: 0, color: '#BAE6FD' }} />
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22A35A', boxShadow: '0 0 6px #22A35A', flexShrink: 0 }} />
+                <Building2 size={15} style={{ flexShrink: 0, color: '#CFE2F6' }} />
                 <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {activeBuilding.name}
                 </span>
@@ -1293,7 +1296,7 @@ function App() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <Zap size={14} color="#FDE047" />
+              <Zap size={14} color="#F7B86C" />
               <span style={{ fontWeight: 800, fontSize: '0.8125rem', color: '#FFFFFF' }}>อัปเกรดแผน</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', fontWeight: 600, lineHeight: 1.4 }}>
@@ -1360,7 +1363,7 @@ function App() {
                 (e.currentTarget as HTMLButtonElement).style.transform = 'none';
               }}
             >
-              <Smartphone size={17} style={{ flexShrink: 0, color: '#FDE047' }} />
+              <Smartphone size={17} style={{ flexShrink: 0, color: '#F7B86C' }} />
               {!sidebarCollapsed && <span>ติดตั้งแอป HorCare</span>}
             </button>
           )}
@@ -1393,7 +1396,7 @@ function App() {
               flexShrink: 0,
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = '#F0FDF4';
+              (e.currentTarget as HTMLAnchorElement).style.background = '#EFF8F2';
               (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 6px 18px rgba(0,0,0,0.15)';
               (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
             }}
@@ -1404,7 +1407,7 @@ function App() {
             }}
           >
             {/* LINE icon SVG */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#16A34A" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#15803D" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
               <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.627.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
             </svg>
             {!sidebarCollapsed && <span>ติดต่อฝ่ายบริการ</span>}
@@ -1424,7 +1427,7 @@ function App() {
             }}
             title="ออกจากระบบ"
           >
-            <LogOut size={18} style={{ color: '#BAE6FD' }} />
+            <LogOut size={18} style={{ color: '#CFE2F6' }} />
             {!sidebarCollapsed && <span>ออกจากระบบ</span>}
           </button>
           {!sidebarCollapsed && (
@@ -1458,8 +1461,8 @@ function App() {
         {/* Browser Notification Permission Banner */}
         {user && notifPermission === 'default' && !dismissedNotifBanner && (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(16, 185, 129, 0.08))',
-            border: '1px solid rgba(14, 165, 233, 0.25)',
+            background: 'linear-gradient(135deg, rgba(10, 108, 194, 0.1), rgba(34, 163, 90, 0.08))',
+            border: '1px solid rgba(10, 108, 194, 0.25)',
             borderRadius: '14px',
             padding: '0.75rem 1.25rem',
             marginBottom: '1.5rem',
@@ -1468,16 +1471,16 @@ function App() {
             justifyContent: 'space-between',
             gap: '1rem',
             flexWrap: 'wrap',
-            boxShadow: '0 4px 16px rgba(14, 165, 233, 0.08)',
+            boxShadow: '0 4px 16px rgba(10, 108, 194, 0.08)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '220px' }}>
               <div style={{
                 width: 36, height: 36, borderRadius: '10px',
-                background: 'rgba(14, 165, 233, 0.15)',
+                background: 'rgba(10, 108, 194, 0.15)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
               }}>
-                <Bell size={18} color="#0EA5E9" />
+                <Bell size={18} color="#0A6CC2" />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--color-text)' }}>
@@ -1547,8 +1550,32 @@ function App() {
             buildingId={activeBuildingId ?? undefined}
             buildingName={activeBuilding?.name}
             onGoToPayments={() => setCurrentView('payments')}
+            onGoToPlan={visibleNavItems.some(i => i.id === 'floorplan') ? () => handleNavClick('floorplan') : undefined}
+            onGoToAccounting={visibleNavItems.some(i => i.id === 'ledger') ? () => handleNavClick('ledger') : undefined}
             license={planProfile?.license}
             onUpgrade={() => setCurrentView('pricing')}
+          />
+        )}
+
+        {currentView === 'floorplan' && user && activeBuildingId && !maidSession && (
+          <FloorPlanPage
+            uid={orgUid}
+            buildingId={activeBuildingId}
+            config={config}
+            rooms={rooms}
+            bills={bills}
+            currentMonth={currentMonth}
+            maintenance={_maintenanceReqs}
+            cleaning={cleaningRequests}
+            permissions={staffPermissions}
+            actorName={profile?.display_name || user.email || undefined}
+            onUpdateRoom={updateRoom}
+            onAddRoom={addRoom}
+            onDeleteRoom={deleteRoom}
+            onOpenTenant={visibleNavItems.some(i => i.id === 'tenants')
+              ? room => { setTenantRoomToOpen(room.id); handleNavClick('tenants'); }
+              : undefined}
+            onNavigate={view => handleNavClick(view)}
           />
         )}
 
@@ -1790,9 +1817,9 @@ function App() {
       {paymentToast === 'success' && (
         <div style={{
           position: 'fixed', top: '1.25rem', left: '50%', transform: 'translateX(-50%)',
-          background: 'linear-gradient(135deg, #059669, #10B981)',
+          background: 'linear-gradient(135deg, #15803D, #22A35A)',
           color: '#fff', padding: '0.875rem 1.5rem',
-          borderRadius: '14px', boxShadow: '0 4px 24px rgba(16,185,129,0.4)',
+          borderRadius: '14px', boxShadow: '0 4px 24px rgba(34, 163, 90,0.4)',
           zIndex: 1000, display: 'flex', alignItems: 'center', gap: '0.625rem',
           fontWeight: 600, fontSize: '0.9375rem', whiteSpace: 'nowrap',
         }}>
@@ -1885,8 +1912,8 @@ function App() {
                   onClick={() => setDeleteBuildingConfirm(null)}
                   style={{
                     flex: 1, padding: '0.75rem', borderRadius: '10px',
-                    background: 'none', border: '1px solid #E5E7EB',
-                    cursor: 'pointer', fontWeight: 600, color: '#6B7280',
+                    background: 'none', border: '1px solid #DCE5EF',
+                    cursor: 'pointer', fontWeight: 600, color: '#557089',
                   }}
                 >
                   ยกเลิก

@@ -227,7 +227,7 @@ export default function InstallPrompt() {
             {/* Info */}
             <div className="install-prompt-info">
               <div className="install-prompt-badge">
-                <CheckCircle2 size={12} color="#10B981" />
+                <CheckCircle2 size={12} color="#22A35A" />
                 <span>แอปพลิเคชันทางการ</span>
               </div>
               <div className="install-prompt-title">ติดตั้ง HorCare</div>
@@ -328,14 +328,14 @@ export default function InstallPrompt() {
                   fontSize: '0.78rem',
                   fontWeight: activeTab === 'ios' ? 700 : 500,
                   background: activeTab === 'ios' ? '#FFFFFF' : 'transparent',
-                  color: activeTab === 'ios' ? '#0F172A' : 'var(--color-gray-600)',
+                  color: activeTab === 'ios' ? '#102A43' : 'var(--color-gray-600)',
                   boxShadow: activeTab === 'ios' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <Smartphone size={13} color={activeTab === 'ios' ? '#0284C7' : 'currentColor'} />
+                <Smartphone size={13} color={activeTab === 'ios' ? '#0A6CC2' : 'currentColor'} />
                 iPhone / iPad
               </button>
 
@@ -354,14 +354,14 @@ export default function InstallPrompt() {
                   fontSize: '0.78rem',
                   fontWeight: activeTab === 'android' ? 700 : 500,
                   background: activeTab === 'android' ? '#FFFFFF' : 'transparent',
-                  color: activeTab === 'android' ? '#0F172A' : 'var(--color-gray-600)',
+                  color: activeTab === 'android' ? '#102A43' : 'var(--color-gray-600)',
                   boxShadow: activeTab === 'android' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <Smartphone size={13} color={activeTab === 'android' ? '#10B981' : 'currentColor'} />
+                <Smartphone size={13} color={activeTab === 'android' ? '#22A35A' : 'currentColor'} />
                 Android
               </button>
 
@@ -408,14 +408,14 @@ export default function InstallPrompt() {
                   fontSize: '0.78rem',
                   fontWeight: activeTab === 'desktop' ? 700 : 500,
                   background: activeTab === 'desktop' ? '#FFFFFF' : 'transparent',
-                  color: activeTab === 'desktop' ? '#0F172A' : 'var(--color-gray-600)',
+                  color: activeTab === 'desktop' ? '#102A43' : 'var(--color-gray-600)',
                   boxShadow: activeTab === 'desktop' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'all 0.15s ease',
                 }}
               >
-                <Monitor size={13} color={activeTab === 'desktop' ? '#6366F1' : 'currentColor'} />
+                <Monitor size={13} color={activeTab === 'desktop' ? '#0A6CC2' : 'currentColor'} />
                 คอมพิวเตอร์
               </button>
             </div>
@@ -425,16 +425,16 @@ export default function InstallPrompt() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{
                   padding: '0.65rem 0.85rem',
-                  background: 'rgba(2, 132, 199, 0.08)',
+                  background: 'rgba(10, 108, 194, 0.08)',
                   borderRadius: '12px',
-                  border: '1px solid rgba(2, 132, 199, 0.2)',
+                  border: '1px solid rgba(10, 108, 194, 0.2)',
                   fontSize: '0.8rem',
-                  color: '#0369A1',
+                  color: '#08589F',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                 }}>
-                  <Share size={15} color="#0284C7" />
+                  <Share size={15} color="#0A6CC2" />
                   <span>ระบบ iOS ต้องเปิดผ่าน <strong>Safari</strong> เพื่อติดตั้งแอป</span>
                 </div>
 
@@ -443,13 +443,13 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.15)',
-                    color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(10, 108, 194, 0.15)',
+                    color: '#0A6CC2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     1
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
-                    กดปุ่ม <strong>แชร์</strong> (<Share size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#0284C7' }} /> ไอคอนกล่องสี่เหลี่ยมลูกศรชี้ขึ้น) ที่แถบเมนูด้านล่างของ Safari
+                    กดปุ่ม <strong>แชร์</strong> (<Share size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#0A6CC2' }} /> ไอคอนกล่องสี่เหลี่ยมลูกศรชี้ขึ้น) ที่แถบเมนูด้านล่างของ Safari
                   </div>
                 </div>
 
@@ -458,13 +458,13 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.15)',
-                    color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(10, 108, 194, 0.15)',
+                    color: '#0A6CC2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     2
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
-                    เลื่อนหน้าต่างขึ้นแล้วกดเลือก <PlusSquare size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#10B981' }} /> <strong>"เพิ่มไปยังหน้าจอโฮม"</strong> (Add to Home Screen)
+                    เลื่อนหน้าต่างขึ้นแล้วกดเลือก <PlusSquare size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#22A35A' }} /> <strong>"เพิ่มไปยังหน้าจอโฮม"</strong> (Add to Home Screen)
                   </div>
                 </div>
 
@@ -473,8 +473,8 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(14, 165, 233, 0.15)',
-                    color: '#0284C7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(10, 108, 194, 0.15)',
+                    color: '#0A6CC2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     3
                   </div>
@@ -496,7 +496,7 @@ export default function InstallPrompt() {
                       width: '100%',
                       padding: '0.75rem 1rem',
                       borderRadius: '14px',
-                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      background: 'linear-gradient(135deg, #22A35A 0%, #15803D 100%)',
                       color: '#FFFFFF',
                       border: 'none',
                       fontWeight: 800,
@@ -506,7 +506,7 @@ export default function InstallPrompt() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.5rem',
-                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                      boxShadow: '0 4px 14px rgba(34, 163, 90, 0.35)',
                       marginBottom: '0.25rem',
                     }}
                   >
@@ -517,16 +517,16 @@ export default function InstallPrompt() {
 
                 <div style={{
                   padding: '0.65rem 0.85rem',
-                  background: 'rgba(16, 185, 129, 0.08)',
+                  background: 'rgba(34, 163, 90, 0.08)',
                   borderRadius: '12px',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  border: '1px solid rgba(34, 163, 90, 0.2)',
                   fontSize: '0.8rem',
-                  color: '#047857',
+                  color: '#166534',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
                 }}>
-                  <MoreVertical size={15} color="#10B981" />
+                  <MoreVertical size={15} color="#22A35A" />
                   <span>สามารถติดตั้งผ่านเมนูของ <strong>Google Chrome</strong> ได้โดยตรง:</span>
                 </div>
 
@@ -535,13 +535,13 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(34, 163, 90, 0.15)',
+                    color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     1
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
-                    กดปุ่ม <strong>จุด 3 จุด</strong> (<MoreVertical size={13} style={{ verticalAlign: '-2px', display: 'inline', color: '#0F172A' }} /> เมนู) ที่มุมบนขวาของ Google Chrome
+                    กดปุ่ม <strong>จุด 3 จุด</strong> (<MoreVertical size={13} style={{ verticalAlign: '-2px', display: 'inline', color: '#102A43' }} /> เมนู) ที่มุมบนขวาของ Google Chrome
                   </div>
                 </div>
 
@@ -550,8 +550,8 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(34, 163, 90, 0.15)',
+                    color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     2
                   </div>
@@ -565,8 +565,8 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)',
-                    color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(34, 163, 90, 0.15)',
+                    color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     3
                   </div>
@@ -648,9 +648,9 @@ export default function InstallPrompt() {
                     gap: '0.5rem',
                     padding: '0.7rem',
                     borderRadius: '12px',
-                    background: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    color: '#334155',
+                    background: '#EBF1F7',
+                    border: '1px solid #C3D0DE',
+                    color: '#29435E',
                     fontSize: '0.85rem',
                     fontWeight: 700,
                     cursor: 'pointer',
@@ -671,13 +671,13 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(99, 102, 241, 0.15)',
-                    color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(10, 108, 194, 0.15)',
+                    color: '#0A6CC2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     1
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--color-gray-700)', lineHeight: 1.5 }}>
-                    มองหาไอคอน <strong>ติดตั้ง</strong> (<Download size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#6366F1' }} /> หรือไอคอนจอคอมพิวเตอร์) ที่แถบ Address bar ด้านบนขวาของ Chrome / Edge
+                    มองหาไอคอน <strong>ติดตั้ง</strong> (<Download size={14} style={{ verticalAlign: '-2px', display: 'inline', color: '#0A6CC2' }} /> หรือไอคอนจอคอมพิวเตอร์) ที่แถบ Address bar ด้านบนขวาของ Chrome / Edge
                   </div>
                 </div>
 
@@ -686,8 +686,8 @@ export default function InstallPrompt() {
                   background: 'var(--color-gray-50)', padding: '0.85rem', borderRadius: '14px', border: '1px solid var(--color-gray-200)',
                 }}>
                   <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(99, 102, 241, 0.15)',
-                    color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
+                    width: 26, height: 26, borderRadius: '50%', background: 'rgba(10, 108, 194, 0.15)',
+                    color: '#0A6CC2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0
                   }}>
                     2
                   </div>
@@ -706,13 +706,13 @@ export default function InstallPrompt() {
                 marginTop: '1.25rem',
                 padding: '0.75rem',
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, #0284C7 0%, #10B981 100%)',
+                background: 'linear-gradient(135deg, #0A6CC2 0%, #22A35A 100%)',
                 color: '#FFFFFF',
                 border: 'none',
                 fontWeight: 700,
                 fontSize: '0.9rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)',
+                boxShadow: '0 4px 14px rgba(10, 108, 194, 0.25)',
               }}
             >
               เข้าใจแล้ว

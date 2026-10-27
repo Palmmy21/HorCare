@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../utils/api';
-import type { Booking, Charge, ChargePayment, Rate, StallPlan } from '../shared/collections';
-import type { ShopClosure } from '../shared/market';
+import { buildRound, resolveRate, type Booking, type Charge, type ChargePayment, type Rate, type RoundRow, type StallPlan } from '../shared/collections';
+import { closuresOn, type ShopClosure } from '../shared/market';
 
 export interface CollectionsSnapshot {
   today: string;
@@ -15,6 +15,18 @@ export interface CollectionsSnapshot {
   payments: (ChargePayment & { verification?: string })[];
   attendance: { room_id: string; visit_date: string; present: boolean }[];
   day_closes: { close_date: string; expected_cash_satang: number; counted_cash_satang: number; difference_satang: number; closed_by_name: string }[];
+}
+
+/** Today's collection round (one row per stall) from a snapshot: the round screen and the market plan read the same rows. */
+export function todayRoundOf(data: CollectionsSnapshot): RoundRow[] {
+  const closedToday = new Set(data.rooms.filter(r => closuresOn(data.closures.filter(c => c.room_id === r.id), data.today).length > 0).map(r => r.id));
+  const absentToday = new Set(data.attendance.filter(a => a.visit_date === data.today && !a.present).map(a => a.room_id));
+  const zone = new Map(data.rooms.map(r => [r.id, r.zone]));
+  return buildRound({
+    date: data.today, plans: data.plans, charges: data.charges, closedToday, absentToday, rooms: data.rooms.map(r => ({ id: r.id, room_number: r.room_number })),
+    dayRateOf: id => resolveRate(data.rates, { purpose: 'stall', unit: 'day', roomId: id, zone: zone.get(id), date: data.today })?.amount_satang ?? null,
+    weekRateOf: id => resolveRate(data.rates, { purpose: 'stall', unit: 'week', roomId: id, zone: zone.get(id), date: data.today })?.amount_satang ?? null,
+  });
 }
 
 const ERRORS: Record<string, string> = {

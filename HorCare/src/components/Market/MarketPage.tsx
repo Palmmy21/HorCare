@@ -34,8 +34,8 @@ function ReadError({ code }: { code: string }) {
         </div>
     );
 }
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--color-white, #fff)' };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--color-white, #fff)' };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
 const dayLabel = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' });
 
 async function call(ownerUid: string, buildingId: string, body: Record<string, unknown>): Promise<boolean> {
@@ -70,7 +70,7 @@ function ClosuresTab({ ownerUid, buildingId }: Props) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {error && <ReadError code={error} />}
-            <div style={{ ...card, background: closedToday.length ? '#FEF3C7' : undefined }}>
+            <div style={{ ...card, background: closedToday.length ? '#FDEBD3' : undefined }}>
                 <strong><BellOff size={14} style={{ verticalAlign: -2 }} /> หยุดวันนี้ {closedToday.length} แผง</strong>
                 <span style={{ fontSize: '0.9rem' }}>{closedToday.length ? closedToday.map(c => c.room_number).join(', ') : 'ทุกแผงเปิดตามปกติ'}</span>
             </div>
@@ -103,7 +103,7 @@ function ClosuresTab({ ownerUid, buildingId }: Props) {
                     </div>
                     <div style={{ fontSize: '0.9rem' }}>{dayLabel(c.from_date)}{c.to_date !== c.from_date ? ` – ${dayLabel(c.to_date)}` : ''}</div>
                     {c.note && <div style={{ fontSize: '0.85rem', color: 'var(--color-gray-500)', overflowWrap: 'anywhere' }}>{c.note}</div>}
-                    {c.ack_at ? <span style={{ fontSize: '0.75rem', color: '#065F46' }}>รับทราบแล้วโดย {c.ack_by}</span> : (
+                    {c.ack_at ? <span style={{ fontSize: '0.75rem', color: '#166534' }}>รับทราบแล้วโดย {c.ack_by}</span> : (
                         <div><button className="btn btn-outline btn-sm" onClick={() => void call(ownerUid, buildingId, { action: 'closure_ack', closure_id: c.id })}>รับทราบ</button></div>
                     )}
                 </div>
@@ -157,7 +157,7 @@ function WalkInsTab({ ownerUid, buildingId }: Props) {
                 <span style={{ flex: 1 }} />
                 <button className="btn btn-outline btn-sm" onClick={() => setShow(s => !s)} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Plus size={14} /> เพิ่มเอง</button>
             </div>
-            {pending > 0 && <div style={{ fontSize: '0.85rem', color: '#92400E' }}>มี {pending} รายการรอพิจารณา</div>}
+            {pending > 0 && <div style={{ fontSize: '0.85rem', color: '#9A3412' }}>มี {pending} รายการรอพิจารณา</div>}
 
             {show && (
                 <div style={{ ...card, flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -191,7 +191,7 @@ function WalkInsTab({ ownerUid, buildingId }: Props) {
 export default function MarketPage({ ownerUid, buildingId }: Props) {
     const [tab, setTab] = useState<'closures' | 'walkins'>('closures');
     return (
-        <div style={{ maxWidth: 760, margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <h1 style={{ margin: 0, fontSize: '1.4rem' }}>ร้านค้า & ขาจร</h1>
             <div style={{ display: 'flex', gap: 6 }}>
                 <button className={tab === 'closures' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'} onClick={() => setTab('closures')} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Store size={14} /> แจ้งหยุด</button>

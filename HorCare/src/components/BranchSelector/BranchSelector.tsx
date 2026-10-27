@@ -44,9 +44,9 @@ export default function BranchSelector({
                   {b.logo ? (
                     <img src={b.logo} alt={b.name} />
                   ) : isMarket ? (
-                    <Store size={28} color="#D97706" />
+                    <Store size={28} color="#E8740C" />
                   ) : isCommercial ? (
-                    <Building2 size={28} color="#2563EB" />
+                    <Building2 size={28} color="#0A6CC2" />
                   ) : (
                     <Building2 size={28} />
                   )}
@@ -55,8 +55,8 @@ export default function BranchSelector({
                   <h3>{b.name}</h3>
                   <span style={{
                     display: 'inline-block', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.6rem', borderRadius: '999px',
-                    background: isMarket ? '#FEF3C7' : '#E0F2FE', color: isMarket ? '#B45309' : '#0369A1',
-                    border: isMarket ? '1px solid #FDE68A' : '1px solid #BAE6FD', margin: '0.25rem 0 0.375rem',
+                    background: isMarket ? '#FDEBD3' : '#E7F0FA', color: isMarket ? '#C2410C' : '#08589F',
+                    border: isMarket ? '1px solid #FBD9A8' : '1px solid #CFE2F6', margin: '0.25rem 0 0.375rem',
                   }}>
                     {BUILDING_TYPE_LABELS[b.building_type ?? 'dormitory'] ?? 'หอพัก'}
                   </span>

@@ -39,11 +39,11 @@ export default function WalkInPage() {
     }
   };
 
-  const field: React.CSSProperties = { padding: '0.7rem', border: '1px solid #CBD5E1', borderRadius: 10, font: 'inherit', width: '100%', boxSizing: 'border-box' };
+  const field: React.CSSProperties = { padding: '0.7rem', border: '1px solid #C3D0DE', borderRadius: 10, font: 'inherit', width: '100%', boxSizing: 'border-box' };
   const ready = form.name.trim().length >= 2 && form.phone.replace(/\D/g, '').length >= 9 && form.goods.trim().length >= 2 && (!captchaRequired || token !== '');
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+    <div style={{ minHeight: '100vh', background: '#F4F7FB', display: 'flex', justifyContent: 'center', padding: '1rem' }}>
       <div style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 16, padding: '1.25rem', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'flex-start' }}>
         <h1 style={{ margin: 0, fontSize: '1.3rem' }}>แจ้งเข้าขายของ (ขาจร)</h1>
         {!uid || !bid ? <p>ลิงก์ไม่ถูกต้อง กรุณาขอลิงก์ใหม่จากตลาด</p> : state === 'done' ? (
@@ -57,10 +57,10 @@ export default function WalkInPage() {
             <AntiBot trap={trap} onTrap={setTrap} onToken={setToken} />
             {error && <div role="alert" style={{ color: '#B91C1C', fontSize: '0.9rem' }}>{error}</div>}
             <button type="button" disabled={state === 'busy' || !ready} onClick={() => void submit()}
-              style={{ padding: '0.8rem', borderRadius: 12, border: 'none', background: ready ? '#0F766E' : '#94A3B8', color: '#fff', fontWeight: 700, font: 'inherit', cursor: ready ? 'pointer' : 'default' }}>
+              style={{ padding: '0.8rem', borderRadius: 12, border: 'none', background: ready ? '#15803D' : '#8FA3B8', color: '#fff', fontWeight: 700, font: 'inherit', cursor: ready ? 'pointer' : 'default' }}>
               {state === 'busy' ? 'กำลังส่ง…' : 'ส่งเรื่อง'}
             </button>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748B' }}>ข้อมูลนี้ใช้เพื่อการจัดพื้นที่ขายของตลาดเท่านั้น</p>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#557089' }}>ข้อมูลนี้ใช้เพื่อการจัดพื้นที่ขายของตลาดเท่านั้น</p>
           </>
         )}
       </div>

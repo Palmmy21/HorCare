@@ -15,7 +15,8 @@ import {
 import { apiPost, ApiError } from '../../utils/api';
 import { logActivity } from '../../utils/auditLog';
 import LineBindingsTab from './LineBindingsTab';
-import { useSecurityAlerts } from '../../hooks/useSecurityAlerts';
+import { useSecurityAlerts } from '../../hooks/useSecurityAlerts';
+
 import AdminAccountForm, { ResetPasswordButton, ScopeEditor } from './AdminAccountForm';
 
 interface SecurityPageProps {
@@ -369,7 +370,7 @@ export default function SecurityPage(props: SecurityPageProps) {
         { id: 'line', label: openCount > 0 ? `การผูก LINE (${openCount})` : 'การผูก LINE', icon: Link2 },
     ];
     return (
-        <div style={{ maxWidth: 980, margin: '0 auto' }}>
+        <div>
             <div className="page-header">
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

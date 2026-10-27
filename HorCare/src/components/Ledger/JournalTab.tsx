@@ -9,8 +9,8 @@ import { todayThDate, type JournalEntry, type Ledger } from '../../shared/ledger
 interface Props { ownerUid: string; ledger: Ledger; entries: JournalEntry[] }
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
-const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
+const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
 const KIND_LABELS: Record<JournalEntry['kind'], string> = { invoice: 'ตั้งลูกหนี้', receipt: 'รับชำระ', manual: 'ปรับปรุงเอง', reversal: 'กลับรายการ' };
 
 const ERRORS: Record<string, string> = {
@@ -103,7 +103,7 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
                     ))}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <button className="btn btn-outline btn-sm" onClick={() => setLines([...lines, blankLine()])}>+ เพิ่มบรรทัด</button>
-                        <span style={{ fontSize: '0.85rem', color: balanced ? '#065F46' : '#B91C1C' }}>เดบิต {baht(Math.round(dr * 100))} / เครดิต {baht(Math.round(cr * 100))} {balanced ? '✓' : '— ยังไม่เท่ากัน'}</span>
+                        <span style={{ fontSize: '0.85rem', color: balanced ? '#166534' : '#B91C1C' }}>เดบิต {baht(Math.round(dr * 100))} / เครดิต {baht(Math.round(cr * 100))} {balanced ? '✓' : '— ยังไม่เท่ากัน'}</span>
                         <span style={{ flex: 1 }} />
                         <button className="btn btn-primary btn-sm" disabled={!balanced || !memo.trim() || busy === 'manual'} onClick={() => void saveManual()}>{busy === 'manual' ? <Loader2 size={14} className="spin" /> : 'บันทึกรายการ'}</button>
                     </div>
@@ -115,9 +115,9 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
                 <div key={e.id} style={{ ...card, opacity: e.reversed_by ? 0.65 : 1 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', flexWrap: 'wrap' }} onClick={() => setOpen(open === e.id ? null : e.id)}>
                         <strong style={{ minWidth: 100 }}>{e.date}</strong>
-                        <span style={{ fontSize: '0.8rem', background: 'var(--color-gray-100, #F3F4F6)', borderRadius: 999, padding: '0.1rem 0.5rem' }}>{KIND_LABELS[e.kind]}</span>
+                        <span style={{ fontSize: '0.8rem', background: 'var(--color-gray-100, #EBF1F7)', borderRadius: 999, padding: '0.1rem 0.5rem' }}>{KIND_LABELS[e.kind]}</span>
                         <span style={{ flex: 1, minWidth: 140, overflowWrap: 'anywhere' }}>{e.doc_ref} · {e.memo}</span>
-                        {e.reversed_by && <span style={{ fontSize: '0.75rem', color: '#92400E' }}>ถูกกลับรายการแล้ว</span>}
+                        {e.reversed_by && <span style={{ fontSize: '0.75rem', color: '#9A3412' }}>ถูกกลับรายการแล้ว</span>}
                         <strong>{baht(e.total_satang)}</strong>
                     </div>
                     {open === e.id && (
@@ -125,7 +125,7 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <tbody>
                                     {e.lines.map((l, i) => (
-                                        <tr key={i} style={{ borderTop: '1px solid var(--color-gray-100, #F3F4F6)' }}>
+                                        <tr key={i} style={{ borderTop: '1px solid var(--color-gray-100, #EBF1F7)' }}>
                                             <td style={{ padding: '0.25rem' }}>{l.account} {names.get(l.account) ?? ''}</td>
                                             <td style={{ color: 'var(--color-gray-500)' }}>{l.description}</td>
                                             <td style={{ textAlign: 'right' }}>{l.dr_satang ? baht(l.dr_satang) : ''}</td>

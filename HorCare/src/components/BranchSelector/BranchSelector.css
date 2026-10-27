@@ -90,10 +90,10 @@
   height: 68px;
   object-fit: contain;
   border-radius: 18px;
-  box-shadow: 0 10px 25px -4px rgba(14, 165, 233, 0.22), 0 4px 10px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 25px -4px rgba(10, 108, 194, 0.22), 0 4px 10px -2px rgba(0, 0, 0, 0.05);
   background: #ffffff;
   padding: 3px;
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border: 1px solid rgba(220, 229, 239, 0.8);
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -197,7 +197,7 @@
 
 .branch-card:hover .branch-card-icon.has-logo {
   border-color: var(--color-primary);
-  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25);
+  box-shadow: 0 4px 14px rgba(10, 108, 194, 0.25);
   transform: scale(1.06);
 }
 

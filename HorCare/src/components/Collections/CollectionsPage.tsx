@@ -27,7 +27,7 @@ export default function CollectionsPage({ ownerUid, buildingId, style }: Props) 
   const { activeAccounts } = useBankAccounts(ownerUid, buildingId);
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: 0, fontSize: '1.4rem' }}>{stall ? 'เก็บเงินแผง' : 'เก็บค่าห้อง'}</h1>

@@ -145,6 +145,26 @@ export function contractOccupancy(
   return { status: 'vacant', source: 'none', key: 'none', detail: 'ไม่มีสัญญาหรือการจอง' };
 }
 
+/**
+ * Who holds the room now and until when, from the same facts `contractOccupancy` reads (active lease → signed E-Sign
+ * contract → tenant profile). Empty when nobody holds it. Used by the plan's contract layer and to group units of one
+ * tenant.
+ */
+export function contractTerms(
+  input: { leases?: LeaseFacts[]; profile?: ProfileFacts | null },
+  today: string,
+): { tenant?: string; end?: string } {
+  const active = (input.leases ?? []).find(l => l.status === 'active');
+  if (active) return { tenant: nonEmpty(active.tenant_name) ? active.tenant_name : undefined, end: active.end_date };
+  const p = input.profile;
+  if (!p || (nonEmpty(p.expected_move_out) && p.expected_move_out <= today)) return {};
+  const tenant = nonEmpty(p.full_name) ? p.full_name : undefined;
+  const sc = p.signed_contract;
+  if (sc?.status === 'signed') return { tenant, end: nonEmpty(sc.end_date) ? sc.end_date : undefined };
+  if (nonEmpty(p.move_in_date) || tenant) return { tenant, end: nonEmpty(p.contract_end_date) ? p.contract_end_date : undefined };
+  return {};
+}
+
 /** The status shown: the admin's override while it still matches the contract, otherwise the contract's. */
 export function effectiveOccupancy(auto: AutoOccupancy, override?: StatusOverride | null): Occupancy {
   if (override && override.contract_key === auto.key && override.status !== auto.status) {

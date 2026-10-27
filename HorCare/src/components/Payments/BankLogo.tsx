@@ -17,7 +17,7 @@ export default function BankLogo({ short, size = 32 }: { short: string | null | 
         const label = (short ?? '?').slice(0, 4);
         return (
             <span aria-label={bank?.name_th ?? short ?? 'ธนาคาร'} style={{
-                ...box, background: bank?.color ?? '#6B7280', color: '#fff', fontWeight: 800,
+                ...box, background: bank?.color ?? '#557089', color: '#fff', fontWeight: 800,
                 fontSize: Math.max(8, Math.round(size * (label.length > 3 ? 0.26 : 0.32))),
             }}>{label}</span>
         );

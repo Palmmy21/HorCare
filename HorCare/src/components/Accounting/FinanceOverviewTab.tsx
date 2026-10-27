@@ -16,10 +16,10 @@ const COLORS = { billed: 'var(--series-1-soft)', collected: 'var(--series-1)', l
 const CATEGORY_COLORS: Record<RevenueCategory, string> = {
   rent: 'var(--cat-1)', electric: 'var(--cat-2)', water: 'var(--cat-3)', common_fee: 'var(--cat-4)', fine: 'var(--cat-8)', stay: 'var(--cat-6)', stall: 'var(--cat-7)', walk_in: 'var(--cat-5)', other_income: 'var(--status-vacant)',
 };
-const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #E5E7EB)', borderRadius: 12, padding: '0.9rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 };
+const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.9rem', background: 'var(--color-white, #fff)', display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 };
 const baht = (s: number) => `฿${(s / 100).toLocaleString('th-TH', { maximumFractionDigits: 0 })}`;
 const monthLabel = (m: string) => new Date(`${m}-01T00:00:00+07:00`).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' });
-const fieldStyle: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #D1D5DB)', borderRadius: 8, font: 'inherit', minWidth: 0 };
+const fieldStyle: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0 };
 
 function download(name: string, mime: string, body: string) {
   const url = URL.createObjectURL(new Blob([body], { type: `${mime};charset=utf-8` }));
@@ -120,7 +120,7 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
               <strong style={{ fontSize: '1.5rem' }}>{rate === null ? '—' : `${(rate * 100).toFixed(0)}%`}</strong>
               <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>รับเงิน ÷ ยอดที่ตั้งไว้ในเดือนเดียวกัน</span>
             </div>
-            <div style={{ ...card, background: view.aging.total_satang > 0 ? '#FFFBEB' : undefined }}>
+            <div style={{ ...card, background: view.aging.total_satang > 0 ? '#FEF6EC' : undefined }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--color-gray-500)' }}>ยอดค้างชำระทั้งหมด</span>
               <strong style={{ fontSize: '1.5rem' }}>{baht(view.aging.total_satang)}</strong>
               <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>{view.open.length} รายการ</span>
@@ -128,7 +128,7 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
           </div>
 
           {insights.length > 0 && (
-            <div style={{ ...card, background: '#F0F9FF', borderColor: '#BAE6FD' }}>
+            <div style={{ ...card, background: '#F2F7FC', borderColor: '#CFE2F6' }}>
               <strong>สรุปให้อ่านง่าย</strong>
               {insights.map(t => <span key={t} style={{ fontSize: '0.88rem' }}>• {t}</span>)}
             </div>
@@ -165,7 +165,7 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
                 <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span style={{ fontSize: '0.8rem' }}>{label} · {baht(total)}</span>
                   {total > 0 ? (
-                    <div role="img" aria-label={`${label}: เงินสด ${baht(cash)} โอน ${baht(transfer)} อื่นๆ ${baht(other)}`} style={{ display: 'flex', height: 18, borderRadius: 9, overflow: 'hidden', background: 'var(--color-gray-100, #F3F4F6)' }}>
+                    <div role="img" aria-label={`${label}: เงินสด ${baht(cash)} โอน ${baht(transfer)} อื่นๆ ${baht(other)}`} style={{ display: 'flex', height: 18, borderRadius: 9, overflow: 'hidden', background: 'var(--color-gray-100, #EBF1F7)' }}>
                       {[[cash, COLORS.cash, 'เงินสด'], [transfer, COLORS.transfer, 'โอน'], [other, COLORS.other, 'อื่น ๆ']].map(([v, c, n]) => <div key={n as string} title={`${n}: ${baht(v as number)}`} style={{ width: `${((v as number) / total) * 100}%`, background: c as string }} />)}
                     </div>
                   ) : <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>ยังไม่มีการรับเงิน</span>}
