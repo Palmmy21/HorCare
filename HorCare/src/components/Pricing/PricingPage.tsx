@@ -147,6 +147,19 @@ const CSS = `
 .plan-cta:active {
   transform: translateY(0);
 }
+button.plan-cta { font-family: inherit; }
+.plan-cta:focus-visible { outline: 2px solid #74B2EC; outline-offset: 3px; }
+.plan-alt {
+  display: block;
+  margin-top: 0.75rem;
+  padding: 0.4rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: #8FA3B8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.plan-alt:hover { color: #DCE5EF; }
 
 /* -- Price typography -- */
 .price-number {
@@ -393,14 +406,15 @@ const PLANS: Plan[] = [
     },
 ];
 
+/** Yearly price against twelve months at the full yearly list price, rounded down so the claim is never overstated */
+const yearlySavings = (plan: Plan) => Math.floor((1 - plan.yearlyPrice / plan.originalYearlyPrice) * 100);
+
 /* ----------- PlanCard ----------- */
 const PlanCard = memo(function PlanCard({
-    plan, cycle, currentPlanId,
-}: { plan: Plan; cycle: BillingCycle; currentPlanId?: string; onSelect?: (p: Plan) => void }) {
+    plan, cycle, currentPlanId, onSelect,
+}:{ plan: Plan; cycle: BillingCycle; currentPlanId?: string; onSelect?: (p: Plan) => void }) {
     const price = cycle === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
-    const savings = cycle === 'yearly'
-        ? Math.round((1 - plan.yearlyPrice / plan.originalYearlyPrice) * 100)
-        : 0;
+    const savings = yearlySavings(plan);
 
 
     return (
@@ -464,7 +478,7 @@ const PlanCard = memo(function PlanCard({
                     </div>
                 ) : (
                     <div style={{ fontSize: '0.8125rem', color: '#8FA3B8', marginTop: '0.45rem' }}>
-                        หรือจ่ายรายปี <span style={{ color: '#3D8FD6', fontWeight: 600 }}>฿{plan.yearlyPrice.toLocaleString()}</span> / ปี (ประหยัดกว่า 49%)
+                        หรือจ่ายรายปี <span style={{ color: '#3D8FD6', fontWeight: 600 }}>฿{plan.yearlyPrice.toLocaleString()}</span> / ปี (ประหยัด {savings}%)
                     </div>
                 )}
             </div>
@@ -526,16 +540,23 @@ const PlanCard = memo(function PlanCard({
                 })}
             </ul>
 
-            {/* CTA — direct to LINE Support */}
-            <a
+            {/* CTA — Stripe checkout (PromptPay / card); LINE stays as the way to ask first */}
+            <button
+                type="button"
                 id={`pricing-btn-${plan.id}`}
                 className="plan-cta"
+                onClick={() => onSelect?.(plan)}
+            >
+                <span>{currentPlanId === plan.id ? 'ต่ออายุแพ็กเกจ' : `สมัคร ${plan.name}`} · ฿{price.toLocaleString()}</span>
+                <Zap size={16} />
+            </button>
+            <a
+                className="plan-alt"
                 href={`https://line.me/R/oaMessage/${encodeURIComponent('@127qwwfi')}/?${encodeURIComponent('สนใจสมัครแพ็กเกจ HorCare')}`}
                 target="_blank"
                 rel="noopener noreferrer"
             >
-                <span>{currentPlanId === plan.id ? 'ต่ออายุแพ็กเกจ' : 'สมัครใช้งานผ่าน LINE'}</span>
-                <Zap size={16} />
+                มีคำถาม? คุยกับทีมงานทาง LINE
             </a>
         </div>
     );
@@ -777,7 +798,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                                                 background: 'rgba(34, 163, 90,0.18)', border: '1px solid rgba(34, 163, 90,0.32)',
                                                 color: '#22A35A', borderRadius: '999px',
                                                 padding: '0.1rem 0.5rem', fontSize: '0.68rem', fontWeight: 700,
-                                            }}>ประหยัด 49%</span>
+                                            }}>ประหยัด {yearlySavings(currentPlan ?? PLANS.find(p => p.id === 'large')!)}%</span>
                                         )}
                                     </button>
                                 ))}
