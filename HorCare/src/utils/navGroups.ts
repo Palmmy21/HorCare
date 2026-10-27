@@ -18,7 +18,9 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
     { id: 'accounting', label: 'บัญชี', items: ['ledger', 'accounting', 'archives'] },
     { id: 'service', label: 'ซ่อมบำรุงและบริการ', items: ['maintenance', 'cleaning', 'workorders', 'operations'] },
     { id: 'residents', label: isMarket ? 'ผู้ค้าและการสื่อสาร' : 'ลูกบ้านและการสื่อสาร', items: ['parcels', 'market', 'messages', 'announcements'] },
-    { id: 'system', label: 'ระบบ', items: ['security', 'settings', 'pricing', 'admin'] },
+    // Plan & billing sits on its own (a one-item group renders as a plain top-level link, not a category)
+    { id: 'plan', label: 'แพ็กเกจ', items: ['pricing'] },
+    { id: 'system', label: 'ระบบ', items: ['security', 'settings', 'admin'] },
   ];
 }
 

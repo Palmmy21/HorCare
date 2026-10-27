@@ -9,7 +9,8 @@ const ALL = ['dashboard', 'rooms', 'recording', 'tenants', 'maintenance', 'clean
 describe('groupNav', () => {
   it('puts every view in a category, in definition order', () => {
     const groups = groupNav(ALL, navGroupDefs(false));
-    expect(groups.map(g => g.id)).toEqual(['overview', 'property', 'leasing', 'billing', 'accounting', 'service', 'residents', 'system']);
+    expect(groups.map(g => g.id)).toEqual(['overview', 'property', 'leasing', 'billing', 'accounting', 'service', 'residents', 'plan', 'system']);
+    expect(ids(groups.find(g => g.id === 'plan')!.items)).toEqual(['pricing']); // one item → plain top-level link
     expect(ids(groups.find(g => g.id === 'billing')!.items)).toEqual(['payments']);
     expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['archives']);
     expect(ids(groups.find(g => g.id === 'property')!.items)).toEqual(['rooms', 'recording', 'summary']);
@@ -30,7 +31,7 @@ describe('groupNav', () => {
 
   it('includes admin under the system group when present', () => {
     const groups = groupNav([...ALL, item('admin')], navGroupDefs(false));
-    expect(ids(groups.find(g => g.id === 'system')!.items)).toEqual(['security', 'settings', 'pricing', 'admin']);
+    expect(ids(groups.find(g => g.id === 'system')!.items)).toEqual(['security', 'settings', 'admin']);
   });
 
   it('adapts labels for a market workspace', () => {

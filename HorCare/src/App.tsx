@@ -730,7 +730,7 @@ function App() {
           id="expired-pricing-overlay"
           style={{
             display: 'none', position: 'fixed', inset: 0,
-            background: '#fff', zIndex: 500, overflowY: 'auto', padding: '2rem',
+            background: 'var(--color-gray-50)', zIndex: 500, overflowY: 'auto',
           }}
         >
           <PricingPage

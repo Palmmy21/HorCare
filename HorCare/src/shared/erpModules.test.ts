@@ -3,10 +3,11 @@ import { VIEW_LABELS_TH, erpModules } from './erpModules';
 import { navGroupDefs } from '../utils/navGroups';
 
 describe('erpModules', () => {
-  it('uses the same ids as the sidebar groups (except the overview home)', () => {
+  it('uses the same ids as the sidebar groups (except the standalone home and plan links)', () => {
+    const standalone = ['overview', 'plan'];
     for (const market of [false, true]) {
       const ids = erpModules(market).map(m => m.id);
-      const groups = navGroupDefs(market).map(g => g.id).filter(id => id !== 'overview');
+      const groups = navGroupDefs(market).map(g => g.id).filter(id => !standalone.includes(id));
       expect(ids).toEqual(groups);
     }
   });
