@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
@@ -729,7 +730,7 @@ async function handleSlipImage(
 
     // 7. Auto Slip Verification for Pro Users (Gemini OCR)
     const userSnap = await db.collection('users').doc(uid).get();
-    const license = userSnap.data()?.license || 'free';
+    const license = effectiveLicense(userSnap.data());
     // อนุญาตให้ทุกแพ็กเกจที่จ่ายเงิน (small, medium, large) หรือ active ได้ใช้งาน AI 
     const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 

@@ -17,6 +17,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { db, admin } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { dbError, supabase, SupabaseNotConfigured } from './_supabase.js';
@@ -401,7 +402,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             const ownerSnap = await db.collection('users').doc(ctx.ownerUid).get();
-            const license = String(ownerSnap.data()?.license || 'free');
+            const license = effectiveLicense(ownerSnap.data());
             const isPro = license === 'active' || /^(monthly|yearly)_(small|medium|large)$/.test(license);
             const evaluation = await evaluateSlip({
                 ownerUid: owner, buildingId, imageBase64: m[2], mimeType, qrPayload: qr.payload, expectedAmount: left / 100, billCreatedAt: charge.created_at, isPro,

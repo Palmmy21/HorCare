@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="preload" as="image" href="/logo.png?v=2" fetchpriority="high" />
   <link
     href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap"
     rel="stylesheet">
@@ -43,34 +44,69 @@
     });
   </script>
   <style>
-    body { margin: 0; background-color: #0A5DAA; font-family: 'Anuphan', sans-serif; }
+    body { margin: 0; background-color: #FFFFFF; font-family: 'Anuphan', sans-serif; }
+    /* Mostly white, with the HorCare blue, green and orange washed into the corners */
     .splash-screen {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
-      width: 100vw;
-      background: #0A5DAA;
+      height: 100dvh;
+      width: 100%;
+      background:
+        radial-gradient(38rem 28rem at 0% 0%, rgba(63, 174, 106, 0.20), transparent 65%),
+        radial-gradient(42rem 30rem at 100% 100%, rgba(10, 108, 194, 0.20), transparent 65%),
+        radial-gradient(24rem 18rem at 100% 0%, rgba(247, 151, 30, 0.14), transparent 70%),
+        radial-gradient(26rem 20rem at 0% 100%, rgba(30, 155, 176, 0.10), transparent 70%),
+        #FFFFFF;
+    }
+    /* The logo stays still; a glowing arc orbits it. App.tsx renders this same markup until the app is ready,
+       so the two splashes read as one and the orbit never restarts visibly. */
+    .splash-logo-container {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 140px;
+      height: 140px;
     }
     .splash-logo-container img {
-      width: 96px;
-      height: 96px;
+      width: 88px;
+      height: 88px;
       object-fit: contain;
-      animation: splash-breathe 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate;
+      filter: drop-shadow(0 8px 18px rgba(10, 108, 194, 0.22));
     }
-    @keyframes splash-breathe {
-      from { transform: scale(0.96); opacity: 0.75; }
-      to { transform: scale(1); opacity: 1; }
+    /* faint full track */
+    .splash-logo-container::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 3px solid rgba(10, 108, 194, 0.08);
     }
-    @media (prefers-reduced-motion: reduce) {
-      .splash-logo-container img { animation: none; }
+    /* the orbiting arc: a conic tail in the logo's colours, green fading into a bright blue head */
+    .splash-logo-container::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 0turn, rgba(63, 174, 106, 0) 0.5turn, rgba(63, 174, 106, 0.55) 0.72turn, #1E9BB0 0.86turn, #0A6CC2 0.995turn, transparent 1turn);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+      filter: drop-shadow(0 0 5px rgba(10, 108, 194, 0.45));
+      animation: splash-orbit 0.85s linear infinite;
+    }
+    @keyframes splash-orbit {
+      to { transform: rotate(1turn); }
     }
     .splash-text {
       margin-top: 1.25rem;
       font-size: 0.875rem;
-      color: rgba(255, 255, 255, 0.6);
+      color: #557089;
       font-weight: 500;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .splash-logo-container::after { animation-duration: 3s; }
     }
   </style>
 </head>
@@ -78,8 +114,8 @@
 <body>
   <div id="root">
     <div class="splash-screen">
-      <div class="splash-logo-container">
-        <img src="/logo.png?v=2" alt="HorCare" />
+      <div class="splash-logo-container" role="progressbar" aria-label="กำลังโหลด">
+        <img src="/logo.png?v=2" alt="HorCare" width="88" height="88" />
       </div>
       <div class="splash-text">กำลังโหลด...</div>
     </div>

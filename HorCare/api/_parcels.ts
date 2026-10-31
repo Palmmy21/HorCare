@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { notify } from './_notify.js';
@@ -82,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!(await buildingExists(ctx.ownerUid, buildingId))) { res.status(404).json({ error: 'property_not_found' }); return; }
         // The plan belongs to the organization (owner), not the staff member calling.
         const owner = await db.doc(`users/${ctx.ownerUid}`).get();
-        if (!isPlusOrAbove(owner.data()?.license ?? 'free')) {
+        if (!isPlusOrAbove(effectiveLicense(owner.data()))) {
             res.status(403).json({ error: 'feature_locked', message: 'อ่านใบปะหน้าอัตโนมัติสำหรับแพ็กเกจ Plus และ Pro เท่านั้น' });
             return;
         }

@@ -124,7 +124,7 @@ service cloud.firestore {
     function billMeterFields() {
       return ['id', 'room_id', 'room_number', 'month', 'prev_elec', 'curr_elec', 'elec_units', 'elec_bill',
               'prev_water', 'curr_water', 'water_units', 'water_bill', 'water_flat_amount', 'water_excess_units',
-              'water_excess_amount', 'common_fee', 'applied_common_fees', 'room_rent', 'total_bill', 'tenant_count',
+              'water_excess_amount', 'common_fee', 'applied_common_fees', 'room_rent', 'rent_prorate', 'total_bill', 'tenant_count',
               'is_saved', 'is_notified', 'created_at', 'updated_at'];
     }
 
@@ -144,7 +144,7 @@ service cloud.firestore {
     function isWritingProtectedFields() {
       let protectedFields = ['license', 'subscription_id', 'subscription_status',
                              'current_period_end', 'access_until', 'plan_name', 'billing_cycle',
-                             'stripe_customer_id', 'trial_expires_at', 'role', 'status'];
+                             'stripe_customer_id', 'trial_expires_at', 'trial_started_at', 'trial_until', 'role', 'status'];
       return request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedFields);
     }
 
@@ -152,7 +152,7 @@ service cloud.firestore {
     // but block any billing/subscription fields that only the backend should set.
     function isWritingProtectedFieldsOnCreate() {
       let billingFields = ['subscription_id', 'subscription_status', 'current_period_end',
-                           'plan_name', 'billing_cycle', 'stripe_customer_id', 'trial_expires_at',
+                           'plan_name', 'billing_cycle', 'stripe_customer_id', 'trial_expires_at', 'trial_started_at', 'trial_until',
                            'role', 'status'];
       let hasBillingField = request.resource.data.keys().hasAny(billingFields);
       let licenseOk = request.resource.data.get('license', 'free') == 'free';
@@ -189,6 +189,11 @@ service cloud.firestore {
                         || ((memberCan(userId, buildingId, 'meter.record') || housekeeperWrites(userId, buildingId))
                             && changesOnly(['current_meter_elec', 'current_meter_water']));
           allow delete: if ownerWrites(userId) || memberCan(userId, buildingId, 'room.delete');
+        }
+        // Parking spaces: staff who may edit rooms manage them (assigning a spot also updates the room's parking copy).
+        match /parking_spots/{spotId} {
+          allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId);
+          allow write: if ownerWrites(userId) || memberCan(userId, buildingId, 'room.update');
         }
         match /bills/{billId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);

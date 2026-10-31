@@ -1,6 +1,7 @@
-import { useState, useRef, Fragment } from 'react';
+import { useState, Fragment } from 'react';
 import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles, Layers } from 'lucide-react';
 import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
+import ImportSheetModal from './ImportSheetModal';
 import BulkRoomModal from './BulkRoomModal';
 import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
 import { formatCurrency } from '../../utils/calculations';
@@ -45,8 +46,8 @@ export default function RoomManagement({
     const terms = getWorkspaceTerms(config?.building_type);
     const [newRoomNumber, setNewRoomNumber] = useState('');
     const [editingRoom, setEditingRoom] = useState<string | null>(null);
-    const [importResult, setImportResult] = useState<{ updated: number; created: number; skipped: string[] } | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [importResult, setImportResult] = useState<{ updated: number; created: number; tenants: number; skipped: string[] } | null>(null);
+    const [showImport, setShowImport] = useState(false);
     const [editValue, setEditValue] = useState('');
     const [editRentAmount, setEditRentAmount] = useState('');
     const [editRentType, setEditRentType] = useState<Room['rent_type']>('monthly');
@@ -241,79 +242,21 @@ export default function RoomManagement({
         a.click();
     };
 
-    // ── CSV import ─────────────────────────────────────────────────────────────
-    const handleImportFile = async (file: File) => {
-        const text = await file.text();
-        const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim());
-        if (lines.length < 2) return;
-
-        const parseRow = (line: string) =>
-            line.split(',').map(c => c.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"'));
-
-        const ALIASES: Record<string, string> = {
-            'ห้อง': 'room', 'room': 'room', 'room_number': 'room', 'เลขห้อง': 'room',
-            'ค่าเช่า': 'rent', 'rent_amount': 'rent', 'rent': 'rent',
-            'จำนวนผู้เช่า': 'tenants', 'tenant_count': 'tenants', 'tenants': 'tenants',
-            'ประเภทห้อง': 'type', 'room_type': 'type', 'type': 'type',
-            'ประเภทค่าเช่า': 'renttype', 'rent_type': 'renttype', 'renttype': 'renttype',
-            'มิเตอร์ไฟเริ่มต้น': 'elec', 'current_meter_elec': 'elec', 'elec': 'elec',
-            'มิเตอร์น้ำเริ่มต้น': 'water', 'current_meter_water': 'water', 'water': 'water',
-        };
-
-        const headers = parseRow(lines[0]).map(h => h.toLowerCase().trim());
-        const col: Record<string, number> = {};
-        headers.forEach((h, i) => {
-            const key = ALIASES[h] ?? ALIASES[h.replace(/\s+/g, '')] ?? null;
-            if (key && !(key in col)) col[key] = i;
-        });
-        if (!('room' in col)) { col.room = 0; col.rent = 1; col.tenants = 2; col.type = 3; col.renttype = 4; col.elec = 5; col.water = 6; }
-
-        const roomMap = new Map(rooms.map(r => [r.room_number, r]));
-        const get = (cols: string[], key: string) => col[key] !== undefined ? (cols[col[key]] ?? '').trim() : '';
-
-        let updated = 0, created = 0;
-        const skipped: string[] = [];
-        const promises: Promise<void>[] = [];
-
-        for (let i = 1; i < lines.length; i++) {
-            const cols = parseRow(lines[i]);
-            const roomNum = get(cols, 'room');
-            if (!roomNum) continue;
-
-            const existing = roomMap.get(roomNum);
-            const rentVal = get(cols, 'rent');
-            const tenantsVal = get(cols, 'tenants');
-            const typeVal = get(cols, 'type').toLowerCase();
-            const rentTypeVal = get(cols, 'renttype').toLowerCase();
-            const elecVal = get(cols, 'elec');
-            const waterVal = get(cols, 'water');
-
-            const updates: Partial<Room> = {};
-            if (rentVal) updates.rent_amount = Number(rentVal) || 0;
-            if (tenantsVal) updates.tenant_count = Math.max(1, Number(tenantsVal) || 1);
-            if (typeVal === 'commercial') updates.room_type = 'commercial';
-            else if (typeVal === 'dormitory') updates.room_type = 'dormitory';
-            if (rentTypeVal === 'semester') updates.rent_type = 'semester';
-            else if (rentTypeVal === 'monthly') updates.rent_type = 'monthly';
-            if (elecVal) updates.current_meter_elec = Number(elecVal) || 0;
-            if (waterVal) updates.current_meter_water = Number(waterVal) || 0;
-
-            if (existing) {
-                promises.push(onUpdateRoom(existing.id, updates).then(() => { updated++; }));
-            } else {
-                if (atRoomLimit) { skipped.push(roomNum); continue; }
-                onAddRoom(roomNum);
-                created++;
-            }
-        }
-
-        await Promise.all(promises);
-        setImportResult({ updated, created, skipped });
-        setTimeout(() => setImportResult(null), 7000);
-    };
-
     return (
         <div>
+            {showImport && onBulkCreate && (
+                <ImportSheetModal
+                    uid={uid}
+                    buildingId={buildingId}
+                    rooms={rooms}
+                    remainingSlots={Math.max(0, maxRooms - rooms.length)}
+                    unitName={terms.unitName}
+                    onBulkCreate={onBulkCreate}
+                    onUpdateRoom={onUpdateRoom}
+                    onClose={() => setShowImport(false)}
+                    onDone={r => { setShowImport(false); setImportResult(r); setTimeout(() => setImportResult(null), 9000); }}
+                />
+            )}
             {showBulk && onBulkCreate && onSaveConfig && (
                 <BulkRoomModal
                     existingRooms={rooms}
@@ -370,24 +313,16 @@ export default function RoomManagement({
                     >
                         <Download size={15} /> Template
                     </button>
-                    <button
-                        className="btn btn-outline btn-sm"
-                        onClick={() => fileInputRef.current?.click()}
-                        title={`นำเข้าข้อมูล${terms.unitName}จาก CSV`}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
-                    >
-                        <Upload size={15} /> นำเข้า CSV
-                    </button>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv,text/csv"
-                        style={{ display: 'none' }}
-                        onChange={e => {
-                            const f = e.target.files?.[0];
-                            if (f) { handleImportFile(f); e.target.value = ''; }
-                        }}
-                    />
+                    {onBulkCreate && (
+                        <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => setShowImport(true)}
+                            title={`นำเข้า${terms.unitName}และผู้เช่าจากไฟล์ Excel / CSV รูปแบบไหนก็ได้`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
+                        >
+                            <Upload size={15} /> นำเข้า Excel
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -405,6 +340,7 @@ export default function RoomManagement({
                         {importResult.updated > 0 && `อัปเดต ${importResult.updated} ${terms.unitName}`}
                         {importResult.updated > 0 && importResult.created > 0 && ' · '}
                         {importResult.created > 0 && `สร้างใหม่ ${importResult.created} ${terms.unitName}`}
+                        {importResult.tenants > 0 && ` · ข้อมูลผู้เช่า ${importResult.tenants} ราย`}
                         {importResult.updated === 0 && importResult.created === 0 && 'ไม่พบข้อมูลที่นำเข้าได้'}
                         {importResult.skipped.length > 0 && ` · ข้ามไป (ถึงลิมิต): ${importResult.skipped.join(', ')}`}
                     </span>

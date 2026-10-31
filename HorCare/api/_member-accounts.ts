@@ -10,6 +10,7 @@
  * "staff mode" in the app.
  */
 import { admin, db } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { ASSIGNABLE_ROLES, isRole, permissionsForRole, type MemberDoc, type Role } from '../src/shared/permissions.js';
 
 export class AccountError extends Error {
@@ -80,12 +81,12 @@ export async function myMemberships(uid: string): Promise<Membership[]> {
     for (const owner of orgs.slice(0, 20)) {
         const m = (await db.doc(`users/${owner}/members/${uid}`).get()).data() as ManagedMember | undefined;
         if (!m || m.status !== 'active' || !isRole(m.role)) continue;
-        const profile = (await db.doc(`users/${owner}`).get()).data() as { display_name?: string; license?: string; access_until?: number } | undefined;
+        const profile = (await db.doc(`users/${owner}`).get()).data() as { display_name?: string; license?: string; access_until?: number; trial_until?: number } | undefined;
         out.push({
             owner_uid: owner, owner_name: profile?.display_name ?? '', role: m.role,
             // recomputed from the role, never trusted from the stored copy
             permissions: permissionsForRole(m.role), property_ids: m.property_ids, managed: m.managed === true,
-            license: profile?.license ?? 'free', access_until: profile?.access_until ?? 0,
+            license: effectiveLicense(profile), access_until: profile?.access_until ?? 0,
         });
     }
     return out;

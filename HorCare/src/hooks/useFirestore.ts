@@ -7,7 +7,7 @@ import { logActivity, diffFields } from '../utils/auditLog';
 import { findDuplicates, MAX_BULK_ROOMS } from '../utils/bulkRooms';
 import { defaultRentType } from '../utils/workspaceTerminology';
 import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee } from '../types';
-import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth } from '../utils/calculations';
+import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth, rentForRecalc, roomFees } from '../utils/calculations';
 
 // How many months of bills the realtime listener keeps in memory, anchored on the
 // selected month. Bounds reads + memory regardless of how long a dorm has existed —
@@ -19,7 +19,7 @@ const BILLS_WINDOW_MONTHS = 6;
 export function nextBillPatch(
     bill: MonthlyBill, nextMonthBill: MonthlyBill, room: Room, nextMonth: string, config: DormConfig, commonFees: CommonFee[],
 ): Partial<MonthlyBill> {
-    const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+    const effectiveRent = rentForRecalc(['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent), nextMonthBill);
     const { electricityRate, waterConfig } = getEffectiveRates(room, config);
 
     const calculation = calculateFullBill(
@@ -32,7 +32,7 @@ export function nextBillPatch(
         room.tenant_count,
         electricityRate,
         waterConfig,
-        commonFees,
+        roomFees(commonFees, room),
         room.common_fee_overrides,
         nextMonth
     );
@@ -246,7 +246,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 const room = rooms.find(r => r.id === existingBill.room_id);
                 if (!room) continue;
 
-                const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? newConfig.room_rent);
+                const effectiveRent = rentForRecalc(['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? newConfig.room_rent), existingBill);
                 const { electricityRate, waterConfig } = getEffectiveRates(room, newConfig);
 
                 const calculation = calculateFullBill(
@@ -259,7 +259,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                     room.tenant_count,
                     electricityRate,
                     waterConfig,
-                    commonFees,
+                    roomFees(commonFees, room),
                     room.common_fee_overrides,
                     month
                 );
@@ -326,9 +326,9 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
      * Create many rooms atomically per chunk. Rejects (creating nothing) if any room
      * number already exists in this property or repeats inside the request.
      */
-    const addRoomsBulk = useCallback(async (inputs: Partial<Room>[]): Promise<{ created: number }> => {
+    const addRoomsBulk = useCallback(async (inputs: Partial<Room>[]): Promise<{ created: number; ids: string[] }> => {
         if (!userPath) throw new Error('no_property');
-        if (inputs.length === 0) return { created: 0 };
+        if (inputs.length === 0) return { created: 0, ids: [] };
         if (inputs.length > MAX_BULK_ROOMS) throw new Error('too_many');
 
         const dupes = findDuplicates(
@@ -371,7 +371,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             after: { count: docs.length, first: docs[0].room_number, last: docs[docs.length - 1].room_number },
             note: 'bulk create',
         });
-        return { created: docs.length };
+        return { created: docs.length, ids: docs.map(d => d.id) };
     }, [userPath, rooms, config.building_type, config.room_rent, config.market_config?.default_rent_cycle]);
 
     const updateRoom = useCallback(async (roomId: string, updates: Partial<Room>) => {
@@ -411,17 +411,18 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             if (!existingBill || existingBill.is_locked) continue;
 
             // Use meter readings from the existing bill (snapshot)
+            const billRent = rentForRecalc(effectiveRent, existingBill);
             const calculation = calculateFullBill(
                 existingBill.prev_elec,
                 existingBill.curr_elec,
                 existingBill.prev_water,
                 existingBill.curr_water,
                 config,
-                effectiveRent,
+                billRent,
                 newRoom.tenant_count,
                 electricityRate,
                 waterConfig,
-                commonFees,
+                roomFees(commonFees, newRoom),
                 newRoom.common_fee_overrides,
                 month
             );
@@ -434,7 +435,9 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 water_flat_amount: calculation.water_flat_amount,
                 water_excess_units: calculation.water_excess_units,
                 water_excess_amount: calculation.water_excess_amount,
-                room_rent: effectiveRent,
+                room_rent: billRent,
+                common_fee: calculation.common_fee,
+                applied_common_fees: calculation.applied_common_fees,
                 total_bill: calculation.total_bill,
                 tenant_count: newRoom.tenant_count || 1, // Update snapshot of tenant count
                 updated_at: new Date().toISOString()

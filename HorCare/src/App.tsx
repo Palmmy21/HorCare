@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
-  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon
+  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -30,6 +30,9 @@ import RoomManagement from './components/RoomManagement/RoomManagement';
 import MeterRecording from './components/MeterRecording/MeterRecording';
 import Settings from './components/Settings/Settings';
 import LoginPage from './components/Auth/LoginPage';
+import GuestHome from './components/Guest/GuestHome';
+import { canStartTrial, effectiveLicense, START_TRIAL_KEY, TRIAL_DAYS, trialDaysLeft } from './shared/trial';
+import { apiPost } from './utils/api';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine, isPlusOrAbove } from './hooks/useSubscription';
 import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
 import { useCleaningRequests } from './hooks/useCleaningRequests';
@@ -55,6 +58,7 @@ const MarketPage = lazy(() => import('./components/Market/MarketPage'));
 const AccountingPage = lazy(() => import('./components/Accounting/AccountingPage'));
 const LedgerPage = lazy(() => import('./components/Ledger/LedgerPage'));
 const FloorPlanPage = lazy(() => import('./components/FloorPlan/FloorPlanPage'));
+const ParkingPage = lazy(() => import('./components/Parking/ParkingPage'));
 const LeasingPage = lazy(() => import('./components/Leasing/LeasingPage'));
 const CollectionsPage = lazy(() => import('./components/Collections/CollectionsPage'));
 const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
@@ -67,6 +71,7 @@ const BranchSelector = lazy(() => import('./components/BranchSelector/BranchSele
 
 import './index.css';
 import horcareLogo from './assets/horcare_logo.png';
+import { LOGO_SRC } from './utils/brand';
 
 function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
   return (
@@ -90,13 +95,14 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
-type ViewMode = 'dashboard' | 'floorplan' | 'rooms' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
+type ViewMode = 'dashboard' | 'floorplan' | 'rooms' | 'parking' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
   
   useEffect(() => {
-    const timer = setTimeout(() => setMinSplashDone(true), 2500);
+    // a short floor so a fast load still shows the orbiting splash for a moment instead of flashing it
+    const timer = setTimeout(() => setMinSplashDone(true), 1200);
     return () => clearTimeout(timer);
   }, []);
 
@@ -166,7 +172,15 @@ function App() {
   // null = the owner, who may do everything
   const staffPermissions = membership ? membership.permissions : null;
   // the plan belongs to the owner: staff inherit it (they cannot read the owner's profile)
-  const planProfile = useMemo(() => (profile && membership ? { ...profile, license: membership.license as typeof profile.license, access_until: membership.access_until } : profile), [profile, membership]);
+  // A running HorCare Pro trial lifts the owner's free plan to Pro (staff get it already applied by the server).
+  const planProfile = useMemo(() => {
+    if (!profile) return profile;
+    if (membership) return { ...profile, license: membership.license as typeof profile.license, access_until: membership.access_until };
+    return { ...profile, license: effectiveLicense(profile) as typeof profile.license };
+  }, [profile, membership]);
+  const ownTrialDaysLeft = membership ? 0 : trialDaysLeft(profile);
+  // Signed out: the guest home (sample property) unless the visitor asked for sign in / sign up / the plans
+  const [authScreen, setAuthScreen] = useState<'login' | 'register' | 'pricing' | null>(null);
 
   // FCM push notification token — registers silently when permission is already granted
   useFCMToken(user?.uid ?? null);
@@ -248,6 +262,7 @@ function App() {
       try { sessionStorage.removeItem(`horcare_login_logged_${user.uid}`); } catch { /* ignore */ }
     }
     await signOutUser();
+    setAuthScreen('login');
   };
 
   // Buildings (multi-building support — Large plan)
@@ -301,6 +316,21 @@ function App() {
       setCurrentView('pricing');
     }
   }, [user]);
+
+  // A visitor who chose "try free" on the guest home gets the HorCare Pro trial as soon as their profile exists.
+  const trialRequestedRef = useRef(false);
+  useEffect(() => {
+    if (!user || !profile || membership || trialRequestedRef.current) return;
+    let wanted = false;
+    try { wanted = localStorage.getItem(START_TRIAL_KEY) === '1'; } catch { /* storage blocked */ }
+    if (!wanted) return;
+    trialRequestedRef.current = true;
+    try { localStorage.removeItem(START_TRIAL_KEY); } catch { /* storage blocked */ }
+    if (!canStartTrial(profile)) return;
+    apiPost('trial', {})
+      .then(() => toast.success(`เริ่มทดลองใช้ HorCare Pro ฟรี ${TRIAL_DAYS} วันแล้ว ใช้ได้ทุกฟีเจอร์`))
+      .catch(err => toast.error(`เริ่มทดลองใช้ไม่สำเร็จ: ${err instanceof Error ? err.message : String(err)} — กดเริ่มได้อีกครั้งที่หน้าแพ็กเกจ`));
+  }, [user, profile, membership]);
 
   // Close building menu on outside click
   useEffect(() => {
@@ -447,6 +477,7 @@ function App() {
     { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'floorplan'   as ViewMode, icon: MapIcon, label: PLAN_LABELS[planKindOf(config?.building_type)].title },
     { id: 'rooms'       as ViewMode, icon: terms.isMarket ? Store : Home, label: terms.manageUnitsLabel || 'จัดการห้อง' },
+    { id: 'parking'     as ViewMode, icon: Car, label: 'ที่จอดรถ' },
     ...(collectionStyle !== 'monthly' ? [{ id: 'collections' as ViewMode, icon: Wallet, label: collectionStyle === 'stall' ? 'เก็บเงินแผง' : 'เก็บค่าห้อง' }] : []),
     ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
     { id: 'tenants'     as ViewMode, icon: Users,           label: terms.tenantLabel || 'ผู้เช่า' },
@@ -625,18 +656,12 @@ function App() {
   // Loading state
   if (authLoading || !minSplashDone || (user && membershipLoading)) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
-        <div className="login-logo" style={{ marginBottom: 0 }}>
-          <img src={horcareLogo} alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain' }} />
+      // Same markup and styles (index.html) as the splash shown before the script loads, so it continues seamlessly
+      <div className="splash-screen">
+        <div className="splash-logo-container" role="progressbar" aria-label="กำลังโหลด">
+          <img src={LOGO_SRC} alt="HorCare" width={88} height={88} />
         </div>
-        <p style={{ color: 'var(--color-gray-400)', fontWeight: 500 }}>กำลังโหลด...</p>
+        <div className="splash-text">กำลังโหลด...</div>
       </div>
     );
   }
@@ -750,8 +775,26 @@ function App() {
 
   // Not logged in → show login page
   if (!user && !maidSession) {
+    if (authScreen === null) {
+      return (
+        <GuestHome
+          onStartTrial={() => {
+            try { localStorage.setItem(START_TRIAL_KEY, '1'); } catch { /* storage blocked: the trial can still be started from Pricing */ }
+            setAuthScreen('register');
+          }}
+          onLogin={() => setAuthScreen('login')}
+          onPricing={() => setAuthScreen('pricing')}
+        />
+      );
+    }
     return (
       <LoginPage
+        key={authScreen}
+        initialMode={authScreen}
+        onBack={() => {
+          try { localStorage.removeItem(START_TRIAL_KEY); } catch { /* storage blocked */ }
+          setAuthScreen(null);
+        }}
         onLogin={handleLogin}
         onRegister={handleRegister}
         onResetPassword={resetPassword}
@@ -859,6 +902,13 @@ function App() {
           }
           <Zap size={14} style={{ marginLeft: 'auto' }} />
         </div>
+      )}
+      {/* HorCare Pro trial running — days left, and the way to keep Pro */}
+      {licenseDaysLeft === null && ownTrialDaysLeft > 0 && (
+        <button type="button" className="trial-banner" style={{ cursor: 'pointer', border: 'none', width: '100%', font: 'inherit' }} onClick={() => setCurrentView('pricing')}>
+          <Sparkles size={16} aria-hidden />
+          {`กำลังทดลองใช้ HorCare Pro ฟรี เหลือ ${ownTrialDaysLeft} วัน — ดูแพ็กเกจเพื่อใช้ต่อ`}
+        </button>
       )}
 
 
@@ -1297,10 +1347,10 @@ function App() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
               <Zap size={14} color="#F7B86C" />
-              <span style={{ fontWeight: 800, fontSize: '0.8125rem', color: '#FFFFFF' }}>อัปเกรดแผน</span>
+              <span style={{ fontWeight: 800, fontSize: '0.8125rem', color: '#FFFFFF' }}>{!isStaff && canStartTrial(profile) ? `ทดลองใช้ Pro ฟรี ${TRIAL_DAYS} วัน` : 'อัปเกรดแผน'}</span>
             </div>
             <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', fontWeight: 600, lineHeight: 1.4 }}>
-              HorCare ฿399/เดือน · ฟีเจอร์ครบ
+              {!isStaff && canStartTrial(profile) ? 'ใช้ได้ทุกฟีเจอร์ ไม่ต้องผูกบัตร' : 'HorCare ฿399/เดือน · ฟีเจอร์ครบ'}
             </div>
           </button>
         )}
@@ -1579,6 +1629,15 @@ function App() {
           />
         )}
 
+        {currentView === 'parking' && activeBuildingId && !maidSession && (
+          <ParkingPage
+            uid={orgUid}
+            buildingId={activeBuildingId}
+            rooms={rooms}
+            canEdit={staffPermissions === null || staffPermissions.includes('room.update')}
+          />
+        )}
+
         {currentView === 'rooms' && (
           <RoomManagement
             rooms={rooms}
@@ -1790,6 +1849,7 @@ function App() {
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
             uid={orgUid}
+            buildingId={activeBuildingId ?? undefined}
           />
         )}
 

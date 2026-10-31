@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { admin } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { AiError, aiGenerate } from './_ai.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
@@ -33,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const userData = userSnap.data();
-        const license = userData?.license || 'free';
+        const license = effectiveLicense(userData);
         
         if (!isPro(license)) {
             return res.status(403).json({ error: 'Nong Care AI is available for Pro plan only.' });

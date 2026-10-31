@@ -14,6 +14,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { aiGenerate, extractJson } from './_ai.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
@@ -100,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // ── Plan check (Plus / Pro only) ──────────────────────────────────────
         const userDoc = await db.collection('users').doc(uid).get();
-        const license: string = userDoc.data()?.license ?? 'free';
+        const license = effectiveLicense(userDoc.data());
         if (!isPlusOrAbove(license)) {
             res.status(403).json({ error: 'feature_locked', message: 'ฟีเจอร์นี้สำหรับแพ็กเกจ Plus และ Pro เท่านั้น' });
             return;

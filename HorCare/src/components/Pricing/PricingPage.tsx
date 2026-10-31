@@ -2,9 +2,57 @@ import { useState, useEffect, memo } from 'react';
 import toast from 'react-hot-toast';
 import {
     Check, X, Clock, ChevronLeft, ShieldCheck, Zap, MessageCircle, Loader2,
-    Home, Building, Building2, CreditCard,
+    Home, Building, Building2, CreditCard, Sparkles,
 } from 'lucide-react';
 import type { UserProfile, PlanName, BillingCycle } from '../../types';
+import { canStartTrial, trialDaysLeft, TRIAL_DAYS } from '../../shared/trial';
+import { apiPost } from '../../utils/api';
+
+/* ----------- Free trial strip ----------- */
+function TrialStrip({ profile, isGuest, onNeedAuth }: { profile?: UserProfile | null; isGuest?: boolean; onNeedAuth?: () => void }) {
+    const [starting, setStarting] = useState(false);
+    const daysLeft = trialDaysLeft(profile);
+
+    if (!isGuest && daysLeft > 0) {
+        return (
+            <div className="pp-trial pp-trial-on">
+                <Sparkles size={20} aria-hidden className="pp-trial-icon" />
+                <div className="pp-trial-text">
+                    <strong>กำลังทดลองใช้ HorCare Pro</strong>
+                    <span>เหลืออีก {daysLeft} วัน · ใช้ได้ทุกฟีเจอร์ สมัครแพ็กเกจก่อนหมดเขตเพื่อใช้งานต่อเนื่อง</span>
+                </div>
+            </div>
+        );
+    }
+    if (!isGuest && !canStartTrial(profile)) return null;
+
+    const start = async () => {
+        if (isGuest) { onNeedAuth?.(); return; }
+        setStarting(true);
+        try {
+            await apiPost('trial', {});
+            toast.success(`เริ่มทดลองใช้ HorCare Pro ${TRIAL_DAYS} วันแล้ว ใช้ได้ทุกฟีเจอร์`);
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'เริ่มทดลองใช้ไม่สำเร็จ');
+        } finally {
+            setStarting(false);
+        }
+    };
+
+    return (
+        <div className="pp-trial">
+            <Sparkles size={20} aria-hidden className="pp-trial-icon" />
+            <div className="pp-trial-text">
+                <strong>ทดลองใช้ HorCare Pro ฟรี {TRIAL_DAYS} วัน</strong>
+                <span>ใช้ได้ทุกฟีเจอร์ ไม่ต้องผูกบัตร ครบกำหนดแล้วกลับเป็นแผนฟรีเอง ข้อมูลไม่หาย</span>
+            </div>
+            <button type="button" className="btn btn-primary pp-trial-btn" onClick={start} disabled={starting}>
+                {starting ? <Loader2 size={16} className="pp-spin" aria-hidden /> : null}
+                {isGuest ? 'สมัครและเริ่มทดลองใช้' : 'เริ่มทดลองใช้ฟรี'}
+            </button>
+        </div>
+    );
+}
 
 /* ----------- Plan definitions (stable ref) ----------- */
 interface Plan {
@@ -185,13 +233,15 @@ interface PricingPageProps {
     /** ผู้ใช้ยังไม่ได้ล็อกอิน — แสดงแผนได้ แต่คลิกซื้อ → เรียก onNeedAuth แทน checkout */
     isGuest?: boolean;
     onNeedAuth?: (planId: string, cycle: BillingCycle) => void;
+    /** Guest pressed "start the free trial": sign up first */
+    onTrialNeedAuth?: () => void;
     /** Pre-select a plan from the guest flow after login */
     initialPlanId?: string;
     initialCycle?: BillingCycle;
     onSubscribed?: () => void;
 }
 
-export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, initialPlanId, initialCycle }: PricingPageProps) {
+export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, onTrialNeedAuth, initialPlanId, initialCycle }: PricingPageProps) {
     const [cycle, setCycle] = useState<BillingCycle>(initialCycle ?? 'monthly');
     const [selectedPlan, setSelectedPlan] = useState<Plan | null>(() =>
         initialPlanId ? PLANS.find(p => p.id === initialPlanId) ?? null : null
@@ -264,6 +314,8 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, init
                             : 'จดมิเตอร์ ออกบิล ส่ง LINE และตรวจสลิป ครบในที่เดียว'}
                     </p>
                 </header>
+
+                <TrialStrip profile={profile} isGuest={isGuest} onNeedAuth={onTrialNeedAuth} />
 
                 <div className="seg pp-cycle" role="group" aria-label="รอบการชำระ">
                     {(['monthly', 'yearly'] as BillingCycle[]).map(c => (

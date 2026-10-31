@@ -9,7 +9,9 @@ import MeterPhotoReader, { type MeterReadResult } from './MeterPhotoReader';
 import MeterBatchModal, { type BatchSaveResult } from './MeterBatchModal';
 import { logActivity } from '../../utils/auditLog';
 import type { RoomMeterContext, RoomReadings } from '../../utils/meterBatch';
-import type { Room, DormConfig, MonthlyBill, CommonFee } from '../../types';
+import type { Room, DormConfig, MonthlyBill, CommonFee, RentProrate } from '../../types';
+import { useTenantStays } from '../../hooks/useTenantStays';
+import { prorateRent, proratedAmount } from '../../shared/prorate';
 import {
     calculateFullBill,
     formatCurrency,
@@ -17,7 +19,8 @@ import {
     formatMonthThai,
     getPreviousMonth,
     getNextMonth,
-    getEffectiveRates
+    getEffectiveRates,
+    roomFees
 } from '../../utils/calculations';
 
 interface MeterRecordingProps {
@@ -55,6 +58,17 @@ interface MeterDraft {
 }
 
 const DRAFT_PREFIX = 'horcare_meter_drafts_';
+const METER_TAB_KEY = 'horcare_meter_tab';
+
+type MeterTab = 'elec' | 'water';
+
+function readMeterTab(): MeterTab {
+    try {
+        return localStorage.getItem(METER_TAB_KEY) === 'water' ? 'water' : 'elec';
+    } catch {
+        return 'elec';
+    }
+}
 
 function readDrafts(key: string): Record<string, MeterDraft> {
     try {
@@ -97,6 +111,12 @@ export default function MeterRecording({
     ownerUid,
 }: MeterRecordingProps) {
     const [showBatch, setShowBatch] = useState(false);
+    // Electricity and water are recorded on separate tabs — one meter type per walk-through
+    const [meterTab, setMeterTab] = useState<MeterTab>(readMeterTab);
+    const changeMeterTab = (tab: MeterTab) => {
+        setMeterTab(tab);
+        try { localStorage.setItem(METER_TAB_KEY, tab); } catch { /* best-effort */ }
+    };
     const [recordingState, setRecordingState] = useState<Record<string, RoomRecordingState>>({});
     const [searchQuery, setSearchQuery] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'saved' | 'unsaved'>('all');
@@ -120,6 +140,15 @@ export default function MeterRecording({
     }, [bulkProgress != null]); // eslint-disable-line react-hooks/exhaustive-deps -- depend on presence not value
 
     const draftKey = `${DRAFT_PREFIX}${buildingId || 'local'}_${currentMonth}`;
+
+    // Rent for this month: monthly rooms only (term/daily rent is billed elsewhere), prorated for a mid-month
+    // move-in or move-out when the property turns that on (Settings → บิล).
+    const stays = useTenantStays(config.prorate_rent ? ownerUid : null, buildingId);
+    const rentFor = (room: Room): { rent: number; prorate: RentProrate | null } => {
+        const full = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+        const prorate = config.prorate_rent ? prorateRent(full, currentMonth, stays[room.id]) : null;
+        return { rent: proratedAmount(full, prorate), prorate };
+    };
 
     // Drop drafts older than ~3 months so localStorage doesn't accumulate forever
     useEffect(() => {
@@ -222,7 +251,7 @@ export default function MeterRecording({
         const currElec = parseInt(state.currElec) || 0;
         const currWater = parseInt(state.currWater) || 0;
 
-        const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+        const { rent: effectiveRent, prorate } = rentFor(room);
         const { electricityRate, waterConfig } = getEffectiveRates(room, config);
 
         const calculation = calculateFullBill(
@@ -235,7 +264,7 @@ export default function MeterRecording({
             room.tenant_count,
             electricityRate,
             waterConfig,
-            commonFees,
+            roomFees(commonFees, room),
             room.common_fee_overrides,
             currentMonth
         );
@@ -259,6 +288,7 @@ export default function MeterRecording({
             common_fee: calculation.common_fee,
             applied_common_fees: calculation.applied_common_fees,
             room_rent: effectiveRent,
+            ...(prorate ? { rent_prorate: prorate } : {}),
             total_bill: calculation.total_bill,
             is_saved: true,
             is_locked: false,
@@ -315,9 +345,9 @@ export default function MeterRecording({
             const prevWater = parseInt(state.prevWater) || 0;
             const currElec = parseInt(state.currElec) || 0;
             const currWater = parseInt(state.currWater) || 0;
-            const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+            const { rent: effectiveRent, prorate } = rentFor(room);
             const { electricityRate, waterConfig } = getEffectiveRates(room, config);
-            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig, commonFees, room.common_fee_overrides, currentMonth);
+            const calculation = calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRent, room.tenant_count, electricityRate, waterConfig, roomFees(commonFees, room), room.common_fee_overrides, currentMonth);
             const bill: MonthlyBill = {
                 id: `bill_${room.id}_${currentMonth}`,
                 room_id: room.id,
@@ -333,6 +363,7 @@ export default function MeterRecording({
                 common_fee: calculation.common_fee,
                 applied_common_fees: calculation.applied_common_fees,
                 room_rent: effectiveRent,
+                ...(prorate ? { rent_prorate: prorate } : {}),
                 total_bill: calculation.total_bill,
                 is_saved: true, is_locked: false, is_notified: false,
                 created_at: new Date().toISOString(),
@@ -394,10 +425,10 @@ export default function MeterRecording({
                 continue;
             }
 
-            const effectiveRent = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+            const { rent: effectiveRent, prorate } = rentFor(room);
             const { electricityRate, waterConfig } = getEffectiveRates(room, config);
             const calc = calculateFullBill(prevElec, parseInt(currElec), prevWater, parseInt(currWater), config, effectiveRent,
-                room.tenant_count, electricityRate, waterConfig, commonFees, room.common_fee_overrides, currentMonth);
+                room.tenant_count, electricityRate, waterConfig, roomFees(commonFees, room), room.common_fee_overrides, currentMonth);
             const now = new Date().toISOString();
             const bill: MonthlyBill = {
                 id: `bill_${room.id}_${currentMonth}`, room_id: room.id, room_number: room.room_number, month: currentMonth,
@@ -405,7 +436,7 @@ export default function MeterRecording({
                 prev_water: prevWater, curr_water: parseInt(currWater), water_units: calc.water_units, water_bill: calc.water_bill,
                 water_flat_amount: calc.water_flat_amount, water_excess_units: calc.water_excess_units,
                 water_excess_amount: calc.water_excess_amount, common_fee: calc.common_fee,
-                applied_common_fees: calc.applied_common_fees, room_rent: effectiveRent, total_bill: calc.total_bill,
+                applied_common_fees: calc.applied_common_fees, room_rent: effectiveRent, ...(prorate ? { rent_prorate: prorate } : {}), total_bill: calc.total_bill,
                 is_saved: true, is_locked: false, is_notified: false, created_at: now, updated_at: now,
             };
             try {
@@ -534,6 +565,20 @@ export default function MeterRecording({
         reader.readAsText(file, 'UTF-8');
     };
 
+    // Enter on a "เดือนนี้" input jumps to the same meter of the next visible, unlocked room
+    const focusNextRoom = (roomId: string) => {
+        const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[data-meter-curr]:not(:disabled)'));
+        const idx = inputs.findIndex(el => el.dataset.meterCurr === roomId);
+        const next = inputs[idx + 1];
+        if (next) {
+            next.focus();
+            next.select();
+            next.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } else {
+            inputs[idx]?.blur();
+        }
+    };
+
     const renderRoomCard = (room: Room) => {
         const state = recordingState[room.id] || { prevElec: '0', prevWater: '0', currElec: '', currWater: '', isSaved: false, isLocked: false };
         const isSaving = savingRooms[room.id] || false;
@@ -550,16 +595,26 @@ export default function MeterRecording({
         const elecValidation = state.currElec ? validateReading(prevElec, currElec) : { valid: true };
         const waterValidation = state.currWater ? validateReading(prevWater, currWater) : { valid: true };
 
-        const effectiveRentPreview = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+        const { rent: effectiveRentPreview, prorate: prorateInfo } = rentFor(room);
         const { electricityRate: roomElecRate, waterConfig: roomWaterCfg } = getEffectiveRates(room, config);
 
         // Calculate preview
         const calculation = state.currElec && state.currWater
-            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg, commonFees, room.common_fee_overrides, currentMonth)
+            ? calculateFullBill(prevElec, currElec, prevWater, currWater, config, effectiveRentPreview, room.tenant_count, roomElecRate, roomWaterCfg, roomFees(commonFees, room), room.common_fee_overrides, currentMonth)
             : null;
 
         // prevElec/prevWater อาจเป็น '' (แทน 0) ถือว่า valid — ตรวจแค่ currElec/currWater ต้องกรอก
         const canSave = state.currElec !== '' && state.currWater !== '' && elecValidation.valid && waterValidation.valid;
+
+        // Values for the meter shown on the active tab
+        const isElec = meterTab === 'elec';
+        const prevField = isElec ? 'prevElec' : 'prevWater';
+        const currField = isElec ? 'currElec' : 'currWater';
+        const prevValue = isElec ? state.prevElec : state.prevWater;
+        const currValue = isElec ? state.currElec : state.currWater;
+        const units = isElec ? elecUnits : waterUnits;
+        const validation = isElec ? elecValidation : waterValidation;
+        const otherMissing = isElec ? state.currWater === '' : state.currElec === '';
 
         // ── Photo reader confirm handler ────────────────────────────────────────
         const handlePhotoConfirm = (result: MeterReadResult) => {
@@ -573,9 +628,8 @@ export default function MeterRecording({
                 // ใส่ค่าลง field ที่ตรงกับประเภทมิเตอร์
                 handleInputChange(room.id, field, result.reading.toString());
             } else {
-                // ไม่ทราบประเภท — ถามผู้ใช้โดยเติมทั้งคู่ถ้ายังว่างอยู่
-                if (!state.currElec) handleInputChange(room.id, 'currElec', result.reading.toString());
-                if (!state.currWater) handleInputChange(room.id, 'currWater', result.reading.toString());
+                // ไม่ทราบประเภท — ใส่ลงมิเตอร์ของแท็บที่เปิดอยู่
+                handleInputChange(room.id, currField, result.reading.toString());
             }
             setPhotoReaderId(null);
         };
@@ -621,11 +675,11 @@ export default function MeterRecording({
                     />
                 )}
 
-                {/* Electricity */}
+                {/* Meter for the active tab (ไฟฟ้า or น้ำประปา) */}
                 <div className="meter-section">
                     <div className="meter-label">
-                        <Zap size={16} color="#F59E2E" />
-                        ค่าไฟฟ้า
+                        {isElec ? <Zap size={16} color="#F59E2E" /> : <Droplets size={16} color="#0A6CC2" />}
+                        {isElec ? 'มิเตอร์ไฟฟ้า' : 'มิเตอร์น้ำประปา'}
                     </div>
                     <div className="meter-row">
                         <div className="meter-input-group">
@@ -635,8 +689,8 @@ export default function MeterRecording({
                                 inputMode="numeric"
                                 className="meter-input meter-input-prev"
                                 placeholder="0"
-                                value={state.prevElec}
-                                onChange={e => handleInputChange(room.id, 'prevElec', e.target.value)}
+                                value={prevValue}
+                                onChange={e => handleInputChange(room.id, prevField, e.target.value)}
                                 disabled={state.isLocked}
                             />
                         </div>
@@ -646,102 +700,88 @@ export default function MeterRecording({
                             <input
                                 type="text"
                                 inputMode="numeric"
-                                className={`meter-input ${elecValidation.warning ? 'error' : ''}`}
+                                enterKeyHint="next"
+                                data-meter-curr={room.id}
+                                className={`meter-input ${validation.warning ? 'error' : ''}`}
                                 placeholder="0"
-                                value={state.currElec}
-                                onChange={e => handleInputChange(room.id, 'currElec', e.target.value)}
+                                value={currValue}
+                                onChange={e => handleInputChange(room.id, currField, e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') focusNextRoom(room.id); }}
                                 disabled={state.isLocked}
                             />
                         </div>
                         <span className="meter-units">
-                            {state.currElec && state.prevElec && (
-                                <span className={`units-badge ${elecUnits < 0 ? 'text-danger' : ''}`}>
-                                    {elecUnits >= 0 ? '+' : ''}{elecUnits} หน่วย
+                            {currValue && prevValue && (
+                                <span className={`units-badge ${units < 0 ? 'text-danger' : ''}`}>
+                                    {units >= 0 ? '+' : ''}{units} หน่วย
                                 </span>
                             )}
                         </span>
                     </div>
-                    {elecValidation.warning && (
+                    {validation.warning && (
                         <div className="form-error flex items-center gap-2 mt-2">
                             <AlertTriangle size={14} />
-                            {elecValidation.warning}
+                            {validation.warning}
                         </div>
                     )}
-                </div>
-
-                {/* Water */}
-                <div className="meter-section">
-                    <div className="meter-label">
-                        <Droplets size={16} color="#0A6CC2" />
-                        ค่าน้ำประปา
-                    </div>
-                    <div className="meter-row">
-                        <div className="meter-input-group">
-                            <span className="meter-input-label">เดือนก่อน</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                className="meter-input meter-input-prev"
-                                placeholder="0"
-                                value={state.prevWater}
-                                onChange={e => handleInputChange(room.id, 'prevWater', e.target.value)}
-                                disabled={state.isLocked}
-                            />
-                        </div>
-                        <ArrowRight size={16} className="meter-arrow" />
-                        <div className="meter-input-group">
-                            <span className="meter-input-label">เดือนนี้</span>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                className={`meter-input ${waterValidation.warning ? 'error' : ''}`}
-                                placeholder="0"
-                                value={state.currWater}
-                                onChange={e => handleInputChange(room.id, 'currWater', e.target.value)}
-                                disabled={state.isLocked}
-                            />
-                        </div>
-                        <span className="meter-units">
-                            {state.currWater && state.prevWater && (
-                                <span className={`units-badge ${waterUnits < 0 ? 'text-danger' : ''}`}>
-                                    {waterUnits >= 0 ? '+' : ''}{waterUnits} หน่วย
-                                </span>
-                            )}
-                        </span>
-                    </div>
-                    {waterValidation.warning && (
-                        <div className="form-error flex items-center gap-2 mt-2">
-                            <AlertTriangle size={14} />
-                            {waterValidation.warning}
-                        </div>
+                    {/* The other meter is still missing — a bill needs both readings */}
+                    {!state.isLocked && otherMissing && (
+                        <button
+                            type="button"
+                            onClick={() => changeMeterTab(isElec ? 'water' : 'elec')}
+                            style={{
+                                marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                                fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-muted, #557089)',
+                            }}
+                        >
+                            {isElec ? <Droplets size={13} color="#0A6CC2" /> : <Zap size={13} color="#F59E2E" />}
+                            {isElec ? 'ยังไม่ได้จดมิเตอร์น้ำ' : 'ยังไม่ได้จดมิเตอร์ไฟ'} — ไปจด
+                            <ArrowRight size={12} />
+                        </button>
                     )}
                 </div>
 
                 {/* Bill Preview */}
                 {calculation && (
                     <div className="bill-preview">
+                        {isElec ? (
+                            <div className="bill-row">
+                                <span className="bill-label">
+                                    <Zap size={14} color="#F59E2E" />
+                                    ค่าไฟ ({calculation.elec_units} หน่วย × {roomElecRate}฿)
+                                </span>
+                                <span className="bill-value">{formatCurrency(calculation.elec_bill)}</span>
+                            </div>
+                        ) : (
+                            <div className="bill-row">
+                                <span className="bill-label">
+                                    <Droplets size={14} color="#0A6CC2" />
+                                    {roomWaterCfg.type === 'normal'
+                                        ? `ค่าน้ำ (${calculation.water_units} หน่วย × ${roomWaterCfg.unit_rate}฿)`
+                                        : `ค่าน้ำ ${calculation.water_excess_units > 0 ? `(เกิน ${calculation.water_excess_units} หน่วย)` : '(เหมา)'}`
+                                    }
+                                </span>
+                                <span className="bill-value">{formatCurrency(calculation.water_bill)}</span>
+                            </div>
+                        )}
                         <div className="bill-row">
                             <span className="bill-label">
-                                <Zap size={14} color="#F59E2E" />
-                                ค่าไฟ ({calculation.elec_units} หน่วย × {roomElecRate}฿)
+                                {isElec ? <Droplets size={14} color="#0A6CC2" /> : <Zap size={14} color="#F59E2E" />}
+                                {isElec ? 'ค่าน้ำ' : 'ค่าไฟ'}
                             </span>
-                            <span className="bill-value">{formatCurrency(calculation.elec_bill)}</span>
-                        </div>
-                        <div className="bill-row">
-                            <span className="bill-label">
-                                <Droplets size={14} color="#0A6CC2" />
-                                {roomWaterCfg.type === 'normal'
-                                    ? `ค่าน้ำ (${calculation.water_units} หน่วย × ${roomWaterCfg.unit_rate}฿)`
-                                    : `ค่าน้ำ ${calculation.water_excess_units > 0 ? `(เกิน ${calculation.water_excess_units} หน่วย)` : '(เหมา)'}`
-                                }
-                            </span>
-                            <span className="bill-value">{formatCurrency(calculation.water_bill)}</span>
+                            <span className="bill-value">{formatCurrency(isElec ? calculation.water_bill : calculation.elec_bill)}</span>
                         </div>
                         <div className="bill-row">
                             <span className="bill-label">
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#15803D" /> ค่าห้อง</span>
                                 {room.rent_type === 'semester' && (
                                     <span style={{ fontSize: '0.75rem', color: 'var(--color-warning)', marginLeft: '4px' }}>(รายเทอม)</span>
+                                )}
+                                {prorateInfo && (
+                                    <span className="rent-prorate-note" title={`ค่าเช่าเต็มเดือน ${formatCurrency(prorateInfo.full_rent)}`}>
+                                        คิด {prorateInfo.days}/{prorateInfo.days_in_month} วัน
+                                    </span>
                                 )}
                             </span>
                             <span className="bill-value">{formatCurrency(effectiveRentPreview)}</span>
@@ -789,7 +829,9 @@ export default function MeterRecording({
                         ) : (
                             <>
                                 <Save size={18} />
-                                บันทึก
+                                {!state.isLocked && otherMissing && currValue !== ''
+                                    ? (isElec ? 'รอจดค่าน้ำ' : 'รอจดค่าไฟ')
+                                    : 'บันทึก'}
                             </>
                         )}
                     </button>
@@ -1042,6 +1084,56 @@ export default function MeterRecording({
                 >
                     <ChevronRight size={20} />
                 </button>
+            </div>
+
+            {/* Meter type tabs — record electricity and water separately */}
+            <div
+                role="tablist"
+                aria-label="ประเภทมิเตอร์"
+                style={{
+                    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem',
+                    marginBottom: '1rem',
+                }}
+            >
+                {([
+                    { id: 'elec', label: 'ไฟฟ้า', Icon: Zap, color: '#F59E2E', tint: '#FEF4E6', field: 'currElec' },
+                    { id: 'water', label: 'น้ำประปา', Icon: Droplets, color: '#0A6CC2', tint: '#E8F2FB', field: 'currWater' },
+                ] as const).map(t => {
+                    const active = meterTab === t.id;
+                    const done = activeRooms.filter(r => {
+                        const s = recordingState[r.id];
+                        return s && (s.isLocked || s[t.field] !== '');
+                    }).length;
+                    const complete = activeRooms.length > 0 && done === activeRooms.length;
+                    return (
+                        <button
+                            key={t.id}
+                            role="tab"
+                            aria-selected={active}
+                            onClick={() => changeMeterTab(t.id)}
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                                padding: '0.75rem 0.5rem', borderRadius: '12px', cursor: 'pointer',
+                                border: `2px solid ${active ? t.color : 'var(--color-border, #DCE5EF)'}`,
+                                background: active ? t.tint : 'var(--color-surface, #fff)',
+                                color: active ? 'var(--color-text, #102A43)' : 'var(--color-text-muted, #557089)',
+                                fontWeight: active ? 800 : 600, fontSize: '0.95rem',
+                                transition: 'all 0.15s',
+                            }}
+                        >
+                            <t.Icon size={18} color={t.color} />
+                            {t.label}
+                            <span style={{
+                                fontSize: '0.75rem', fontWeight: 700, padding: '0.1rem 0.5rem', borderRadius: 999,
+                                background: complete ? '#EFF8F2' : active ? '#fff' : 'var(--color-gray-100, #EBF1F7)',
+                                color: complete ? '#15803D' : 'var(--color-text-muted, #557089)',
+                                fontFamily: 'var(--font-mono)',
+                            }}>
+                                {done}/{activeRooms.length}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Search and Filter Bar */}

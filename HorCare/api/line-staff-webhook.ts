@@ -5,11 +5,14 @@
  * Its only job is connecting a staff member's LINE account to their HorCare staff record
  * when they send the code the manager gave them (HCS-XXXXXXXX). Job notifications are
  * pushed from api/_notify.ts using the same staff channel.
+ * Owners and finance staff also link here (HCO- code) and ask for figures with #ยอด / #ค้าง / #ห้องว่าง (_owner-line.ts).
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { lineReply, staffLineToken, verifyLineSignature } from './_line.js';
 import { isStaffLinkCode, redeemStaffLink } from './_work-orders.js';
 import { HELP, handleStaffChat } from './_staff-registration.js';
+import { handleOwnerCommand, redeemOwnerLink } from './_owner-line.js';
+import { isOwnerLinkCode } from '../src/shared/ownerCommands.js';
 
 export const config = {
     api: { bodyParser: false },   // the signature is computed over the raw body
@@ -62,6 +65,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             if (event.type !== 'message' || event.message?.type !== 'text') return;
             const text: string = (event.message.text ?? '').trim();
+
+            // owners / finance staff: link code, then #ยอด #ค้าง #ห้องว่าง
+            if (isOwnerLinkCode(text)) {
+                await lineReply(replyToken, [{ type: 'text', text: await redeemOwnerLink(lineUserId, text) }], token);
+                return;
+            }
+            const ownerReply = await handleOwnerCommand(lineUserId, text);
+            if (ownerReply) { await lineReply(replyToken, ownerReply, token); return; }
 
             if (isStaffLinkCode(text)) {
                 const r = await redeemStaffLink(lineUserId, text);

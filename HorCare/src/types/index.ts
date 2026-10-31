@@ -1,5 +1,6 @@
 // HorCare - Type Definitions
 import type { StatusOverride } from '../shared/roomOccupancy.js';
+import type { ListingConfig } from '../shared/listing.js';
 
 export type PlanName = 'small' | 'medium' | 'large';
 export type BillingCycle = 'monthly' | 'yearly';
@@ -22,6 +23,8 @@ export interface UserProfile {
   role?: 'admin' | 'user';
   status?: 'active' | 'banned'; // 'banned' = blocked by admin
   trial_expires_at?: string; // legacy — unused for free plan
+  trial_started_at?: number; // epoch millis — HorCare Pro trial (written only by /api/trial)
+  trial_until?: number; // epoch millis — Pro features until then; see shared/trial.ts effectiveLicense()
   created_at: string;
   // Subscription info (Stripe)
   subscription_id?: string;
@@ -119,6 +122,24 @@ export interface DormConfig {
   /** Owner-defined amenities, offered next to the built-in list in bulk room creation. */
   custom_amenities?: string[];
   contract_templates?: ContractTemplate[]; //เทมเพลตสัญญาเช่าดิจิทัลที่เจ้าของสร้าง
+  /** ค่าปรับชำระล่าช้าอัตโนมัติ — the daily cron adds it as a fine (src/shared/lateFee.ts) */
+  late_fee?: LateFeeConfig;
+  /** คิดค่าเช่าตามจำนวนวันที่อยู่จริง เมื่อย้ายเข้า/ย้ายออกกลางเดือน (src/shared/prorate.ts) */
+  prorate_rent?: boolean;
+  /** หน้าประกาศห้องว่างสาธารณะ — written by /api/listing (publish) only */
+  listing?: ListingConfig;
+}
+
+export interface LateFeeConfig {
+  enabled: boolean;
+  /** 'flat' = ปรับครั้งเดียว, 'per_day' = ปรับรายวันนับจากวันที่เลยกำหนด (+ วันผ่อนผัน) */
+  mode: 'flat' | 'per_day';
+  /** บาท (ต่อครั้ง หรือ ต่อวัน) */
+  amount: number;
+  /** วันผ่อนผันหลังวันครบกำหนด ก่อนเริ่มคิดค่าปรับ */
+  grace_days: number;
+  /** เพดานค่าปรับต่อบิล (เฉพาะรายวัน); 0/undefined = ไม่จำกัด */
+  max_amount?: number;
 }
 
 export interface Room {
@@ -159,6 +180,34 @@ export interface Room {
   amenities?: string[];        // amenity ids (see src/utils/amenities.ts) or custom names
   // ภาษาเฉพาะห้องสำหรับบิลและการแจ้งเตือน (ถ้าไม่ระบุจะใช้ค่าเริ่มต้นของหอพัก)
   language?: BillLanguage;
+  /** Parking spots assigned to this room — a copy kept in step with parking_spots, billed every month (roomFees()). */
+  parking?: RoomParking[];
+}
+
+export type ParkingKind = 'car' | 'motorcycle' | 'other';
+
+/** users/{uid}/buildings/{bid}/parking_spots/{id} — one parking space the property rents out. */
+export interface ParkingSpot {
+  id: string;
+  code: string;              // e.g. 'A-01'
+  zone?: string;
+  kind: ParkingKind;
+  monthly_fee: number;       // baht, added to the assigned room's bill
+  room_id: string | null;
+  room_number: string | null;
+  plate?: string | null;     // ทะเบียนรถ
+  sticker_no?: string | null;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoomParking {
+  spot_id: string;
+  code: string;
+  kind: ParkingKind;
+  fee: number;
+  plate?: string | null;
 }
 
 export interface MonthlyBill {
@@ -180,6 +229,8 @@ export interface MonthlyBill {
   common_fee: number; // Sum of applied common fees
   applied_common_fees?: { id: string; name: string; amount: number }[]; // Breakdown of applied common fees
   room_rent: number;
+  /** Set when room_rent was prorated for a mid-month move-in/out (room_rent is already the prorated amount). */
+  rent_prorate?: RentProrate;
   total_bill: number;
   is_saved: boolean;
   is_locked: boolean;
@@ -475,6 +526,14 @@ export interface Expense {
 }
 
 // ─── Fines (ค่าปรับรายห้อง) ───────────────────────────────────────────────────
+export interface RentProrate {
+  days: number;
+  days_in_month: number;
+  full_rent: number;
+  from: string; // YYYY-MM-DD, first billed day
+  to: string;   // YYYY-MM-DD, last billed day
+}
+
 export interface Fine {
   id: string;
   room_id: string;
@@ -484,6 +543,9 @@ export interface Fine {
   date: string;
   status: PaymentStatus;
   note?: string;
+  /** 'late_fee' = created and kept up to date by the daily late-fee job for the bill in bill_id */
+  source?: 'late_fee';
+  bill_id?: string;
   created_at: string;
   updated_at?: string;
 

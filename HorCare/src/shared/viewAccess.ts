@@ -6,6 +6,7 @@ import type { Permission } from './permissions.js';
 export const VIEW_PERMISSIONS: Record<string, Permission[] | null | 'owner'> = {
   dashboard: null,
   rooms: ['room.read'],
+  parking: ['room.read'],
   floorplan: ['room.read'],
   collections: ['collections.read', 'booking.read'],
   recording: ['meter.record', 'meter.read'],

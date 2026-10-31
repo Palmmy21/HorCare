@@ -1,14 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
-import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Globe, Upload, Store, Plus, Sparkles } from 'lucide-react';
+import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Globe, Upload, Store, Plus, Sparkles, Clock } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeCanvas } from 'qrcode.react';
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../../firebase/config';
-import type { DormConfig, WaterConfig, BillLanguage, MarketConfig } from '../../types';
+import type { DormConfig, WaterConfig, BillLanguage, MarketConfig, LateFeeConfig } from '../../types';
+
+/** Late-fee form values, with defaults for a property that has never set them. */
+function lateFeeFormOf(c: DormConfig): Required<LateFeeConfig> {
+    return {
+        enabled: c.late_fee?.enabled ?? false,
+        mode: c.late_fee?.mode ?? 'per_day',
+        amount: c.late_fee?.amount ?? 50,
+        grace_days: c.late_fee?.grace_days ?? 0,
+        max_amount: c.late_fee?.max_amount ?? 0,
+    };
+}
 import { generateDormCode } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
 import type { ThemeMode } from '../../hooks/useTheme';
+import ListingSettingsSection from './ListingSettingsSection';
+import OwnerLineSection from './OwnerLineSection';
 import { toast } from 'react-hot-toast';
 import horcareLogo from '../../assets/horcare_logo.png';
 import ContractTemplatesSettingsSection from './ContractTemplatesSettingsSection';
@@ -43,6 +56,8 @@ interface SettingsProps {
     isPaid?: boolean;
     onUpgrade?: () => void;
     uid?: string;
+    /** The property being edited (public vacancy page, viewing requests). */
+    buildingId?: string;
 }
 
 const BUILDING_TYPES = [
@@ -149,7 +164,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; desc: string; icon: typeo
 ];
 
 export default function Settings(props: SettingsProps) {
-    const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid } = props;
+    const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid, buildingId } = props;
     const [activeTab, setActiveTab] = useState<SettingsTab>('general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
@@ -291,6 +306,8 @@ export default function Settings(props: SettingsProps) {
         bilingual_mode: config.bill_customization?.bilingual_mode || false,
         secondary_language: (config.bill_customization?.secondary_language || 'en') as BillLanguage,
     });
+    const [lateFee, setLateFee] = useState(() => lateFeeFormOf(config));
+    const [prorateRentOn, setProrateRentOn] = useState(!!config.prorate_rent);
     const [dormLogo, setDormLogo] = useState<string | undefined>(config.bill_customization?.dorm_logo);
     const [logoLoading, setLogoLoading] = useState(false);
     const logoInputRef = useRef<HTMLInputElement>(null);
@@ -324,6 +341,8 @@ export default function Settings(props: SettingsProps) {
             secondary_language: (config.bill_customization?.secondary_language || 'en') as BillLanguage,
         });
         setDormLogo(config.bill_customization?.dorm_logo);
+        setLateFee(lateFeeFormOf(config));
+        setProrateRentOn(!!config.prorate_rent);
         setDormCode(config.dorm_code || '');
         setPortalPin(config.portal_pin || '');
         setMarketConfig({
@@ -339,7 +358,7 @@ export default function Settings(props: SettingsProps) {
         });
     }
 
-    const snapshot = JSON.stringify({ formData, billForm, dormLogo, dormCode, portalPin, marketConfig });
+    const snapshot = JSON.stringify({ formData, billForm, dormLogo, dormCode, portalPin, marketConfig, lateFee, prorateRentOn });
     const [baseline, setBaseline] = useState<string | null>(null);
     const [baselineFor, setBaselineFor] = useState(prevConfig);
     if (baselineFor !== prevConfig) { setBaselineFor(prevConfig); setBaseline(null); }
@@ -392,6 +411,10 @@ export default function Settings(props: SettingsProps) {
     };
 
     const handleSave = () => {
+        if (lateFee.enabled && !(Number(lateFee.amount) > 0)) {
+            toast.error('ใส่จำนวนค่าปรับให้มากกว่า 0 หรือปิดค่าปรับล่าช้า');
+            return;
+        }
         const dormWaterConfig: WaterConfig = formData.dorm_water_type === 'normal'
             ? { type: 'normal', unit_rate: Number(formData.dorm_water_unit_rate) }
             : {
@@ -410,7 +433,11 @@ export default function Settings(props: SettingsProps) {
                 excess_unit_rate: Number(formData.comm_water_excess_rate)
             };
 
+        // saveConfig replaces the whole document: start from the current config so settings this form does not edit
+        // (collection style, LINE claim mode, custom amenities, …) survive. A field set to undefined is removed
+        // (Firestore here ignores undefined properties).
         const newConfig: DormConfig = {
+            ...config,
             building_type: formData.building_type as DormConfig['building_type'],
             electricity_rate: Number(formData.electricity_rate),
             room_rent: Number(formData.room_rent),
@@ -429,10 +456,17 @@ export default function Settings(props: SettingsProps) {
                 // legacy PromptPay values stay until they are moved onto a bank account (Payments → receiving accounts)
                 ...(config.bill_customization?.promptpay_number ? { promptpay_number: config.bill_customization.promptpay_number, promptpay_name: config.bill_customization.promptpay_name ?? '' } : {}),
             },
-            ...(dormCode ? { dorm_code: dormCode } : {}),
-            ...(portalPin.length === 4 ? { portal_pin: portalPin } : {}),
-            ...(formData.building_type === 'market' || config.market_config ? { market_config: marketConfig } : {}),
-            ...(config.contract_templates ? { contract_templates: config.contract_templates } : {}),
+            dorm_code: dormCode || undefined,
+            portal_pin: portalPin.length === 4 ? portalPin : undefined,
+            market_config: formData.building_type === 'market' || config.market_config ? marketConfig : undefined,
+            late_fee: {
+                enabled: lateFee.enabled,
+                mode: lateFee.mode,
+                amount: Math.max(0, Number(lateFee.amount) || 0),
+                grace_days: Math.max(0, Math.floor(Number(lateFee.grace_days) || 0)),
+                max_amount: Math.max(0, Number(lateFee.max_amount) || 0),
+            },
+            prorate_rent: prorateRentOn,
         };
 
         onSaveConfig(newConfig);
@@ -1511,6 +1545,102 @@ export default function Settings(props: SettingsProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Late fees + prorated rent */}
+            <div className="settings-section">
+                <h3 className="settings-title">
+                    <Clock size={20} color="#E8740C" />
+                    ค่าปรับล่าช้าและค่าเช่าตามจริง
+                </h3>
+
+                <div className="form-group">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>คิดค่าปรับชำระล่าช้าอัตโนมัติ</span>
+                        <input
+                            type="checkbox"
+                            checked={lateFee.enabled}
+                            onChange={e => setLateFee(prev => ({ ...prev, enabled: e.target.checked }))}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0A6CC2' }}
+                        />
+                    </label>
+                    <p className="form-hint" style={{ marginTop: '0.25rem' }}>
+                        ระบบตรวจทุกเช้า บิลที่ยังไม่จ่ายเลยวันที่ {Number(billForm.due_day) || 5}
+                        {Number(lateFee.grace_days) > 0 ? ` + ผ่อนผัน ${lateFee.grace_days} วัน` : ''} จะได้รายการค่าปรับในห้องนั้น
+                        และแจ้งในข้อความทวงทาง LINE ผู้เช่าที่ส่งสลิปแล้วรอตรวจจะไม่ถูกปรับเพิ่ม
+                    </p>
+                </div>
+
+                {lateFee.enabled && (
+                    <div className="settings-grid">
+                        <div className="form-group">
+                            <label className="form-label">วิธีคิด</label>
+                            <select
+                                className="form-input"
+                                style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                value={lateFee.mode}
+                                onChange={e => setLateFee(prev => ({ ...prev, mode: e.target.value as LateFeeConfig['mode'] }))}
+                            >
+                                <option value="per_day">รายวัน (บาท/วัน)</option>
+                                <option value="flat">ครั้งเดียว (บาท)</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">{lateFee.mode === 'per_day' ? 'ค่าปรับต่อวัน (บาท)' : 'ค่าปรับ (บาท)'}</label>
+                            <input
+                                type="number"
+                                className="form-input mono"
+                                style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                min={0}
+                                value={lateFee.amount}
+                                onChange={e => setLateFee(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">ผ่อนผัน (วัน)</label>
+                            <input
+                                type="number"
+                                className="form-input mono"
+                                style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                min={0}
+                                max={60}
+                                value={lateFee.grace_days}
+                                onChange={e => setLateFee(prev => ({ ...prev, grace_days: Number(e.target.value) }))}
+                            />
+                            <p className="form-hint">จำนวนวันหลังครบกำหนดที่ยังไม่คิดค่าปรับ</p>
+                        </div>
+                        {lateFee.mode === 'per_day' && (
+                            <div className="form-group">
+                                <label className="form-label">เพดานค่าปรับต่อบิล (บาท)</label>
+                                <input
+                                    type="number"
+                                    className="form-input mono"
+                                    style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
+                                    min={0}
+                                    value={lateFee.max_amount}
+                                    onChange={e => setLateFee(prev => ({ ...prev, max_amount: Number(e.target.value) }))}
+                                />
+                                <p className="form-hint">0 = ไม่จำกัด</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>คิดค่าเช่าตามจำนวนวัน เมื่อย้ายเข้า/ย้ายออกกลางเดือน</span>
+                        <input
+                            type="checkbox"
+                            checked={prorateRentOn}
+                            onChange={e => setProrateRentOn(e.target.checked)}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#0A6CC2' }}
+                        />
+                    </label>
+                    <p className="form-hint" style={{ marginTop: '0.25rem' }}>
+                        ใช้วันเข้าอยู่และวันย้ายออกจากข้อมูลผู้เช่า เช่น ค่าเช่า 3,100 บาท เข้าอยู่วันที่ 21 ต.ค. (11 จาก 31 วัน) คิด 1,100 บาท
+                        ใช้กับห้องรายเดือนเท่านั้น แสดงเป็น “คิด 11/31 วัน” ในหน้าจดมิเตอร์ก่อนบันทึก
+                    </p>
+                </div>
+            </div>
             </>
             )}
 
@@ -1525,6 +1655,9 @@ export default function Settings(props: SettingsProps) {
             {/* Integrations Tab */}
             {activeTab === 'integrations' && (
                 <>
+            <ListingSettingsSection config={config} ownerUid={uid} buildingId={buildingId} />
+            <OwnerLineSection ownerUid={uid} />
+
             {/* LINE Integration */}
             <div className="settings-section" style={{ position: 'relative' }}>
             {!isPaid && (

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
+import { effectiveLicense } from '../src/shared/trial.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { decodeSlipQR, slipFingerprint } from './_slip.js';
 import { applySlipSplit, outstandingSatang, recordSlipPayment } from './_slip-payment.js';
@@ -114,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         const userSnap = await db.collection('users').doc(uid).get();
-        const license = userSnap.data()?.license || 'free';
+        const license = effectiveLicense(userSnap.data());
         const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
 
         // Read the slip with AI and compare it with the bill and the property's receiving accounts

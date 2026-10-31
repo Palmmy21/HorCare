@@ -58,7 +58,8 @@ function collectionRef(path: string, filters: [string, unknown][] = []) {
         .map(p => snap(p))
         .filter(s => filters.every(([f, v]) => (s.data() as Data)[f] === v));
     return {
-        doc: (id: string) => docRef(`${path}/${id}`),
+        // like Firestore, doc() with no id makes a new random one
+        doc: (id?: string) => docRef(`${path}/${id ?? `auto${Math.random().toString(36).slice(2, 12)}`}`),
         where: (field: string, op: string, value: unknown) => {
             if (op !== '==') throw new Error('fake firestore only supports ==');
             return collectionRef(path, [...filters, [field, value]]);

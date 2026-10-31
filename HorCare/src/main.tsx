@@ -6,6 +6,7 @@ import TenantPortalPage from './components/TenantPortal/TenantPortalPage.tsx'
 import TenantGateway from './components/TenantPortal/TenantGateway.tsx'
 import StaffWorkPage from './components/WorkOrders/StaffWorkPage.tsx'
 import WalkInPage from './components/Market/WalkInPage.tsx'
+import ListingPage from './components/Listing/ListingPage.tsx'
 
 // ── Firestore internal assertion error → auto silent reload ──────────────────
 // Firebase SDK can enter a broken state when too many listeners are created /
@@ -37,18 +38,21 @@ window.addEventListener('unhandledrejection', (e) => {
 //        ?uid=&bid=&rid=    → TenantPortalPage, which explains that old links no longer open a portal
 // Route: ?w=<link>           → StaffWorkPage (technician / housekeeper job, opened from LINE)
 // Route: ?walkin=1&uid=&bid= → WalkInPage (public form for walk-in market vendors)
+// Route: ?listing=<slug>     → ListingPage (public vacancy page + viewing requests, checked by /api/listing)
 // Route: everything else    → Owner App
 const params = new URLSearchParams(window.location.search);
 const isTenantGateway = window.location.pathname === '/portal';
 const isTenantPortal = params.has('p') || (params.has('uid') && params.has('bid') && params.has('rid'));
 const isStaffWork = params.has('w');
 const isWalkIn = params.has('walkin') && params.has('uid') && params.has('bid');
+const isListing = params.has('listing');
 
 // eslint-disable-next-line react-refresh/only-export-components
 function Root() {
   if (isTenantGateway) return <TenantGateway />;
   if (isStaffWork) return <StaffWorkPage />;
   if (isWalkIn) return <WalkInPage />;
+  if (isListing) return <ListingPage />;
   if (isTenantPortal) return <TenantPortalPage />;
   return <App />;
 }

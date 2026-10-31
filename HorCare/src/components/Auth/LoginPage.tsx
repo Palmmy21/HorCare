@@ -2,11 +2,12 @@ import { useState, lazy, Suspense } from 'react';
 import {
     Mail, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle2,
     AlertTriangle, Smartphone, Cloud, Zap, Sparkles, Building2, Building,
-    Home, Hotel, Store, Droplets, Calendar, DollarSign
+    Home, Hotel, Store, Droplets, Calendar, DollarSign, ChevronLeft
 } from 'lucide-react';
+import { START_TRIAL_KEY, TRIAL_DAYS } from '../../shared/trial';
 import { authenticateHousekeeper } from '../../hooks/useHousekeepers';
 import type { HousekeeperSession, DormConfig, WaterConfig, InitialBuildingConfig } from '../../types';
-import horcareLogo from '../../assets/horcare_logo.png';
+import { LOGO_SRC } from '../../utils/brand';
 import { errorInfo } from '../../shared/errorInfo';
 const PricingPage = lazy(() => import('../Pricing/PricingPage'));
 
@@ -17,6 +18,10 @@ interface LoginPageProps {
     onMaidLogin?: (session: HousekeeperSession) => void;
     error: string | null;
     clearError: () => void;
+    /** Screen to open on (the guest home sends people straight to sign up, sign in or the plans) */
+    initialMode?: 'login' | 'register' | 'pricing';
+    /** Back to the guest home */
+    onBack?: () => void;
 }
 
 type PageMode = 'login' | 'register' | 'forgot' | 'pricing' | 'maid';
@@ -31,8 +36,14 @@ const BUILDING_TYPES = [
     { type: 'resort', label: 'รีสอร์ท/รร.', icon: <Hotel size={20} /> },
 ] as const;
 
-export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaidLogin, error, clearError }: LoginPageProps) {
-    const [mode, setMode] = useState<PageMode>('login');
+export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaidLogin, error, clearError, initialMode = 'login', onBack }: LoginPageProps) {
+    const [mode, setMode] = useState<PageMode>(initialMode);
+    const logo = (
+        <div className="login-brand">
+            <img src={LOGO_SRC} alt="" width={84} height={84} />
+            <h1 className="login-brand-name">HorCare</h1>
+        </div>
+    );
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
@@ -162,7 +173,11 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                     profile={null}
                     isGuest
                     onNeedAuth={handleGuestSelectPlan}
-                    onBack={() => switchMode('login')}
+                    onTrialNeedAuth={() => {
+                        try { localStorage.setItem(START_TRIAL_KEY, '1'); } catch { /* storage blocked: the trial can still be started from Pricing */ }
+                        switchMode('register');
+                    }}
+                    onBack={() => (onBack && initialMode === 'pricing' ? onBack() : switchMode('login'))}
                 />
             </Suspense>
         );
@@ -174,7 +189,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
             <div className="login-page">
                 <div className="login-card">
                     <div className="login-logo">
-                        <img src={horcareLogo} alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain', marginBottom: '0.25rem' }} />
+                        {logo}
                         <p className="login-subtitle">รีเซ็ตรหัสผ่าน</p>
                     </div>
 
@@ -272,10 +287,15 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
     return (
         <div className="login-page">
             <div className={`login-card ${mode === 'register' ? 'register-mode' : ''}`}>
+                {onBack && (
+                    <button type="button" className="btn btn-ghost btn-sm login-back" onClick={onBack}>
+                        <ChevronLeft size={16} aria-hidden /> กลับไปดูระบบตัวอย่าง
+                    </button>
+                )}
                 {/* Logo */}
                 <div className="login-logo">
-                    <img src={horcareLogo} alt="HorCare" style={{ width: 140, height: 140, objectFit: 'contain', marginBottom: '0.25rem' }} />
-                    <p className="login-subtitle">จัดการหอพักครบวงจร</p>
+                    {logo}
+                    <p className="login-subtitle">บริหารอสังหาริมทรัพย์ให้เช่าอย่างมืออาชีพ</p>
                     <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
                         background: 'rgba(34, 163, 90,0.12)', border: '1px solid rgba(34, 163, 90,0.28)',
@@ -819,6 +839,12 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                     }}>
                         <Zap size={14} style={{ flexShrink: 0 }} />
                         สมัครแล้วจะพาไปหน้าชำระเงินทันที
+                    </div>
+                )}
+                {mode === 'register' && !localStorage.getItem('horcare_pending_plan') && localStorage.getItem(START_TRIAL_KEY) && (
+                    <div className="login-trial-note">
+                        <Sparkles size={14} aria-hidden />
+                        สมัครแล้วเริ่มทดลองใช้ HorCare Pro ฟรี {TRIAL_DAYS} วันทันที ใช้ได้ทุกฟีเจอร์
                     </div>
                 )}
 

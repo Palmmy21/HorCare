@@ -1,5 +1,33 @@
 // DormUtility Pro - Core Calculation Logic
-import type { DormConfig, BillCalculation, WaterConfig, Room, CommonFee } from '../types';
+import type { DormConfig, BillCalculation, WaterConfig, Room, CommonFee, MonthlyBill } from '../types';
+import { proratedAmount } from '../shared/prorate';
+
+const PARKING_KIND_TH = { car: 'รถยนต์', motorcycle: 'มอเตอร์ไซค์', other: '' } as const;
+
+/**
+ * The fees billed to one room: the property's common fees plus the room's own parking spots.
+ * Every bill calculation passes this to calculateFullBill, so recalculating a saved bill keeps its parking fees.
+ */
+export function roomFees(commonFees: CommonFee[], room: Pick<Room, 'parking'>): CommonFee[] {
+    if (!room.parking?.length) return commonFees;
+    return [
+        ...commonFees,
+        ...room.parking.filter(p => p.fee > 0).map(p => ({
+            id: `parking_${p.spot_id}`,
+            name: `ค่าที่จอด${PARKING_KIND_TH[p.kind] ?? ''} ${p.code}`.replace(/\s+/g, ' ').trim(),
+            amount: p.fee,
+            is_active: true,
+            charge_cycle: 'monthly' as const,
+            charge_type: 'per_room' as const,
+            created_at: '',
+        })),
+    ];
+}
+
+/** Rent when recalculating a saved bill: keeps the mid-month prorate it was saved with (applied to the new rent). */
+export function rentForRecalc(fullRent: number, bill?: Pick<MonthlyBill, 'rent_prorate'> | null): number {
+    return bill?.rent_prorate ? proratedAmount(fullRent, bill.rent_prorate) : fullRent;
+}
 
 /**
  * Calculate electricity bill

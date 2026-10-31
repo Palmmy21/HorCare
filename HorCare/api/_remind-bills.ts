@@ -3,7 +3,8 @@ import { db, admin } from './_firebase.js';
 import { linePush, buildBillFlex, thaiMonthLabel, runPooled } from './_line.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
-import type { BillLanguage, MonthlyBill } from '../src/types/index.js';
+import type { BillLanguage, LateFeeConfig, MonthlyBill } from '../src/types/index.js';
+import { upsertLateFee } from './_late-fees.js';
 
 /**
  * ทวงบิลอัตโนมัติ (Vercel Cron — ดู vercel.json, รันทุกวัน 09:00 เวลาไทย)
@@ -13,6 +14,8 @@ import type { BillLanguage, MonthlyBill } from '../src/types/index.js';
  *   • 2 วันก่อนครบกำหนด  → เตือนล่วงหน้า
  *   • วันครบกำหนด        → เตือนวันสุดท้าย
  *   • เลยกำหนด           → เตือนซ้ำทุก 3 วัน (เพดานรวม MAX_REMINDERS ครั้ง กันสแปม)
+ *
+ * ทุกบิลที่เลยกำหนด + วันผ่อนผัน จะได้ค่าปรับชำระล่าช้าเป็น fine (ถ้าเปิดใน config.late_fee — ดู _late-fees.ts)
  *
  * ข้ามบิลที่ payment_status เป็น 'paid' (จ่ายแล้ว) และ 'pending' (ส่งสลิปแล้ว
  * รอเจ้าของยืนยัน — ลูกหอทำหน้าที่ของเขาแล้ว ไม่ควรโดนทวง)
@@ -74,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             byBuilding.get(key)!.push(d);
         }
 
-        let reminded = 0, skipped = 0, failed = 0;
+        let reminded = 0, skipped = 0, failed = 0, lateFeesCharged = 0;
 
         for (const [key, bills] of byBuilding) {
             const [uid, bid] = key.split('/');
@@ -98,6 +101,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             await runPooled(bills, PUSH_CONCURRENCY, async (billDoc) => {
                 const bill = billDoc.data();
+
+                // Late fee first: it applies whether or not the tenant has LINE, and on days with no reminder too.
+                let lateFee = 0;
+                try {
+                    lateFee = await upsertLateFee(base, {
+                        id: billDoc.id, room_id: bill.room_id as string, room_number: bill.room_number as string, month: bill.month as string,
+                    }, cfg.late_fee as LateFeeConfig | undefined, dueDay, todayKey);
+                    if (lateFee > 0) lateFeesCharged++;
+                } catch (err) {
+                    console.error(`late fee failed (${billDoc.ref.path}):`, (err as Error).message);
+                }
+
                 const lineUserId = lineByRoom.get(bill.room_id);
                 if (!lineUserId) { skipped++; return; }
 
@@ -127,7 +142,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 } else if (daysUntilDue === 0) {
                     text = `📢 วันนี้ครบกำหนดชำระบิลห้อง ${bill.room_number} รอบ ${monthThai} ยอด ${amount} ค่ะ\n\nชำระแล้วส่งสลิปในแชทนี้ได้เลยนะคะ 🙏`;
                 } else if (daysUntilDue < 0 && (-daysUntilDue) % OVERDUE_EVERY_DAYS === 0) {
-                    text = `⚠️ บิลห้อง ${bill.room_number} รอบ ${monthThai} เลยกำหนดชำระมา ${-daysUntilDue} วันแล้วค่ะ\nยอดค้างชำระ ${amount}\n\nรบกวนชำระและส่งสลิปในแชทนี้นะคะ 🙏`;
+                    const feeLine = lateFee > 0 ? `\nค่าปรับชำระล่าช้า ฿${lateFee.toLocaleString()}` : '';
+                    text = `⚠️ บิลห้อง ${bill.room_number} รอบ ${monthThai} เลยกำหนดชำระมา ${-daysUntilDue} วันแล้วค่ะ\nยอดค้างชำระ ${amount}${feeLine}\n\nรบกวนชำระและส่งสลิปในแชทนี้นะคะ 🙏`;
                 }
                 if (!text) { skipped++; return; }
 
@@ -154,8 +170,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
-        console.log(`remind-bills: reminded=${reminded} skipped=${skipped} failed=${failed} candidates=${candidates.length}`);
-        res.status(200).json({ ok: true, reminded, skipped, failed });
+        console.log(`remind-bills: reminded=${reminded} skipped=${skipped} failed=${failed} late_fees=${lateFeesCharged} candidates=${candidates.length}`);
+        res.status(200).json({ ok: true, reminded, skipped, failed, late_fees: lateFeesCharged });
     } catch (err) {
         console.error('remind-bills failed:', (err as Error).message);
         res.status(500).json({ ok: false, error: (err as Error).message });

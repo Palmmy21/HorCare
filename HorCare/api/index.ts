@@ -76,6 +76,10 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'announcements': return announcementsHandler(req, res);
         case 'remind-parcels': return remindParcelsHandler(req, res);
         case 'qr': return qrHandler(req, res);
+        case 'trial': return (await import('./_trial.js')).default(req, res);
+        case 'listing': return (await import('./_listing.js')).default(req, res);
+        case 'owner-line': return (await import('./_owner-line.js')).default(req, res);
+        case 'import-map': return (await import('./_import-map.js')).default(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);
         case 'notify-payment': return notifyPaymentHandler(req, res);
