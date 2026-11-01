@@ -4,7 +4,7 @@ import {
     CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer, BarChart3,
     Home, Zap, Droplets, Banknote, ClipboardList, Calendar, MapPin,
-    MessageCircle, Building2
+    MessageCircle, Building2, Pencil
 } from 'lucide-react';
 import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room, BillLanguage } from '../../types';
@@ -12,6 +12,9 @@ import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/
 import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import InvoiceBill from './InvoiceBill';
 import PrintBillSlip from './PrintBillSlip';
+import BillEditModal from './BillEditModal';
+import { adjustmentsTotal } from '../../shared/billAdjustments';
+import type { BillAdjustment } from '../../types';
 import MonthlyReport from './MonthlyReport';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
@@ -42,6 +45,8 @@ interface SummaryProps {
 
     canSendLine?: boolean;
     onUpgrade?: () => void;
+    /** Add extra charges / discounts and a note to a bill; omitted when this account may not edit bills. */
+    onEditBillExtras?: (billId: string, adjustments: BillAdjustment[], note: string) => Promise<void>;
 }
 
 export default function Summary({
@@ -57,7 +62,9 @@ export default function Summary({
 
     canSendLine = true,
     onUpgrade,
+    onEditBillExtras,
 }: SummaryProps) {
+    const [editingBillId, setEditingBillId] = useState<string | null>(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
@@ -628,7 +635,12 @@ export default function Summary({
                                             <td className="text-right mono">
                                                 {hasBill && bill.common_fee ? (
                                                     <span style={{ color: 'var(--color-primary)' }}>+{formatCurrency(bill.common_fee)}</span>
-                                                ) : <span className="text-muted">-</span>}
+                                                ) : !(hasBill && adjustmentsTotal(bill)) ? <span className="text-muted">-</span> : null}
+                                                {hasBill && adjustmentsTotal(bill) !== 0 && (
+                                                    <div className="summary-extra" title={bill.adjustments!.map(a => `${a.label} ${formatCurrency(a.amount)}`).join('\n')}>
+                                                        อื่นๆ {adjustmentsTotal(bill) > 0 ? '+' : '−'}{formatCurrency(Math.abs(adjustmentsTotal(bill)))}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="text-right mono font-bold">
                                                 {hasBill ? formatCurrency(bill.total_bill) : <span className="text-muted">-</span>}
@@ -672,6 +684,17 @@ export default function Summary({
                                                         <Eye size={14} />
                                                         ดูบิล
                                                     </button>
+                                                    {onEditBillExtras && (
+                                                        <button
+                                                            className="btn btn-outline btn-sm"
+                                                            onClick={() => bill && setEditingBillId(bill.id)}
+                                                            title="แก้ไขบิล: เพิ่มค่าใช้จ่ายหรือส่วนลด"
+                                                            disabled={!hasBill}
+                                                        >
+                                                            <Pencil size={14} />
+                                                            แก้ไข
+                                                        </button>
+                                                    )}
                                                     <button
                                                         className="btn btn-outline btn-sm"
                                                         onClick={() => bill && handleDownloadBill(bill)}
@@ -747,6 +770,12 @@ export default function Summary({
                                                 <span className="mono" style={{ color: 'var(--color-primary)' }}>+{formatCurrency(bill.common_fee)}</span>
                                             </div>
                                         ) : null}
+                                        {hasBill && (bill.adjustments ?? []).map(a => (
+                                            <div key={a.id} className="summary-bill-card-row">
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Pencil size={14} color="#E8740C" /> {a.label}</span>
+                                                <span className="mono" style={{ color: a.amount < 0 ? 'var(--color-success)' : 'var(--color-accent, #C2410C)' }}>{a.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(a.amount))}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                     <div className="summary-bill-card-footer">
                                         <div className="summary-bill-card-total">
@@ -764,6 +793,16 @@ export default function Summary({
                                                 <Eye size={14} />
                                                 ดู
                                             </button>
+                                            {onEditBillExtras && (
+                                                <button
+                                                    className="btn btn-outline btn-sm flex-1"
+                                                    onClick={() => bill && setEditingBillId(bill.id)}
+                                                    disabled={!hasBill}
+                                                >
+                                                    <Pencil size={14} />
+                                                    แก้ไข
+                                                </button>
+                                            )}
                                             <button
                                                 className="btn btn-outline btn-sm flex-1"
                                                 onClick={() => bill && handleDownloadBill(bill)}
@@ -839,6 +878,12 @@ export default function Summary({
                 </div>
             </div>
 
+            {/* Edit a bill: extra charges / discounts and a note (always the live copy of the bill) */}
+            {editingBillId && onEditBillExtras && (() => {
+                const live = monthBills.find(b => b.id === editingBillId);
+                return live ? <BillEditModal bill={live} onSave={onEditBillExtras} onClose={() => setEditingBillId(null)} /> : null;
+            })()}
+
             {/* Invoice Modal */}
             {selectedBill && (
                 <div className="modal-overlay" onClick={() => setSelectedBill(null)}>
@@ -910,6 +955,11 @@ export default function Summary({
                             <button className="btn btn-secondary" onClick={() => { setSelectedBill(null); setPreviewLang(null); }}>
                                 ปิด
                             </button>
+                            {onEditBillExtras && (
+                                <button className="btn btn-outline" onClick={() => { setEditingBillId(selectedBill.id); setSelectedBill(null); }}>
+                                    <Pencil size={16} /> แก้ไขบิล
+                                </button>
+                            )}
                             <button
                                 className="btn btn-outline"
                                 onClick={() => handleDownloadBill(selectedBill)}

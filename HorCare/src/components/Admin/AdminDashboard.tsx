@@ -9,6 +9,7 @@ import {
     X, Copy, Ban, Crown, ChevronRight, RefreshCw, Download, Check,
     Infinity as InfinityIcon, ShieldAlert, RotateCcw, Wrench, ArrowUpDown,
 } from 'lucide-react';
+import { CHECKOUT_AMOUNTS } from '../../shared/plans';
 
 type AdminUserRow = UserProfile & {
     email_verified?: boolean;
@@ -16,7 +17,7 @@ type AdminUserRow = UserProfile & {
     has_firestore_profile?: boolean;
 };
 
-type FilterKey = 'all' | 'paid' | 'free' | 'small' | 'medium' | 'large' | 'active' | 'expiring_soon' | 'expired' | 'banned';
+type FilterKey = 'all' | 'paid' | 'free' | 'small' | 'medium' | 'large' | 'business' | 'active' | 'expiring_soon' | 'expired' | 'banned';
 type SortKey = 'created_desc' | 'created_asc' | 'expiry_asc' | 'name_asc';
 
 const LICENSE_LABELS: Record<string, { label: string; short: string }> = {
@@ -27,13 +28,16 @@ const LICENSE_LABELS: Record<string, { label: string; short: string }> = {
     yearly_medium:  { label: 'Plus · รายปี',         short: 'Plus' },
     monthly_large:  { label: 'HorCare Pro · รายเดือน', short: 'Pro' },
     yearly_large:   { label: 'HorCare Pro · รายปี',    short: 'Pro' },
+    monthly_business: { label: 'Business · รายเดือน', short: 'Business' },
+    yearly_business:  { label: 'Business · รายปี',    short: 'Business' },
     active:         { label: 'ตลอดชีพ',             short: 'ตลอดชีพ' },
 };
 
 const LICENSE_OPTIONS: LicenseType[] = [
     'free', 'monthly_small', 'yearly_small',
     'monthly_medium', 'yearly_medium',
-    'monthly_large', 'yearly_large', 'active',
+    'monthly_large', 'yearly_large',
+    'monthly_business', 'yearly_business', 'active',
 ];
 
 const EXTEND_OPTIONS = [
@@ -357,25 +361,22 @@ export default function AdminDashboard() {
         const small = users.filter(u => u.license?.includes('small')).length;
         const medium = users.filter(u => u.license?.includes('medium')).length;
         const large = users.filter(u => u.license?.includes('large')).length;
+        const business = users.filter(u => u.license?.includes('business')).length;
         const lifetime = users.filter(u => u.license === 'active').length;
         const expired = users.filter(isExpiredUser).length;
         const expiringSoon = users.filter(isExpiringSoon).length;
         const banned = users.filter(u => u.status === 'banned').length;
-        const paid = small + medium + large + lifetime;
+        const paid = small + medium + large + business + lifetime;
 
         // Estimated MRR: yearly plans spread over 12 months; banned and expired accounts excluded
         const mrr = users.reduce((sum, u) => {
             if (u.status === 'banned' || isExpiredUser(u)) return sum;
-            if (u.license === 'monthly_small') return sum + 149;
-            if (u.license === 'yearly_small') return sum + Math.round(950 / 12);
-            if (u.license === 'monthly_medium') return sum + 259;
-            if (u.license === 'yearly_medium') return sum + Math.round(1590 / 12);
-            if (u.license === 'monthly_large') return sum + 399;
-            if (u.license === 'yearly_large') return sum + Math.round(2990 / 12);
-            return sum;
+            const amount = u.license ? CHECKOUT_AMOUNTS[u.license] : undefined;
+            if (!amount) return sum;
+            return sum + (u.license!.startsWith('yearly_') ? Math.round(amount / 12) : amount);
         }, 0);
 
-        return { total, free, small, medium, large, lifetime, expired, expiringSoon, banned, paid, mrr };
+        return { total, free, small, medium, large, business, lifetime, expired, expiringSoon, banned, paid, mrr };
     }, [users]);
 
     const displayedUsers = useMemo(() => {
@@ -393,6 +394,7 @@ export default function AdminDashboard() {
                 case 'small': return u.license?.includes('small');
                 case 'medium': return u.license?.includes('medium');
                 case 'large': return u.license?.includes('large');
+                case 'business': return u.license?.includes('business');
                 case 'active': return u.license === 'active';
                 case 'expiring_soon': return isExpiringSoon(u);
                 case 'expired': return isExpiredUser(u);
@@ -567,6 +569,7 @@ export default function AdminDashboard() {
         { key: 'small', label: 'Start', count: stats.small, color: 'var(--cat-1)' },
         { key: 'medium', label: 'Plus', count: stats.medium, color: 'var(--cat-3)' },
         { key: 'large', label: 'HorCare Pro', count: stats.large, color: 'var(--cat-7)' },
+        { key: 'business', label: 'Business', count: stats.business, color: 'var(--cat-5)' },
         { key: 'active', label: 'ตลอดชีพ', count: stats.lifetime, color: 'var(--cat-4)' },
         { key: 'free', label: 'Free', count: stats.free, color: 'var(--series-muted)' },
     ];

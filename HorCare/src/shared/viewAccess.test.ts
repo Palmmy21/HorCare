@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canOpenView, firstOpenView, VIEW_PERMISSIONS } from './viewAccess';
+import { canOpenOpsTab, canOpenView, firstOpenView, VIEW_PERMISSIONS } from './viewAccess';
 import { ROLE_PERMISSIONS, ROLES } from './permissions';
 
 const of = (role: keyof typeof ROLE_PERMISSIONS) => ROLE_PERMISSIONS[role];
@@ -19,7 +19,10 @@ describe('which screens a role sees', () => {
     expect(canOpenView('payments', of('finance'))).toBe(true);
     expect(canOpenView('ledger', of('finance'))).toBe(true);
     expect(canOpenView('settings', of('finance'))).toBe(false);
-    expect(canOpenView('operations', of('front_desk'))).toBe(false);
+    // front desk takes repair requests, so it opens ระบบจัดการ (its tabs then show only the repair work)
+    expect(canOpenView('operations', of('front_desk'))).toBe(true);
+    expect(canOpenView('maintenance', of('front_desk'))).toBe(true);
+    expect(canOpenView('operations', of('finance'))).toBe(false);
     expect(canOpenView('parcels', of('front_desk'))).toBe(true);
     expect(canOpenView('workorders', of('technician'))).toBe(true);
     expect(canOpenView('payments', of('technician'))).toBe(false);
@@ -44,5 +47,21 @@ describe('which screens a role sees', () => {
     expect(firstOpenView(['payments', 'rooms', 'dashboard'], of('technician'))).toBe('rooms');
     expect(firstOpenView(['security', 'payments'], of('finance'))).toBe('payments');
     expect(firstOpenView([], [])).toBe('dashboard');
+  });
+});
+
+describe('tabs of ระบบจัดการ', () => {
+  it('staff with repair work only see the service tabs, never the back office', () => {
+    const desk = of('front_desk');
+    expect(canOpenOpsTab('maintenance', desk)).toBe(true);
+    for (const t of ['vendors', 'stock', 'assets', 'expenses', 'fines', 'common_fees'] as const) expect(canOpenOpsTab(t, desk), t).toBe(false);
+    expect(canOpenOpsTab('workorders', of('technician'))).toBe(true);
+    expect(canOpenOpsTab('stock', of('technician'))).toBe(false);
+  });
+  it('a building manager and the owner see every tab', () => {
+    for (const t of ['maintenance', 'workorders', 'cleaning', 'vendors', 'stock', 'common_fees'] as const) {
+      expect(canOpenOpsTab(t, of('property_manager')), t).toBe(true);
+      expect(canOpenOpsTab(t, null), t).toBe(true);
+    }
   });
 });

@@ -194,8 +194,20 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                 <td className="invoice-td text-right mono">{bill.common_fee.toLocaleString()}</td>
                             </tr>
                         )}
+
+                        {/* ค่าใช้จ่ายเพิ่มเติม / ส่วนลด ที่เจ้าของเพิ่มเอง */}
+                        {(bill.adjustments ?? []).map(a => (
+                            <tr key={a.id} className="invoice-row">
+                                <td className="invoice-td"><div style={{ fontWeight: 500 }}>{a.label}</div></td>
+                                <td className="invoice-td text-center">—</td>
+                                <td className="invoice-td text-right">—</td>
+                                <td className="invoice-td text-right mono">{a.amount < 0 ? '−' : ''}{Math.abs(a.amount).toLocaleString()}</td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
+
+                {bill.bill_note && <div className="invoice-detail" style={{ margin: '8px 0 0', whiteSpace: 'pre-line' }}>{bill.bill_note}</div>}
 
                 {/* Summary Box */}
                 <div className="invoice-summary-box">

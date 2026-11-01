@@ -106,9 +106,11 @@ function fmtRelative(iso?: string): string {
 interface Props {
   uid: string;
   buildingId: string;
+  /** Shown as a tab of ระบบจัดการ: no page title */
+  embedded?: boolean;
 }
 
-export default function CleaningPage({ uid, buildingId }: Props) {
+export default function CleaningPage({ uid, buildingId, embedded = false }: Props) {
   const {
     requests,
     loading: requestsLoading,
@@ -296,6 +298,9 @@ export default function CleaningPage({ uid, buildingId }: Props) {
       {/* ── Top Header ────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
         <div>
+          {embedded ? (
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-gray-500)' }}>คำขอทำความสะอาด มอบหมายงาน และบัญชีแม่บ้าน</p>
+          ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #0A6CC2, #08589F)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(10, 108, 194, 0.25)' }}>
               <Sparkles size={22} />
@@ -305,6 +310,7 @@ export default function CleaningPage({ uid, buildingId }: Props) {
               <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-gray-500)' }}>ระบบจัดการคำขอทำความสะอาด มอบหมายงาน และบัญชีแม่บ้านประจำหอพัก</p>
             </div>
           </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>

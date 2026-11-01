@@ -7,7 +7,7 @@ import {
 import type { CleaningRequest, DormConfig, MaintenanceRequest, MonthlyBill, Room } from '../../types';
 import type { Permission } from '../../shared/permissions';
 import {
-  addGap, addGroup, autoPlan, linkUnits, moveGroup, moveUnit, placeUnit, planKindOf, PLAN_LABELS, reconcile, removeGap,
+  addGap, addGroup, autoPlan, planForWing, linkUnits, moveGroup, moveUnit, placeUnit, planKindOf, PLAN_LABELS, reconcile, removeGap,
   removeGroup, renameGroup, resizeUnit, setCols, unlinkUnit, MAX_COLS, MAX_SPAN, MIN_COLS, daysUntil, type FloorPlan,
 } from '../../shared/floorPlan';
 import { LAYER_LABELS, legendOf, type PlanLayer, type UnitMark } from '../../shared/planLayers';
@@ -45,6 +45,8 @@ interface Props {
   onDeleteRoom: (roomId: string) => Promise<void>;
   onOpenTenant?: (room: Room) => void;
   onNavigate: (view: NavTarget) => void;
+  /** One building of the property (ตึก) to show; null/undefined = all. Display only: edits use the whole plan. */
+  wing?: string | null;
 }
 
 const thDate = (iso: string) => {
@@ -89,7 +91,7 @@ export default function FloorPlanPage(props: Props) {
 
   const [draft, setDraft] = useState<FloorPlan | null>(null);
   const editing = draft !== null;
-  const plan = draft ?? livePlan;
+  const fullPlan = draft ?? livePlan;
   const [selected, setSelected] = useState<string[]>([]);
   const [slot, setSlot] = useState<{ groupId: string; col: number; row: number } | null>(null);
   const [newNumber, setNewNumber] = useState('');
@@ -103,9 +105,11 @@ export default function FloorPlanPage(props: Props) {
   const pickView = (on: boolean) => { setView3d(on); try { localStorage.setItem(VIEW_KEY, on ? '3d' : '2d'); } catch { /* per-viewer convenience only */ } };
   const show3d = view3d && !editing;
 
+  const roomsById = useMemo(() => new Map(rooms.map(r => [r.id, r])), [rooms]);
+  // a chosen building shows its own floors; editing always works on (and saves) the whole property's plan
+  const plan = useMemo(() => (props.wing && !editing ? planForWing(fullPlan, roomsById, props.wing) : fullPlan), [props.wing, editing, fullPlan, roomsById]);
   const monthBills = useMemo(() => bills.filter(b => b.month === currentMonth), [bills, currentMonth]);
   const view = usePlanView({ plan, rooms, occupancy, termsByRoom, monthBills, maintenance, cleaning, todayByRoom, layer, terms });
-  const roomsById = useMemo(() => new Map(rooms.map(r => [r.id, r])), [rooms]);
   const focus = selected.length === 1 ? roomsById.get(selected[0]) : undefined;
   useEffect(() => { setAreaInput(focus?.area_sqm ? String(focus.area_sqm) : ''); setConfirmDelete(false); }, [focus?.id, focus?.area_sqm]);
 

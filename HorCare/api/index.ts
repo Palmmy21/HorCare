@@ -80,6 +80,7 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'listing': return (await import('./_listing.js')).default(req, res);
         case 'owner-line': return (await import('./_owner-line.js')).default(req, res);
         case 'import-map': return (await import('./_import-map.js')).default(req, res);
+        case 'staff-portal': return (await import('./_staff-portal.js')).default(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);
         case 'notify-payment': return notifyPaymentHandler(req, res);

@@ -137,8 +137,17 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                             <td style={tdR}>{n(bill.common_fee)}</td>
                         </tr>
                     ) : null}
+
+                    {(bill.adjustments ?? []).map(a => (
+                        <tr key={a.id}>
+                            <td style={tdL}>{a.label}</td>
+                            <td style={tdR}>{a.amount < 0 ? '-' : ''}{n(Math.abs(a.amount))}</td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
+
+            {bill.bill_note && <div style={{ fontSize: 9, color: '#333', marginTop: 4, whiteSpace: 'pre-line' }}>{bill.bill_note}</div>}
 
             <div style={{ borderTop: '2px solid #000', margin: '4px 0' }} />
 

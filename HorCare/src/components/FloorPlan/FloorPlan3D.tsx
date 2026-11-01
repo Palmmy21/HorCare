@@ -4,18 +4,21 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { LocateFixed } from 'lucide-react';
-import { rowsOf, type FloorPlan, type PlanKind } from '../../shared/floorPlan';
+import { rowsOf, splitGroupName, type FloorPlan, type PlanKind } from '../../shared/floorPlan';
 import type { Tone, UnitMark } from '../../shared/planLayers';
 import type { BoardUnit } from './FloorPlanBoard';
 
-// The plan as a small 3D model: floors stacked as storeys, zones and streets laid out on the ground. Same data and
-// layer colours as the 2D board; clicking a unit selects it the same way. Loaded only when someone opens the 3D view.
+// The plan as a small 3D model: floors stacked as storeys of a real-looking building (one tower per building of the
+// property, windows, roof, water tank, grounds), zones and streets laid out on the ground. Same data and layer colours
+// as the 2D board; clicking a unit selects it the same way. Loaded only when someone opens the 3D view.
 
 const GAP = 0.14;
 const FLOOR_H = 1.3;
 const AISLE = 1.15;
 const UNIT_H: Record<PlanKind, number> = { floors: 0.92, zones: 0.5, streets: 0.62 };
 const ROOF_H = 0.42;
+/** Space between the towers of a property with several buildings. */
+const TOWER_GAP = 2.6;
 
 interface Props {
   plan: FloorPlan;
@@ -39,6 +42,11 @@ interface Palette {
   edge: THREE.Color;
   slab: THREE.Color;
   road: THREE.Color;
+  grass: THREE.Color;
+  glass: THREE.Color;
+  roof: THREE.Color;
+  trunk: THREE.Color;
+  leaf: THREE.Color;
   tagBg: string;
   tagText: string;
   tagPrimary: string;
@@ -68,6 +76,11 @@ function readPalette(): Palette {
     edge: col('--color-gray-500', '#557089'),
     slab: dark ? col('--color-gray-100', '#17304B') : surface.clone(),
     road: col('--color-gray-300', '#C3D0DE'),
+    grass: new THREE.Color(dark ? '#1F3B2C' : '#D7EBCF'),
+    glass: new THREE.Color(dark ? '#7FB4E6' : '#9CC9EE'),
+    roof: new THREE.Color(dark ? '#2B4560' : '#8FA3B8'),
+    trunk: new THREE.Color(dark ? '#5B4636' : '#8B6B4E'),
+    leaf: new THREE.Color(dark ? '#2F6B45' : '#5BAE6E'),
     tagBg: v('--color-white', '#ffffff'),
     tagText: v('--color-gray-900', '#102A43'),
     tagPrimary: v('--color-primary', '#0A6CC2'),
@@ -89,10 +102,14 @@ interface UnitObj {
   tex: THREE.CanvasTexture;
   height: number;
   top: number;
+  /** where the number tag rests (above the unit, or on the front of a room in a building) */
+  labelY: number;
 }
 
 interface GroupObj {
   id: string;
+  /** building of the property this floor belongs to ('' when there is only one) */
+  tower: string;
   level: number;
   obj: THREE.Group;
   baseY: number;
@@ -183,7 +200,8 @@ function setFocusTargets(groups: GroupObj[], focusId: string | null, kind: PlanK
   const focus = groups.find(g => g.id === focusId);
   for (const g of groups) {
     if (!focus || g === focus) { g.targetY = g.baseY; g.targetFade = 1; continue; }
-    g.targetY = kind === 'floors' && g.level > focus.level ? g.baseY + 3.4 + (g.level - focus.level) * 0.4 : g.baseY;
+    // only the floors above it in the same building lift away
+    g.targetY = kind === 'floors' && g.tower === focus.tower && g.level > focus.level ? g.baseY + 3.4 + (g.level - focus.level) * 0.4 : g.baseY;
     g.targetFade = 0.1;
   }
   return focus;
@@ -256,7 +274,7 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
       u.mesh.position.y = u.height / 2 + lift;
       u.edges.position.y = u.height / 2 + lift;
       if (u.roof) u.roof.position.y = u.height + ROOF_H / 2 + lift;
-      u.label.position.y = u.top + 0.24 + lift;
+      u.label.position.y = u.labelY + lift;
       const text = trim(latest.current.units[u.id]?.number ?? '…', 10);
       drawTag(u.canvas, text, pal, { dot: pal.dot[tone], strong: isSel });
       u.tex.needsUpdate = true;
@@ -280,7 +298,7 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft is gone from three.js; shadow.radius still softens these
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     renderer.domElement.className = 'plan3d-canvas';
@@ -402,7 +420,6 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
 
     const h = UNIT_H[kind];
     const maxCols = Math.max(1, ...plan.groups.map(g => g.cols));
-    const maxRows = Math.max(1, ...plan.groups.map(g => rowsOf(g)));
     const geos = new Map<string, THREE.BufferGeometry>();
     const geo = (key: string, make: () => THREE.BufferGeometry) => {
       let g = geos.get(key);
@@ -414,12 +431,30 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
     const groups: GroupObj[] = [];
     let z = 0;
 
+    // floors: one tower per building of the property ("ตึก A · ชั้น 2"), standing side by side
+    const towerOf = (name: string) => (kind === 'floors' ? splitGroupName(name).wing : '');
+    const towerNames = [...new Set(plan.groups.map(g => towerOf(g.name)))];
+    const towerFloors = new Map(towerNames.map(t => [t, plan.groups.filter(g => towerOf(g.name) === t)]));
+    const towerCols = new Map(towerNames.map(t => [t, Math.max(1, ...towerFloors.get(t)!.map(g => g.cols))]));
+    const towerRows = new Map(towerNames.map(t => [t, Math.max(1, ...towerFloors.get(t)!.map(g => rowsOf(g)))]));
+    const towerX0 = new Map<string, number>();
+    {
+      const total = towerNames.reduce((sum, t) => sum + towerCols.get(t)!, 0) + TOWER_GAP * (towerNames.length - 1);
+      let x = -total / 2;
+      for (const t of towerNames) { towerX0.set(t, x); x += towerCols.get(t)! + TOWER_GAP; }
+    }
+    const multiTower = towerNames.length > 1;
+    const windowGeo = geo('win', () => new THREE.PlaneGeometry(1, 1));
+
     plan.groups.forEach((g, gi) => {
       const rows = Math.max(1, rowsOf(g));
-      const level = kind === 'floors' ? n - 1 - gi : 0;
+      const tower = towerOf(g.name);
+      const floorsOfTower = towerFloors.get(tower)!;
+      const level = kind === 'floors' ? floorsOfTower.length - 1 - floorsOfTower.indexOf(g) : 0;
       const baseY = level * FLOOR_H;
-      const x0 = -maxCols / 2;
-      const z0 = kind === 'floors' ? -maxRows / 2 : z;
+      const x0 = kind === 'floors' ? towerX0.get(tower)! : -maxCols / 2;
+      const z0 = kind === 'floors' ? -towerRows.get(tower)! / 2 : z;
+      const glassMat = kind === 'floors' ? new THREE.MeshStandardMaterial({ color: pal.glass, roughness: 0.15, metalness: 0.35, emissive: pal.glass, emissiveIntensity: pal.dark ? 0.35 : 0.08 }) : null;
       const obj = new THREE.Group();
       const mats: THREE.Material[] = [];
 
@@ -433,7 +468,9 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
       obj.add(slab);
       mats.push(slabMat);
 
-      const name = tagSprite(trim(g.name, 18), pal, 0.34, { big: true });
+      if (glassMat) mats.push(glassMat);
+      // the tower's own name sits on its roof, so each floor tag says just the floor
+      const name = tagSprite(trim(multiTower ? splitGroupName(g.name).floor : g.name, 18), pal, 0.34, { big: true });
       name.sprite.center.set(1, 0.5);
       name.sprite.position.set(x0 - 0.45, kind === 'floors' ? h / 2 : 0.3, z0 + rows / 2);
       obj.add(name.sprite);
@@ -467,13 +504,26 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
           mats.push(roofMat);
         }
 
+        if (glassMat) {
+          // a window on the front and the back of the room, so the floors read as storeys of a building
+          for (const side of [1, -1]) {
+            const win = new THREE.Mesh(windowGeo, glassMat);
+            win.scale.set(Math.max(0.2, fw * 0.62), h * 0.46, 1);
+            win.position.set(cx, h * 0.56, cz + side * (fd / 2 + 0.004));
+            if (side < 0) win.rotation.y = Math.PI;
+            obj.add(win);
+          }
+        }
+
         const tag = tagSprite('', pal, 0.26);
-        tag.sprite.position.set(cx, h + 0.24, cz);
+        // rooms in a building wear their number on the front, above the window (the floor above would hide it on top)
+        const labelY = kind === 'floors' ? h * 0.9 : h + 0.24;
+        tag.sprite.position.set(cx, labelY, kind === 'floors' ? cz + fd / 2 + 0.06 : cz);
         obj.add(tag.sprite);
         mats.push(mat, edgeMat, tag.mat);
         unitObjs.current.set(cell.room_id, {
           id: cell.room_id, groupId: g.id, mesh, mat, roof, roofMat, edges, edgeMat, label: tag.sprite, canvas: tag.canvas, tex: tag.tex,
-          height: h, top: h + (roof ? ROOF_H : 0),
+          height: h, top: h + (roof ? ROOF_H : 0), labelY: labelY + (roof ? ROOF_H : 0),
         });
       }
 
@@ -487,7 +537,46 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
 
       obj.position.y = baseY;
       c.content.add(obj);
-      groups.push({ id: g.id, level, obj, baseY, targetY: baseY, fade: 1, targetFade: 1, mats, center: new THREE.Vector3(0, baseY + h / 2, z0 + rows / 2) });
+      groups.push({ id: g.id, tower, level, obj, baseY, targetY: baseY, fade: 1, targetFade: 1, mats, center: new THREE.Vector3(kind === 'floors' ? x0 + g.cols / 2 : 0, baseY + h / 2, z0 + rows / 2) });
+
+      // the top floor of a tower carries the roof: slab, parapet, stair house, water tank and the building's name
+      if (kind === 'floors' && level === floorsOfTower.length - 1) {
+        const tw = towerCols.get(tower)!, td = towerRows.get(tower)!;
+        const cxT = x0 + tw / 2, czT = z0 + td / 2;
+        const roofY = FLOOR_H - 0.12;
+        const roofMat = new THREE.MeshStandardMaterial({ color: pal.roof, roughness: 0.85 });
+        const roof = new THREE.Mesh(geo(`roof${tw}:${td}`, () => new RoundedBoxGeometry(tw + 0.5, 0.12, td + 0.5, 2, 0.05)), roofMat);
+        roof.position.set(cxT, roofY, czT);
+        roof.castShadow = true; roof.receiveShadow = true;
+        obj.add(roof);
+        const parapetMat = new THREE.MeshStandardMaterial({ color: pal.slab, roughness: 0.8 });
+        const walls: [number, number, number, number][] = [
+          [tw + 0.5, 0.06, 0, (td + 0.44) / 2], [tw + 0.5, 0.06, 0, -(td + 0.44) / 2],
+          [0.06, td + 0.5, (tw + 0.44) / 2, 0], [0.06, td + 0.5, -(tw + 0.44) / 2, 0],
+        ];
+        for (const [w, d, dx, dz] of walls) {
+          const wall = new THREE.Mesh(geo(`par${w}:${d}`, () => new THREE.BoxGeometry(w, 0.22, d)), parapetMat);
+          wall.position.set(cxT + dx, roofY + 0.17, czT + dz);
+          wall.castShadow = true;
+          obj.add(wall);
+        }
+        const tankMat = new THREE.MeshStandardMaterial({ color: pal.tone.base, roughness: 0.4, metalness: 0.2 });
+        const tank = new THREE.Mesh(geo('tank', () => new THREE.CylinderGeometry(0.32, 0.32, 0.55, 24)), tankMat);
+        tank.position.set(x0 + tw - 0.6, roofY + 0.34, z0 + 0.6);
+        tank.castShadow = true;
+        obj.add(tank);
+        const stair = new THREE.Mesh(geo('stairhouse', () => new RoundedBoxGeometry(0.9, 0.5, 0.9, 2, 0.05)), parapetMat);
+        stair.position.set(x0 + 0.65, roofY + 0.31, z0 + td - 0.65);
+        stair.castShadow = true;
+        obj.add(stair);
+        mats.push(roofMat, parapetMat, tankMat);
+        if (multiTower) {
+          const sign = tagSprite(trim(tower, 18), pal, 0.46, { big: true, strong: true });
+          sign.sprite.position.set(cxT, roofY + 1.0, czT);
+          obj.add(sign.sprite);
+          mats.push(sign.mat);
+        }
+      }
       if (kind !== 'floors') z += rows + AISLE;
     });
 
@@ -504,6 +593,59 @@ export default function FloorPlan3D({ plan, kind, units, marks, tenantGroups, gr
 
     c.ground.scale.set(r * 8, r * 8, 1);
     c.ground.position.set(center.x, -0.13, center.z);
+
+    // grounds around a building or a housing estate: lawn, a driveway to the front, and trees (after the bounds,
+    // so they never change how the camera frames the model)
+    if (kind !== 'zones') {
+      // decorations live inside `content` (shifted along z for estates); center / box are world positions
+      const cz = center.z - c.content.position.z, frontZ = box.max.z - c.content.position.z;
+      const lawn = new THREE.Mesh(
+        new THREE.CircleGeometry(r * 1.55, 64),
+        new THREE.MeshStandardMaterial({ color: pal.grass, roughness: 1 }),
+      );
+      lawn.rotation.x = -Math.PI / 2;
+      lawn.position.set(center.x, -0.135, cz);
+      lawn.receiveShadow = true;
+      c.content.add(lawn);
+
+      const roadMat = new THREE.MeshStandardMaterial({ color: pal.road, roughness: 0.95 });
+      if (kind === 'floors') {
+        const width = box.max.x - box.min.x + 1.6;
+        const drive = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.9), roadMat);
+        drive.rotation.x = -Math.PI / 2;
+        drive.position.set(center.x, -0.128, frontZ + 0.75);
+        drive.receiveShadow = true;
+        c.content.add(drive);
+        const path = new THREE.Mesh(new THREE.PlaneGeometry(0.7, r * 1.55 - (frontZ - cz) - 1.2), roadMat);
+        path.rotation.x = -Math.PI / 2;
+        path.position.set(center.x, -0.129, frontZ + 1.2 + (r * 1.55 - (frontZ - cz) - 1.2) / 2);
+        path.receiveShadow = true;
+        c.content.add(path);
+      }
+
+      const trunkGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.42, 8);
+      const leafGeo = new THREE.IcosahedronGeometry(0.34, 1);
+      const trunkMat = new THREE.MeshStandardMaterial({ color: pal.trunk, roughness: 0.9 });
+      const leafMat = new THREE.MeshStandardMaterial({ color: pal.leaf, roughness: 0.8, flatShading: true });
+      // a ring of trees just outside the model, skipping the front where the driveway runs
+      const ring = Math.max(box.max.x - center.x, frontZ - cz) + 1.3;
+      const count = Math.min(18, Math.max(8, Math.round(ring * 2)));
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * Math.PI * 2 + 0.35;
+        if (kind === 'floors' && Math.abs(Math.sin(a)) > 0.88 && Math.sin(a) > 0) continue; // keep the entrance open
+        const tx = center.x + Math.cos(a) * ring * 1.05, tz = cz + Math.sin(a) * ring;
+        const s = 0.85 + ((i * 37) % 10) / 25;
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.set(tx, -0.13 + 0.21 * s, tz);
+        trunk.scale.setScalar(s);
+        trunk.castShadow = true;
+        const leaf = new THREE.Mesh(leafGeo, leafMat);
+        leaf.position.set(tx, -0.13 + 0.62 * s, tz);
+        leaf.scale.setScalar(s);
+        leaf.castShadow = true;
+        c.content.add(trunk, leaf);
+      }
+    }
     c.sun.position.set(center.x + r * 0.7, center.y + r * 1.6, center.z + r * 1.1);
     c.sun.target.position.copy(center);
     const sc = c.sun.shadow.camera;

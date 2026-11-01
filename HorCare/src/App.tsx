@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
-  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, ClipboardCheck, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
+  Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
   Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
@@ -24,6 +24,8 @@ import { HIDDEN_VIEWS } from './shared/erpModules';
 import { PLAN_LABELS, planKindOf } from './shared/floorPlan';
 import { isAdminUser } from './shared/admin';
 import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
+import { billsInWing, hasWings, monthStatsOf, roomsInWing, validWing, wingsOf } from './shared/wings';
+import WingBar from './components/Building/WingBar';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
 import RoomManagement from './components/RoomManagement/RoomManagement';
@@ -47,10 +49,9 @@ const Summary         = lazy(() => import('./components/Summary/Summary'));
 const DocumentArchive = lazy(() => import('./components/DocumentArchive/DocumentArchive'));
 const PaymentsPage    = lazy(() => import('./components/Payments/PaymentsPage'));
 const TenantsPage     = lazy(() => import('./components/TenantProfile/TenantsPage'));
-const MaintenancePage = lazy(() => import('./components/Maintenance/MaintenancePage'));
-const CleaningPage    = lazy(() => import('./components/Cleaning/CleaningPage'));
 const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'));
 const OperationsPage  = lazy(() => import('./components/Operations/OperationsPage'));
+import type { OpsTab } from './shared/viewAccess';
 const SecurityPage    = lazy(() => import('./components/Security/SecurityPage'));
 const ParcelsPage     = lazy(() => import('./components/Parcels/ParcelsPage'));
 const AnnouncementsPage = lazy(() => import('./components/Announcements/AnnouncementsPage'));
@@ -61,7 +62,6 @@ const FloorPlanPage = lazy(() => import('./components/FloorPlan/FloorPlanPage'))
 const ParkingPage = lazy(() => import('./components/Parking/ParkingPage'));
 const LeasingPage = lazy(() => import('./components/Leasing/LeasingPage'));
 const CollectionsPage = lazy(() => import('./components/Collections/CollectionsPage'));
-const WorkOrdersPage  = lazy(() => import('./components/WorkOrders/WorkOrdersPage'));
 const MessagesPage    = lazy(() => import('./components/Messages/MessagesPage'));
 
 const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
@@ -95,6 +95,9 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 }
 
 
+/** Screens that follow the chosen building (ตึก) of the property. */
+const WING_VIEWS: string[] = ['dashboard', 'floorplan', 'parking', 'rooms', 'tenants', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels'];
+
 type ViewMode = 'dashboard' | 'floorplan' | 'rooms' | 'parking' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
 
 function App() {
@@ -107,6 +110,11 @@ function App() {
   }, []);
 
   const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
+  const [opsTab, setOpsTab] = useState<OpsTab>('maintenance');
+  // ตึกย่อยที่เลือกดู ต่อหอ (property id → building_name); empty = every building
+  const [wingChoice, setWingChoice] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('horcare_wing_v1') || '{}'); } catch { return {}; }
+  });
   // a room tapped on the Dashboard's room map: the Tenants page opens its profile on arrival
   const [tenantRoomToOpen, setTenantRoomToOpen] = useState<string | null>(null);
   const clearTenantRoomToOpen = useCallback(() => setTenantRoomToOpen(null), []);
@@ -404,6 +412,7 @@ function App() {
     getMonthStats,
     deleteBill,
     updateBillPayment,
+    updateBillExtras,
     addFine,
     updateFine,
     deleteFine,
@@ -470,6 +479,23 @@ function App() {
 
   const stats = getMonthStats(currentMonth);
   const monthBills = getBillsForMonth(currentMonth);
+
+  // One building of the property at a time (ตึก A / ตึก B), when its rooms name more than one
+  const wings = hasWings(rooms) ? wingsOf(rooms) : [];
+  const activeWing = validWing(activeBuildingId ? wingChoice[activeBuildingId] : null, rooms);
+  const scopedRooms = useMemo(() => roomsInWing(rooms, activeWing), [rooms, activeWing]);
+  const scopedBills = useMemo(() => (activeWing ? billsInWing(bills, scopedRooms) : bills), [activeWing, bills, scopedRooms]);
+  const scopedStats = activeWing ? monthStatsOf(scopedRooms, scopedBills, currentMonth) : stats;
+  const scopedMonthBills = activeWing ? scopedBills.filter(b => b.month === currentMonth) : monthBills;
+  const chooseWing = (wing: string | null) => {
+    if (!activeBuildingId) return;
+    setWingChoice(prev => {
+      const next = { ...prev };
+      if (wing) next[activeBuildingId] = wing; else delete next[activeBuildingId];
+      try { localStorage.setItem('horcare_wing_v1', JSON.stringify(next)); } catch { /* storage blocked: choice lasts this session */ }
+      return next;
+    });
+  };
   const terms = getWorkspaceTerms(config?.building_type);
   const collectionStyle = collectionStyleOf(config);
 
@@ -481,8 +507,6 @@ function App() {
     ...(collectionStyle !== 'monthly' ? [{ id: 'collections' as ViewMode, icon: Wallet, label: collectionStyle === 'stall' ? 'เก็บเงินแผง' : 'เก็บค่าห้อง' }] : []),
     ...(terms.usesMeters ? [{ id: 'recording' as ViewMode, icon: FileText, label: terms.meterRecordingLabel || 'จดมิเตอร์' }] : []),
     { id: 'tenants'     as ViewMode, icon: Users,           label: terms.tenantLabel || 'ผู้เช่า' },
-    { id: 'maintenance' as ViewMode, icon: Wrench,          label: 'แจ้งซ่อม' },
-    { id: 'cleaning'    as ViewMode, icon: Sparkles,        label: terms.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน' },
     { id: 'operations'  as ViewMode, icon: SlidersHorizontal, label: 'ระบบจัดการ' },
     { id: 'payments'    as ViewMode, icon: CreditCard,      label: 'การชำระเงิน' },
     { id: 'ledger' as ViewMode, icon: BookOpen, label: 'สมุดบัญชี' },
@@ -492,7 +516,6 @@ function App() {
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
     ...(terms.isMarket ? [{ id: 'market' as ViewMode, icon: Store, label: 'ร้านค้า & ขาจร' }] : []),
-    { id: 'workorders'  as ViewMode, icon: ClipboardCheck,  label: 'ใบงานช่าง/แม่บ้าน' },
     { id: 'messages'    as ViewMode, icon: MessageSquare,   label: 'ข้อความ LINE' },
     { id: 'announcements' as ViewMode, icon: Megaphone, label: 'ประกาศ & ตอบอัตโนมัติ' },
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
@@ -534,6 +557,11 @@ function App() {
   };
 
   const handleNavClick = (view: ViewMode) => {
+    // แจ้งซ่อม / ใบงาน / งานแม่บ้าน are tabs of ระบบจัดการ (a housekeeper session keeps its own cleaning screen)
+    if (!maidSession && (view === 'maintenance' || view === 'cleaning' || view === 'workorders')) {
+      setOpsTab(view);
+      view = 'operations';
+    }
     if (!maidSession && START_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
       setShowFeatureLockedModal(VIEW_LABELS[view] ?? view);
       setMobileMenuOpen(false);
@@ -548,8 +576,7 @@ function App() {
     if (!hasPaidSubscription) return 0;
     switch (id) {
       case 'cleaning': return pendingCleaningCount;
-      case 'maintenance': return pendingMaintenanceCount;
-      case 'operations': return lowStockCount;
+      case 'operations': return pendingMaintenanceCount + pendingCleaningCount + lowStockCount;
       case 'payments': return pendingSlipCount;
       case 'messages': return unreadMessages;
       case 'security': return openSecurityAlerts;
@@ -1508,6 +1535,9 @@ function App() {
 
       {/* Main Content */}
       <main className={`main-content ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        {wings.length > 0 && !maidSession && WING_VIEWS.includes(currentView) && (
+          <WingBar wings={wings} active={activeWing} onChange={chooseWing} />
+        )}
         {/* Browser Notification Permission Banner */}
         {user && notifPermission === 'default' && !dismissedNotifBanner && (
           <div style={{
@@ -1587,11 +1617,11 @@ function App() {
         {currentView === 'dashboard' && (
           <Dashboard
             config={config}
-            stats={stats}
+            stats={scopedStats}
             currentMonth={currentMonth}
-            recentBills={monthBills}
-            allBills={bills}
-            rooms={rooms}
+            recentBills={scopedMonthBills}
+            allBills={scopedBills}
+            rooms={scopedRooms}
             onOpenRoom={visibleNavItems.some(i => i.id === 'tenants')
               ? room => { setTenantRoomToOpen(room.id); handleNavClick('tenants'); }
               : undefined}
@@ -1613,6 +1643,7 @@ function App() {
             buildingId={activeBuildingId}
             config={config}
             rooms={rooms}
+            wing={activeWing}
             bills={bills}
             currentMonth={currentMonth}
             maintenance={_maintenanceReqs}
@@ -1633,14 +1664,14 @@ function App() {
           <ParkingPage
             uid={orgUid}
             buildingId={activeBuildingId}
-            rooms={rooms}
+            rooms={scopedRooms}
             canEdit={staffPermissions === null || staffPermissions.includes('room.update')}
           />
         )}
 
         {currentView === 'rooms' && (
           <RoomManagement
-            rooms={rooms}
+            rooms={scopedRooms}
             config={config}
             commonFees={commonFees}
             onAddRoom={addRoom}
@@ -1648,7 +1679,7 @@ function App() {
             onSaveConfig={saveConfig}
             onUpdateRoom={updateRoom}
             onDeleteRoom={deleteRoom}
-            maxRooms={maxRooms}
+            maxRooms={maxRooms - (rooms.length - scopedRooms.length)}
             isTrial={planProfile?.license === 'free'}
             onUpgrade={() => setCurrentView('pricing')}
             uid={orgUid}
@@ -1659,7 +1690,7 @@ function App() {
 
         {currentView === 'tenants' && user && activeBuildingId && (
           <TenantsPage
-            rooms={rooms}
+            rooms={scopedRooms}
             uid={orgUid}
             buildingId={activeBuildingId}
             isPaid={hasPaidSubscription}
@@ -1674,13 +1705,6 @@ function App() {
           />
         )}
 
-        {currentView === 'maintenance' && user && activeBuildingId && (
-          <MaintenancePage
-            uid={orgUid}
-            buildingId={activeBuildingId}
-          />
-        )}
-
         {currentView === 'cleaning' && (
           maidSession ? (
             <MaidPortalView
@@ -1689,22 +1713,21 @@ function App() {
               onGoToRecording={() => setCurrentView('recording')}
               onLogout={handleMaidLogout}
             />
-          ) : (
-            user && activeBuildingId && hasPaidSubscription && (
-              <CleaningPage
-                uid={orgUid}
-                buildingId={activeBuildingId}
-              />
-            )
-          )
+          ) : null
         )}
 
         {currentView === 'operations' && user && activeBuildingId && (
           <OperationsPage
             uid={orgUid}
             buildingId={activeBuildingId}
-            rooms={rooms}
-            lowStockCount={lowStockCount}
+            rooms={scopedRooms}
+            unitName={terms.unitName}
+            tab={opsTab}
+            onTabChange={setOpsTab}
+            permissions={staffPermissions}
+            cleaningAvailable={hasPaidSubscription}
+            isMarket={terms.isMarket}
+            counts={{ maintenance: pendingMaintenanceCount, cleaning: pendingCleaningCount, stock: lowStockCount }}
             fines={fines}
             commonFees={commonFees}
             onAddFine={addFine}
@@ -1718,7 +1741,7 @@ function App() {
 
         {currentView === 'recording' && (
           <MeterRecording
-            rooms={rooms}
+            rooms={scopedRooms}
             config={config}
             commonFees={commonFees}
             currentMonth={currentMonth}
@@ -1734,24 +1757,25 @@ function App() {
 
         {currentView === 'summary' && (
           <Summary
-            bills={bills}
-            rooms={rooms}
+            bills={scopedBills}
+            rooms={scopedRooms}
             config={config}
             currentMonth={currentMonth}
-            stats={stats}
+            stats={scopedStats}
             onCloseMonth={closeMonth}
             onUnlockMonth={unlockMonth}
             uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
             canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
+            onEditBillExtras={staffPermissions === null || staffPermissions.includes('payment.update') ? updateBillExtras : undefined}
           />
         )}
 
         {currentView === 'archives' && (
           <DocumentArchive
-            bills={bills}
-            rooms={rooms}
+            bills={scopedBills}
+            rooms={scopedRooms}
             config={config}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
@@ -1760,8 +1784,8 @@ function App() {
 
         {currentView === 'payments' && (
           <PaymentsPage
-            bills={bills}
-            rooms={rooms}
+            bills={scopedBills}
+            rooms={scopedRooms}
             config={config}
             currentMonth={currentMonth}
             onMonthChange={handleMonthChange}
@@ -1807,20 +1831,11 @@ function App() {
           />
         )}
 
-        {currentView === 'workorders' && user && activeBuildingId && !maidSession && (
-          <WorkOrdersPage
-            ownerUid={orgUid}
-            buildingId={activeBuildingId}
-            rooms={rooms}
-            unitName={terms.unitName}
-          />
-        )}
-
         {currentView === 'parcels' && user && activeBuildingId && !maidSession && (
           <ParcelsPage
             ownerUid={orgUid}
             buildingId={activeBuildingId}
-            rooms={rooms}
+            rooms={scopedRooms}
             unitName={terms.unitName}
           />
         )}

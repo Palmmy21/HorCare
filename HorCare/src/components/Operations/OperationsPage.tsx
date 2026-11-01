@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { lazy, Suspense } from 'react';
 import type { Room, Fine, CommonFee } from '../../types';
-import { HardHat, Package, Layers, Receipt, AlertTriangle, Building2 } from 'lucide-react';
+import { HardHat, Package, Layers, Receipt, AlertTriangle, Building2, Wrench, ClipboardCheck, Sparkles, Users, MessageCircle } from 'lucide-react';
+import StaffTeamTab from './StaffTeamTab';
+import { canOpenOpsTab, type OpsTab } from '../../shared/viewAccess';
+import type { Permission } from '../../shared/permissions';
 import VendorsTab from './VendorsTab';
 import StockTab from './StockTab';
 import AssetsTab from './AssetsTab';
@@ -8,11 +11,26 @@ import ExpensesTab from './ExpensesTab';
 import FinesTab from './FinesTab';
 import CommonFeesTab from './CommonFeesTab';
 
+// The service work lives here too (it used to be three separate menu entries)
+const MaintenancePage = lazy(() => import('../Maintenance/MaintenancePage'));
+const WorkOrdersPage = lazy(() => import('../WorkOrders/WorkOrdersPage'));
+const CleaningPage = lazy(() => import('../Cleaning/CleaningPage'));
+
+export type { OpsTab };
+
 interface Props {
   uid: string;
   buildingId: string;
   rooms: Room[];
-  lowStockCount?: number;
+  unitName: string;
+  tab: OpsTab;
+  onTabChange: (tab: OpsTab) => void;
+  /** null = the owner (everything) */
+  permissions: readonly Permission[] | null;
+  /** Housekeeping needs a paid plan */
+  cleaningAvailable: boolean;
+  isMarket: boolean;
+  counts: { maintenance: number; cleaning: number; stock: number };
   fines: Fine[];
   commonFees: CommonFee[];
   onAddFine: (data: Omit<Fine, 'id' | 'created_at'>) => Promise<void>;
@@ -23,101 +41,102 @@ interface Props {
   onDeleteCommonFee: (feeId: string) => Promise<void>;
 }
 
-type Tab = 'vendors' | 'stock' | 'assets' | 'expenses' | 'fines' | 'common_fees';
+interface TabDef { id: OpsTab; label: string; Icon: React.ComponentType<{ size?: number }>; badge?: number }
 
-export default function OperationsPage({
-  uid, buildingId, rooms, lowStockCount = 0,
-  fines, commonFees,
-  onAddFine, onUpdateFine, onDeleteFine,
-  onAddCommonFee, onUpdateCommonFee, onDeleteCommonFee,
-}: Props) {
-  const [tab, setTab] = useState<Tab>('vendors');
 
-  const unpaidFinesCount = fines.filter(f => f.status === 'unpaid').length;
+/** ระบบจัดการ: service work (repairs, work orders, housekeeping) and the property's back office, as tabs. */
+export default function OperationsPage(props: Props) {
+  const { uid, buildingId, rooms, tab, onTabChange, permissions, counts, fines } = props;
+  const unpaidFines = fines.filter(f => f.status === 'unpaid').length;
+  const can = (t: OpsTab) => canOpenOpsTab(t, permissions) && (t !== 'cleaning' || props.cleaningAvailable);
 
-  const tabs: { id: Tab; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
-    { id: 'vendors',     label: 'ผู้รับเหมา', Icon: HardHat },
-    { id: 'stock',       label: 'สต็อก',      Icon: Package },
-    { id: 'assets',      label: 'ทรัพย์สิน',  Icon: Layers  },
-    { id: 'expenses',    label: 'ค่าใช้จ่าย', Icon: Receipt },
-    { id: 'fines',       label: 'ค่าปรับ',    Icon: AlertTriangle },
-    { id: 'common_fees', label: 'ส่วนกลาง',   Icon: Building2 },
+  const allGroups: { label: string; tabs: TabDef[] }[] = [
+    {
+      label: 'งานบริการ',
+      tabs: [
+        { id: 'maintenance', label: 'แจ้งซ่อม', Icon: Wrench, badge: counts.maintenance },
+        { id: 'workorders', label: 'ใบงาน', Icon: ClipboardCheck },
+        { id: 'cleaning', label: props.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน', Icon: Sparkles, badge: counts.cleaning },
+        { id: 'team', label: 'ทีมช่าง/แม่บ้าน', Icon: Users },
+      ],
+    },
+    {
+      label: 'ข้อมูลอาคาร',
+      tabs: [
+        { id: 'vendors', label: 'ผู้รับเหมา', Icon: HardHat },
+        { id: 'stock', label: 'สต็อก', Icon: Package, badge: counts.stock },
+        { id: 'assets', label: 'ทรัพย์สิน', Icon: Layers },
+        { id: 'expenses', label: 'ค่าใช้จ่าย', Icon: Receipt },
+        { id: 'fines', label: 'ค่าปรับ', Icon: AlertTriangle, badge: unpaidFines },
+        { id: 'common_fees', label: 'ส่วนกลาง', Icon: Building2 },
+      ],
+    },
   ];
+  const groups = allGroups.map(g => ({ ...g, tabs: g.tabs.filter(t => can(t.id)) })).filter(g => g.tabs.length > 0);
+
+  const allowed = groups.flatMap(g => g.tabs.map(t => t.id));
+  // a tab this account may not open (or that does not exist for it) falls back to the first one it may
+  const active: OpsTab | undefined = allowed.includes(tab) ? tab : allowed[0];
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">ระบบจัดการ</h1>
-        <p className="page-subtitle">ผู้รับเหมา · สต็อกวัสดุ · ทรัพย์สิน · ค่าใช้จ่าย · ค่าปรับ · ส่วนกลาง</p>
+        <p className="page-subtitle">งานซ่อม ใบงานช่าง งานแม่บ้าน และข้อมูลอาคาร ในที่เดียว</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="card mb-6" style={{ padding: '0.5rem', display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-        {tabs.map(t => {
-          const active = tab === t.id;
-          const showStockBadge = t.id === 'stock' && lowStockCount > 0;
-          const showFinesBadge = t.id === 'fines' && unpaidFinesCount > 0;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                flex: 1, minWidth: 'calc(33.333% - 0.5rem)',
-                padding: '0.625rem 0.5rem', borderRadius: '10px', cursor: 'pointer',
-                border: active ? '1.5px solid var(--color-primary, #0F4C81)' : '1.5px solid transparent',
-                background: active ? 'rgba(15, 76, 129,0.1)' : 'none',
-                color: active ? 'var(--color-primary, #0F4C81)' : 'var(--color-text-muted, #557089)',
-                fontWeight: active ? 700 : 500, fontSize: '0.8125rem',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
-                transition: 'all 0.15s', position: 'relative',
-              }}
-            >
-              <span style={{ position: 'relative', display: 'inline-flex' }}>
-                <t.Icon size={18} />
-                {(showStockBadge || showFinesBadge) && (
-                  <span style={{
-                    position: 'absolute', top: -3, right: -5,
-                    minWidth: 14, height: 14, borderRadius: 7,
-                    background: '#EF4444', color: '#fff',
-                    fontSize: '0.6rem', fontWeight: 700,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 3px',
-                    border: '1.5px solid var(--color-white, #fff)',
-                  }}>
-                    {showStockBadge ? (lowStockCount > 9 ? '9+' : lowStockCount) : (unpaidFinesCount > 9 ? '9+' : unpaidFinesCount)}
-                  </span>
-                )}
-              </span>
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
+      <nav className="ops-tabs" aria-label="หมวดในระบบจัดการ">
+        {groups.map(g => (
+          <div key={g.label} className="ops-tab-group">
+            <span className="ops-tab-group-label">{g.label}</span>
+            <div className="ops-tab-row" role="tablist">
+              {g.tabs.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active === t.id}
+                  className={`ops-tab${active === t.id ? ' is-active' : ''}`}
+                  onClick={() => onTabChange(t.id)}
+                >
+                  <t.Icon size={16} />
+                  {t.label}
+                  {!!t.badge && <span className="ops-tab-badge">{t.badge > 9 ? '9+' : t.badge}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
 
-      {tab === 'vendors'     && <VendorsTab  uid={uid} buildingId={buildingId} />}
-      {tab === 'stock'       && <StockTab    uid={uid} buildingId={buildingId} />}
-      {tab === 'assets'      && <AssetsTab   uid={uid} buildingId={buildingId} rooms={rooms} />}
-      {tab === 'expenses'    && <ExpensesTab uid={uid} buildingId={buildingId} />}
-      {tab === 'fines'       && (
-        <FinesTab
-          uid={uid}
-          buildingId={buildingId}
-          rooms={rooms}
-          fines={fines}
-          onAdd={onAddFine}
-          onUpdate={onUpdateFine}
-          onDelete={onDeleteFine}
-        />
+      <Suspense fallback={<div className="ops-loading"><div className="loading-spinner" /></div>}>
+        {active === 'maintenance' && <MaintenancePage uid={uid} buildingId={buildingId} embedded />}
+        {active === 'workorders' && <WorkOrdersPage ownerUid={uid} buildingId={buildingId} rooms={rooms} unitName={props.unitName} embedded />}
+        {active === 'cleaning' && <CleaningPage uid={uid} buildingId={buildingId} embedded />}
+      </Suspense>
+      {active === 'team' && (
+        <>
+          <div className="ops-portal-note">
+            <MessageCircle size={20} aria-hidden />
+            <div>
+              <strong>หน้างานส่วนตัวของช่างและแม่บ้าน</strong>
+              <p>เมื่อเชื่อม LINE แล้ว ให้พิมพ์ <b>งานของฉัน</b> ในแชท LINE ของทีมงาน จะได้ลิงก์ที่เห็นงานทั้งหมดของตัวเองทุกสถานที่ กดเริ่มงาน แนบรูป และส่งงานได้เลย ไม่ต้องมีรหัสผ่าน</p>
+            </div>
+          </div>
+          <StaffTeamTab uid={uid} buildingId={buildingId} />
+        </>
       )}
-      {tab === 'common_fees' && (
-        <CommonFeesTab
-          uid={uid}
-          buildingId={buildingId}
-          commonFees={commonFees}
-          onAdd={onAddCommonFee}
-          onUpdate={onUpdateCommonFee}
-          onDelete={onDeleteCommonFee}
-        />
+      {active === 'vendors' && <VendorsTab uid={uid} buildingId={buildingId} />}
+      {active === 'stock' && <StockTab uid={uid} buildingId={buildingId} />}
+      {active === 'assets' && <AssetsTab uid={uid} buildingId={buildingId} rooms={rooms} />}
+      {active === 'expenses' && <ExpensesTab uid={uid} buildingId={buildingId} />}
+      {active === 'fines' && (
+        <FinesTab uid={uid} buildingId={buildingId} rooms={rooms} fines={fines}
+          onAdd={props.onAddFine} onUpdate={props.onUpdateFine} onDelete={props.onDeleteFine} />
+      )}
+      {active === 'common_fees' && (
+        <CommonFeesTab uid={uid} buildingId={buildingId} commonFees={props.commonFees}
+          onAdd={props.onAddCommonFee} onUpdate={props.onUpdateCommonFee} onDelete={props.onDeleteCommonFee} />
       )}
     </div>
   );

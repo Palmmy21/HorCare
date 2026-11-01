@@ -15,7 +15,7 @@ export interface ErpModule {
 export const VIEW_LABELS_TH: Record<string, string> = {
   rooms: 'จัดการห้อง/แผง', collections: 'เก็บค่าห้อง / เก็บเงินแผง (รายวัน รายสัปดาห์)', recording: 'จดมิเตอร์', leasing: 'ปล่อยเช่า (ผู้สนใจ จอง สัญญา)', tenants: 'ผู้เช่า',
   payments: 'การชำระเงิน', ledger: 'สมุดบัญชี', accounting: 'ภาพรวมการเงิน', summary: 'สรุปยอด', archives: 'คลังเอกสาร',
-  maintenance: 'แจ้งซ่อม', cleaning: 'งานแม่บ้าน', workorders: 'ใบงานช่าง/แม่บ้าน', operations: 'ระบบจัดการ (สต็อก ทรัพย์สิน ค่าใช้จ่าย)',
+  maintenance: 'แจ้งซ่อม', cleaning: 'งานแม่บ้าน', workorders: 'ใบงานช่าง/แม่บ้าน', operations: 'ระบบจัดการ (แจ้งซ่อม ใบงาน งานแม่บ้าน สต็อก ทรัพย์สิน ค่าใช้จ่าย)',
   parcels: 'พัสดุ', market: 'ร้านค้าแจ้งหยุด / ขาจร', messages: 'ข้อความ LINE', announcements: 'ประกาศและตอบอัตโนมัติ',
   security: 'ความปลอดภัยและสิทธิ์', settings: 'ตั้งค่า',
 };
@@ -55,7 +55,7 @@ export function erpModules(isMarket: boolean, style: ModuleStyle = 'monthly'): E
     {
       id: 'service', label: 'ซ่อมบำรุงและบริการ',
       purpose: 'แจ้งซ่อม ใบงานช่างและแม่บ้านผ่าน LINE สต็อกวัสดุ ทรัพย์สิน และค่าใช้จ่าย',
-      views: ['maintenance', 'cleaning', 'workorders', 'operations'],
+      views: ['operations'],
       planned: ['ซ่อมบำรุงตามรอบ (PM)', 'ค่าเสื่อมทรัพย์สิน', 'ใบสั่งซื้อ'],
     },
     {

@@ -14,7 +14,7 @@ describe('groupNav', () => {
     expect(ids(groups.find(g => g.id === 'billing')!.items)).toEqual(['payments']);
     expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['archives']);
     expect(ids(groups.find(g => g.id === 'property')!.items)).toEqual(['rooms', 'recording', 'summary']);
-    expect(ids(groups.find(g => g.id === 'service')!.items)).toEqual(['maintenance', 'cleaning', 'workorders', 'operations']);
+    expect(ids(groups.find(g => g.id === 'service')!.items)).toEqual(['operations', 'maintenance', 'cleaning', 'workorders']);
     expect(groups.flatMap(g => ids(g.items)).sort()).toEqual(ids(ALL).sort()); // nothing lost, nothing duplicated
   });
 

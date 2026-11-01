@@ -2,7 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import toast from 'react-hot-toast';
 import {
     Check, X, Clock, ChevronLeft, ShieldCheck, Zap, MessageCircle, Loader2,
-    Home, Building, Building2, CreditCard, Sparkles,
+    Home, Building, Building2, CreditCard, Sparkles, Briefcase,
 } from 'lucide-react';
 import type { UserProfile, PlanName, BillingCycle } from '../../types';
 import { canStartTrial, trialDaysLeft, TRIAL_DAYS } from '../../shared/trial';
@@ -113,6 +113,20 @@ const PLANS: Plan[] = [
             'ทีมงาน HorCare ดูแลเซ็ตอัพให้',
             '[soon] ทีมงานไม่จำกัด (RBAC)',
             '[soon] Dashboard เปรียบเทียบหลายหอ',
+            'Priority Support ตลอด 24 ชม.',
+        ],
+    },
+    {
+        id: 'business', name: 'Business', icon: Briefcase, roomRange: 'ไม่จำกัดห้อง · ไม่จำกัดสาขา',
+        monthlyPrice: 679, yearlyPrice: 5000, originalYearlyPrice: 8148,
+        features: [
+            'สำหรับเจ้าของธุรกิจหลายแห่ง: ไม่จำกัดสาขาและห้อง',
+            'ทุกอย่างของ HorCare Pro',
+            'สลับดูแต่ละสาขา หรือแยกตึกในหอเดียวกัน',
+            'ทีมงาน ช่าง และแม่บ้าน ดูแลหลายสาขาในบัญชีเดียว',
+            'ดูยอดทุกสาขาผ่าน LINE (#ยอด)',
+            'หน้าประกาศห้องว่างทุกสาขา',
+            'ทีมงาน HorCare ช่วยย้ายข้อมูลทุกสาขาให้',
             'Priority Support ตลอด 24 ชม.',
         ],
     },
@@ -291,8 +305,9 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, onTr
     const currentPlanId = profile && profile.license !== 'free' ? profile.plan_name : undefined;
     const currentPlan = PLANS.find(p => p.id === currentPlanId);
     const largePlan = PLANS.find(p => p.id === 'large')!;
-    // Owners on a smaller plan see it to renew beside the HorCare upgrade; everyone else sees HorCare alone
-    const cards = currentPlan && currentPlan.id !== 'large' ? [currentPlan, largePlan] : [largePlan];
+    const businessPlan = PLANS.find(p => p.id === 'business')!;
+    // HorCare Pro beside Business; owners on a smaller plan also see theirs to renew
+    const cards = currentPlan && currentPlan.id !== 'large' && currentPlan.id !== 'business' ? [currentPlan, largePlan, businessPlan] : [largePlan, businessPlan];
     const periodEnd = profile?.current_period_end
         ? new Date(profile.current_period_end).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })
         : null;
@@ -333,7 +348,7 @@ export default function PricingPage({ profile, onBack, isGuest, onNeedAuth, onTr
                     ))}
                 </div>
 
-                <div className={`pp-cards${cards.length > 1 ? ' pp-cards-2' : ''}`}>
+                <div className={`pp-cards pp-cards-${cards.length}`}>
                     {cards.map(p => (
                         <PlanCard
                             key={p.id}

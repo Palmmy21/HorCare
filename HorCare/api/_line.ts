@@ -124,8 +124,9 @@ const STATUS: Record<'unpaid' | 'pending' | 'paid', { fg: string; bg: string; ke
 
 /** Labels without the emoji the older cards used ("📋 ใบแจ้งค่าบริการ" → "ใบแจ้งค่าบริการ"). */
 const plain = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[\s\p{Extended_Pictographic}\u{FE0F}]+$/u, '').trim();
+/** "฿1,250"; a discount reads "-฿200". */
 const baht = (n: number, decimals = false) =>
-    `฿${(Number(n) || 0).toLocaleString('th-TH', decimals ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 2 })}`;
+    `${Number(n) < 0 ? '-' : ''}฿${Math.abs(Number(n) || 0).toLocaleString('th-TH', decimals ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 2 })}`;
 
 /** One line of the invoice: name (+ a small detail line such as the meter readings) and its amount. */
 const itemRow = (name: string, amount: number, detail?: string) => ({
@@ -282,6 +283,8 @@ export function buildBillFlex(
     const fees = (bill.applied_common_fees ?? []).filter(f => Number(f.amount) > 0);
     if (fees.length) fees.forEach(f => items.push(itemRow(f.name, f.amount)));
     else if (Number(bill.common_fee) > 0) items.push(itemRow(L('common_fee'), bill.common_fee));
+    // charges / discounts the owner added to this bill by hand (a discount shows as a negative amount)
+    for (const a of bill.adjustments ?? []) if (Number(a.amount)) items.push(itemRow(a.label, a.amount));
 
     return invoiceCard({
         lang, L,
@@ -369,6 +372,7 @@ export function buildReceiptFlex(
                     row(waterLabel, `฿${Number(bill.water_bill ?? 0).toLocaleString()}`),
                     row(rentLabel, `฿${Number(bill.room_rent ?? 0).toLocaleString()}`),
                     ...(bill.common_fee ? [row(commonLabel, `฿${Number(bill.common_fee).toLocaleString()}`)] : []),
+                    ...(bill.adjustments ?? []).filter(a => Number(a.amount)).map(a => row(`➕ ${a.label}`, `${a.amount < 0 ? '-' : ''}฿${Math.abs(Number(a.amount)).toLocaleString()}`)),
                     { type: 'separator', margin: 'md' },
                     { type: 'box', layout: 'horizontal', margin: 'md', contents: [
                         { type: 'text', text: paidAmountLabel, size: 'md', weight: 'bold', flex: 2 },

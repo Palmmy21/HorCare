@@ -10,7 +10,7 @@ const details = {
     receiver_bank: 'กสิกรไทย', sender_bank: 'ไทยพาณิชย์', datetime_iso: '2026-10-15T09:30:00+07:00', reference: 'R1',
 };
 const evaluation = (over: Partial<SlipEvaluation>): SlipEvaluation => ({
-    autoApprove: false, outcome: 'review', problems: [], qrPresent: true, details: null, verdict: null,
+    autoApprove: false, outcome: 'review', problems: [], qrPresent: true, bankVerified: false, details: null, verdict: null,
     fields: {}, verifyNote: '', aiAmount: null, splitAmount: null, ...over,
 });
 const checks = (amount: 'pass' | 'fail') => ({

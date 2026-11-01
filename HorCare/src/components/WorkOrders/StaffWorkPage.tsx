@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Wrench, MapPin, Calendar, Loader2, Camera, CheckCircle2, AlertTriangle, PlayCircle, ThumbsUp } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Wrench, MapPin, Calendar, Loader2, Camera, CheckCircle2, AlertTriangle, PlayCircle, ThumbsUp, ChevronLeft } from 'lucide-react';
 import { compressImage } from '../../utils/imageCompress';
 import {
     PRIORITY_LABELS_TH, WORK_STATUS_LABELS_TH, WORK_TYPE_LABELS_TH, type Priority, type StaffWorkView,
 } from '../../shared/workOrders';
 
 /**
- * Mobile page a technician / housekeeper opens from the LINE job card (/?w=<link>).
- * No HorCare account: the link itself identifies the job and the person. Every request
- * is re-checked server-side by /api/work-orders.
+ * Mobile page a technician / housekeeper opens from the LINE job card (/?w=<link>), or from their staff portal
+ * (portal token + job key). No HorCare account: the link (or the portal) identifies the job and the person.
+ * Every request is re-checked server-side by /api/work-orders.
  */
 
 interface WorkImage { id: string; kind: string; data_url: string }
@@ -16,18 +16,23 @@ interface PendingPhoto { kind: 'before' | 'after'; base64: string }
 
 const PRIORITY_COLOR: Record<Priority, string> = { low: '#557089', normal: '#0A6CC2', high: '#E8740C', urgent: '#DC2626' };
 
-async function call<T>(link: string, body: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: T & { error?: string; message?: string } }> {
+type Auth = { link: string } | { portal: string; job: string };
+
+async function call<T>(auth: Auth, body: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: T & { error?: string; message?: string } }> {
     const res = await fetch('/api/work-orders', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link, ...body }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...auth, ...body }),
     });
     return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
 }
 
-export default function StaffWorkPage() {
-    const link = new URLSearchParams(window.location.search).get('w') ?? '';
+export default function StaffWorkPage({ portal }: { portal?: { token: string; job: string; onBack: () => void } } = {}) {
+    const link = portal ? '' : new URLSearchParams(window.location.search).get('w') ?? '';
+    const token = portal?.token ?? '';
+    const jobKey = portal?.job ?? '';
+    const auth = useMemo<Auth | null>(() => (token ? { portal: token, job: jobKey } : link ? { link } : null), [token, jobKey, link]);
     const [job, setJob] = useState<StaffWorkView | null>(null);
     const [images, setImages] = useState<WorkImage[]>([]);
-    const [state, setState] = useState<'loading' | 'ready' | 'gone'>(link ? 'loading' : 'gone');
+    const [state, setState] = useState<'loading' | 'ready' | 'gone'>(auth ? 'loading' : 'gone');
     const [note, setNote] = useState('');
     const [photos, setPhotos] = useState<PendingPhoto[]>([]);
     const [busy, setBusy] = useState(false);
@@ -37,29 +42,29 @@ export default function StaffWorkPage() {
     const afterRef = useRef<HTMLInputElement>(null);
 
     const load = useCallback(async () => {
-        const v = await call<{ work_order: StaffWorkView }>(link, { action: 'staff_view' });
+        const v = await call<{ work_order: StaffWorkView }>(auth!, { action: 'staff_view' });
         if (!v.ok) { setState('gone'); return; }
         setJob(v.data.work_order);
         setState('ready');
-        const im = await call<{ images: WorkImage[] }>(link, { action: 'staff_images' });
+        const im = await call<{ images: WorkImage[] }>(auth!, { action: 'staff_images' });
         if (im.ok) setImages(im.data.images ?? []);
-    }, [link]);
+    }, [auth]);
 
     // Initial load (after-send refreshes reuse `load`)
     useEffect(() => {
-        if (!link) return;
+        if (!auth) return;
         let cancelled = false;
         void (async () => {
-            const v = await call<{ work_order: StaffWorkView }>(link, { action: 'staff_view' });
+            const v = await call<{ work_order: StaffWorkView }>(auth!, { action: 'staff_view' });
             if (cancelled) return;
             if (!v.ok) { setState('gone'); return; }
             setJob(v.data.work_order);
             setState('ready');
-            const im = await call<{ images: WorkImage[] }>(link, { action: 'staff_images' });
+            const im = await call<{ images: WorkImage[] }>(auth!, { action: 'staff_images' });
             if (!cancelled && im.ok) setImages(im.data.images ?? []);
         })();
         return () => { cancelled = true; };
-    }, [link]);
+    }, [auth]);
 
     const addPhoto = async (kind: 'before' | 'after', files: FileList | null) => {
         if (!files) return;
@@ -72,7 +77,7 @@ export default function StaffWorkPage() {
     const send = async (status?: 'accepted' | 'in_progress' | 'completed') => {
         setBusy(true);
         setError(null);
-        const r = await call(link, {
+        const r = await call(auth!, {
             action: 'staff_update', status, note: note.trim() || undefined, images: photos,
         });
         setBusy(false);
@@ -99,6 +104,7 @@ export default function StaffWorkPage() {
                     <AlertTriangle size={36} color="#E8740C" />
                     <h2 style={{ margin: '0.5rem 0', fontSize: '1.15rem' }}>เปิดงานนี้ไม่ได้</h2>
                     <p style={{ color: '#557089', fontSize: '0.9rem', margin: 0 }}>ลิงก์อาจหมดอายุ งานถูกปิดแล้ว หรือถูกมอบหมายให้คนอื่น กรุณาติดต่อผู้จัดการ</p>
+                    {portal && <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={portal.onBack}>กลับไปงานทั้งหมด</button>}
                 </div>
             </div>
         );
@@ -116,6 +122,11 @@ export default function StaffWorkPage() {
     return (
         <div style={page}>
             <div style={card}>
+                {portal && (
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={portal.onBack} style={{ margin: '-0.5rem 0 0.5rem -0.5rem' }}>
+                        <ChevronLeft size={16} /> งานทั้งหมด
+                    </button>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#08589F', fontWeight: 700, fontSize: '0.85rem' }}>
                     <Wrench size={16} /> {job.dorm_name || 'HorCare'} · สวัสดีคุณ {job.staff_name}
                 </div>

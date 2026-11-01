@@ -4,15 +4,10 @@ import { effectiveLicense } from '../src/shared/trial.js';
 import { AiError, aiGenerate } from './_ai.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
+import { isProOrAbove } from '../src/shared/plans.js';
 
-// ── Plan helper ──
-function isPro(license: string): boolean {
-    if (license === 'active') return true;
-    const match = license.match(/^(monthly|yearly)_(small|medium|large)$/);
-    if (!match) return false;
-    // Pro is the 'large' plan
-    return match[2] === 'large';
-}
+// น้องแคร์ is a HorCare Pro (and Business) feature
+const isPro = isProOrAbove;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {

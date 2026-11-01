@@ -18,14 +18,8 @@ import { effectiveLicense } from '../src/shared/trial.js';
 import { aiGenerate, extractJson } from './_ai.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
+import { isPlusOrAbove } from '../src/shared/plans.js';
 
-// ── Plan helpers (inline — ไม่ import จาก src เพราะ API ไม่ bundle React) ──
-function isPlusOrAbove(license: string): boolean {
-    if (license === 'active') return true;
-    const match = license.match(/^(monthly|yearly)_(small|medium|large)$/);
-    if (!match) return false;
-    return match[2] === 'medium' || match[2] === 'large';
-}
 
 // ── Gemini Vision call ────────────────────────────────────────────────────────
 interface GeminiResult {

@@ -1,4 +1,5 @@
 import type { PlanName, BillingCycle, LicenseType } from '../types';
+import { CHECKOUT_AMOUNTS, isPlusOrAbove as plusOrAbove, isProOrAbove, parsePlan } from '../shared/plans';
 
 /* ── Plan config ──────────────────────────────────────────
    Internal keys stay as small / medium / large (no Firestore migration needed).
@@ -11,6 +12,7 @@ export const PLAN_CONFIG = {
     small:  { maxRooms: 50,       displayName: 'Start' },
     medium: { maxRooms: 150,      displayName: 'Plus'  },
     large:  { maxRooms: Infinity, displayName: 'Pro'   },
+    business: { maxRooms: Infinity, displayName: 'Business' },
 } as const;
 
 /** Human-readable plan name from license key */
@@ -31,11 +33,8 @@ export function getMaxRooms(license: LicenseType): number {
     return PLAN_CONFIG[parsed.plan].maxRooms;
 }
 
-export const PLAN_PRICES = {
-    small:  { monthly: 79,  yearly: 790  },
-    medium: { monthly: 199, yearly: 1990 },
-    large:  { monthly: 399, yearly: 2990 },
-} as const;
+/** What checkout charges (shared/plans.ts is the source). */
+export const PLAN_PRICES = Object.fromEntries((['small', 'medium', 'large', 'business'] as const).map(p => [p, { monthly: CHECKOUT_AMOUNTS[`monthly_${p}`], yearly: CHECKOUT_AMOUNTS[`yearly_${p}`] }])) as Record<PlanName, { monthly: number; yearly: number }>;
 
 /** Build license key from plan + cycle */
 export function toLicenseType(plan: PlanName, cycle: BillingCycle): LicenseType {
@@ -44,9 +43,8 @@ export function toLicenseType(plan: PlanName, cycle: BillingCycle): LicenseType 
 
 /** Parse license key → plan + cycle */
 export function parseLicense(license: LicenseType): { plan: PlanName; cycle: BillingCycle } | null {
-    const match = license.match(/^(monthly|yearly)_(small|medium|large)$/);
-    if (!match) return null;
-    return { cycle: match[1] as BillingCycle, plan: match[2] as PlanName };
+    const parsed = parsePlan(license);
+    return parsed ? { cycle: parsed.cycle as BillingCycle, plan: parsed.plan as PlanName } : null;
 }
 
 /** Whether this license is any paid subscription (Start / Plus / Pro / Active) */
@@ -54,11 +52,9 @@ export function isPaidLicense(license: LicenseType): boolean {
     return parseLicense(license) !== null || license === 'active';
 }
 
-/** Whether this license is Plus or above (medium / large / active) */
+/** Whether this license is Plus or above (medium / large / business / active) */
 export function isPlusOrAbove(license: LicenseType): boolean {
-    if (license === 'active') return true;
-    const parsed = parseLicense(license);
-    return parsed?.plan === 'medium' || parsed?.plan === 'large';
+    return plusOrAbove(license);
 }
 
 /** Whether this license can send bills via LINE (Start+ only) */
@@ -76,14 +72,13 @@ export function getMaxBuildings(license: LicenseType): number {
     if (!parsed) return 1;
     if (parsed.plan === 'small')  return 1;
     if (parsed.plan === 'medium') return 5;
+    if (parsed.plan === 'business') return Infinity;
     return 10; // large = Pro
 }
 
-/** Whether this license is the Pro (large) tier */
+/** Whether this license is the Pro (large) tier or above */
 export function isProPlan(license: LicenseType): boolean {
-    if (license === 'active') return true;
-    const parsed = parseLicense(license);
-    return parsed?.plan === 'large';
+    return isProOrAbove(license);
 }
 
 // NOTE: ตัว hook useSubscription (mock checkout เขียน license ตรงจาก client) ถูกลบแล้ว —

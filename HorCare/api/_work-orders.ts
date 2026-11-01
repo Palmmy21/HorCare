@@ -13,6 +13,7 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { appBaseUrl, notify, type NotifyResult } from './_notify.js';
+import { parseJobKey, resolvePortalToken } from './_staff-portal.js';
 import {
     MAX_WORK_IMAGES, WORK_TYPE_LABELS_TH, canTransition, isPriority, isWorkType,
     type StaffRole, type StaffWorkView, type WorkImageKind, type WorkOrder, type WorkStaff, type WorkStatus,
@@ -138,6 +139,9 @@ interface Body {
     note?: string;
     // staff (link) actions
     link?: string;
+    /** staff portal token + 'owner~building~id', instead of link */
+    portal?: string;
+    job?: string;
     status?: string;
 }
 
@@ -373,20 +377,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 // ── Staff (link) handlers ───────────────────────────────────────────────────────
 async function handleStaff(req: VercelRequest, res: VercelResponse, body: Body) {
-    const link = parseLink(body.link);
-    if (!link) { res.status(400).json({ error: 'invalid_link' }); return; }
+    // Two ways in: the per-job link from the LINE card, or the person's staff portal (token + job key).
+    let link: { ownerUid: string; buildingId: string; workOrderId: string; secret: string | null };
+    let portalLine: string | null = null;
+    if (body.portal !== undefined) {
+        portalLine = await resolvePortalToken(body.portal);
+        const job = parseJobKey(body.job);
+        if (!portalLine || !job) { res.status(401).json({ error: 'invalid_link' }); return; }
+        link = { ownerUid: job.ownerUid, buildingId: job.buildingId, workOrderId: job.id, secret: null };
+    } else {
+        const parsed = parseLink(body.link);
+        if (!parsed) { res.status(400).json({ error: 'invalid_link' }); return; }
+        link = parsed;
+    }
     const b = baseOf(link.ownerUid, link.buildingId);
     const ref = db.doc(`${b}/work_orders/${link.workOrderId}`);
     const snap = await ref.get();
     const order = snap.exists ? (snap.data() as WorkOrder) : null;
-    // One response for "no such job" and "wrong secret" so job ids can't be probed.
-    if (!order || !order.staff_token_hash || !safeEqualHex(order.staff_token_hash, sha256(link.secret)) || order.status === 'closed') {
+    const linkOk = link.secret === null || (!!order?.staff_token_hash && safeEqualHex(order.staff_token_hash, sha256(link.secret)));
+    // One response for "no such job", "wrong secret" and "not your job" so job ids can't be probed.
+    if (!order || !linkOk || order.status === 'closed') {
         res.status(404).json({ error: 'not_found' });
         return;
     }
     const staffSnap = await db.doc(`${b}/staff/${order.assigned_staff_id}`).get();
     const staff = staffSnap.data() as WorkStaff | undefined;
-    if (!staff || staff.active === false) { res.status(404).json({ error: 'not_found' }); return; }
+    if (!staff || staff.active === false || (portalLine !== null && staff.line_user_id !== portalLine)) { res.status(404).json({ error: 'not_found' }); return; }
 
     if (body.action === 'staff_view') {
         const cfg = await db.doc(`${b}/data/config`).get();

@@ -13,6 +13,8 @@ import { isStaffLinkCode, redeemStaffLink } from './_work-orders.js';
 import { HELP, handleStaffChat } from './_staff-registration.js';
 import { handleOwnerCommand, redeemOwnerLink } from './_owner-line.js';
 import { isOwnerLinkCode } from '../src/shared/ownerCommands.js';
+import { issuePortalLink } from './_staff-portal.js';
+import { isPortalRequest } from '../src/shared/staffPortal.js';
 
 export const config = {
     api: { bodyParser: false },   // the signature is computed over the raw body
@@ -73,6 +75,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             const ownerReply = await handleOwnerCommand(lineUserId, text);
             if (ownerReply) { await lineReply(replyToken, ownerReply, token); return; }
+
+            // technicians / housekeepers: their personal job portal (no password: this LINE account is the login)
+            if (isPortalRequest(text)) {
+                const url = await issuePortalLink(lineUserId);
+                if (url) {
+                    await lineReply(replyToken, [{ type: 'text', text: `📋 งานของคุณทั้งหมดอยู่ที่นี่\n${url}\n\nลิงก์นี้เป็นของคุณคนเดียว ใช้ได้ 30 วัน พิมพ์ "งานของฉัน" เมื่อไหร่ก็ได้เพื่อขอลิงก์ใหม่` }], token);
+                    return;
+                }
+            }
 
             if (isStaffLinkCode(text)) {
                 const r = await redeemStaffLink(lineUserId, text);

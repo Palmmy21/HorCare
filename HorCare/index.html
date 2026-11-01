@@ -30,11 +30,8 @@
   <meta property="og:image" content="/logo.png?v=2" />
   <meta property="og:type" content="website" />
 
-  <!-- Security: prevent clickjacking, XSS -->
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <!-- X-Frame-Options, X-Content-Type-Options and Permissions-Policy only work as HTTP headers: vercel.json sends them -->
   <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
   <script>
     window.__pwaInstallPrompt = null;
     window.addEventListener('beforeinstallprompt', function (e) {

@@ -3,6 +3,7 @@
 // and only stored once the owner edits it; every read reconciles it with the current rooms, so a room added or
 // removed elsewhere never leaves the plan stale.
 import type { DormConfig } from '../types';
+import { hasWings, wingLabel } from './wings';
 
 export type PlanKind = 'floors' | 'zones' | 'streets';
 
@@ -50,8 +51,20 @@ export const PLAN_LABELS: Record<PlanKind, { title: string; group: string; unit:
 const byNumber = (a: string, b: string) => a.localeCompare(b, 'th', { numeric: true });
 const clean = (s?: string) => (typeof s === 'string' ? s.trim() : '');
 
-/** The group a room belongs to when nobody placed it: its zone / floor as entered, else read from the room number. */
-export function groupNameOf(room: PlanRoom, kind: PlanKind): string {
+/** Separator between a building and its floor in a group name: "ตึก A · ชั้น 2". */
+export const WING_SEP = ' · ';
+
+/**
+ * The group a room belongs to when nobody placed it: its zone / floor as entered, else read from the room number.
+ * In a property with several buildings (`multiWing`), floors are per building: "ตึก A · ชั้น 2".
+ */
+export function groupNameOf(room: PlanRoom, kind: PlanKind, multiWing = false): string {
+  const base = floorOrZoneOf(room, kind);
+  const wing = clean(room.building_name);
+  return multiWing && kind === 'floors' && wing && base !== wing ? `${wingLabel(wing)}${WING_SEP}${base}` : base;
+}
+
+function floorOrZoneOf(room: PlanRoom, kind: PlanKind): string {
   const named = kind === 'floors' ? clean(room.floor) || clean(room.zone) : clean(room.zone) || clean(room.floor);
   if (named) return kind === 'floors' && /^\d+$/.test(named) ? `ชั้น ${named}` : named;
   if (kind === 'floors') {
@@ -66,10 +79,19 @@ export function groupNameOf(room: PlanRoom, kind: PlanKind): string {
   return clean(room.building_name) || 'ทั้งหมด';
 }
 
-/** Floors read top to bottom like the building; zones and streets in name order. */
+/** Splits "ตึก A · ชั้น 2" into its building and floor ('' building for a single-building property). */
+export function splitGroupName(name: string): { wing: string; floor: string } {
+  const i = name.indexOf(WING_SEP);
+  return i < 0 ? { wing: '', floor: name } : { wing: name.slice(0, i), floor: name.slice(i + WING_SEP.length) };
+}
+
+/** Floors read top to bottom like the building (building by building); zones and streets in name order. */
 function sortGroups(names: string[], kind: PlanKind): string[] {
-  const sorted = [...names].sort(byNumber);
-  return kind === 'floors' ? sorted.reverse() : sorted;
+  if (kind !== 'floors') return [...names].sort(byNumber);
+  return [...names].sort((a, b) => {
+    const x = splitGroupName(a), y = splitGroupName(b);
+    return byNumber(x.wing, y.wing) || byNumber(y.floor, x.floor);
+  });
 }
 
 let seq = 0;
@@ -78,9 +100,10 @@ export const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${
 /** A first plan from the rooms alone: one group per floor / zone, units in number order, as many columns as fit. */
 export function autoPlan(rooms: PlanRoom[], kind: PlanKind): FloorPlan {
   const active = rooms.filter(r => r.is_active);
+  const multiWing = hasWings(active);
   const groups = new Map<string, PlanRoom[]>();
   for (const r of active) {
-    const g = groupNameOf(r, kind);
+    const g = groupNameOf(r, kind, multiWing);
     groups.set(g, [...(groups.get(g) ?? []), r]);
   }
   const largest = Math.max(0, ...[...groups.values()].map(g => g.length));
@@ -140,9 +163,10 @@ export function reconcile(plan: FloorPlan, rooms: PlanRoom[], kind: PlanKind): F
   });
   const placed = new Set(groups.flatMap(g => g.cells.map(c => c.room_id)));
   const missing = [...live.values()].filter(r => !placed.has(r.id)).sort((a, b) => byNumber(a.room_number, b.room_number));
+  const multiWing = hasWings([...live.values()]);
   for (const r of missing) {
     changed = true;
-    const name = groupNameOf(r, kind);
+    const name = groupNameOf(r, kind, multiWing);
     let g = groups.find(x => x.name === name) ?? groups.find(x => x.name === UNPLACED_GROUP_NAME);
     if (!g) {
       g = { id: newId('g'), name: UNPLACED_GROUP_NAME, cols: Math.max(MIN_COLS, groups[0]?.cols ?? 8), cells: [], gaps: [] };
@@ -331,4 +355,19 @@ export function isFloorPlan(x: unknown): x is FloorPlan {
   const p = x as FloorPlan;
   return !!p && p.version === 1 && Array.isArray(p.groups) && Array.isArray(p.links)
     && p.groups.every(g => typeof g.id === 'string' && typeof g.name === 'string' && Number.isInteger(g.cols) && Array.isArray(g.cells) && Array.isArray(g.gaps));
+}
+
+/**
+ * The plan as seen for one building of the property (rooms whose building_name is `wing`): its units only, empty
+ * floors dropped. Display only — edits and saves always use the whole plan, so no other building's layout is lost.
+ */
+export function planForWing(plan: FloorPlan, rooms: Map<string, PlanRoom>, wing: string): FloorPlan {
+  const inWing = (id: string) => clean(rooms.get(id)?.building_name) === wing;
+  return {
+    ...plan,
+    groups: plan.groups
+      .map(g => ({ ...g, cells: g.cells.filter(c => inWing(c.room_id)) }))
+      .filter(g => g.cells.length > 0),
+    links: plan.links.map(l => ({ ...l, room_ids: l.room_ids.filter(inWing) })).filter(l => l.room_ids.length > 1),
+  };
 }

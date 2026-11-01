@@ -15,7 +15,7 @@ import {
     type Priority, type WorkOrder, type WorkStaff, type WorkStatus, type WorkType,
 } from '../../shared/workOrders';
 
-interface Props { ownerUid: string; buildingId: string; rooms: Room[]; unitName: string }
+interface Props { ownerUid: string; buildingId: string; rooms: Room[]; unitName: string; /** Shown as a tab of ระบบจัดการ: no page title */ embedded?: boolean }
 
 type Tab = 'all' | 'todo' | 'active' | 'review' | 'closed';
 const TAB_FILTER: Record<Tab, (o: WorkOrder) => boolean> = {
@@ -346,9 +346,9 @@ export default function WorkOrdersPage(props: Props) {
 
     return (
         <div>
-            <div className="page-header">
+            <div className={props.embedded ? 'ops-embedded-head' : 'page-header'}>
                 <div>
-                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardCheck size={28} /> ใบงานช่าง/แม่บ้าน</h1>
+                    {!props.embedded && <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardCheck size={28} /> ใบงานช่าง/แม่บ้าน</h1>}
                     <p className="page-subtitle">
                         สั่งงานผ่าน LINE ติดตามสถานะ และตรวจงานก่อนปิด
                         {counts.overdue > 0 && <span style={{ color: '#C2410C', fontWeight: 700 }}> · เลยกำหนด {counts.overdue} งาน</span>}

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
+import { isPaidPlan } from '../src/shared/plans.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
@@ -732,7 +733,7 @@ async function handleSlipImage(
     const userSnap = await db.collection('users').doc(uid).get();
     const license = effectiveLicense(userSnap.data());
     // อนุญาตให้ทุกแพ็กเกจที่จ่ายเงิน (small, medium, large) หรือ active ได้ใช้งาน AI 
-    const isPro = license === 'active' || !!license.match(/^(monthly|yearly)_(small|medium|large)$/);
+    const isPro = isPaidPlan(license);
 
     // Read the slip with AI and compare it with the bill and the property's receiving accounts
     // (amount, receiver name / account, date-time). Auto-approval needs every check to hold, and the

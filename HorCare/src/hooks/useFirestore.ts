@@ -6,8 +6,9 @@ import { db } from '../firebase/config';
 import { logActivity, diffFields } from '../utils/auditLog';
 import { findDuplicates, MAX_BULK_ROOMS } from '../utils/bulkRooms';
 import { defaultRentType } from '../utils/workspaceTerminology';
-import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee } from '../types';
+import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee, BillAdjustment } from '../types';
 import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth, rentForRecalc, roomFees } from '../utils/calculations';
+import { adjustmentsTotal } from '../shared/billAdjustments';
 
 // How many months of bills the realtime listener keeps in memory, anchored on the
 // selected month. Bounds reads + memory regardless of how long a dorm has existed —
@@ -47,7 +48,7 @@ export function nextBillPatch(
         water_flat_amount: calculation.water_flat_amount,
         water_excess_units: calculation.water_excess_units,
         water_excess_amount: calculation.water_excess_amount,
-        total_bill: calculation.total_bill,
+        total_bill: calculation.total_bill + adjustmentsTotal(nextMonthBill),
         updated_at: new Date().toISOString()
     };
 }
@@ -275,7 +276,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                     room_rent: effectiveRent,
                     common_fee: calculation.common_fee,
                     applied_common_fees: calculation.applied_common_fees,
-                    total_bill: calculation.total_bill,
+                    total_bill: calculation.total_bill + adjustmentsTotal(existingBill),
                     updated_at: new Date().toISOString()
                 };
 
@@ -438,7 +439,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 room_rent: billRent,
                 common_fee: calculation.common_fee,
                 applied_common_fees: calculation.applied_common_fees,
-                total_bill: calculation.total_bill,
+                total_bill: calculation.total_bill + adjustmentsTotal(existingBill),
                 tenant_count: newRoom.tenant_count || 1, // Update snapshot of tenant count
                 updated_at: new Date().toISOString()
             };
@@ -461,6 +462,33 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
     const deleteBill = useCallback(async (billId: string) => {
         if (!userPath) return;
         await deleteDoc(doc(db, userPath, 'bills', billId));
+    }, [userPath]);
+
+    /**
+     * Extra charges / discounts and the note on one bill (Summary → แก้ไขบิล). The total is re-based on the server copy
+     * inside a transaction, so a meter re-save in between is never overwritten; a closed or paid bill is refused.
+     */
+    const updateBillExtras = useCallback(async (billId: string, adjustments: BillAdjustment[], note: string) => {
+        if (!userPath) return;
+        const ref = doc(db, userPath, 'bills', billId);
+        const before = await runTransaction(db, async tx => {
+            const snap = await tx.get(ref);
+            if (!snap.exists()) throw new Error('bill_not_found');
+            const cur = snap.data() as MonthlyBill;
+            if (cur.is_locked) throw new Error('bill_locked');
+            if (cur.payment_status === 'paid' || cur.payment_status === 'pending') throw new Error('bill_paid');
+            const base = (Number(cur.total_bill) || 0) - adjustmentsTotal(cur);
+            const total = Math.round((base + adjustments.reduce((sum, a) => sum + a.amount, 0)) * 100) / 100;
+            tx.update(ref, { adjustments, bill_note: note, total_bill: total, updated_at: new Date().toISOString() });
+            return cur;
+        });
+        logActivity({
+            action: 'UPDATE', resourceType: 'bill', resourceId: billId,
+            resourceLabel: `Room ${before.room_number} ${before.month}`,
+            before: { total_bill: before.total_bill, adjustments: before.adjustments ?? [] },
+            after: { adjustments },
+            note: 'bill extras edited',
+        });
     }, [userPath]);
 
     // Partial update of payment fields (manual confirm / undo from PaymentsPage)
@@ -497,8 +525,10 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             const cur = curSnap.exists() ? (curSnap.data() as MonthlyBill) : undefined;
             if (cur?.is_locked) throw new Error('bill_locked');
 
-            // merge keeps what the meter screen does not own (payment, slip, reminder fields) and the creation time
-            tx.set(billRef, cur ? { ...bill, created_at: cur.created_at ?? bill.created_at } : bill, { merge: true });
+            // merge keeps what the meter screen does not own (payment, slip, reminder fields, charges added by hand)
+            // and the creation time; the total it sends has no hand-added charges, so those are counted back in
+            const withExtras = bill.adjustments ? bill : { ...bill, total_bill: bill.total_bill + adjustmentsTotal(cur) };
+            tx.set(billRef, cur ? { ...withExtras, created_at: cur.created_at ?? bill.created_at } : withExtras, { merge: true });
             tx.update(doc(db, userPath, 'rooms', bill.room_id), {
                 current_meter_elec: bill.curr_elec,
                 current_meter_water: bill.curr_water
@@ -668,6 +698,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         saveBill,
         deleteBill,
         updateBillPayment,
+        updateBillExtras,
         getBillForRoom,
         getBillsForMonth,
         getPreviousBill,

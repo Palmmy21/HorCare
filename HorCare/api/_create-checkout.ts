@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { db, admin } from './_firebase.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
+import { CHECKOUT_AMOUNTS } from '../src/shared/plans.js';
 
 function getStripe(): Stripe {
     const key = process.env.STRIPE_SECRET_KEY;
@@ -48,15 +49,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // PromptPay (QR) รองรับเฉพาะจ่ายครั้งเดียว จึงคิดราคาเป็นยอดต่อรอบแบบ one-time
         // (ไม่ใช้ recurring Price ID เพราะ payment mode ใช้ราคาแบบ subscription ไม่ได้)
         const PLAN_NAMES_TH: Record<string, string> = {
-            small: 'หอเล็ก', medium: 'หอกลาง', large: 'หอใหญ่',
-        };
-        const AMOUNTS: Record<string, number> = {
-            monthly_small:  149, yearly_small:  950,
-            monthly_medium: 259, yearly_medium: 1590,
-            monthly_large:  399, yearly_large:  2990,
+            small: 'หอเล็ก', medium: 'หอกลาง', large: 'หอใหญ่', business: 'Business (หลายสาขา)',
         };
 
-        const amount = AMOUNTS[licenseKey];
+        const amount = CHECKOUT_AMOUNTS[licenseKey];
         if (!amount) {
             res.status(400).json({ error: `ไม่พบราคาสำหรับ ${licenseKey}` });
             return;

@@ -115,10 +115,10 @@ interface AssignState {
 }
 const EMPTY_ASSIGN: AssignState = { vendorId: '', vendorName: '', vendorPhone: '', scheduledDate: '' };
 
-interface Props { uid: string; buildingId: string; }
+interface Props { uid: string; buildingId: string; /** Shown as a tab of ระบบจัดการ: no page title */ embedded?: boolean }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function MaintenancePage({ uid, buildingId }: Props) {
+export default function MaintenancePage({ uid, buildingId, embedded = false }: Props) {
   const { requests, loading, updateStatus, completeRequest, deleteRequest } = useMaintenanceRequests(uid, buildingId);
   const { items: stockItems, decrementMany } = useStockItems(uid, buildingId);
   const { assets, updateCondition } = useAssets(uid, buildingId);
@@ -237,12 +237,14 @@ export default function MaintenancePage({ uid, buildingId }: Props) {
   return (
     <div>
       {/* Header */}
-      <div className="page-header">
-        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Wrench size={28} /> แจ้งซ่อม
-        </h1>
-        <p className="page-subtitle">คำขอซ่อมแซมจากผู้เช่า</p>
-      </div>
+      {!embedded && (
+        <div className="page-header">
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Wrench size={28} /> แจ้งซ่อม
+          </h1>
+          <p className="page-subtitle">คำขอซ่อมแซมจากผู้เช่า</p>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="card mb-6" style={{ padding: '0.625rem' }}>

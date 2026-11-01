@@ -16,6 +16,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_firebase.js';
+import { isPlusOrAbove } from '../src/shared/plans.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { AiError, aiErrorHint, aiGenerate, extractJson } from './_ai.js';
@@ -43,11 +44,7 @@ export interface MeterOcrItem extends MeterOcrResult {
 
 const EMPTY: MeterOcrResult = { room_number: null, reading: null, meter_type: 'unknown', confidence: 0, note: '' };
 
-export function isPlusOrAbove(license: string): boolean {
-    if (license === 'active') return true;
-    const m = license.match(/^(monthly|yearly)_(small|medium|large)$/);
-    return !!m && (m[2] === 'medium' || m[2] === 'large');
-}
+export { isPlusOrAbove };
 
 /** Defensive parse: the model's output is untrusted input. Never throws. */
 export function parseMeterOcr(raw: string): MeterOcrResult {

@@ -68,9 +68,27 @@ function collectionRef(path: string, filters: [string, unknown][] = []) {
     };
 }
 
+/** Every document in a collection with this id, at any depth (only == filters, like the rest of the fake). */
+function collectionGroupRef(id: string, filters: [string, unknown][] = []) {
+    return {
+        where: (field: string, op: string, value: unknown) => {
+            if (op !== '==') throw new Error('fake firestore only supports ==');
+            return collectionGroupRef(id, [...filters, [field, value]]);
+        },
+        get: async () => {
+            const docs = [...store.keys()]
+                .filter(p => { const parts = p.split('/'); return parts.length % 2 === 0 && parts[parts.length - 2] === id; })
+                .map(p => snap(p))
+                .filter(s => filters.every(([f, v]) => (s.data() as Data)[f] === v));
+            return { docs, empty: docs.length === 0, size: docs.length };
+        },
+    };
+}
+
 export const db = {
     doc: (path: string) => docRef(path),
     collection: (path: string) => collectionRef(path),
+    collectionGroup: (id: string) => collectionGroupRef(id),
     runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => fn({
         get: (ref: { get: () => Promise<unknown> }) => ref.get(),
         set: (ref: { set: (d: Data, o?: { merge?: boolean }) => Promise<void> }, d: Data, o?: { merge?: boolean }) => { void ref.set(d, o); },

@@ -2,7 +2,7 @@
 import type { StatusOverride } from '../shared/roomOccupancy.js';
 import type { ListingConfig } from '../shared/listing.js';
 
-export type PlanName = 'small' | 'medium' | 'large';
+export type PlanName = 'small' | 'medium' | 'large' | 'business';
 export type BillingCycle = 'monthly' | 'yearly';
 export type LicenseType =
   | 'free'
@@ -10,6 +10,8 @@ export type LicenseType =
   | 'monthly_small'
   | 'monthly_medium'
   | 'monthly_large'
+  | 'monthly_business'
+  | 'yearly_business'
   | 'yearly_small'
   | 'yearly_medium'
   | 'yearly_large';
@@ -231,6 +233,10 @@ export interface MonthlyBill {
   room_rent: number;
   /** Set when room_rent was prorated for a mid-month move-in/out (room_rent is already the prorated amount). */
   rent_prorate?: RentProrate;
+  /** Extra charges (+) and discounts (−) added by hand; already counted in total_bill (shared/billAdjustments.ts). */
+  adjustments?: BillAdjustment[];
+  /** Note printed on the bill for the tenant. */
+  bill_note?: string;
   total_bill: number;
   is_saved: boolean;
   is_locked: boolean;
@@ -265,6 +271,9 @@ export interface MonthlyBill {
   slip_datetime?: string;          // ISO, Thailand time
   slip_account_id?: string;        // receiving account the slip matched
   slip_checks?: SlipChecks;
+  /** What the bank said about the slip's QR (api/_bank-slip.ts); absent when no slip service is set up. */
+  slip_bank_check?: 'verified' | 'not_found' | 'pending' | 'unavailable';
+  slip_bank_provider?: 'slipok' | 'easyslip';
   transaction_ref?: string;        // bank / gateway reference
   verification_status?: PaymentVerification; // transfers: has the money been seen in the account?
   bank_transaction_id?: string;    // the bank transaction this payment was reconciled with
@@ -526,6 +535,13 @@ export interface Expense {
 }
 
 // ─── Fines (ค่าปรับรายห้อง) ───────────────────────────────────────────────────
+export interface BillAdjustment {
+  id: string;
+  label: string;
+  /** baht; positive = charge, negative = discount */
+  amount: number;
+}
+
 export interface RentProrate {
   days: number;
   days_in_month: number;
@@ -573,6 +589,9 @@ export interface Fine {
   slip_datetime?: string;
   slip_account_id?: string;
   slip_checks?: SlipChecks;
+  /** What the bank said about the slip's QR (api/_bank-slip.ts); absent when no slip service is set up. */
+  slip_bank_check?: 'verified' | 'not_found' | 'pending' | 'unavailable';
+  slip_bank_provider?: 'slipok' | 'easyslip';
 }
 
 // ─── Common Fees (ค่าบริการส่วนกลาง) ─────────────────────────────────────────

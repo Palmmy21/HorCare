@@ -16,7 +16,8 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
     { id: 'leasing', label: 'ปล่อยเช่า', items: ['leasing', 'tenants'] },
     { id: 'billing', label: 'เรียกเก็บและรับเงิน', items: ['payments'] },
     { id: 'accounting', label: 'บัญชี', items: ['ledger', 'accounting', 'archives'] },
-    { id: 'service', label: 'ซ่อมบำรุงและบริการ', items: ['maintenance', 'cleaning', 'workorders', 'operations'] },
+    { id: 'service', label: 'ซ่อมบำรุงและบริการ', // แจ้งซ่อม / ใบงาน / งานแม่บ้าน are tabs of ระบบจัดการ; listed so the housekeeper portal's cleaning screen still has a home
+      items: ['operations', 'maintenance', 'cleaning', 'workorders'] },
     { id: 'residents', label: isMarket ? 'ผู้ค้าและการสื่อสาร' : 'ลูกบ้านและการสื่อสาร', items: ['parcels', 'market', 'messages', 'announcements'] },
     // Plan & billing sits on its own (a one-item group renders as a plain top-level link, not a category)
     { id: 'plan', label: 'แพ็กเกจ', items: ['pricing'] },

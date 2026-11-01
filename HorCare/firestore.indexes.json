@@ -42,6 +42,14 @@
                 { "order": "ASCENDING", "queryScope": "COLLECTION" },
                 { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
             ]
+        },
+        {
+            "collectionGroup": "staff",
+            "fieldPath": "line_user_id",
+            "indexes": [
+                { "order": "ASCENDING", "queryScope": "COLLECTION" },
+                { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+            ]
         }
     ]
 }

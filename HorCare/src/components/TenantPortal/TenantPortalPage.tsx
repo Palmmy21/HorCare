@@ -444,6 +444,9 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
                 ...(bill.water_flat_amount ? [{ label: t.water_flat, value: bill.water_flat_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
                 ...(bill.water_excess_amount ? [{ label: `${t.water_excess} (${fmt(bill.water_excess_units)} ${t.unit})`, value: bill.water_excess_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
                 ...(!bill.water_flat_amount ? [{ label: `${t.water_bill} (${fmt(bill.water_units)} ${t.unit})`, value: bill.water_bill, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
+                // common fees and the charges / discounts the owner added, by their own names, so the lines add up to the total
+                ...(bill.applied_common_fees ?? []).filter(f => f.amount > 0).map(f => ({ label: f.name, value: f.amount, icon: <Building2 size={13} color="#0A6CC2" /> })),
+                ...(bill.adjustments ?? []).filter(x => x.amount).map(x => ({ label: x.label, value: x.amount, icon: <Pencil size={13} color="#E8740C" /> })),
               ].map((row, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--color-gray-100)' }}>
                   <td style={{ padding: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.875rem', color: 'var(--color-gray-700)' }}>
@@ -462,6 +465,11 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
               </tr>
             </tfoot>
           </table>
+
+          {/* the owner's note on this bill (e.g. what an extra charge was for) */}
+          {bill.bill_note && (
+            <p style={{ marginTop: '0.625rem', fontSize: '0.8125rem', lineHeight: 1.6, color: 'var(--color-gray-600)', whiteSpace: 'pre-line' }}>{bill.bill_note}</p>
+          )}
 
           {/* Meter readings */}
           <div style={{ marginTop: '0.875rem', padding: '0.75rem', background: 'var(--color-gray-50)', borderRadius: '12px' }}>

@@ -4,7 +4,11 @@
  * accounts, and return what to write on the bill / fine.
  *
  * It never decides "paid" by itself beyond `autoApprove`, and an auto-approved slip is recorded
- * as `verification_status: 'unverified'` — a picture is not proof the money reached the bank.
+ * as `verification_status: 'unverified'` (only bank reconciliation sets 'verified').
+ *
+ * When a slip-verification service is configured (_bank-slip.ts), the slip's QR is checked with the BANK first and
+ * the bank's record replaces the picture: a slip the bank does not know is rejected as fake, and while the bank
+ * cannot be asked (pending, outage, quota) nothing is auto-approved — the owner checks it by eye.
  */
 import { db } from './_firebase.js';
 import { readSlipDetails } from './_slip-ai.js';
@@ -12,7 +16,8 @@ import {
     describeChecks, parseSlipQr, senderBankFromQr, verifySlip,
     type ReceiverCandidate, type SlipDetails, type SlipVerdict,
 } from './_slip-verify.js';
-import { bankAccountLabel, digitsOnly, type BankAccount } from '../src/shared/banks.js';
+import { bankAccountLabel, bankByCode, digitsOnly, type BankAccount } from '../src/shared/banks.js';
+import { verifyBankSlip, type BankSlipResult } from './_bank-slip.js';
 
 /** approved = paid now · mismatch = a check failed, tell the tenant what · review = could not check, owner decides. */
 export type SlipOutcome = 'approved' | 'mismatch' | 'review';
@@ -23,6 +28,8 @@ export interface SlipEvaluation {
     /** Thai, tenant-facing: what on the slip does not match (empty unless outcome = mismatch). */
     problems: string[];
     qrPresent: boolean;
+    /** The bank confirmed this transfer (amount, receiver and time came from the bank, not the picture). */
+    bankVerified: boolean;
     details: SlipDetails | null;
     verdict: SlipVerdict | null;
     /** Extra fields to merge into the bill / fine document (never contains undefined). */
@@ -71,18 +78,39 @@ export async function evaluateSlip(input: {
     // Only "not a reused slip" is known here — never word it as if the payment itself was checked.
     const legacyNote = qrPresent ? 'AI ยังไม่ได้ตรวจยอด/ชื่อ — โปรดตรวจสลิปด้วยตา' : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา';
     const none: SlipEvaluation = {
-        autoApprove: false, outcome: 'review', problems: [], qrPresent, details: null, verdict: null, fields: {}, verifyNote: legacyNote, aiAmount: null, splitAmount: null,
+        autoApprove: false, outcome: 'review', problems: [], qrPresent, bankVerified: false, details: null, verdict: null, fields: {}, verifyNote: legacyNote, aiAmount: null, splitAmount: null,
     };
 
-    if (!input.isPro || !input.imageBase64 || !qrPresent) return none;
+    if (!input.isPro || !qrPresent) return none;
 
-    const details = await readSlipDetails(input.imageBase64, input.mimeType);
-    if (!details) return none;
+    // 1. ask the bank about the transfer behind the QR
+    const bank: BankSlipResult = await verifyBankSlip(input.qrPayload, { bankShort: code => bankByCode(code)?.short ?? null });
+    const bankConfigured = !(bank.status === 'unavailable' && bank.reason === 'not_configured');
+    // nothing is recorded about the bank when no slip service is set up
+    const bankFields: Record<string, unknown> = bankConfigured ? { slip_bank_check: bank.status, ...(bank.provider ? { slip_bank_provider: bank.provider } : {}) } : {};
+    if (bank.status === 'not_found') {
+        return {
+            ...none, outcome: 'mismatch', fields: bankFields,
+            problems: ['ธนาคารไม่พบรายการโอนตาม QR ในสลิปนี้ สลิปอาจปลอม ถูกแก้ไข หรือไม่ใช่สลิปโอนเงิน'],
+            verifyNote: 'ธนาคารไม่พบรายการโอนนี้ — สลิปอาจปลอมหรือถูกแก้ไข',
+        };
+    }
+
+    // 2. the bank's record when it has one; otherwise read the picture (never auto-approved while the bank is configured)
+    const bankVerified = bank.status === 'verified';
+    let details: SlipDetails | null = bankVerified ? bank.details : null;
+    if (!details) {
+        if (!input.imageBase64) return { ...none, fields: bankFields, verifyNote: bankWaitNote(bank) ?? legacyNote };
+        details = await readSlipDetails(input.imageBase64, input.mimeType);
+        if (!details) return { ...none, fields: bankFields, verifyNote: bankWaitNote(bank) ?? legacyNote };
+    }
 
     const { candidates } = await loadReceiverCandidates(input.ownerUid, input.buildingId);
-    const verdict = verifySlip({
+    const checked = verifySlip({
         details, qrPresent, duplicate: false, expectedAmount: input.expectedAmount, candidates, billCreatedAt: input.billCreatedAt,
     });
+    // with a slip service configured, only a bank-confirmed slip is approved on its own
+    const verdict: SlipVerdict = bankConfigured && !bankVerified ? { ...checked, auto_approve: false } : checked;
 
     const qr = parseSlipQr(input.qrPayload);
     const matched = verdict.matched_candidate_id ? candidates.find(c => c.id === verdict.matched_candidate_id) : undefined;
@@ -98,6 +126,7 @@ export async function evaluateSlip(input: {
         slip_account_id: matched?.id,
         transaction_ref: qr.reference ?? details.reference,
         slip_checks: verdict.checks,
+        ...bankFields,
     });
     if (verdict.auto_approve) {
         Object.assign(fields, compact({
@@ -124,13 +153,23 @@ export async function evaluateSlip(input: {
         outcome: verdict.auto_approve ? 'approved' : problems.length ? 'mismatch' : 'review',
         problems: verdict.auto_approve ? [] : problems,
         qrPresent,
+        bankVerified,
         details, verdict, fields,
         aiAmount: details.amount,
         splitAmount,
         verifyNote: verdict.auto_approve
-            ? `อนุมัติอัตโนมัติจากสลิป (ยังไม่ยืนยันกับบัญชีธนาคาร) — ${summary}`
-            : `ตรวจสลิปแล้ว — ${summary} · โปรดตรวจด้วยตา`,
+            ? bankVerified
+                ? `อนุมัติอัตโนมัติ — ธนาคารยืนยันรายการโอนแล้ว — ${summary}`
+                : `อนุมัติอัตโนมัติจากสลิป (ยังไม่ยืนยันกับบัญชีธนาคาร) — ${summary}`
+            : `${bankVerified ? 'ธนาคารยืนยันรายการโอนแล้ว' : bankWaitNote(bank) ?? 'ตรวจสลิปแล้ว'} — ${summary} · โปรดตรวจด้วยตา`,
     };
+}
+
+/** Why the bank could not confirm the slip yet (null when there is no slip service or it answered). */
+function bankWaitNote(bank: BankSlipResult): string | null {
+    if (bank.status === 'pending') return 'ธนาคารยังไม่ปล่อยข้อมูลรายการนี้ (บางธนาคารใช้เวลาไม่กี่นาที)';
+    if (bank.status === 'unavailable' && bank.reason !== 'not_configured') return `ตรวจกับธนาคารไม่ได้ตอนนี้ (${bank.reason})`;
+    return null;
 }
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
@@ -149,7 +188,8 @@ function slipProblems(verdict: SlipVerdict, details: SlipDetails, expectedAmount
 export function tenantSlipReply(roomNumber: string, e: SlipEvaluation): string {
     if (e.outcome === 'approved') {
         const amount = e.aiAmount != null ? ` ${baht(e.aiAmount)}` : '';
-        return `✅ ได้รับยอดชำระ${amount} เรียบร้อยแล้วค่ะ\n\nAI ตรวจยอดเงินและชื่อผู้รับตรงกับบิลห้อง ${roomNumber} แล้ว สถานะเปลี่ยนเป็น "จ่ายแล้ว" ขอบคุณค่ะ`;
+        const how = e.bankVerified ? 'ตรวจกับธนาคารแล้ว ยอดเงินและบัญชีผู้รับ' : 'AI ตรวจยอดเงินและชื่อผู้รับ';
+        return `✅ ได้รับยอดชำระ${amount} เรียบร้อยแล้วค่ะ\n\n${how}ตรงกับบิลห้อง ${roomNumber} แล้ว สถานะเปลี่ยนเป็น "จ่ายแล้ว" ขอบคุณค่ะ`;
     }
     if (e.outcome === 'mismatch') {
         const list = e.problems.map(p => `- ${p}`).join('\n');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addGap, addGroup, autoPlan, contractState, firstFree, fits, groupNameOf, isFloorPlan, linkUnits, moveUnit, placeUnit,
+  addGap, addGroup, autoPlan, contractState, planForWing, splitGroupName, firstFree, fits, groupNameOf, isFloorPlan, linkUnits, moveUnit, placeUnit,
   reconcile, removeGroup, resizeUnit, setCols, tenantGroups, unlinkUnit, UNPLACED_GROUP_NAME, type FloorPlan, type PlanRoom,
 } from './floorPlan';
 
@@ -129,5 +129,31 @@ describe('contractState / isFloorPlan', () => {
     expect(isFloorPlan(autoPlan(dorm, 'floors'))).toBe(true);
     expect(isFloorPlan({ version: 2, groups: [], links: [] })).toBe(false);
     expect(isFloorPlan(null)).toBe(false);
+  });
+});
+
+describe('several buildings in one property', () => {
+  const rooms = [
+    { id: 'a101', room_number: '101', is_active: true, building_name: 'A' },
+    { id: 'a201', room_number: '201', is_active: true, building_name: 'A' },
+    { id: 'b101', room_number: '101', is_active: true, building_name: 'B' },
+  ];
+
+  it('gives each building its own floors, building by building, top floor first', () => {
+    expect(autoPlan(rooms, 'floors').groups.map(g => g.name)).toEqual(['ตึก A · ชั้น 2', 'ตึก A · ชั้น 1', 'ตึก B · ชั้น 1']);
+    expect(splitGroupName('ตึก A · ชั้น 2')).toEqual({ wing: 'ตึก A', floor: 'ชั้น 2' });
+    expect(splitGroupName('ชั้น 2')).toEqual({ wing: '', floor: 'ชั้น 2' });
+  });
+
+  it('keeps single-building properties exactly as before', () => {
+    expect(autoPlan(rooms.filter(r => r.building_name === 'A'), 'floors').groups.map(g => g.name)).toEqual(['ชั้น 2', 'ชั้น 1']);
+  });
+
+  it("shows one building's units without touching the plan", () => {
+    const plan = autoPlan(rooms, 'floors');
+    const byId = new Map(rooms.map(r => [r.id, r]));
+    const b = planForWing(plan, byId, 'B');
+    expect(b.groups.map(g => g.name)).toEqual(['ตึก B · ชั้น 1']);
+    expect(plan.groups).toHaveLength(3);
   });
 });

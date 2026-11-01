@@ -211,6 +211,8 @@ service cloud.firestore {
                 && !billLocked() && changesOnly(billMeterFields()))
             // payment.update may change how a bill was paid (including undoing it)
             || (memberCan(userId, buildingId, 'payment.update') && changesOnly(billPaymentFields()))
+            // payment.update may also add charges / discounts to an open bill (Summary → แก้ไขบิล)
+            || (memberCan(userId, buildingId, 'payment.update') && !billLocked() && changesOnly(['adjustments', 'bill_note', 'total_bill', 'updated_at']))
             // payment.create may only record a payment on a bill that is not paid yet
             || (memberCan(userId, buildingId, 'payment.create') && changesOnly(billPaymentFields())
                 && resource.data.get('payment_status', 'unpaid') != 'paid')
