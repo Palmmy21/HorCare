@@ -1,5 +1,6 @@
 import type { Fine, MonthlyBill } from '../src/types/index.js';
 import * as crypto from 'crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 export function verifyLineSignature(rawBody: Buffer | string, secret: string, signature: string): boolean {
     if (!signature) return false;
@@ -19,8 +20,27 @@ export function verifyLineSignature(rawBody: Buffer | string, secret: string, si
  */
 export const staffLineToken = (): string | undefined => process.env.LINE_STAFF_CHANNEL_ACCESS_TOKEN;
 
+/**
+ * Residents talk to one of two Official Accounts: the tenant OA, or the vendor OA for market stalls
+ * (LINE_MARKET_CHANNEL_SECRET / LINE_MARKET_CHANNEL_ACCESS_TOKEN, webhook /api/line-market-webhook). The same tenant code
+ * serves both: the vendor webhook runs it inside runInLineChannel('market'), so every reply, push and image download
+ * made while handling that event uses the vendor OA. Pushes made elsewhere (bills, reminders) pick the OA the room was
+ * linked through — rooms remember it in `line_channel` — so rooms linked before the vendor OA existed keep working.
+ */
+export type LineChannel = 'tenant' | 'market';
+const channelStore = new AsyncLocalStorage<LineChannel>();
+export const currentLineChannel = (): LineChannel => channelStore.getStore() ?? 'tenant';
+export const runInLineChannel = <T>(channel: LineChannel, fn: () => T): T => channelStore.run(channel, fn);
+/** The resident OA's access token: the given channel, else the one this request runs in. */
+export const residentLineToken = (channel: LineChannel = currentLineChannel()): string | undefined =>
+    channel === 'market' ? process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN : process.env.LINE_CHANNEL_ACCESS_TOKEN;
+/** The OA a room's tenant / vendor linked LINE through (rooms linked before the vendor OA have none: tenant). */
+export const roomLineChannel = (room: { line_channel?: unknown } | null | undefined): LineChannel => (room?.line_channel === 'market' ? 'market' : 'tenant');
+/** Access token for pushing to a room's tenant / vendor. */
+export const roomLineToken = (room: { line_channel?: unknown } | null | undefined): string | undefined => residentLineToken(roomLineChannel(room));
+
 /** 	oken defaults to the tenant OA's access token. */
-export async function lineReply(replyToken: string, messages: object[], token: string | undefined = process.env.LINE_CHANNEL_ACCESS_TOKEN): Promise<void> {
+export async function lineReply(replyToken: string, messages: object[], token: string | undefined = residentLineToken()): Promise<void> {
     if (!token) return;
     await fetch('https://api.line.me/v2/bot/message/reply', {
         method: 'POST',
@@ -31,7 +51,7 @@ export async function lineReply(replyToken: string, messages: object[], token: s
 
 /** Download the binary content of an image/file message the user sent. */
 export async function getLineImageContent(messageId: string): Promise<{ buffer: Buffer; contentType: string } | null> {
-    const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const token = residentLineToken();
     if (!token) return null;
     const res = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -42,7 +62,7 @@ export async function getLineImageContent(messageId: string): Promise<{ buffer: 
     return { buffer, contentType };
 }
 
-export async function linePush(to: string, messages: object[], token: string | undefined = process.env.LINE_CHANNEL_ACCESS_TOKEN): Promise<void> {
+export async function linePush(to: string, messages: object[], token: string | undefined = residentLineToken()): Promise<void> {
     if (!token) return;
 
     // ยิงพร้อม retry สั้นๆ เมื่อโดน rate-limit (429) — ตอน 1000 หอบิลจะไม่หายเงียบ.
@@ -271,6 +291,7 @@ export function buildBillFlex(
     // every charge on the bill, in the order of the printed invoice
     const items: object[] = [];
     if (Number(bill.room_rent) > 0) items.push(itemRow(L('room_rent'), bill.room_rent));
+    if (bill.rent_only) { /* rent-only bill: no meter lines */ } else {
     items.push(itemRow(L('electricity'), bill.elec_bill, reading(bill.prev_elec, bill.curr_elec, bill.elec_units, unit)));
     if (Number(bill.water_flat_amount) > 0) {
         items.push(itemRow(L('water_flat'), bill.water_flat_amount, reading(bill.prev_water, bill.curr_water, bill.water_units, unit)));
@@ -279,6 +300,7 @@ export function buildBillFlex(
         }
     } else {
         items.push(itemRow(L('water'), bill.water_bill, reading(bill.prev_water, bill.curr_water, bill.water_units, unit)));
+    }
     }
     const fees = (bill.applied_common_fees ?? []).filter(f => Number(f.amount) > 0);
     if (fees.length) fees.forEach(f => items.push(itemRow(f.name, f.amount)));
@@ -368,8 +390,10 @@ export function buildReceiptFlex(
                         { type: 'text', text: monthFormatted, size: 'sm', flex: 3, align: 'end' },
                     ] },
                     { type: 'separator', margin: 'md' },
-                    row(elecLabel, `฿${Number(bill.elec_bill ?? 0).toLocaleString()}`, { margin: 'md' }),
-                    row(waterLabel, `฿${Number(bill.water_bill ?? 0).toLocaleString()}`),
+                    ...(bill.rent_only ? [] : [
+                        row(elecLabel, `฿${Number(bill.elec_bill ?? 0).toLocaleString()}`, { margin: 'md' }),
+                        row(waterLabel, `฿${Number(bill.water_bill ?? 0).toLocaleString()}`),
+                    ]),
                     row(rentLabel, `฿${Number(bill.room_rent ?? 0).toLocaleString()}`),
                     ...(bill.common_fee ? [row(commonLabel, `฿${Number(bill.common_fee).toLocaleString()}`)] : []),
                     ...(bill.adjustments ?? []).filter(a => Number(a.amount)).map(a => row(`➕ ${a.label}`, `${a.amount < 0 ? '-' : ''}฿${Math.abs(Number(a.amount)).toLocaleString()}`)),

@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { linePush, runPooled } from './_line.js';
+import { linePush, runPooled, roomLineToken } from './_line.js';
 import { resolvePortalLink } from './_portal-link.js';
 import {
     announcementLineText, cleanAnnouncementInput, visibleAnnouncements,
@@ -85,14 +85,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             created_at: now, created_by: ctx.displayName, updated_at: now,
         };
         if (body.send_line === true) {
-            if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) { res.status(503).json({ error: 'line_not_configured', message: 'ยังไม่ได้ตั้งค่า LINE บนเซิร์ฟเวอร์' }); return; }
+            if (!process.env.LINE_CHANNEL_ACCESS_TOKEN && !process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN) { res.status(503).json({ error: 'line_not_configured', message: 'ยังไม่ได้ตั้งค่า LINE บนเซิร์ฟเวอร์' }); return; }
             // Only tenants linked to THIS property (line_rooms carries owner + building).
             const links = await db.collection('line_rooms').where('uid', '==', ctx.ownerUid).where('building_id', '==', buildingId).get();
             const ids = [...new Set(links.docs.map(d => d.id))];
+            // each tenant / vendor hears it through the OA their room linked through
+            const roomOf = new Map(links.docs.map(d => [d.id, String(d.data().room_id ?? '')]));
+            const rooms = new Map((await db.collection(`users/${ctx.ownerUid}/buildings/${buildingId}/rooms`).get()).docs.map(d => [d.id, d.data()]));
             const dorm = ((await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/data/config`).get()).data()?.bill_customization?.dorm_name as string | undefined) || 'หอพัก';
             const text = announcementLineText(ann, dorm);
             await runPooled(ids, PUSH_CONCURRENCY, async lineUserId => {
-                try { await linePush(lineUserId, [{ type: 'text', text }]); ann.line_sent++; } catch { ann.line_failed++; }
+                try { await linePush(lineUserId, [{ type: 'text', text }], roomLineToken(rooms.get(roomOf.get(lineUserId) ?? ''))); ann.line_sent++; } catch { ann.line_failed++; }
             });
         }
         await db.doc(`${col}/${ann.id}`).set(ann);

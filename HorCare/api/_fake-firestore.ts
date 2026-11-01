@@ -89,6 +89,17 @@ export const db = {
     doc: (path: string) => docRef(path),
     collection: (path: string) => collectionRef(path),
     collectionGroup: (id: string) => collectionGroupRef(id),
+    /** Writes queued, applied together on commit (like a Firestore WriteBatch). */
+    batch: () => {
+        const ops: (() => Promise<void>)[] = [];
+        const b = {
+            set: (ref: { set: (d: Data, o?: { merge?: boolean }) => Promise<void> }, d: Data, o?: { merge?: boolean }) => { ops.push(() => ref.set(d, o)); return b; },
+            update: (ref: { update: (d: Data) => Promise<void> }, d: Data) => { ops.push(() => ref.update(d)); return b; },
+            delete: (ref: { delete: () => Promise<void> }) => { ops.push(() => ref.delete()); return b; },
+            commit: async () => { for (const op of ops) await op(); },
+        };
+        return b;
+    },
     runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => fn({
         get: (ref: { get: () => Promise<unknown> }) => ref.get(),
         set: (ref: { set: (d: Data, o?: { merge?: boolean }) => Promise<void> }, d: Data, o?: { merge?: boolean }) => { void ref.set(d, o); },

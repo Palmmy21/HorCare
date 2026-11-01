@@ -28,6 +28,7 @@ import { billsInWing, hasWings, monthStatsOf, roomsInWing, validWing, wingsOf } 
 import WingBar from './components/Building/WingBar';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
+import QuickStart from './components/Dashboard/QuickStart';
 import RoomManagement from './components/RoomManagement/RoomManagement';
 import MeterRecording from './components/MeterRecording/MeterRecording';
 import Settings from './components/Settings/Settings';
@@ -413,6 +414,7 @@ function App() {
     deleteBill,
     updateBillPayment,
     updateBillExtras,
+    createRentBills,
     addFine,
     updateFine,
     deleteFine,
@@ -500,7 +502,7 @@ function App() {
   const collectionStyle = collectionStyleOf(config);
 
   const navItems = [
-    { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'Dashboard' },
+    { id: 'dashboard'   as ViewMode, icon: LayoutDashboard, label: 'ภาพรวม' },
     { id: 'floorplan'   as ViewMode, icon: MapIcon, label: PLAN_LABELS[planKindOf(config?.building_type)].title },
     { id: 'rooms'       as ViewMode, icon: terms.isMarket ? Store : Home, label: terms.manageUnitsLabel || 'จัดการห้อง' },
     { id: 'parking'     as ViewMode, icon: Car, label: 'ที่จอดรถ' },
@@ -512,7 +514,7 @@ function App() {
     { id: 'ledger' as ViewMode, icon: BookOpen, label: 'สมุดบัญชี' },
     { id: 'leasing' as ViewMode, icon: KeyRound, label: 'ปล่อยเช่า' },
     { id: 'accounting' as ViewMode, icon: BookOpenCheck, label: 'ภาพรวมการเงิน' },
-    { id: 'summary'     as ViewMode, icon: Send,            label: 'สรุปยอด' },
+    { id: 'summary'     as ViewMode, icon: Send,            label: 'ออกบิล & ส่งบิล' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
     ...(terms.isMarket ? [{ id: 'market' as ViewMode, icon: Store, label: 'ร้านค้า & ขาจร' }] : []),
@@ -1614,6 +1616,17 @@ function App() {
           </div>
         )}
       <Suspense fallback={<PageLoader />}>
+        {currentView === 'dashboard' && user && activeBuildingId && !maidSession && staffPermissions === null && (
+          <QuickStart
+            key={activeBuildingId}
+            config={config}
+            rooms={rooms}
+            bills={bills}
+            ownerUid={orgUid}
+            buildingId={activeBuildingId}
+            onGo={view => handleNavClick(view)}
+          />
+        )}
         {currentView === 'dashboard' && (
           <Dashboard
             config={config}
@@ -1769,6 +1782,8 @@ function App() {
             canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
             onEditBillExtras={staffPermissions === null || staffPermissions.includes('payment.update') ? updateBillExtras : undefined}
+            onCreateRentBills={staffPermissions === null || staffPermissions.includes('meter.record') ? createRentBills : undefined}
+            unitName={terms.unitName}
           />
         )}
 

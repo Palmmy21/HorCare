@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { linePush } from './_line.js';
+import { linePush, roomLineToken } from './_line.js';
 import { loadMediaDataUrl } from './_line-media.js';
 import {
     MAX_INCOMING_CHARS, MAX_OUTGOING_CHARS,
@@ -172,13 +172,15 @@ async function handleAuthorized(
         res.status(409).json({ error: 'tenant_unlinked', message: 'ผู้เช่าคนนี้ไม่ได้เชื่อม LINE กับห้องนี้แล้ว จึงส่งข้อความไม่ได้' });
         return;
     }
-    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
+    // the OA this tenant / vendor linked through must be set up on the server
+    const token = roomLineToken(room.data());
+    if (!token) {
         res.status(503).json({ error: 'line_not_configured', message: 'ยังไม่ได้ตั้งค่า LINE บนเซิร์ฟเวอร์' });
         return;
     }
 
     try {
-        await linePush(body.line_user_id, [{ type: 'text', text }]);
+        await linePush(body.line_user_id, [{ type: 'text', text }], token);
     } catch (err) {
         console.error('[line-inbox] push failed:', (err as Error).message);
         res.status(502).json({ error: 'send_failed', message: 'ส่งข้อความทาง LINE ไม่สำเร็จ กรุณาลองใหม่' });

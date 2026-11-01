@@ -8,6 +8,7 @@ import ReportsTab from './ReportsTab';
 import LedgerSettingsTab from './LedgerSettingsTab';
 import StatementsTab from './StatementsTab';
 import GuidedEntryTab from './GuidedEntryTab';
+import YearEndClose from './YearEndClose';
 import FinanceOverviewTab from '../Accounting/FinanceOverviewTab';
 
 type Tab = 'overview' | 'guided' | 'statements' | 'post' | 'journal' | 'reports' | 'settings';
@@ -58,7 +59,12 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
             {activeTab === 'overview' && <FinanceOverviewTab key={current?.id ?? 'all'} ownerUid={ownerUid} buildings={chartBuildings.length ? chartBuildings : buildings} />}
             {!loading && activeTab === 'settings' && <LedgerSettingsTab ownerUid={ownerUid} buildings={buildings} ledgers={ledgers} selectedId={selected || current?.id || 'new'} onSelect={setSelected} />}
             {current && activeTab === 'guided' && <GuidedEntryTab ownerUid={ownerUid} ledger={current} />}
-            {current && activeTab === 'statements' && (entriesLoading ? <div>กำลังโหลด…</div> : <StatementsTab ledger={current} entries={entries} />)}
+            {current && activeTab === 'statements' && (entriesLoading ? <div>กำลังโหลด…</div> : (
+                <>
+                    <StatementsTab ledger={current} entries={entries} />
+                    <YearEndClose ownerUid={ownerUid} ledger={current} entries={entries} />
+                </>
+            ))}
             {current && activeTab === 'post' && <PostingTab ownerUid={ownerUid} ledger={current} />}
             {current && activeTab === 'journal' && (entriesLoading ? <div>กำลังโหลด…</div> : <JournalTab ownerUid={ownerUid} ledger={current} entries={entries} />)}
             {current && activeTab === 'reports' && (entriesLoading ? <div>กำลังโหลด…</div> : <ReportsTab ownerUid={ownerUid} ledger={current} entries={entries} />)}

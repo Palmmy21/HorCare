@@ -31,25 +31,25 @@ export function erpModules(isMarket: boolean, style: ModuleStyle = 'monthly'): E
     {
       id: 'property', label: isMarket ? 'แผงค้าและพื้นที่' : 'ทรัพย์สิน',
       purpose: isMarket ? 'ทะเบียนแผง โซน การเก็บเงินรายวัน/รายสัปดาห์ และมิเตอร์' : nightly ? 'ทะเบียนห้องพัก สิ่งอำนวยความสะดวก ปฏิทินการจอง และการเก็บค่าห้องต่อคืน' : 'ทะเบียนห้อง/ยูนิต สิ่งอำนวยความสะดวก และมิเตอร์น้ำไฟ',
-      views: ['rooms', 'collections', 'recording', 'summary'],
+      views: ['rooms'],
       planned: ['ผังชั้น/โซน', 'เจ้าของทรัพย์สิน (กรณีบริหารแทน)'],
     },
     {
       id: 'leasing', label: 'ปล่อยเช่า',
       purpose: 'จากผู้สนใจ สู่การจอง สัญญาเช่า การต่อสัญญา ไปจนถึงย้ายออกและคืนมัดจำ',
-      views: ['leasing', 'tenants'],
+      views: ['tenants', 'leasing'],
       planned: ['ตรวจรับห้องเข้า-ออก (checklist)', 'คืนเงินมัดจำและหักค่าเสียหาย', 'ใบเสนอราคา'],
     },
     {
       id: 'billing', label: 'เรียกเก็บและรับเงิน',
       purpose: nightly ? 'รับเงินสด/โอน อ่านสลิป ค่าปรับ และกระทบยอดธนาคาร (ค่าห้องต่อคืนเก็บที่หน้า เก็บค่าห้อง)' : 'บิลรายเดือน ค่าปรับ รับเงินสด/โอน อ่านสลิป และกระทบยอดธนาคาร',
-      views: ['payments'],
+      views: ['recording', 'summary', 'collections', 'payments'],
       planned: ['ใบกำกับภาษี / VAT', 'เตือนค้างชำระอัตโนมัติ', 'ค่าปรับล่าช้าอัตโนมัติ'],
     },
     {
       id: 'accounting', label: 'บัญชี',
       purpose: 'สมุดบัญชีของ HorCare ลงรายการจากบิลและเงินรับ รายงาน และส่งออกไประบบบัญชีอื่น',
-      views: ['ledger', 'accounting', 'archives'],
+      views: ['accounting', 'ledger', 'archives'],
       planned: ['ยอดยกมา', 'งบกำไรขาดทุน / งบดุล', 'เจ้าหนี้และค่าใช้จ่าย', 'งบประมาณ', 'VAT / หัก ณ ที่จ่าย'],
     },
     {

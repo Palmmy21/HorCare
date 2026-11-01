@@ -12,10 +12,12 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
   return [
     // Real-estate ERP modules: property → leasing → billing → accounting → operations → residents → system
     { id: 'overview', label: 'ภาพรวม', items: ['dashboard'] },
-    { id: 'property', label: isMarket ? 'แผงค้า' : 'ทรัพย์สิน', items: ['floorplan', 'rooms', 'parking', 'collections', 'recording', 'summary'] },
-    { id: 'leasing', label: 'ปล่อยเช่า', items: ['leasing', 'tenants'] },
-    { id: 'billing', label: 'เรียกเก็บและรับเงิน', items: ['payments'] },
-    { id: 'accounting', label: 'บัญชี', items: ['ledger', 'accounting', 'archives'] },
+    { id: 'property', label: isMarket ? 'แผงค้า' : 'ทรัพย์สิน', items: ['floorplan', 'rooms', 'parking'] },
+    // people first: the tenant list is daily work, the leasing pipeline is occasional
+    { id: 'leasing', label: isMarket ? 'ผู้ค้าและสัญญา' : 'ผู้เช่าและสัญญา', items: ['tenants', 'leasing'] },
+    // the monthly money flow in the order it is done: read meters → issue & send bills → take payment
+    { id: 'billing', label: 'เรียกเก็บและรับเงิน', items: ['recording', 'summary', 'collections', 'payments'] },
+    { id: 'accounting', label: 'บัญชี', items: ['accounting', 'ledger', 'archives'] },
     { id: 'service', label: 'ซ่อมบำรุงและบริการ', // แจ้งซ่อม / ใบงาน / งานแม่บ้าน are tabs of ระบบจัดการ; listed so the housekeeper portal's cleaning screen still has a home
       items: ['operations', 'maintenance', 'cleaning', 'workorders'] },
     { id: 'residents', label: isMarket ? 'ผู้ค้าและการสื่อสาร' : 'ลูกบ้านและการสื่อสาร', items: ['parcels', 'market', 'messages', 'announcements'] },

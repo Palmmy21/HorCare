@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { linePush, buildReceiptFlex } from './_line.js';
+import { linePush, buildReceiptFlex, roomLineToken } from './_line.js';
 import type { MonthlyBill } from '../src/types/index.js';
 
 
@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const roomLang = roomSnap.data()?.language || cfgSnap.data()?.bill_customization?.default_language || 'th';
         const bilingual = !!cfgSnap.data()?.bill_customization?.bilingual_mode;
         const secLang = cfgSnap.data()?.bill_customization?.secondary_language || 'en';
-        await linePush(lineUserId, [buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })]);
+        await linePush(lineUserId, [buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })], roomLineToken(roomSnap.data()));
         res.status(200).json({ data: { notified: true } });
 
     } catch (errorRaw) {

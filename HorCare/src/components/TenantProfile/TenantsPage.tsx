@@ -3,7 +3,7 @@ import {
   Users, User, Phone, AlertTriangle, Search,
   LogIn, Banknote, ChevronRight, Home, MessageCircle,
   UserCheck, UserX, Link2, CheckCheck, Store, Tag,
-  PenTool, ShieldCheck, Clock,
+  PenTool, ShieldCheck, Clock, QrCode,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Room, DormConfig } from '../../types';
@@ -12,6 +12,7 @@ import { fetchPortalUrl } from '../../utils/portalLinks';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 import InvitationModal from './InvitationModal';
+import QrSheetModal from './QrSheetModal';
 import { useRoomOccupancy } from '../../hooks/useRoomOccupancy';
 import { canOpenView } from '../../shared/viewAccess';
 import type { Permission } from '../../shared/permissions';
@@ -331,6 +332,8 @@ export default function TenantsPage({
   const [filter, setFilter] = useState<FilterMode>('all');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [inviteTarget, setInviteTarget] = useState<{ room: Room; tenantName?: string } | null>(null);
+  const [qrSheetOpen, setQrSheetOpen] = useState(false);
+  const canInvite = permissions === null || permissions.includes('invitation.create');
 
   const activeRooms = rooms.filter(r => r.is_active);
   // follow the live room (its override changes while the profile is open)
@@ -358,6 +361,11 @@ export default function TenantsPage({
         <p className="page-subtitle">
           จัดการและดูข้อมูล{terms.tenantLabel}ทั้งหมด {activeRooms.length} {terms.unitName}
         </p>
+        {canInvite && (
+          <button className="btn btn-outline btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setQrSheetOpen(true)}>
+            <QrCode size={14} /> QR ลงทะเบียน LINE ทุก{terms.unitName}
+          </button>
+        )}
       </div>
 
       {/* ── Room Status Dashboard ── */}
@@ -454,7 +462,20 @@ export default function TenantsPage({
           room={inviteTarget.room}
           tenantName={inviteTarget.tenantName}
           unitName={terms.unitName}
+          buildingType={buildingType ?? config?.building_type}
           onClose={() => setInviteTarget(null)}
+        />
+      )}
+
+      {qrSheetOpen && (
+        <QrSheetModal
+          ownerUid={uid}
+          buildingId={buildingId}
+          rooms={rooms}
+          unitName={terms.unitName}
+          dormName={config?.bill_customization?.dorm_name}
+          buildingType={buildingType ?? config?.building_type}
+          onClose={() => setQrSheetOpen(false)}
         />
       )}
 

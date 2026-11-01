@@ -11,16 +11,16 @@ describe('groupNav', () => {
     const groups = groupNav(ALL, navGroupDefs(false));
     expect(groups.map(g => g.id)).toEqual(['overview', 'property', 'leasing', 'billing', 'accounting', 'service', 'residents', 'plan', 'system']);
     expect(ids(groups.find(g => g.id === 'plan')!.items)).toEqual(['pricing']); // one item → plain top-level link
-    expect(ids(groups.find(g => g.id === 'billing')!.items)).toEqual(['payments']);
+    expect(ids(groups.find(g => g.id === 'billing')!.items)).toEqual(['recording', 'summary', 'payments']);
     expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['archives']);
-    expect(ids(groups.find(g => g.id === 'property')!.items)).toEqual(['rooms', 'recording', 'summary']);
+    expect(ids(groups.find(g => g.id === 'property')!.items)).toEqual(['rooms']);
     expect(ids(groups.find(g => g.id === 'service')!.items)).toEqual(['operations', 'maintenance', 'cleaning', 'workorders']);
     expect(groups.flatMap(g => ids(g.items)).sort()).toEqual(ids(ALL).sort()); // nothing lost, nothing duplicated
   });
 
   it('drops empty groups (e.g. the maid portal only sees two views)', () => {
     const groups = groupNav([item('cleaning'), item('recording')], navGroupDefs(false));
-    expect(groups.map(g => g.id)).toEqual(['property', 'service']);
+    expect(groups.map(g => g.id)).toEqual(['billing', 'service']);
   });
 
   it('never loses a view that has no category — it joins the last group', () => {
@@ -42,8 +42,8 @@ describe('groupNav', () => {
   it('the new ERP views land in their modules', () => {
     const groups = groupNav([item('dashboard'), item('leasing'), item('tenants'), item('ledger'), item('accounting'), item('market'), item('announcements')], navGroupDefs(false));
     expect(ids(groups.find(g => g.id === 'overview')!.items)).toEqual(['dashboard']);
-    expect(ids(groups.find(g => g.id === 'leasing')!.items)).toEqual(['leasing', 'tenants']);
-    expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['ledger', 'accounting']);
+    expect(ids(groups.find(g => g.id === 'leasing')!.items)).toEqual(['tenants', 'leasing']);
+    expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['accounting', 'ledger']);
     expect(ids(groups.find(g => g.id === 'residents')!.items)).toEqual(['market', 'announcements']);
   });
 

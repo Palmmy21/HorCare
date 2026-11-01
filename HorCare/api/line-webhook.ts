@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { isPaidPlan } from '../src/shared/plans.js';
-import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback } from './_line.js';
+import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback, currentLineChannel } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
@@ -50,9 +50,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
     }
 
-    const secret = process.env.LINE_CHANNEL_SECRET;
+    // the vendor OA (/api/line-market-webhook) runs this same handler with its own channel secret
+    const market = currentLineChannel() === 'market';
+    const secret = market ? process.env.LINE_MARKET_CHANNEL_SECRET : process.env.LINE_CHANNEL_SECRET;
     if (!secret) {
-        res.status(500).send('LINE_CHANNEL_SECRET not set');
+        res.status(500).send(market ? 'LINE_MARKET_CHANNEL_SECRET not set' : 'LINE_CHANNEL_SECRET not set');
         return;
     }
 
@@ -411,7 +413,7 @@ async function handleRoomNumber(
     const batch = db.batch();
 
     // ── บันทึกการลงทะเบียนใหม่ ────────────────────────────────────
-    batch.update(roomDoc.ref, { line_user_id: lineUserId });
+    batch.update(roomDoc.ref, { line_user_id: lineUserId, line_channel: currentLineChannel() });
     batch.set(db.collection('line_rooms').doc(lineUserId), {
         uid,
         building_id,

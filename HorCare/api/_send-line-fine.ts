@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { buildFineFlex, linePush } from './_line.js';
+import { buildFineFlex, linePush, roomLineToken } from './_line.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { portalLinkFor } from './_portal-link.js';
@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             pay: invoicePay(payAccount, Number(fine.amount), appUrl || appBaseUrl()),
         })];
 
-        await linePush(lineUserId, messages);
+        await linePush(lineUserId, messages, roomLineToken(roomData));
 
         // Optional: Update fine doc to mark it as notified
         await fineSnap.ref.update({ is_notified: true });

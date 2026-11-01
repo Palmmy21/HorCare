@@ -3434,6 +3434,20 @@ textarea,
 .sp-gone { max-width: 420px; }
 .sp-gone h1 { font-size: 1.125rem; font-weight: 700; color: var(--color-gray-900); }
 
+/* ===== สรุปยอด → ออกบิลค่าเช่า ===== */
+.summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.rb-modal { max-width: 30rem; }
+.rb-all { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; font-size: 0.875rem; font-weight: 600; color: var(--color-gray-800); cursor: pointer; }
+.rb-list { list-style: none; max-height: 45vh; overflow-y: auto; border: 1px solid var(--color-gray-200); border-radius: var(--radius-lg); }
+.rb-list li + li { border-top: 1px solid var(--color-gray-100); }
+.rb-list label { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-3); cursor: pointer; font-size: 0.875rem; }
+.rb-no { font-weight: 600; color: var(--color-gray-900); }
+.rb-rent { margin-left: auto; color: var(--color-gray-700); }
+.rb-total { margin-top: var(--space-3); font-size: 0.875rem; color: var(--color-gray-700); }
+.rb-total small { color: var(--color-gray-500); }
+.rb-empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-6) 0; color: var(--color-gray-600); }
+.rb-empty svg { color: var(--color-success); }
+
 /* ===== สรุปยอด → แก้ไขบิล ===== */
 .summary-extra { margin-top: 2px; font-size: 0.75rem; color: var(--color-accent, #C2410C); white-space: nowrap; }
 .be-modal { max-width: 34rem; }
@@ -6025,4 +6039,79 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
 .lp-hero-inner, .pricing-page { padding-top: calc(var(--space-6) + env(safe-area-inset-top)); }
 @media (max-width: 768px) {
   .guest-bar { padding-top: calc(var(--space-2) + env(safe-area-inset-top)); }
+}
+
+/* ===== LINE registration QR sheet ===== */
+.qr-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+.qr-sheet-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 10px; border: 1px dashed var(--color-border, #DCE5EF); border-radius: 10px;
+  background: #fff; color: #102A43; text-align: center; break-inside: avoid;
+}
+.qr-sheet-dorm { font-size: 0.75rem; color: #557089; }
+.qr-sheet-room { font-size: 1.125rem; font-weight: 800; }
+.qr-sheet-steps { font-size: 0.6875rem; line-height: 1.4; color: #334E68; }
+.qr-sheet-code { font-size: 0.625rem; color: #8FA3B8; letter-spacing: 0.05em; }
+.qr-sheet-print { display: none; }
+
+@media print {
+  /* the sheet prints on its own: the app underneath takes no pages */
+  body:has(.qr-sheet-print) #root { display: none !important; }
+  .qr-sheet-print { display: block !important; position: static; }
+  .qr-sheet-print, .qr-sheet-print * { visibility: visible; }
+  .qr-sheet-print .qr-sheet-grid { grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .qr-sheet-print .qr-sheet-card { border: 1px dashed #000; border-radius: 0; padding: 4mm 3mm; }
+}
+
+/* ===== Quick start checklist (dashboard) ===== */
+.qs { margin-bottom: 1rem; padding: 1rem 1.125rem; }
+.qs-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.qs-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 1rem; }
+.qs-count { font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted, #557089); }
+.qs-bar { height: 6px; border-radius: 3px; background: var(--color-gray-100, #EBF1F7); margin: 0.625rem 0 0.75rem; overflow: hidden; }
+.qs-bar > span { display: block; height: 100%; background: var(--color-primary, #0F4C81); transition: width 0.3s; }
+.qs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.qs-step { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.625rem; border-radius: 10px; }
+.qs-step.is-next { background: var(--color-gray-50, #F4F7FB); }
+.qs-dot {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  border: 2px solid var(--color-border, #DCE5EF); color: #fff;
+}
+.qs-step.is-done .qs-dot { background: #15803D; border-color: #15803D; }
+.qs-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.qs-step-title { font-weight: 700; font-size: 0.875rem; }
+.qs-step.is-done .qs-step-title { color: var(--color-text-muted, #557089); text-decoration: line-through; font-weight: 500; }
+.qs-hint { font-size: 0.75rem; color: var(--color-text-muted, #557089); }
+.qs-step .btn { flex: none; white-space: nowrap; }
+@media (max-width: 520px) {
+  .qs-step { flex-wrap: wrap; }
+  .qs-step .btn { margin-left: 32px; }
+}
+
+/* ===== Accounting voucher (ใบสำคัญ) — print only ===== */
+.voucher-print { display: none; }
+@media print {
+  body:has(.voucher-print) #root { display: none !important; }
+  .voucher-print, .voucher-print * { visibility: visible; }
+  .voucher-print { display: block !important; color: #000; font-size: 11pt; font-family: var(--font-sans); }
+  .vp-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 3mm; }
+  .vp-entity { font-size: 14pt; font-weight: 700; }
+  .vp-sub { font-size: 10pt; }
+  .vp-title { font-size: 18pt; font-weight: 800; border: 2px solid #000; padding: 1mm 5mm; }
+  .vp-meta { display: flex; justify-content: space-between; margin: 4mm 0 2mm; }
+  .vp-memo { margin: 2mm 0; }
+  .vp-table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+  .vp-table th, .vp-table td { border: 1px solid #000; padding: 1.5mm 2mm; text-align: left; }
+  .vp-table th { background: #eee; }
+  .vp-table .num { text-align: right; white-space: nowrap; }
+  .vp-table tfoot td { font-weight: 700; }
+  .vp-signs { display: flex; gap: 6mm; margin-top: 18mm; }
+  .vp-sign { flex: 1; text-align: center; font-size: 10pt; }
+  .vp-line { border-bottom: 1px dotted #000; height: 10mm; margin-bottom: 1mm; }
+  .vp-date { margin-top: 1mm; font-size: 9pt; }
+  .vp-foot { margin-top: 10mm; font-size: 8pt; color: #444; }
 }

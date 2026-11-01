@@ -45,6 +45,7 @@ export function defaultChart(): Account[] {
     a('2201', 'ภาษีมูลค่าเพิ่มรอนำส่ง', 'liability'),
     a('2210', 'ภาษีหัก ณ ที่จ่ายรอนำส่ง', 'liability'),
     a('3101', 'ทุน / ส่วนของเจ้าของ', 'equity'),
+    a('3201', 'กำไร (ขาดทุน) สะสม', 'equity'),
     a('4101', 'รายได้ค่าเช่า', 'revenue'),
     a('4102', 'รายได้ค่าไฟฟ้า', 'revenue'),
     a('4103', 'รายได้ค่าน้ำ', 'revenue'),
@@ -159,7 +160,7 @@ export function postingProfile(l: Ledger): PostingProfile {
 
 // ── Journal entries ─────────────────────────────────────────────────────────
 
-export type EntryKind = 'invoice' | 'receipt' | 'manual' | 'reversal';
+export type EntryKind = 'invoice' | 'receipt' | 'manual' | 'reversal' | 'closing';
 
 export interface EntryLine {
   account: string;
@@ -191,6 +192,8 @@ export interface JournalEntry {
   /** Set on a reversal entry: the entry it cancels. */
   reversal_of?: string;
   reason?: string;
+  /** Set on a year-end closing entry and on its reversal: the profit and loss of a period leaves them out. */
+  closing?: boolean;
 }
 
 export const MAX_ENTRY_LINES = 100;
@@ -239,7 +242,7 @@ export function voucherToLines(v: Voucher): EntryLine[] {
 export function postedSources(entries: JournalEntry[]): Map<string, string> {
   const out = new Map<string, string>();
   for (const e of entries) {
-    if (e.reversed_by || e.kind === 'reversal' || e.kind === 'manual') continue;
+    if (e.reversed_by || e.kind === 'reversal' || e.kind === 'manual' || e.kind === 'closing') continue;
     for (const s of e.sources) out.set(s.kind === 'payment' ? `receipt:payment:${s.id}` : `invoice:${s.kind}:${s.id}`, s.revision);
   }
   return out;
@@ -305,12 +308,52 @@ export function receivablesByParty(entries: JournalEntry[], arAccount: string, a
   return new Map([...out].filter(([, v]) => v !== 0));
 }
 
+/** Age bands of an aged-receivables report, in days past the invoice date. */
+export const AGING_BUCKETS = ['0-30', '31-60', '61-90', '90+'] as const;
+export type AgingBucket = (typeof AGING_BUCKETS)[number];
+export interface AgingRow { party_id: string; buckets: Record<AgingBucket, number>; total_satang: number }
+
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+const bucketOf = (days: number): AgingBucket => (days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+');
+
+/**
+ * Aged receivables at a date: each party's payments settle its oldest charges first, and what is still open is
+ * banded by how long ago it was charged. A party that has paid more than it owes shows the credit in 0-30.
+ */
+export function receivablesAging(entries: JournalEntry[], arAccount: string, asOf: string): AgingRow[] {
+  const charges = new Map<string, { date: string; open: number }[]>();
+  const paid = new Map<string, number>();
+  for (const e of [...entries].sort((x, y) => x.date.localeCompare(y.date) || x.posted_at.localeCompare(y.posted_at))) {
+    if (e.date > asOf) continue;
+    for (const l of e.lines) {
+      if (l.account !== arAccount) continue;
+      const k = l.party_id ?? '(ไม่ระบุ)';
+      if (l.dr_satang) { const list = charges.get(k) ?? []; list.push({ date: e.date, open: l.dr_satang }); charges.set(k, list); }
+      if (l.cr_satang) paid.set(k, (paid.get(k) ?? 0) + l.cr_satang);
+    }
+  }
+  const rows: AgingRow[] = [];
+  for (const k of new Set([...charges.keys(), ...paid.keys()])) {
+    const buckets: Record<AgingBucket, number> = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
+    let credit = paid.get(k) ?? 0;
+    for (const c of charges.get(k) ?? []) {
+      const used = Math.min(credit, c.open);
+      credit -= used;
+      if (c.open > used) buckets[bucketOf(daysBetween(c.date, asOf))] += c.open - used;
+    }
+    if (credit > 0) buckets['0-30'] -= credit;
+    const total = AGING_BUCKETS.reduce((s, b) => s + buckets[b], 0);
+    if (AGING_BUCKETS.some(b => buckets[b] !== 0)) rows.push({ party_id: k, buckets, total_satang: total });
+  }
+  return rows.sort((x, y) => y.total_satang - x.total_satang);
+}
+
 /** Revenue per account for a period (credit minus debit on revenue accounts). */
 export function revenueByAccount(entries: JournalEntry[], accounts: Account[], from: string, to: string) {
   const rev = new Map(accounts.filter(a => a.type === 'revenue').map(a => [a.code, a]));
   const sums = new Map<string, number>();
   for (const e of entries) {
-    if (e.date < from || e.date > to) continue;
+    if (e.date < from || e.date > to || e.closing) continue;
     for (const l of e.lines) if (rev.has(l.account)) sums.set(l.account, (sums.get(l.account) ?? 0) + l.cr_satang - l.dr_satang);
   }
   return [...sums].map(([code, v]) => ({ account: rev.get(code)!, amount_satang: v })).sort((a, b) => a.account.code.localeCompare(b.account.code, 'th', { numeric: true }));
@@ -325,7 +368,7 @@ export function profitAndLoss(entries: JournalEntry[], accounts: Account[], from
   const byCode = new Map(accounts.map(a => [a.code, a]));
   const sums = new Map<string, { dr: number; cr: number }>();
   for (const e of entries) {
-    if (e.date < from || e.date > to) continue;
+    if (e.date < from || e.date > to || e.closing) continue; // closing moves the year's result, it is not part of it
     for (const l of e.lines) {
       const a = byCode.get(l.account);
       if (!a || (a.type !== 'revenue' && a.type !== 'expense')) continue;
@@ -358,6 +401,29 @@ export function balanceSheet(entries: JournalEntry[], accounts: Account[], asOf:
     assets, liabilities, equity, earnings_satang, assets_satang, liabilities_satang, equity_satang,
     balanced: assets_satang === liabilities_satang + equity_satang + earnings_satang,
   };
+}
+
+/**
+ * The year-end closing entry: every revenue and expense account with a balance up to `through` is brought to zero,
+ * and the difference — the profit or loss not yet closed — goes to the retained-earnings account. Balances from
+ * years already closed are zero by then, so closing is always cumulative and closing twice finds nothing new.
+ */
+export function closingLines(entries: JournalEntry[], accounts: Account[], through: string, retainedAccount: string): EntryLine[] {
+  const lines: EntryLine[] = [];
+  let profit = 0;
+  for (const r of trialBalance(entries, accounts, through)) {
+    if (r.account.type !== 'revenue' && r.account.type !== 'expense') continue;
+    const net = r.dr_satang - r.cr_satang; // debit-positive
+    if (net === 0) continue;
+    profit -= net;
+    lines.push({ account: r.account.code, dr_satang: net < 0 ? -net : 0, cr_satang: net > 0 ? net : 0, description: `ปิดบัญชี ${r.account.name}`, party_id: null });
+  }
+  if (lines.length === 0) return [];
+  lines.push({
+    account: retainedAccount, dr_satang: profit < 0 ? -profit : 0, cr_satang: profit > 0 ? profit : 0,
+    description: profit >= 0 ? 'โอนกำไรสุทธิเข้ากำไรสะสม' : 'โอนขาดทุนสุทธิเข้ากำไรสะสม', party_id: null,
+  });
+  return lines.filter(l => l.dr_satang || l.cr_satang);
 }
 
 /** Outstanding payable per supplier: credits to the payable account minus debits. */

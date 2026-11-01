@@ -10,7 +10,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
-import { linePush, staffLineToken } from './_line.js';
+import { linePush, staffLineToken, roomLineToken } from './_line.js';
 import { portalUrlFor } from './_portal-link.js';
 
 export type NotificationEvent =
@@ -162,7 +162,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
         const cfgSnap = await db.doc(`${base}/data/config`).get();
         const dormName: string = cfgSnap.data()?.bill_customization?.dorm_name || 'หอพัก';
 
-        let recipient: { line_user_id?: string } | undefined;
+        let recipient: { line_user_id?: string; line_channel?: string } | undefined;
         let data = input.data;
         let url = input.url ?? '';
         if (input.lineUserId) {
@@ -188,7 +188,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
                 } else if (ch === 'line') {
                     // Staff have their own LINE OA; tenants use the main one. A LINE user id only
                     // works with the channel it was issued for, so never mix the two.
-                    const token = input.lineUserId ? staffLineToken() : process.env.LINE_CHANNEL_ACCESS_TOKEN;
+                    const token = input.lineUserId ? staffLineToken() : roomLineToken(recipient);
                     // linePush silently no-ops without a token; don't report that as delivered.
                     if (!token) { channels.line = 'skipped'; continue; }
                     await linePush(recipient!.line_user_id!, [msg.lineMessage ?? { type: 'text', text: msg.body }], token);

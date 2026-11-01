@@ -24,6 +24,20 @@ export function roomFees(commonFees: CommonFee[], room: Pick<Room, 'parking'>): 
     ];
 }
 
+/**
+ * A rent-only bill (no meters: market stalls, offices, rooms with water / power included): rent plus the room's fees,
+ * no electricity or water lines. Returns the fields to store; total_bill excludes hand-added adjustments.
+ */
+export function rentOnlyAmounts(rent: number, fees: CommonFee[], room: Pick<Room, 'common_fee_overrides' | 'tenant_count'>, month: string) {
+    // common fees follow exactly the rules of a metered bill; with no readings the meter lines are simply left out
+    const calc = calculateFullBill(0, 0, 0, 0, { electricity_rate: 0, water_config: { type: 'normal', unit_rate: 0 } } as DormConfig,
+        rent, room.tenant_count ?? 1, 0, { type: 'normal', unit_rate: 0 }, fees, room.common_fee_overrides ?? {}, month);
+    return {
+        elec_units: 0, elec_bill: 0, water_units: 0, water_bill: 0, water_flat_amount: 0, water_excess_units: 0, water_excess_amount: 0,
+        room_rent: rent, common_fee: calc.common_fee, applied_common_fees: calc.applied_common_fees, total_bill: rent + calc.common_fee,
+    };
+}
+
 /** Rent when recalculating a saved bill: keeps the mid-month prorate it was saved with (applied to the new rent). */
 export function rentForRecalc(fullRent: number, bill?: Pick<MonthlyBill, 'rent_prorate'> | null): number {
     return bill?.rent_prorate ? proratedAmount(fullRent, bill.rent_prorate) : fullRent;

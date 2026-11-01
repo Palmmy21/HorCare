@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { residentOaId } from '../../utils/lineOa';
 import { X, Link2, Copy, Check, QrCode, Loader2, Ban, MessageCircle, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
@@ -11,6 +12,8 @@ interface InvitationModalProps {
     room: Room;
     tenantName?: string;
     unitName: string;
+    /** Picks the OA the invitation goes to (market stalls → the vendor OA). */
+    buildingType?: string;
     onClose: () => void;
 }
 
@@ -51,7 +54,7 @@ function statusOf(i: InvitationRow): { label: string; color: string } {
     return { label: 'ใช้งานได้', color: '#0A6CC2' };
 }
 
-export default function InvitationModal({ ownerUid, buildingId, room, tenantName, unitName, onClose }: InvitationModalProps) {
+export default function InvitationModal({ ownerUid, buildingId, room, tenantName, unitName, buildingType, onClose }: InvitationModalProps) {
     const [name, setName] = useState(tenantName ?? '');
     const [ttl, setTtl] = useState(72);
     const [oneTime, setOneTime] = useState(true);
@@ -62,7 +65,7 @@ export default function InvitationModal({ ownerUid, buildingId, room, tenantName
     const [history, setHistory] = useState<InvitationRow[] | null>(null);
     const [copied, setCopied] = useState<'code' | 'link' | null>(null);
 
-    const lineOaId = import.meta.env.VITE_LINE_OA_ID as string | undefined;
+    const lineOaId = residentOaId(buildingType);
     // LINE opens a chat with the OA and pre-fills the code; the tenant only has to press send.
     const link = created && lineOaId
         ? `https://line.me/R/oaMessage/${encodeURIComponent(lineOaId)}/?${encodeURIComponent(created.code)}`

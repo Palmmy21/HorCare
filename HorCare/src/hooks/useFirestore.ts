@@ -7,7 +7,7 @@ import { logActivity, diffFields } from '../utils/auditLog';
 import { findDuplicates, MAX_BULK_ROOMS } from '../utils/bulkRooms';
 import { defaultRentType } from '../utils/workspaceTerminology';
 import type { DormConfig, Room, MonthlyBill, UserProfile, Fine, CommonFee, BillAdjustment } from '../types';
-import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth, rentForRecalc, roomFees } from '../utils/calculations';
+import { getCurrentMonth, calculateFullBill, getEffectiveRates, getNextMonth, getPreviousMonth, rentForRecalc, rentOnlyAmounts, roomFees } from '../utils/calculations';
 import { adjustmentsTotal } from '../shared/billAdjustments';
 
 // How many months of bills the realtime listener keeps in memory, anchored on the
@@ -20,6 +20,8 @@ const BILLS_WINDOW_MONTHS = 6;
 export function nextBillPatch(
     bill: MonthlyBill, nextMonthBill: MonthlyBill, room: Room, nextMonth: string, config: DormConfig, commonFees: CommonFee[],
 ): Partial<MonthlyBill> {
+    // a rent-only bill has no meter charges: only its opening readings follow
+    if (nextMonthBill.rent_only) return { prev_elec: bill.curr_elec, prev_water: bill.curr_water };
     const effectiveRent = rentForRecalc(['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent), nextMonthBill);
     const { electricityRate, waterConfig } = getEffectiveRates(room, config);
 
@@ -248,6 +250,13 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
                 if (!room) continue;
 
                 const effectiveRent = rentForRecalc(['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? newConfig.room_rent), existingBill);
+                if (existingBill.rent_only) {
+                    const amounts = rentOnlyAmounts(effectiveRent, roomFees(commonFees, room), room, month);
+                    await updateDoc(doc(db, userPath, 'bills', existingBill.id), {
+                        ...amounts, total_bill: amounts.total_bill + adjustmentsTotal(existingBill), updated_at: new Date().toISOString(),
+                    });
+                    continue;
+                }
                 const { electricityRate, waterConfig } = getEffectiveRates(room, newConfig);
 
                 const calculation = calculateFullBill(
@@ -413,6 +422,13 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
             // Use meter readings from the existing bill (snapshot)
             const billRent = rentForRecalc(effectiveRent, existingBill);
+            if (existingBill.rent_only) {
+                const amounts = rentOnlyAmounts(billRent, roomFees(commonFees, newRoom), newRoom, month);
+                await updateDoc(doc(db, userPath, 'bills', existingBill.id), {
+                    ...amounts, total_bill: amounts.total_bill + adjustmentsTotal(existingBill), tenant_count: newRoom.tenant_count || 1, updated_at: new Date().toISOString(),
+                });
+                continue;
+            }
             const calculation = calculateFullBill(
                 existingBill.prev_elec,
                 existingBill.curr_elec,
@@ -463,6 +479,45 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         if (!userPath) return;
         await deleteDoc(doc(db, userPath, 'bills', billId));
     }, [userPath]);
+
+    /**
+     * Rent-only bills (Summary → ออกบิลค่าเช่า): rent + the room's fees, no meter lines, for rooms with no bill this month.
+     * Re-reads every bill inside the transaction, so a room that got a bill meanwhile (meter recording) is skipped.
+     */
+    const createRentBills = useCallback(async (
+        items: { room: Room; rent: number; prorate?: MonthlyBill['rent_prorate'] }[], month: string,
+    ): Promise<{ created: number; skipped: number }> => {
+        if (!userPath) return { created: 0, skipped: 0 };
+        let created = 0, skipped = 0;
+        for (let i = 0; i < items.length; i += 100) {
+            const chunk = items.slice(i, i + 100);
+            await runTransaction(db, async tx => {
+                const refs = chunk.map(it => doc(db, userPath, 'bills', `bill_${it.room.id}_${month}`));
+                const snaps = await Promise.all(refs.map(r => tx.get(r)));
+                const now = new Date().toISOString();
+                chunk.forEach((it, j) => {
+                    if (snaps[j].exists()) { skipped++; return; }
+                    const prev = bills.filter(b => b.room_id === it.room.id && b.month < month).sort((a, b) => b.month.localeCompare(a.month))[0];
+                    const elec = prev?.curr_elec ?? it.room.current_meter_elec ?? 0;
+                    const water = prev?.curr_water ?? it.room.current_meter_water ?? 0;
+                    const bill: MonthlyBill = {
+                        id: refs[j].id, room_id: it.room.id, room_number: it.room.room_number, month,
+                        prev_elec: elec, curr_elec: elec, prev_water: water, curr_water: water,
+                        ...rentOnlyAmounts(it.rent, roomFees(commonFees, it.room), it.room, month),
+                        ...(it.prorate ? { rent_prorate: it.prorate } : {}),
+                        tenant_count: it.room.tenant_count ?? 1,
+                        rent_only: true, is_saved: true, is_locked: false, is_notified: false, created_at: now, updated_at: now,
+                    };
+                    tx.set(refs[j], JSON.parse(JSON.stringify(bill)));
+                    created++;
+                });
+            });
+        }
+        if (created) {
+            logActivity({ action: 'CREATE', resourceType: 'bill', resourceId: null, resourceLabel: `${created} rent bills ${month}`, note: 'rent-only bills issued' });
+        }
+        return { created, skipped };
+    }, [userPath, bills, commonFees]);
 
     /**
      * Extra charges / discounts and the note on one bill (Summary → แก้ไขบิล). The total is re-based on the server copy
@@ -527,7 +582,8 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
 
             // merge keeps what the meter screen does not own (payment, slip, reminder fields, charges added by hand)
             // and the creation time; the total it sends has no hand-added charges, so those are counted back in
-            const withExtras = bill.adjustments ? bill : { ...bill, total_bill: bill.total_bill + adjustmentsTotal(cur) };
+            const metered = cur?.rent_only ? { ...bill, rent_only: false } : bill; // recording the meters turns a rent-only bill into a normal one
+            const withExtras = metered.adjustments ? metered : { ...metered, total_bill: metered.total_bill + adjustmentsTotal(cur) };
             tx.set(billRef, cur ? { ...withExtras, created_at: cur.created_at ?? bill.created_at } : withExtras, { merge: true });
             tx.update(doc(db, userPath, 'rooms', bill.room_id), {
                 current_meter_elec: bill.curr_elec,
@@ -699,6 +755,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         deleteBill,
         updateBillPayment,
         updateBillExtras,
+        createRentBills,
         getBillForRoom,
         getBillsForMonth,
         getPreviousBill,

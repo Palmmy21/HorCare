@@ -124,7 +124,7 @@ service cloud.firestore {
     function billMeterFields() {
       return ['id', 'room_id', 'room_number', 'month', 'prev_elec', 'curr_elec', 'elec_units', 'elec_bill',
               'prev_water', 'curr_water', 'water_units', 'water_bill', 'water_flat_amount', 'water_excess_units',
-              'water_excess_amount', 'common_fee', 'applied_common_fees', 'room_rent', 'rent_prorate', 'total_bill', 'tenant_count',
+              'water_excess_amount', 'common_fee', 'applied_common_fees', 'room_rent', 'rent_prorate', 'rent_only', 'total_bill', 'tenant_count',
               'is_saved', 'is_notified', 'created_at', 'updated_at'];
     }
 

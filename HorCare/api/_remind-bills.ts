@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { linePush, buildBillFlex, thaiMonthLabel, runPooled } from './_line.js';
+import { linePush, buildBillFlex, thaiMonthLabel, runPooled, roomLineToken } from './_line.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import type { BillLanguage, LateFeeConfig, MonthlyBill } from '../src/types/index.js';
@@ -92,10 +92,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dormName = cfg.bill_customization?.dorm_name || 'หอพัก';
             const dueDay = Number(cfg.bill_customization?.due_day) || 5;
             const lineByRoom = new Map<string, string>();
+            const channelByRoom = new Map<string, unknown>(); // the OA each room linked through
             const langByRoom = new Map<string, BillLanguage>();
             roomsSnap.docs.forEach(r => {
                 const rdata = r.data();
                 if (rdata.line_user_id) lineByRoom.set(r.id, rdata.line_user_id);
+                if (rdata.line_channel) channelByRoom.set(r.id, rdata.line_channel);
                 if (rdata.language) langByRoom.set(r.id, rdata.language as BillLanguage);
             });
 
@@ -157,7 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         buildBillFlex(bill as MonthlyBill, dormName, dueDay, bill.month as string, {
                             lang: roomLang, bilingual, secLang, pay: invoicePay(payAccount, bill.total_bill as number, appBaseUrl()),
                         }),
-                    ]);
+                    ], roomLineToken({ line_channel: channelByRoom.get(bill.room_id) }));
                     await billDoc.ref.update({
                         last_reminded_at: new Date().toISOString(),
                         reminder_count: admin.firestore.FieldValue.increment(1),

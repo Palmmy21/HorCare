@@ -5,7 +5,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 import handler, { cleanLedger } from './_ledger.js';
 import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
-import { emptyLedger, trialBalance, trialTotals, type JournalEntry, type Ledger } from '../src/shared/ledger.js';
+import { balanceSheet, emptyLedger, profitAndLoss, trialBalance, trialTotals, type JournalEntry, type Ledger } from '../src/shared/ledger.js';
 import { todayTh } from '../src/shared/market.js';
 
 const OWNER = 'owner-1';
@@ -258,6 +258,53 @@ describe('manual entries', () => {
         expect((await manual({}, 'fin')).statusCode).toBe(200);
         await call(OWNER, { action: 'lock_period', ledger_id: 'led1', through: today });
         expect((await manual()).body.error).toBe('period_locked');
+    });
+});
+
+describe('year-end closing', () => {
+    beforeEach(async () => { await save(); });
+    const manual = (lines: unknown[]) => call(OWNER, { action: 'manual_entry', ledger_id: 'led1', date: today, memo: 'm', lines });
+    const close = (over: Record<string, unknown> = {}, uid: string | null = OWNER) =>
+        call(uid, { action: 'close_year', ledger_id: 'led1', through: today, account: '3201', ...over });
+
+    it('moves the result to retained earnings; P&L still shows the year and the balance sheet still balances', async () => {
+        await manual([{ account: '1101', debit: 1000 }, { account: '4101', credit: 1000 }]);
+        await manual([{ account: '5101', debit: 300 }, { account: '1101', credit: 300 }]);
+        const r = await close();
+        expect(r.statusCode).toBe(200);
+        expect(r.body.entry).toMatchObject({ kind: 'closing', closing: true, total_satang: 100000 });
+        const accounts = goodLedger().accounts;
+        const all = entries();
+        const tb = trialBalance(all, accounts, today);
+        const bal = (code: string) => tb.find(x => x.account.code === code)?.balance_satang ?? 0;
+        expect([bal('4101'), bal('5101'), bal('3201')]).toEqual([0, 0, 70000]);
+        expect(profitAndLoss(all, accounts, '2000-01-01', today).net_satang).toBe(70000);
+        const bs = balanceSheet(all, accounts, today);
+        expect(bs).toMatchObject({ balanced: true, earnings_satang: 0, equity_satang: 70000 });
+    });
+
+    it('refuses closing twice, closing with nothing to close, and a non-equity account', async () => {
+        expect((await close()).body.error).toBe('nothing_to_close');
+        await manual([{ account: '1101', debit: 10 }, { account: '4101', credit: 10 }]);
+        expect((await close({ account: '1101' })).body.error).toBe('retained_account_invalid');
+        expect((await close()).statusCode).toBe(200);
+        expect((await close()).body.error).toBe('already_closed');
+    });
+
+    it('a reversed closing can be redone, and its reversal stays out of P&L', async () => {
+        await manual([{ account: '1101', debit: 10 }, { account: '4101', credit: 10 }]);
+        const first = (await close()).body.entry as JournalEntry;
+        expect((await call(OWNER, { action: 'reverse', ledger_id: 'led1', entry_id: first.id, reason: 'ผิดวัน' })).statusCode).toBe(200);
+        expect(entries().find(e => e.reversal_of === first.id)?.closing).toBe(true);
+        expect(profitAndLoss(entries(), goodLedger().accounts, '2000-01-01', today).net_satang).toBe(1000);
+        expect((await close()).statusCode).toBe(200);
+    });
+
+    it('needs ledger.manage and an open period', async () => {
+        await manual([{ account: '1101', debit: 10 }, { account: '4101', credit: 10 }]);
+        expect((await close({}, 'fin')).statusCode).toBe(403);
+        await call(OWNER, { action: 'lock_period', ledger_id: 'led1', through: today });
+        expect((await close()).body.error).toBe('period_locked');
     });
 });
 

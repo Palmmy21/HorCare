@@ -440,10 +440,10 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
             <tbody>
               {[
                 { label: t.room_rent, value: bill.room_rent, icon: <Home size={13} color="#0A6CC2" /> },
-                { label: `${t.elec_bill} (${fmt(bill.elec_units)} ${t.unit})`, value: bill.elec_bill, icon: <Zap size={13} color="#F59E2E" /> },
-                ...(bill.water_flat_amount ? [{ label: t.water_flat, value: bill.water_flat_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
+                ...(bill.rent_only ? [] : [{ label: `${t.elec_bill} (${fmt(bill.elec_units)} ${t.unit})`, value: bill.elec_bill, icon: <Zap size={13} color="#F59E2E" /> }]),
+                ...(bill.rent_only ? [] : bill.water_flat_amount ? [{ label: t.water_flat, value: bill.water_flat_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
                 ...(bill.water_excess_amount ? [{ label: `${t.water_excess} (${fmt(bill.water_excess_units)} ${t.unit})`, value: bill.water_excess_amount, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
-                ...(!bill.water_flat_amount ? [{ label: `${t.water_bill} (${fmt(bill.water_units)} ${t.unit})`, value: bill.water_bill, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
+                ...(!bill.rent_only && !bill.water_flat_amount ? [{ label: `${t.water_bill} (${fmt(bill.water_units)} ${t.unit})`, value: bill.water_bill, icon: <Droplets size={13} color="#0A6CC2" /> }] : []),
                 // common fees and the charges / discounts the owner added, by their own names, so the lines add up to the total
                 ...(bill.applied_common_fees ?? []).filter(f => f.amount > 0).map(f => ({ label: f.name, value: f.amount, icon: <Building2 size={13} color="#0A6CC2" /> })),
                 ...(bill.adjustments ?? []).filter(x => x.amount).map(x => ({ label: x.label, value: x.amount, icon: <Pencil size={13} color="#E8740C" /> })),

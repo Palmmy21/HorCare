@@ -21,6 +21,7 @@ import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
 import type { ThemeMode } from '../../hooks/useTheme';
 import ListingSettingsSection from './ListingSettingsSection';
+import { residentOaId } from '../../utils/lineOa';
 import OwnerLineSection from './OwnerLineSection';
 import { toast } from 'react-hot-toast';
 import horcareLogo from '../../assets/horcare_logo.png';
@@ -1772,7 +1773,7 @@ export default function Settings(props: SettingsProps) {
 
                 {/* Invite Link Card */}
                 {dormCode && (() => {
-                    const lineOaId = import.meta.env.VITE_LINE_OA_ID as string | undefined;
+                    const lineOaId = residentOaId(config.building_type);
                     // LINE URL scheme: https://line.me/R/oaMessage/{OA ID}/?{text}
                     // The OA ID ("@xxxx") and the message must both be URL-encoded,
                     // otherwise LINE can't resolve the account ("ไม่พบผู้ใช้").

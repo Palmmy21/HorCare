@@ -1,17 +1,18 @@
-import { useMemo, useState } from 'react';
-import { Download, Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
+import { Download, Loader2, Plus, Printer, RotateCcw, Trash2 } from 'lucide-react';
 import { downloadCsv } from '../../utils/csv';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { fromSatang } from '../../shared/accounting';
 import { todayThDate, type JournalEntry, type Ledger } from '../../shared/ledger';
+import VoucherPrint from './VoucherPrint';
 
 interface Props { ownerUid: string; ledger: Ledger; entries: JournalEntry[] }
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const card: React.CSSProperties = { border: '1px solid var(--color-gray-200, #DCE5EF)', borderRadius: 12, padding: '0.75rem', background: 'var(--color-white, #fff)' };
 const input: React.CSSProperties = { padding: '0.45rem 0.6rem', border: '1px solid var(--color-gray-300, #C3D0DE)', borderRadius: 8, font: 'inherit', minWidth: 0, boxSizing: 'border-box' };
-const KIND_LABELS: Record<JournalEntry['kind'], string> = { invoice: 'ตั้งลูกหนี้', receipt: 'รับชำระ', manual: 'ปรับปรุงเอง', reversal: 'กลับรายการ' };
+const KIND_LABELS: Record<JournalEntry['kind'], string> = { invoice: 'ตั้งลูกหนี้', receipt: 'รับชำระ', manual: 'ปรับปรุงเอง', reversal: 'กลับรายการ', closing: 'ปิดบัญชีสิ้นปี' };
 
 const ERRORS: Record<string, string> = {
     period_locked: 'งวดนี้ปิดแล้ว',
@@ -35,6 +36,8 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
     const [memo, setMemo] = useState('');
     const [lines, setLines] = useState<FormLine[]>([blankLine(), blankLine()]);
     const [busy, setBusy] = useState<string | null>(null);
+    const [printing, setPrinting] = useState<JournalEntry | null>(null);
+    const stopPrinting = useCallback(() => setPrinting(null), []);
 
     const names = useMemo(() => new Map(ledger.accounts.map(a => [a.code, a.name])), [ledger.accounts]);
     const shown = useMemo(() => {
@@ -136,6 +139,7 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
                             </table>
                             <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', color: 'var(--color-gray-500)', fontSize: '0.75rem' }}>
                                 ลงโดย {e.posted_by_name} · {new Date(e.posted_at).toLocaleString('th-TH')}{e.reason ? ` · เหตุผล: ${e.reason}` : ''}
+                                <button className="btn btn-outline btn-sm" onClick={() => setPrinting(e)} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Printer size={13} /> พิมพ์ใบสำคัญ</button>
                                 {e.kind !== 'reversal' && !e.reversed_by && (
                                     <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => void reverse(e)} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><RotateCcw size={13} /> กลับรายการ</button>
                                 )}
@@ -144,6 +148,7 @@ export default function JournalTab({ ownerUid, ledger, entries }: Props) {
                     )}
                 </div>
             ))}
+            {printing && <VoucherPrint ledger={ledger} entry={printing} onDone={stopPrinting} />}
         </div>
     );
 }

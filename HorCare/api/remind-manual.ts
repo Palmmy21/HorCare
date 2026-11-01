@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
-import { buildBillFlex, linePush, runPooled, thaiMonthLabel } from './_line.js';
+import { buildBillFlex, linePush, runPooled, thaiMonthLabel, roomLineToken } from './_line.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { portalLinkFor } from './_portal-link.js';
@@ -111,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     })
                 ];
 
-                await linePush(lineUserId, messages);
+                await linePush(lineUserId, messages, roomLineToken(roomData));
                 
                 await billDoc.ref.update({ 
                     last_reminded_at: new Date().toISOString(),

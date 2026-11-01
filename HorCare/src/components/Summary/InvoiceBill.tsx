@@ -110,6 +110,8 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                             <td className="invoice-td text-right mono">{bill.room_rent > 0 ? bill.room_rent.toLocaleString() : '0'}</td>
                         </tr>
 
+                        {/* a rent-only bill (no meter readings) has no electricity / water lines */}
+                        {!bill.rent_only && (<>
                         {/* ค่าไฟฟ้า */}
                         <tr className="invoice-row">
                             <td className="invoice-td">
@@ -177,6 +179,8 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                                 <td className="invoice-td text-right mono">{bill.water_bill.toLocaleString()}</td>
                             </tr>
                         )}
+
+                        </>)}
 
                         {/* ค่าส่วนกลาง */}
                         {bill.common_fee > 0 && (

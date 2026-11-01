@@ -87,6 +87,8 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                         <td style={tdR}>{n(bill.room_rent)}</td>
                     </tr>
 
+                    {/* a rent-only bill (no meter readings) has no electricity / water lines */}
+                    {!bill.rent_only && (<>
                     {/* ค่าไฟ */}
                     <tr>
                         <td style={tdL}>
@@ -122,6 +124,8 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
                             <td style={tdR}>{n(bill.water_bill)}</td>
                         </tr>
                     )}
+
+                    </>)}
 
                     {/* ค่าส่วนกลาง */}
                     {bill.common_fee ? (

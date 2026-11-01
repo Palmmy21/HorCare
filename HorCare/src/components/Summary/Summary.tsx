@@ -13,6 +13,7 @@ import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import InvoiceBill from './InvoiceBill';
 import PrintBillSlip from './PrintBillSlip';
 import BillEditModal from './BillEditModal';
+import RentBillModal from './RentBillModal';
 import { adjustmentsTotal } from '../../shared/billAdjustments';
 import type { BillAdjustment } from '../../types';
 import MonthlyReport from './MonthlyReport';
@@ -47,6 +48,9 @@ interface SummaryProps {
     onUpgrade?: () => void;
     /** Add extra charges / discounts and a note to a bill; omitted when this account may not edit bills. */
     onEditBillExtras?: (billId: string, adjustments: BillAdjustment[], note: string) => Promise<void>;
+    /** Issue rent-only bills (no meters) for units with no bill this month; omitted when this account may not. */
+    onCreateRentBills?: (items: { room: Room; rent: number; prorate?: MonthlyBill['rent_prorate'] }[], month: string) => Promise<{ created: number; skipped: number }>;
+    unitName?: string;
 }
 
 export default function Summary({
@@ -63,8 +67,11 @@ export default function Summary({
     canSendLine = true,
     onUpgrade,
     onEditBillExtras,
+    onCreateRentBills,
+    unitName = 'ห้อง',
 }: SummaryProps) {
     const [editingBillId, setEditingBillId] = useState<string | null>(null);
+    const [issuingRent, setIssuingRent] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [lineStatus, setLineStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
@@ -423,12 +430,24 @@ export default function Summary({
 
     return (
         <div>
-            <div className="page-header">
-                <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BarChart3 size={28} /> สรุปยอดรายเดือน</h1>
-                <p className="page-subtitle">
-                    รอบเดือน {formatMonthThai(currentMonth)}
-                </p>
+            <div className="page-header summary-head">
+                <div>
+                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><BarChart3 size={28} /> สรุปยอดรายเดือน</h1>
+                    <p className="page-subtitle">
+                        รอบเดือน {formatMonthThai(currentMonth)}
+                    </p>
+                </div>
+                {onCreateRentBills && !isLocked && (
+                    <button type="button" className="btn btn-primary" onClick={() => setIssuingRent(true)} title={`ออกบิลค่าเช่าโดยไม่ต้องจดมิเตอร์ ให้${unitName}ที่ยังไม่มีบิลเดือนนี้`}>
+                        <FileText size={16} /> ออกบิลค่าเช่า
+                    </button>
+                )}
             </div>
+
+            {issuingRent && onCreateRentBills && (
+                <RentBillModal rooms={rooms} bills={bills} config={config} month={currentMonth} uid={uid} buildingId={buildingId}
+                    unitName={unitName} onCreate={onCreateRentBills} onClose={() => setIssuingRent(false)} />
+            )}
 
             {/* Bill Date Selector */}
             <div className="card mb-6">
@@ -577,7 +596,12 @@ export default function Summary({
                     <div className="empty-state">
                         <FileText size={48} />
                         <h3>ยังไม่มีข้อมูลบิล</h3>
-                        <p>กรุณาจดมิเตอร์และบันทึกข้อมูลก่อน</p>
+                        <p>{onCreateRentBills ? `จดมิเตอร์ หรือกด "ออกบิลค่าเช่า" เพื่อออกบิลโดยไม่ต้องจดมิเตอร์` : 'กรุณาจดมิเตอร์และบันทึกข้อมูลก่อน'}</p>
+                        {onCreateRentBills && !isLocked && (
+                            <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={() => setIssuingRent(true)}>
+                                <FileText size={16} /> ออกบิลค่าเช่า
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -604,7 +628,7 @@ export default function Summary({
                                         <tr key={room.id}>
                                             <td className="mono font-bold">{room.room_number}</td>
                                             <td className="text-center">
-                                                {hasBill ? (
+                                                {hasBill && !bill.rent_only ? (
                                                     <>
                                                         <div className="mono">{bill.elec_units} หน่วย</div>
                                                         <div className="text-muted" style={{ fontSize: '0.75rem' }}>
@@ -614,7 +638,7 @@ export default function Summary({
                                                 ) : <div className="text-muted">-</div>}
                                             </td>
                                             <td className="text-center">
-                                                {hasBill ? (
+                                                {hasBill && !bill.rent_only ? (
                                                     <>
                                                         <div className="mono">{bill.water_units} หน่วย</div>
                                                         <div className="text-muted" style={{ fontSize: '0.75rem' }}>
@@ -754,11 +778,11 @@ export default function Summary({
                                     <div className="summary-bill-card-body">
                                         <div className="summary-bill-card-row">
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Zap size={14} color="#E8740C" /> ไฟฟ้า</span>
-                                            <span className="mono">{hasBill ? `${bill.elec_units} หน่วย = ${formatCurrency(bill.elec_bill)}` : '-'}</span>
+                                            <span className="mono">{hasBill && !bill.rent_only ? `${bill.elec_units} หน่วย = ${formatCurrency(bill.elec_bill)}` : '-'}</span>
                                         </div>
                                         <div className="summary-bill-card-row">
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Droplets size={14} color="#0A6CC2" /> น้ำประปา</span>
-                                            <span className="mono">{hasBill ? `${bill.water_units} หน่วย = ${formatCurrency(bill.water_bill)}` : '-'}</span>
+                                            <span className="mono">{hasBill && !bill.rent_only ? `${bill.water_units} หน่วย = ${formatCurrency(bill.water_bill)}` : '-'}</span>
                                         </div>
                                         <div className="summary-bill-card-row">
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#15803D" /> ค่าห้อง</span>

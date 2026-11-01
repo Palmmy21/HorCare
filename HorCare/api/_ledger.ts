@@ -5,7 +5,7 @@
  * Entries are immutable: a mistake is fixed by a reversal. Posting rules are pure and tested in
  * src/shared/accounting.ts (buildVouchers), shared with the automatic posting in _ledger-auto.ts.
  *
- * Actions: ledger_save | lock_period | unlock_period | post_preview | post | reverse | manual_entry
+ * Actions: ledger_save | lock_period | unlock_period | post_preview | post | reverse | manual_entry | close_year
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash, randomUUID } from 'node:crypto';
@@ -17,18 +17,20 @@ import {
     buildVouchers, REVENUE_CATEGORIES, sumCr, sumDr, thDate, toSatang, type PostingResult, type VoucherKind,
 } from '../src/shared/accounting.js';
 import {
-    ACCOUNT_TYPES, isLocked, ledgerGaps, MAX_MEMO, postedSources, postingProfile, reversalLines, validateChart, validateEntryLines, voucherToLines,
+    ACCOUNT_TYPES, closingLines, isLocked, ledgerGaps, MAX_MEMO, postedSources, postingProfile, reversalLines, validateChart, validateEntryLines, voucherToLines,
     type Account, type EntryLine, type JournalEntry, type Ledger,
 } from '../src/shared/ledger.js';
 import type { Permission } from '../src/shared/permissions.js';
 
 export const config = { maxDuration: 60 };
 
-type Action = 'ledger_save' | 'lock_period' | 'unlock_period' | 'post_preview' | 'post' | 'reverse' | 'manual_entry';
-const ACTIONS: Action[] = ['ledger_save', 'lock_period', 'unlock_period', 'post_preview', 'post', 'reverse', 'manual_entry'];
+type Action = 'ledger_save' | 'lock_period' | 'unlock_period' | 'post_preview' | 'post' | 'reverse' | 'manual_entry' | 'close_year';
+const ACTIONS: Action[] = ['ledger_save', 'lock_period', 'unlock_period', 'post_preview', 'post', 'reverse', 'manual_entry', 'close_year'];
 const PERMISSION: Record<Action, Permission> = {
     ledger_save: 'ledger.manage', lock_period: 'ledger.manage', unlock_period: 'ledger.manage',
     post_preview: 'ledger.post', post: 'ledger.post', reverse: 'ledger.post', manual_entry: 'ledger.post',
+    // closing the year changes what every later report shows: the books' manager only
+    close_year: 'ledger.manage',
 };
 
 interface Body {
@@ -41,6 +43,8 @@ interface Body {
     to?: string;
     through?: string | null;
     entry_id?: string;
+    /** close_year: the equity account the year's result goes to */
+    account?: string;
     reason?: unknown;
     date?: string;
     memo?: unknown;
@@ -155,6 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             case 'post': return await postRun();
             case 'reverse': return await reverseEntry();
             case 'manual_entry': return await manualEntry();
+            case 'close_year': return await closeYear();
         }
     } catch (e) {
         if (e instanceof HttpError) { res.status(e.status).json({ error: e.code, ...(e.detail ? { detail: e.detail } : {}) }); return; }
@@ -279,6 +284,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 id: revId, ledger_id: l.id, kind: 'reversal', key: `reversal|${orig.id}`, doc_ref: `REV-${orig.doc_ref}`.slice(0, 40), date,
                 memo: `กลับรายการ ${orig.doc_ref}: ${reason}`.slice(0, MAX_MEMO), lines: reversalLines(orig.lines), total_satang: orig.total_satang,
                 sources: orig.sources, posted_at: nowIso, posted_by: who.uid, posted_by_name: who.displayName, reversal_of: orig.id, reason,
+                ...(orig.closing ? { closing: true } : {}),
             };
             tx.set(revRef, entry);
             tx.update(origRef, { reversed_by: revId });
@@ -316,6 +322,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         await db.doc(`${ledgerPath(owner, l.id)}/entries/${id}`).set(entry);
         await audit('CREATE', 'journal_entry', id, entry.doc_ref, { note: memo });
+        res.status(200).json({ entry });
+    }
+
+    // ── close_year ───────────────────────────────────────────────────────────
+    async function closeYear() {
+        const l = ledger!;
+        const through = body.through;
+        if (typeof through !== 'string' || !DATE_RE.test(through) || through > today) throw new HttpError(400, 'invalid_input');
+        if (isLocked(through, l.locked_through)) throw new HttpError(409, 'period_locked');
+        const retained = l.accounts.find(a => a.code === body.account);
+        if (!retained || retained.type !== 'equity' || !retained.active) throw new HttpError(400, 'retained_account_invalid');
+        const entries = await entriesOf(l);
+        if (entries.some(e => e.kind === 'closing' && !e.reversed_by && e.date >= through)) throw new HttpError(409, 'already_closed');
+        const lines = closingLines(entries, l.accounts, through, retained.code);
+        if (lines.length === 0) throw new HttpError(409, 'nothing_to_close');
+        const id = randomUUID();
+        const entry: JournalEntry = {
+            id, ledger_id: l.id, kind: 'closing', key: `closing|${through}|${id}`, doc_ref: `CL-${through}`, date: through,
+            memo: `ปิดบัญชีรายได้และค่าใช้จ่ายถึง ${through} เข้า ${retained.code} ${retained.name}`.slice(0, MAX_MEMO), lines,
+            total_satang: lines.reduce((s, x) => s + x.dr_satang, 0), sources: [], posted_at: nowIso, posted_by: who.uid, posted_by_name: who.displayName,
+            closing: true,
+        };
+        await db.doc(`${ledgerPath(owner, l.id)}/entries/${id}`).set(entry);
+        await audit('CREATE', 'journal_entry', id, entry.doc_ref, { note: `year-end close through ${through}` });
         res.status(200).json({ entry });
     }
 }

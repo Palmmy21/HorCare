@@ -237,6 +237,8 @@ export interface MonthlyBill {
   adjustments?: BillAdjustment[];
   /** Note printed on the bill for the tenant. */
   bill_note?: string;
+  /** Issued without meter readings (rent + fees only); recording the meters later turns it into a normal bill. */
+  rent_only?: boolean;
   total_bill: number;
   is_saved: boolean;
   is_locked: boolean;

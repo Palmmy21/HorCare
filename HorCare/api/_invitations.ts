@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash, randomInt } from 'node:crypto';
 import { admin, db } from './_firebase.js';
+import { currentLineChannel } from './_line.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { raiseBindingAlert } from './_security-alerts.js';
@@ -17,6 +18,8 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const DEFAULT_TTL_HOURS = 72;
 const MAX_TTL_HOURS = 24 * 30;
+/** Rooms on one printable QR sheet. */
+const MAX_SHEET = 500;
 
 export function isInvitationToken(text: string): boolean {
     return TOKEN_RE.test(text.trim().toUpperCase());
@@ -84,10 +87,10 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
         const prevRoomDoc = prevRoomRef ? await tx.get(prevRoomRef) : null;
 
         // ── all reads done; writes below ──
-        tx.update(roomRef, { line_user_id: lineUserId });
+        tx.update(roomRef, { line_user_id: lineUserId, line_channel: currentLineChannel() });
         if (existingLine && existingLine !== lineUserId) tx.delete(db.collection('line_rooms').doc(existingLine));
         if (prevRoomRef && prevRoomDoc?.exists && prevRoomDoc.data()?.line_user_id === lineUserId) {
-            tx.update(prevRoomRef, { line_user_id: admin.firestore.FieldValue.delete() });
+            tx.update(prevRoomRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete() });
         }
         tx.set(db.collection('line_rooms').doc(lineUserId), {
             uid: inv.owner_uid,
@@ -133,7 +136,7 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
 }
 
 interface Body {
-    action?: 'create' | 'list' | 'revoke';
+    action?: 'create' | 'create_sheet' | 'list' | 'revoke';
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -142,6 +145,8 @@ interface Body {
     one_time?: boolean;
     replace_existing?: boolean;
     invitation_id?: string;
+    /** create_sheet: the rooms to print; omitted = every active room not linked to LINE yet */
+    room_ids?: unknown;
 }
 
 /** Owner/staff-facing: create, list and revoke room invitations. */
@@ -244,6 +249,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         // The plaintext code is returned exactly once.
         res.status(200).json({ code: token, expires_at: now + ttl * 3600 * 1000, one_time: oneTime, room_number: room.room_number });
+        return;
+    }
+
+    // A printable sheet: one single-use code per room, for an owner moving residents over from another system
+    // ("scan, press send, done"). Same rules as one invitation — single use, expires, never takes a room that already
+    // has LINE — but no tenant name is needed: the resident proves the room by holding its paper.
+    if (body.action === 'create_sheet') {
+        const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'invitation.create' });
+        if (!ctx) return;
+        const base = `users/${ctx.ownerUid}/buildings/${buildingId}`;
+        const wanted = Array.isArray(body.room_ids) ? new Set(body.room_ids.filter((x): x is string => typeof x === 'string').slice(0, MAX_SHEET)) : null;
+        const [roomsSnap, tenantsSnap, cfgSnap] = await Promise.all([
+            db.collection(`${base}/rooms`).get(),
+            db.collection(`${base}/tenants`).get(),
+            db.doc(`${base}/data/config`).get(),
+        ]);
+        const names = new Map(tenantsSnap.docs.map(d => [d.id, String(d.data().full_name ?? '').trim()]));
+        const rooms = roomsSnap.docs
+            .filter(d => d.data().is_active !== false && !d.data().line_user_id && (!wanted || wanted.has(d.id)))
+            .sort((a, b) => String(a.data().room_number).localeCompare(String(b.data().room_number), 'th', { numeric: true }))
+            .slice(0, MAX_SHEET);
+        if (rooms.length === 0) { res.status(200).json({ codes: [] }); return; }
+
+        const ttl = Math.min(Math.max(Number(body.expires_in_hours) || MAX_TTL_HOURS, 1), MAX_TTL_HOURS);
+        const now = Date.now();
+        const dorm = cfgSnap.data()?.bill_customization?.dorm_name ?? '';
+        const codes: { room_id: string; room_number: string; code: string }[] = [];
+        for (let i = 0; i < rooms.length; i += 400) {
+            const batch = db.batch();
+            for (const r of rooms.slice(i, i + 400)) {
+                const token = generateToken();
+                const roomNumber = String(r.data().room_number ?? r.id);
+                batch.set(db.collection(COLLECTION).doc(hashToken(token)), {
+                    owner_uid: ctx.ownerUid, building_id: buildingId, room_id: r.id, room_number: roomNumber,
+                    tenant_name: names.get(r.id) || `ผู้เช่าห้อง ${roomNumber}`, dorm_name: dorm,
+                    one_time: true, max_uses: 1, use_count: 0, replace_existing: false, status: 'active', source: 'sheet',
+                    created_at: new Date(now).toISOString(), created_by: ctx.uid, expires_at: now + ttl * 3600 * 1000,
+                });
+                codes.push({ room_id: r.id, room_number: roomNumber, code: token });
+            }
+            await batch.commit();
+        }
+        await writeAudit({
+            ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
+            action: 'CREATE', resourceType: 'invitation', resourceId: null, resourceLabel: `QR sheet ${codes.length} rooms`,
+            after: { rooms: codes.length, ttl_hours: ttl }, req,
+        });
+        // plaintext codes go back exactly once, for printing
+        res.status(200).json({ codes, expires_at: now + ttl * 3600 * 1000, dorm_name: dorm });
         return;
     }
 

@@ -198,3 +198,32 @@ describe('redeeming invitations', () => {
         expect(listPaths(`users/${OWNER}/audit_logs/`)).toHaveLength(2);
     });
 });
+
+describe('printable QR sheet', () => {
+    async function sheet(uid: string | undefined, body: Record<string, unknown> = {}) {
+        const res = fakeRes();
+        await handler(fakeReq({ action: 'create_sheet', owner_uid: OWNER, building_id: BLD, ...body }, uid), res as never);
+        return res as unknown as { statusCode: number; body: { codes: { room_id: string; room_number: string; code: string }[] } };
+    }
+
+    it('makes one single-use code per room not on LINE yet, without needing tenant names', async () => {
+        seed(`users/${OWNER}/buildings/${BLD}/rooms/room-103`, { room_number: '103', is_active: true, line_user_id: LINE_B });
+        seed(`users/${OWNER}/buildings/${BLD}/rooms/room-104`, { room_number: '104', is_active: false });
+        const r = await sheet(OWNER);
+        expect(r.statusCode).toBe(200);
+        expect(r.body.codes.map(c => c.room_number)).toEqual(['101', '102']); // linked and inactive rooms are left out
+        expect(r.body.codes.every(c => isInvitationToken(c.code))).toBe(true);
+        expect(JSON.stringify(listPaths('invitations/').map(read))).not.toContain(r.body.codes[0].code); // hashes only
+
+        // scanning room 102's code links LINE to room 102, once
+        const code102 = r.body.codes.find(c => c.room_number === '102')!.code;
+        expect((await redeemInvitation(LINE_A, code102)).ok).toBe(true);
+        expect(read(`users/${OWNER}/buildings/${BLD}/rooms/room-102`)).toMatchObject({ line_user_id: LINE_A, line_channel: 'tenant' });
+        expect((await redeemInvitation('U' + 'c'.repeat(32), code102)).ok).toBe(false);
+    });
+
+    it('can be limited to chosen rooms, and needs invitation.create', async () => {
+        expect((await sheet(OWNER, { room_ids: ['room-102'] })).body.codes.map(c => c.room_number)).toEqual(['102']);
+        expect((await sheet('other-owner')).statusCode).toBe(403);
+    });
+});
