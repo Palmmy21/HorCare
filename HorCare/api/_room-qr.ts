@@ -1,9 +1,13 @@
 /**
  * The permanent registration QR of a room: printed once, stuck on the door or the welcome pack, good for every tenant.
  *
- *   GET  /r/<code>      the QR's address. Goes through HorCare, not straight to LINE, so the Official Account behind a
- *                       property can change without reprinting anything.
+ *   GET  /r/<code>      the QR's address. Goes through HorCare, not straight to LINE, so how a scan works and the
+ *                       Official Account behind a property can change without reprinting anything.
  *   POST /api/room-qr   codes | rotate | status | approve | reject (owner / staff)
+ *                       liff_scan (the scanner, proven by a LINE access token)
+ *
+ * Two ways a scan arrives. On the shared OA it opens the LIFF app and registers with nothing else to do. The LIFF app
+ * knows LINE ids only for its own provider, so a team's OA or the vendor OA opens the chat with the code ready to send.
  *
  * A code is not a secret that grants a room: it sits on a door, and a past tenant may have a photo of it. So it binds on
  * its own only while the room has no LINE account. When the room is taken the scan becomes a request and nobody loses
@@ -19,8 +23,8 @@ import { db } from './_firebase.js';
 import { rateLimit } from './_abuse-guard.js';
 import { appBaseUrl } from './_app-url.js';
 import { writeAudit } from './_audit.js';
-import { bindingDisplay, prepareBinding } from './_line-binding.js';
-import { channelAllowsOwner, currentLineChannel, isLineFriend, linePush, resolveLineToken, roomLineChannel, type LineChannel } from './_line.js';
+import { bindingDisplay, prepareBinding, recordFriendship } from './_line-binding.js';
+import { channelAllowsOwner, currentLineChannel, isLineFriend, linePush, resolveLineToken, roomLineChannel, runInLineChannel, type LineChannel } from './_line.js';
 import { propertyOaId } from './_line-oa.js';
 import { sendFCMToOwner } from './_notify-owner.js';
 import { authorize, buildingExists } from './_rbac.js';
@@ -62,7 +66,47 @@ async function openQr(req: VercelRequest, res: VercelResponse) {
     const oaId = await propertyOaId(entry.owner_uid, entry.building_id);
     if (!oaId) { deadEnd(res, 503, 'ระบบยังไม่พร้อม กรุณาติดต่อเจ้าของหอ'); return; }
     res.setHeader('Cache-Control', 'no-store');
-    res.redirect(302, `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(code)}`);
+    const liff = process.env.VITE_LIFF_ID;
+    if (liff && oaId === process.env.VITE_LINE_OA_ID) { res.redirect(302, `https://liff.line.me/${liff}?room=${code}`); return; }
+    res.redirect(302, chatLink(oaId, code));
+}
+
+const chatLink = (oaId: string, code: string) => `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(code)}`;
+
+/** The scan-only path: the LIFF app proves the LINE account, so nobody has to send anything. */
+async function liffScan(req: VercelRequest, res: VercelResponse, body: Body) {
+    // a whole building can register from one Wi-Fi on move-in day
+    const limited = await rateLimit(req, 'room_qr:liff', 600, 3600);
+    if (!limited.ok) { res.status(429).json({ error: 'too_many_requests' }); return; }
+    const token = body.access_token;
+    const code = typeof body.code === 'string' ? body.code.trim().toUpperCase() : '';
+    if (typeof token !== 'string' || !token || token.length > 2000 || !isRoomCode(code)) { res.status(400).json({ error: 'invalid_input' }); return; }
+
+    const { lineUserFromAccessToken } = await import('./_portal.js');
+    let lineUserId: string | null;
+    try {
+        lineUserId = await lineUserFromAccessToken(token);
+    } catch {
+        res.status(503).json({ error: 'liff_not_configured' });
+        return;
+    }
+    if (!lineUserId) { res.status(401).json({ error: 'invalid_token' }); return; }
+
+    const entry = (await db.collection(CODES).doc(code).get()).data();
+    const oaId = entry ? await propertyOaId(entry.owner_uid, entry.building_id) : undefined;
+    // this LINE id means nothing to a team's OA: such a room can only be registered from its own chat
+    if (entry?.status === 'active' && oaId && oaId !== process.env.VITE_LINE_OA_ID) { res.status(409).json({ error: 'use_chat', url: chatLink(oaId, code) }); return; }
+
+    const scan = await runInLineChannel('tenant', () => scanRoomCode(lineUserId, code));
+    const friend = scan.outcome === 'bound' || scan.outcome === 'already_yours' ? await isLineFriend(lineUserId, await resolveLineToken('tenant')) : null;
+    if (friend !== null) await recordFriendship(lineUserId, friend);
+    if (scan.outcome === 'bound' && friend) await notify(lineUserId, 'tenant', `🎉 ลงทะเบียนห้อง ${scan.roomNumber} สำเร็จ!\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`);
+    res.status(200).json({
+        outcome: scan.outcome,
+        room_number: 'roomNumber' in scan ? scan.roomNumber : undefined,
+        dorm_name: 'dormName' in scan ? scan.dormName : undefined,
+        add_friend_url: friend === false && oaId ? `https://line.me/R/ti/p/${encodeURIComponent(oaId)}` : undefined,
+    });
 }
 
 export type ScanResult =
@@ -147,17 +191,20 @@ async function lineProfileName(lineUserId: string, token: string): Promise<strin
 }
 
 interface Body {
-    action?: 'codes' | 'rotate' | 'status' | 'approve' | 'reject';
+    action?: 'codes' | 'rotate' | 'status' | 'approve' | 'reject' | 'liff_scan';
     owner_uid?: string;
     building_id?: string;
     room_ids?: unknown;
     request_id?: string;
+    access_token?: unknown;
+    code?: unknown;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET' || req.method === 'HEAD') { await openQr(req, res); return; }
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
     const body = (req.body ?? {}) as Body;
+    if (body.action === 'liff_scan') { await liffScan(req, res, body); return; }
     const buildingId = body.building_id;
     if (!buildingId || typeof buildingId !== 'string') { res.status(400).json({ error: 'building_id is required' }); return; }
 

@@ -7,6 +7,7 @@ import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } fro
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { isRoomCode, scanRoomCode } from './_room-qr.js';
 import { propertyOaId } from './_line-oa.js';
+import { recordFriendship } from './_line-binding.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
@@ -327,19 +328,6 @@ async function getOldestUnpaidFine(
 }
 
 /** รับรหัสเชิญรายห้อง (HCI-...) — ห้องถูกกำหนดจากฝั่งเซิร์ฟเวอร์ ผู้เช่าเลือกเองไม่ได้ */
-/** A registered person added or blocked the OA: keeps the room's "can we reach them" flag true to LINE. Never throws. */
-async function recordFriendship(lineUserId: string, friend: boolean) {
-    try {
-        const link = (await db.collection('line_rooms').doc(lineUserId).get()).data();
-        if (!link) return;
-        await db.doc(`users/${link.uid}/buildings/${link.building_id}/rooms/${link.room_id}`).update({
-            line_unreachable: friend ? admin.firestore.FieldValue.delete() : true,
-        });
-    } catch (err) {
-        console.error('[line-webhook] friendship update failed:', (err as Error).message);
-    }
-}
-
 /** The welcome message. The chat link does not require adding the OA, but bills are pushed: catch a non-friend now, not at billing. */
 async function replyRegistered(lineUserId: string, replyToken: string, dormName: string, roomNumber: string) {
     await db.collection('line_pending').doc(lineUserId).delete();

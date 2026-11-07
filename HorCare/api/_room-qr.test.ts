@@ -96,6 +96,24 @@ describe('a room has one permanent code', () => {
 });
 
 describe('the QR address', () => {
+    it('with LIFF set up, a scan on the shared OA opens LIFF: nothing to send', async () => {
+        process.env.VITE_LIFF_ID = '123-abc';
+        const code = await codeOf();
+        const res = await open(code);
+        expect(res.location).toBe(`https://liff.line.me/123-abc?room=${code}`);
+        delete process.env.VITE_LIFF_ID;
+    });
+
+    it('a property on its own OA keeps the chat, even with LIFF set up', async () => {
+        process.env.VITE_LIFF_ID = '123-abc';
+        process.env.VITE_LINE_MARKET_OA_ID = '@market';
+        const code = await codeOf();
+        seed(B, { id: BLD, building_type: 'market' });
+        expect((await open(code)).location).toContain('oaMessage/%40market');
+        delete process.env.VITE_LIFF_ID;
+        delete process.env.VITE_LINE_MARKET_OA_ID;
+    });
+
     it('sends a scan to the OA with the code ready to send', async () => {
         const res = await open(await codeOf());
         expect(res.statusCode).toBe(302);
@@ -217,5 +235,78 @@ describe('an admin decides a taken room', () => {
         expect((await call('staff', { action: 'approve', request_id: id })).statusCode).toBe(403);
         expect((await call('other-owner', { action: 'approve', request_id: id })).statusCode).toBe(403);
         expect(read(`${B}/rooms/r101`)?.line_user_id).toBe(LINE_A);
+    });
+});
+
+describe('scan only, through LIFF', () => {
+    const LIFF_CHANNEL = '123';
+    let friend: boolean;
+
+    beforeEach(() => {
+        friend = true;
+        process.env.VITE_LIFF_ID = `${LIFF_CHANNEL}-abc`;
+        fetchMock.mockImplementation(async (url: string) => {
+            const u = String(url);
+            const ok = (data: unknown) => ({ ok: true, status: 200, json: async () => data, text: async () => '', headers: new Headers() });
+            if (u.includes('/oauth2/v2.1/verify')) {
+                if (u.includes('forged')) return { ok: false, status: 400, json: async () => ({}), headers: new Headers() };
+                return ok({ client_id: u.includes('other-app') ? '999' : LIFF_CHANNEL, expires_in: 100 });
+            }
+            if (u.endsWith('/v2/profile')) return ok({ userId: LINE_A });
+            if (u.includes('/v2/bot/profile/')) return friend ? ok({ displayName: 'Malee' }) : { ok: false, status: 404, json: async () => ({}), headers: new Headers() };
+            return ok({});
+        });
+    });
+    afterEach(() => { delete process.env.VITE_LIFF_ID; });
+
+    const liff = async (access_token: unknown, code: unknown) => {
+        const res = fakeRes();
+        await handler(fakeReq({ action: 'liff_scan', access_token, code }), res as never);
+        return res as unknown as { statusCode: number; body: Record<string, any> };
+    };
+
+    it('binds the room to the account LINE vouches for, with nothing sent', async () => {
+        const res = await liff('good', await codeOf());
+        expect(res.body).toMatchObject({ outcome: 'bound', room_number: '101' });
+        expect(read(`${B}/rooms/r101`)).toMatchObject({ line_user_id: LINE_A, line_channel: 'tenant' });
+        expect(read(`${B}/rooms/r101`)?.line_unreachable).toBeUndefined();
+        expect(res.body.add_friend_url).toBeUndefined();
+    });
+
+    it('someone who skipped adding the OA is flagged and handed the link', async () => {
+        friend = false;
+        const res = await liff('good', await codeOf());
+        expect(read(`${B}/rooms/r101`)?.line_unreachable).toBe(true);
+        expect(res.body.add_friend_url).toBe('https://line.me/R/ti/p/%40horcare');
+    });
+
+    it('never binds on a forged token, or one issued to another LINE app', async () => {
+        const code = await codeOf();
+        expect((await liff('forged', code)).statusCode).toBe(401);
+        expect((await liff('other-app', code)).statusCode).toBe(401);
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBeUndefined();
+    });
+
+    it('a taken room still goes to an admin', async () => {
+        const code = await codeOf();
+        await scanRoomCode(LINE_B, code);
+        expect((await liff('good', code)).body.outcome).toBe('requested');
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBe(LINE_B);
+    });
+
+    it('a room on another OA is refused and pointed at its chat: this LINE id is not valid there', async () => {
+        process.env.VITE_LINE_MARKET_OA_ID = '@market';
+        const code = await codeOf();
+        seed(B, { id: BLD, building_type: 'market' });
+        const res = await liff('good', code);
+        expect(res.statusCode).toBe(409);
+        expect(res.body.url).toContain('oaMessage/%40market');
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBeUndefined();
+        delete process.env.VITE_LINE_MARKET_OA_ID;
+    });
+
+    it('bad input is refused before asking LINE', async () => {
+        expect((await liff('good', 'nope')).statusCode).toBe(400);
+        expect((await liff(undefined, 'HCR-AAAAAAAAAA')).statusCode).toBe(400);
     });
 });

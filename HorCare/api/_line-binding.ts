@@ -60,3 +60,16 @@ export async function bindingDisplay(ownerUid: string, buildingId: string, fallb
     const cfg = (await db.doc(`users/${ownerUid}/buildings/${buildingId}/data/config`).get()).data();
     return { dormName: cfg?.bill_customization?.dorm_name || fallbackName, dueDay: cfg?.bill_customization?.due_day ?? 5 };
 }
+
+/** A registered person added or blocked the OA: keeps the room's "can we reach them" flag true to LINE. Never throws. */
+export async function recordFriendship(lineUserId: string, friend: boolean): Promise<void> {
+    try {
+        const link = (await db.collection('line_rooms').doc(lineUserId).get()).data();
+        if (!link) return;
+        await db.doc(`users/${link.uid}/buildings/${link.building_id}/rooms/${link.room_id}`).update({
+            line_unreachable: friend ? del() : true,
+        });
+    } catch (err) {
+        console.error('[line-binding] friendship update failed:', (err as Error).message);
+    }
+}

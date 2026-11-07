@@ -341,7 +341,7 @@ function QrCard({ code, link, unitName, dormName }: { code: RoomCode; link: stri
             <div className="qr-sheet-room">{unitName} {code.room_number}</div>
             {/* level M: a card on a door gets scuffed */}
             <QRCodeSVG value={link} size={150} level="M" marginSize={2} />
-            <div className="qr-sheet-steps">สแกน → เพิ่มเพื่อน → กด “ส่ง” → เสร็จ<br />รับบิลและแจ้งชำระผ่าน LINE ได้ทันที</div>
+            <div className="qr-sheet-steps">สแกนด้วยมือถือ แล้วทำตามหน้าจอ<br />รับบิลและแจ้งชำระผ่าน LINE ได้ทันที</div>
             <div className="qr-sheet-code mono">{code.code}</div>
         </div>
     );

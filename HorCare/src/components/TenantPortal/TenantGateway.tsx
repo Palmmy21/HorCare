@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import horcareLogo from '../../assets/horcare_logo.png';
-import { ClipboardList, AlertTriangle, Building2, Smartphone } from 'lucide-react';
+import { ClipboardList, AlertTriangle, Building2, Smartphone, CheckCircle2, Hourglass } from 'lucide-react';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,9 +12,30 @@ type GatewayState =
   | { status: 'redirecting'; roomNumber: string; dormName: string }
   | { status: 'not_registered' }
   | { status: 'no_liff' }
+  | { status: 'room_result'; ok: boolean; title: string; message: string; addFriendUrl?: string }
   | { status: 'error'; message: string };
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string | undefined;
+
+interface ScanResponse { outcome?: string; room_number?: string; dorm_name?: string; add_friend_url?: string; url?: string; error?: string }
+
+/** What a person sees after scanning a room's QR. */
+function roomResult(r: ScanResponse): Extract<GatewayState, { status: 'room_result' }> {
+  const room = r.room_number ? `ห้อง ${r.room_number}` : 'ห้องนี้';
+  const where = r.dorm_name ? ` · ${r.dorm_name}` : '';
+  const addFriendUrl = r.add_friend_url;
+  const friendNote = addFriendUrl ? ' เหลืออีกขั้นเดียว: กดเพิ่มเพื่อนด้านล่าง ไม่อย่างนั้นบิลจะส่งมาไม่ถึง' : '';
+  switch (r.outcome) {
+    case 'bound': return { status: 'room_result', ok: true, title: 'ลงทะเบียนสำเร็จ', message: `${room}${where}.${friendNote}`, addFriendUrl };
+    case 'already_yours': return { status: 'room_result', ok: true, title: 'ลงทะเบียนไว้แล้ว', message: `คุณลงทะเบียน${room}ไว้แล้ว${friendNote}`, addFriendUrl };
+    case 'requested':
+    case 'already_requested': return { status: 'room_result', ok: true, title: 'รอแอดมินอนุมัติ', message: `${room}มีผู้ลงทะเบียนอยู่แล้ว ระบบส่งคำขอให้แอดมินแล้ว เมื่ออนุมัติจะแจ้งทาง LINE` };
+    case 'recently_rejected': return { status: 'room_result', ok: false, title: 'ไม่ได้รับการอนุมัติ', message: 'คำขอนี้ไม่ได้รับการอนุมัติ กรุณาติดต่อเจ้าของหอ' };
+    case 'too_many_requests': return { status: 'room_result', ok: false, title: 'มีคำขอจำนวนมาก', message: `${room}มีคำขอรออนุมัติหลายรายการ กรุณาติดต่อเจ้าของหอ` };
+    case 'room_unavailable': return { status: 'room_result', ok: false, title: 'ห้องไม่พร้อมใช้งาน', message: 'กรุณาติดต่อเจ้าของหอ' };
+    default: return { status: 'room_result', ok: false, title: 'QR นี้ใช้ไม่ได้', message: 'กรุณาขอใบใหม่จากเจ้าของหอ' };
+  }
+}
 
 function loadLiffSdk(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -40,13 +61,33 @@ export default function TenantGateway() {
         await loadLiffSdk();
         await window.liff.init({ liffId: LIFF_ID });
 
-        if (!window.liff.isInClient()) {
+        // read only after liff.init(): that is what restores the query from the LIFF URL
+        const roomCode = new URLSearchParams(window.location.search).get('room');
+
+        // a phone camera may open the QR in the browser; LINE Login still proves who is scanning
+        if (!window.liff.isInClient() && !roomCode) {
           setState({ status: 'no_liff' });
           return;
         }
 
         if (!window.liff.isLoggedIn()) {
           window.liff.login({ redirectUri: window.location.href });
+          return;
+        }
+
+        if (roomCode) {
+          const res = await fetch('/api/room-qr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'liff_scan', access_token: window.liff.getAccessToken(), code: roomCode }),
+          });
+          const data = await res.json().catch(() => ({})) as ScanResponse;
+          if (data.error === 'use_chat' && data.url) { window.location.replace(data.url); return; }
+          if (!res.ok) {
+            setState({ status: 'error', message: 'ลงทะเบียนไม่สำเร็จ กรุณาสแกนอีกครั้ง' });
+            return;
+          }
+          setState(roomResult(data));
           return;
         }
 
@@ -168,6 +209,28 @@ export default function TenantGateway() {
               3. กดลิงก์ → พิมพ์เลขห้อง → ลงทะเบียนสำเร็จ
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── After scanning a room's QR ──
+  if (state.status === 'room_result') {
+    const pending = state.title === 'รอแอดมินอนุมัติ';
+    return (
+      <div style={cardStyle}>
+        <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(10, 108, 194, 0.25)' }} />
+        <div style={boxStyle}>
+          <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center', color: state.ok ? (pending ? '#E8740C' : '#15803D') : '#EF4444' }}>
+            {!state.ok ? <AlertTriangle size={40} /> : pending ? <Hourglass size={40} /> : <CheckCircle2 size={40} />}
+          </div>
+          <h2 style={{ fontWeight: 800, color: '#102A43', margin: '0 0 0.5rem', fontSize: '1.2rem' }}>{state.title}</h2>
+          <p style={{ color: '#3E5872', fontSize: '0.875rem', lineHeight: 1.65, margin: 0 }}>{state.message}</p>
+          {state.addFriendUrl && (
+            <a href={state.addFriendUrl} style={{ display: 'block', marginTop: '1.25rem', padding: '0.75rem', borderRadius: 12, background: '#06C755', color: '#fff', fontWeight: 700, textDecoration: 'none' }}>
+              เพิ่มเพื่อน LINE
+            </a>
+          )}
         </div>
       </div>
     );
