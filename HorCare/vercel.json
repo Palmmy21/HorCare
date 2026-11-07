@@ -19,10 +19,12 @@
     { "source": "/api/line-webhook", "destination": "/api/line-webhook" },
     { "source": "/api/line-market-webhook", "destination": "/api/line-market-webhook" },
     { "source": "/api/line-staff-webhook", "destination": "/api/line-staff-webhook" },
+    { "source": "/api/line-team-webhook/:id", "destination": "/api/line-team-webhook?id=:id" },
     { "source": "/api/payment-webhook", "destination": "/api/payment-webhook" },
     { "source": "/api/cron-check-expiry", "destination": "/api/cron-check-expiry" },
     { "source": "/api/remind-manual", "destination": "/api/remind-manual" },
     { "source": "/api/(.*)", "destination": "/api/index?route=$1" },
+    { "source": "/r/:code", "destination": "/api/index?route=room-qr&c=:code" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [

@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             pay: invoicePay(payAccount, Number(fine.amount), appUrl || appBaseUrl()),
         })];
 
-        await linePush(lineUserId, messages, roomLineToken(roomData));
+        await linePush(lineUserId, messages, await roomLineToken(roomData));
 
         // Optional: Update fine doc to mark it as notified
         await fineSnap.ref.update({ is_notified: true });

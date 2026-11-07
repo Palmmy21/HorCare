@@ -363,7 +363,7 @@ export default function TenantsPage({
         </p>
         {canInvite && (
           <button className="btn btn-outline btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => setQrSheetOpen(true)}>
-            <QrCode size={14} /> QR ลงทะเบียน LINE ทุก{terms.unitName}
+            <QrCode size={14} /> QR ลงทะเบียน LINE ราย{terms.unitName}
           </button>
         )}
       </div>
@@ -474,7 +474,7 @@ export default function TenantsPage({
           rooms={rooms}
           unitName={terms.unitName}
           dormName={config?.bill_customization?.dorm_name}
-          buildingType={buildingType ?? config?.building_type}
+          canDecide={permissions === null || permissions.includes('tenant.update')}
           onClose={() => setQrSheetOpen(false)}
         />
       )}

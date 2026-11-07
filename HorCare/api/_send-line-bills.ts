@@ -119,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const secLang = cfg.bill_customization?.secondary_language || 'en';
                 const pay = invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl());
                 const messages: object[] = [buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay })];
-                await linePush(lineUserId, messages, roomLineToken(roomData)); // the OA this room linked through
+                await linePush(lineUserId, messages, await roomLineToken(roomData)); // the OA this room linked through
                 await billDoc.ref.update({ is_notified: true });
                 sent++;
                 results.push(`✅ ห้อง ${bill.room_number}`);

@@ -37,6 +37,25 @@ export async function raiseBindingAlert(
     }
 }
 
+/** Someone scanned a room that already has a LINE account. Never throws, like raiseBindingAlert. */
+export async function raiseRequestAlert(
+    ownerUid: string, buildingId: string,
+    input: { roomId: string; roomNumber: string; lineUserId: string; displayName: string },
+): Promise<void> {
+    try {
+        const alert: SecurityAlert = {
+            id: randomUUID(), type: 'line_request', severity: 'warning',
+            message: `${input.displayName || 'บัญชี LINE ใหม่'} ขอลงทะเบียนห้อง ${input.roomNumber} ซึ่งมีผู้ลงทะเบียนอยู่แล้ว — ยังไม่มีอะไรเปลี่ยน รออนุมัติในหน้า QR ลงทะเบียน LINE`,
+            room_id: input.roomId, room_number: input.roomNumber, from_room_number: null,
+            line_ref: lineRef(input.lineUserId), via: 'room_qr',
+            status: 'open', created_at: new Date().toISOString(),
+        };
+        await db.doc(`${colOf(ownerUid, buildingId)}/${alert.id}`).set(alert);
+    } catch (err) {
+        console.error('[security-alerts] raise failed:', (err as Error).message);
+    }
+}
+
 interface Body {
     action?: 'ack' | 'ack_all';
     owner_uid?: string;

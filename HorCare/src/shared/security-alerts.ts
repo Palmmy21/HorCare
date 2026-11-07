@@ -2,8 +2,8 @@
 // act as a tenant — chiefly when a LINE account is bound to a room — so an admin can spot a wrong
 // or suspicious binding quickly. Stored per property: users/{owner}/buildings/{b}/security_alerts/{id}.
 
-export type AlertType = 'line_bound' | 'line_replaced' | 'line_moved';
-export type AlertVia = 'invitation' | 'room_number';
+export type AlertType = 'line_bound' | 'line_replaced' | 'line_moved' | 'line_request';
+export type AlertVia = 'invitation' | 'room_number' | 'room_qr';
 
 export interface SecurityAlert {
   id: string;
@@ -27,6 +27,7 @@ export const ALERT_TYPE_LABELS_TH: Record<AlertType, string> = {
   line_bound: 'ผูก LINE กับห้องใหม่',
   line_replaced: 'เปลี่ยนบัญชี LINE ของห้อง',
   line_moved: 'บัญชี LINE ย้ายห้อง',
+  line_request: 'คำขอลงทะเบียนซ้อน รออนุมัติ',
 };
 
 export interface BindingEvent {
@@ -40,7 +41,7 @@ export interface BindingEvent {
 
 /** Decide what (if anything) to tell the admin about a LINE binding. Always returns an alert: every new binding is visible. */
 export function describeBinding(e: BindingEvent): Pick<SecurityAlert, 'type' | 'severity' | 'message'> {
-  const via = e.via === 'invitation' ? 'ผ่านรหัสเชิญ' : 'โดยพิมพ์เลขห้อง';
+  const via = { invitation: 'ผ่านรหัสเชิญ', room_number: 'โดยพิมพ์เลขห้อง', room_qr: 'ผ่าน QR ประจำห้อง' }[e.via];
   if (e.movedFromRoomNumber) {
     return { type: 'line_moved', severity: 'warning', message: `บัญชี LINE นี้ย้ายจากห้อง ${e.movedFromRoomNumber} มาผูกกับห้อง ${e.roomNumber} (${via}) — ตรวจสอบว่าเป็นผู้เช่าห้อง ${e.roomNumber} จริง` };
   }

@@ -159,7 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         buildBillFlex(bill as MonthlyBill, dormName, dueDay, bill.month as string, {
                             lang: roomLang, bilingual, secLang, pay: invoicePay(payAccount, bill.total_bill as number, appBaseUrl()),
                         }),
-                    ], roomLineToken({ line_channel: channelByRoom.get(bill.room_id) }));
+                    ], await roomLineToken({ line_channel: channelByRoom.get(bill.room_id) }));
                     await billDoc.ref.update({
                         last_reminded_at: new Date().toISOString(),
                         reminder_count: admin.firestore.FieldValue.increment(1),

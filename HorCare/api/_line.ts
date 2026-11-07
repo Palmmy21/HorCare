@@ -27,17 +27,37 @@ export const staffLineToken = (): string | undefined => process.env.LINE_STAFF_C
  * made while handling that event uses the vendor OA. Pushes made elsewhere (bills, reminders) pick the OA the room was
  * linked through — rooms remember it in `line_channel` — so rooms linked before the vendor OA existed keep working.
  */
-export type LineChannel = 'tenant' | 'market';
-const channelStore = new AsyncLocalStorage<LineChannel>();
-export const currentLineChannel = (): LineChannel => channelStore.getStore() ?? 'tenant';
-export const runInLineChannel = <T>(channel: LineChannel, fn: () => T): T => channelStore.run(channel, fn);
+export type LineChannel = 'tenant' | 'market' | `oa:${string}`;
+/** A team's own OA (api/_line-oa.ts) brings its credentials with it; the shared OAs read theirs from the environment. */
+interface TeamCredentials { token: string; secret: string; ownerUid: string }
+const channelStore = new AsyncLocalStorage<{ channel: LineChannel; team?: TeamCredentials }>();
+export const currentLineChannel = (): LineChannel => channelStore.getStore()?.channel ?? 'tenant';
+export const runInLineChannel = <T>(channel: LineChannel, fn: () => T, team?: TeamCredentials): T => channelStore.run({ channel, team }, fn);
+export const currentTeamSecret = (): string | undefined => channelStore.getStore()?.team?.secret;
+/** A team's OA may only register that team's rooms: another team's tenant must never be billed through its bot. */
+export const channelAllowsOwner = (ownerUid: string): boolean => {
+    const team = channelStore.getStore()?.team;
+    return !team || team.ownerUid === ownerUid;
+};
 /** The resident OA's access token: the given channel, else the one this request runs in. */
-export const residentLineToken = (channel: LineChannel = currentLineChannel()): string | undefined =>
-    channel === 'market' ? process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN : process.env.LINE_CHANNEL_ACCESS_TOKEN;
+export const residentLineToken = (channel: LineChannel = currentLineChannel()): string | undefined => {
+    if (channel.startsWith('oa:')) return channel === currentLineChannel() ? channelStore.getStore()?.team?.token : undefined;
+    return channel === 'market' ? process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN : process.env.LINE_CHANNEL_ACCESS_TOKEN;
+};
+/** Like residentLineToken for any channel, from anywhere: a team's token outside its webhook comes from the database. */
+export async function resolveLineToken(channel: LineChannel): Promise<string | undefined> {
+    const known = residentLineToken(channel);
+    if (known || !channel.startsWith('oa:')) return known;
+    const { loadTeamOa } = await import('./_line-oa.js');
+    return (await loadTeamOa(channel.slice(3)))?.token;
+}
 /** The OA a room's tenant / vendor linked LINE through (rooms linked before the vendor OA have none: tenant). */
-export const roomLineChannel = (room: { line_channel?: unknown } | null | undefined): LineChannel => (room?.line_channel === 'market' ? 'market' : 'tenant');
+export const roomLineChannel = (room: { line_channel?: unknown } | null | undefined): LineChannel => {
+    const c = room?.line_channel;
+    return c === 'market' || (typeof c === 'string' && c.startsWith('oa:')) ? c as LineChannel : 'tenant';
+};
 /** Access token for pushing to a room's tenant / vendor. */
-export const roomLineToken = (room: { line_channel?: unknown } | null | undefined): string | undefined => residentLineToken(roomLineChannel(room));
+export const roomLineToken = (room: { line_channel?: unknown } | null | undefined): Promise<string | undefined> => resolveLineToken(roomLineChannel(room));
 
 /** 	oken defaults to the tenant OA's access token. */
 export async function lineReply(replyToken: string, messages: object[], token: string | undefined = residentLineToken()): Promise<void> {
@@ -47,6 +67,22 @@ export async function lineReply(replyToken: string, messages: object[], token: s
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ replyToken, messages }),
     });
+}
+
+/**
+ * Can the OA message this person? LINE answers the profile lookup only for people who added it as a friend and have not
+ * blocked it, so a 404 means bills pushed to them would not arrive. null = could not tell (no token, LINE down):
+ * callers must not treat that as a problem with the person.
+ */
+export async function isLineFriend(lineUserId: string, token: string | undefined = residentLineToken()): Promise<boolean | null> {
+    if (!token) return null;
+    try {
+        const res = await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(lineUserId)}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) return true;
+        return res.status === 404 ? false : null;
+    } catch {
+        return null;
+    }
 }
 
 /** Download the binary content of an image/file message the user sent. */

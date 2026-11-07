@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { residentOaId } from '../../utils/lineOa';
+import { oaRegistrationLink, residentOaId } from '../../utils/lineOa';
 import { X, Link2, Copy, Check, QrCode, Loader2, Ban, MessageCircle, RefreshCw } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
@@ -30,7 +30,7 @@ interface InvitationRow {
     created_at: string;
 }
 
-interface CreatedInvite { code: string; expires_at: number; one_time: boolean }
+interface CreatedInvite { code: string; expires_at: number; one_time: boolean; oa_id?: string }
 
 const TTL_OPTIONS = [
     { hours: 24, label: '24 ชั่วโมง' },
@@ -65,18 +65,17 @@ export default function InvitationModal({ ownerUid, buildingId, room, tenantName
     const [history, setHistory] = useState<InvitationRow[] | null>(null);
     const [copied, setCopied] = useState<'code' | 'link' | null>(null);
 
-    const lineOaId = residentOaId(buildingType);
+    // the server names the OA: a team may have its own
+    const lineOaId = created?.oa_id ?? residentOaId(buildingType);
     // LINE opens a chat with the OA and pre-fills the code; the tenant only has to press send.
-    const link = created && lineOaId
-        ? `https://line.me/R/oaMessage/${encodeURIComponent(lineOaId)}/?${encodeURIComponent(created.code)}`
-        : null;
+    const link = created && lineOaId ? oaRegistrationLink(lineOaId, created.code) : null;
 
     const loadHistory = useCallback(async () => {
         try {
             const { invitations } = await apiPost<{ invitations: InvitationRow[] }>('invitations', {
-                action: 'list', owner_uid: ownerUid, building_id: buildingId,
+                action: 'list', owner_uid: ownerUid, building_id: buildingId, room_id: room.id,
             });
-            setHistory(invitations.filter(i => i.room_id === room.id));
+            setHistory(invitations);
         } catch {
             setHistory([]);
         }
@@ -142,6 +141,7 @@ export default function InvitationModal({ ownerUid, buildingId, room, tenantName
                         <>
                             <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-gray-600)' }}>
                                 รหัสเชิญผูกกับ{unitName}นี้โดยตรง ผู้เช่าไม่ต้องพิมพ์เลข{unitName}เอง จึงไม่เสี่ยงผูกผิด{unitName}
+                                {' '}สร้างรหัสใหม่แล้วรหัสหรือ QR เดิมของ{unitName}นี้จะใช้ไม่ได้ทันที
                             </p>
                             <label style={field}>
                                 <span className="form-label">ชื่อผู้เช่า</span>

@@ -13,7 +13,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { admin, db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { linePush, roomLineToken } from './_line.js';
+import { linePush, roomLineChannel, roomLineToken } from './_line.js';
 
 export const config = { maxDuration: 15 };
 
@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (link && (link.uid !== ctx.ownerUid || link.building_id !== buildingId)) throw new HttpError(409, 'link_mismatch');
 
             if (body.action === 'unlink') {
-                tx.update(fromRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete() });
+                tx.update(fromRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete(), line_unreachable: admin.firestore.FieldValue.delete() });
                 if (link) tx.delete(linkRef);
                 return { lineUserId, fromNumber: from.room_number, toNumber: null as string | null };
             }
@@ -76,10 +76,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const to = toSnap.data() as { room_number: string; line_user_id?: string };
             if (to.line_user_id && to.line_user_id !== lineUserId) throw new HttpError(409, 'target_occupied');
 
-            tx.update(toRef!, { line_user_id: lineUserId, line_channel: (from as { line_channel?: string }).line_channel === 'market' ? 'market' : 'tenant' });
+            tx.update(toRef!, {
+                line_user_id: lineUserId, line_channel: roomLineChannel(from as { line_channel?: string }),
+                line_unreachable: (from as { line_unreachable?: boolean }).line_unreachable ? true : admin.firestore.FieldValue.delete(),
+            });
             if (link) tx.update(linkRef, { room_id: body.to_room_id, room_number: to.room_number });
             else tx.set(linkRef, { uid: ctx.ownerUid, building_id: buildingId, room_id: body.to_room_id, room_number: to.room_number, registered_at: new Date().toISOString() });
-            tx.update(fromRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete() });
+            tx.update(fromRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete(), line_unreachable: admin.firestore.FieldValue.delete() });
             if (threadSnap.exists) tx.update(threadRef, { room_id: body.to_room_id, room_number: to.room_number });
             return { lineUserId, fromNumber: from.room_number, toNumber: to.room_number, channel: (from as { line_channel?: string }).line_channel };
         });
@@ -91,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             note: out.toNumber ? 'LINE binding moved' : 'LINE binding removed', req,
         });
         // Best-effort: tell the tenant which room they are now registered to.
-        const token = roomLineToken({ line_channel: 'channel' in out ? out.channel : undefined });
+        const token = await roomLineToken({ line_channel: 'channel' in out ? out.channel : undefined });
         if (out.toNumber && token) {
             await linePush(out.lineUserId, [{ type: 'text', text: `🏠 เจ้าของหอปรับการลงทะเบียนของคุณเป็นห้อง ${out.toNumber} แล้วค่ะ\n\nหากไม่ถูกต้อง กรุณาแจ้งเจ้าของหอ` }], token).catch(() => undefined);
         }

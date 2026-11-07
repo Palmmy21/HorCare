@@ -14,7 +14,7 @@ interface NotifyPayload {
 
 // Retrieve all FCM tokens stored for this owner and send a multicast push.
 // Stale / unregistered tokens are silently pruned after the send.
-async function sendFCMToOwner(uid: string, payload: NotifyPayload): Promise<{ sent: number; pruned: number }> {
+export async function sendFCMToOwner(uid: string, payload: NotifyPayload): Promise<{ sent: number; pruned: number }> {
     const fcmDoc = await db.doc(`users/${uid}/data/fcm`).get();
     if (!fcmDoc.exists) return { sent: 0, pruned: 0 };
 

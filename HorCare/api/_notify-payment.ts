@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const roomLang = roomSnap.data()?.language || cfgSnap.data()?.bill_customization?.default_language || 'th';
         const bilingual = !!cfgSnap.data()?.bill_customization?.bilingual_mode;
         const secLang = cfgSnap.data()?.bill_customization?.secondary_language || 'en';
-        await linePush(lineUserId, [buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })], roomLineToken(roomSnap.data()));
+        await linePush(lineUserId, [buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })], await roomLineToken(roomSnap.data()));
         res.status(200).json({ data: { notified: true } });
 
     } catch (errorRaw) {

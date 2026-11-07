@@ -188,7 +188,7 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
                 } else if (ch === 'line') {
                     // Staff have their own LINE OA; tenants use the main one. A LINE user id only
                     // works with the channel it was issued for, so never mix the two.
-                    const token = input.lineUserId ? staffLineToken() : roomLineToken(recipient);
+                    const token = input.lineUserId ? staffLineToken() : await roomLineToken(recipient);
                     // linePush silently no-ops without a token; don't report that as delivered.
                     if (!token) { channels.line = 'skipped'; continue; }
                     await linePush(recipient!.line_user_id!, [msg.lineMessage ?? { type: 'text', text: msg.body }], token);

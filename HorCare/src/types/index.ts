@@ -150,6 +150,8 @@ export interface Room {
   room_type: 'dormitory' | 'commercial';
   tenant_count?: number; // Defaults to 1 if undefined
   line_user_id?: string;
+  /** Set by the server: LINE says this room's account can't be messaged (never added the OA, or blocked it). */
+  line_unreachable?: boolean;
   current_meter_elec: number;
   current_meter_water: number;
   /** Meter serials remembered from AI meter reading, used to match a meter photo to this room. */

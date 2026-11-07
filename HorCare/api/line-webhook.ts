@@ -2,9 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { isPaidPlan } from '../src/shared/plans.js';
-import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback, currentLineChannel } from './_line.js';
+import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
+import { isRoomCode, scanRoomCode } from './_room-qr.js';
+import { propertyOaId } from './_line-oa.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
@@ -52,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // the vendor OA (/api/line-market-webhook) runs this same handler with its own channel secret
     const market = currentLineChannel() === 'market';
-    const secret = market ? process.env.LINE_MARKET_CHANNEL_SECRET : process.env.LINE_CHANNEL_SECRET;
+    const secret = currentTeamSecret() ?? (market ? process.env.LINE_MARKET_CHANNEL_SECRET : process.env.LINE_CHANNEL_SECRET);
     if (!secret) {
         res.status(500).send(market ? 'LINE_MARKET_CHANNEL_SECRET not set' : 'LINE_CHANNEL_SECRET not set');
         return;
@@ -85,6 +87,10 @@ interface LineEvent {
 }
 
 async function handleEvent(event: LineEvent) {
+    if (event.type === 'follow' || event.type === 'unfollow') {
+        if (event.source?.userId) await recordFriendship(event.source.userId, event.type === 'follow');
+        return;
+    }
     if (event.type !== 'message' && event.type !== 'postback') return;
     const lineUserId = event.source?.userId;
     const replyToken = event.replyToken;
@@ -193,6 +199,12 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     // ── 2e. Room invitation: HCI-XXXXXXXXXX (owner-issued, room is bound server-side) ──
     if (isInvitationToken(text)) {
         await handleInvitation(lineUserId, replyToken, text);
+        return;
+    }
+
+    // ── 2f. A room's permanent QR: HCR-XXXXXXXXXX ──
+    if (isRoomCode(text)) {
+        await handleRoomCode(lineUserId, replyToken, text);
         return;
     }
 
@@ -315,14 +327,55 @@ async function getOldestUnpaidFine(
 }
 
 /** รับรหัสเชิญรายห้อง (HCI-...) — ห้องถูกกำหนดจากฝั่งเซิร์ฟเวอร์ ผู้เช่าเลือกเองไม่ได้ */
+/** A registered person added or blocked the OA: keeps the room's "can we reach them" flag true to LINE. Never throws. */
+async function recordFriendship(lineUserId: string, friend: boolean) {
+    try {
+        const link = (await db.collection('line_rooms').doc(lineUserId).get()).data();
+        if (!link) return;
+        await db.doc(`users/${link.uid}/buildings/${link.building_id}/rooms/${link.room_id}`).update({
+            line_unreachable: friend ? admin.firestore.FieldValue.delete() : true,
+        });
+    } catch (err) {
+        console.error('[line-webhook] friendship update failed:', (err as Error).message);
+    }
+}
+
+/** The welcome message. The chat link does not require adding the OA, but bills are pushed: catch a non-friend now, not at billing. */
+async function replyRegistered(lineUserId: string, replyToken: string, dormName: string, roomNumber: string) {
+    await db.collection('line_pending').doc(lineUserId).delete();
+    const friend = await isLineFriend(lineUserId);
+    if (friend !== null) await recordFriendship(lineUserId, friend);
+    const link = (await db.collection('line_rooms').doc(lineUserId).get()).data();
+    const oaId = link ? await propertyOaId(link.uid, link.building_id) : undefined;
+    const addFriend = friend === false
+        ? `\n\n⚠️ ขั้นตอนสุดท้าย: กดเพิ่มเพื่อนบัญชีนี้ ไม่อย่างนั้นบิลจะส่งมาไม่ถึงค่ะ${oaId ? `\nhttps://line.me/R/ti/p/${encodeURIComponent(oaId)}` : ''}`
+        : '';
+    await lineReply(replyToken, [{
+        type: 'text',
+        text: `🎉 ลงทะเบียนสำเร็จ!\n\n🏠 หอพัก: ${dormName || '-'}\n🚪 ห้อง: ${roomNumber}\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬${addFriend}`,
+    }]);
+}
+
+async function handleRoomCode(lineUserId: string, replyToken: string, code: string) {
+    const r = await scanRoomCode(lineUserId, code);
+    if (r.outcome === 'bound') { await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber); return; }
+    const room = 'roomNumber' in r ? r.roomNumber : '';
+    const text = {
+        already_yours: `✅ คุณลงทะเบียนห้อง ${room} ไว้แล้วค่ะ\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`,
+        requested: `📝 ห้อง ${room} มีผู้ลงทะเบียนอยู่แล้ว ระบบส่งคำขอให้แอดมินแล้วค่ะ\n\nเมื่ออนุมัติแล้วจะแจ้งในแชทนี้`,
+        already_requested: `⏳ คำขอลงทะเบียนห้อง ${room} กำลังรอแอดมินอนุมัติอยู่ค่ะ`,
+        recently_rejected: `⚠️ คำขอลงทะเบียนห้อง ${room} ไม่ได้รับการอนุมัติ กรุณาติดต่อเจ้าของหอค่ะ`,
+        too_many_requests: `⚠️ ห้อง ${room} มีคำขอรออนุมัติหลายรายการ กรุณาติดต่อเจ้าของหอค่ะ`,
+        room_unavailable: '⚠️ ห้องนี้ไม่พร้อมใช้งาน กรุณาติดต่อเจ้าของหอ',
+        invalid: '❌ QR นี้ใช้ไม่ได้แล้ว กรุณาขอใบใหม่จากเจ้าของหอ',
+    }[r.outcome];
+    await lineReply(replyToken, [{ type: 'text', text }]);
+}
+
 async function handleInvitation(lineUserId: string, replyToken: string, token: string) {
     const r = await redeemInvitation(lineUserId, token);
     if (r.ok) {
-        await db.collection('line_pending').doc(lineUserId).delete();
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `🎉 ลงทะเบียนสำเร็จ!\n\n🏠 หอพัก: ${r.dormName || '-'}\n🚪 ห้อง: ${r.roomNumber}\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`,
-        }]);
+        await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber);
         return;
     }
     const messages: Record<string, string> = {
@@ -339,7 +392,7 @@ async function handleInvitation(lineUserId: string, replyToken: string, token: s
 /** รับรหัสหอ HC-XXXXXX แล้วย้ายไป step รอเลขห้อง */
 async function handleDormCode(lineUserId: string, replyToken: string, dormCode: string) {
     const codeSnap = await db.collection('dorm_codes').doc(dormCode).get();
-    if (!codeSnap.exists) {
+    if (!codeSnap.exists || !channelAllowsOwner(codeSnap.data()!.uid)) {
         await lineReply(replyToken, [{
             type: 'text',
             text: '❌ ไม่พบรหัสหอพักนี้ กรุณาติดต่อเจ้าของหอ\n\nหรือพิมพ์ "ยกเลิก" เพื่อออก',

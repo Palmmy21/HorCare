@@ -22,6 +22,7 @@ import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTe
 import type { ThemeMode } from '../../hooks/useTheme';
 import ListingSettingsSection from './ListingSettingsSection';
 import { residentOaId } from '../../utils/lineOa';
+import LineOaCard from './LineOaCard';
 import OwnerLineSection from './OwnerLineSection';
 import { toast } from 'react-hot-toast';
 import horcareLogo from '../../assets/horcare_logo.png';
@@ -1656,6 +1657,7 @@ export default function Settings(props: SettingsProps) {
             {/* Integrations Tab */}
             {activeTab === 'integrations' && (
                 <>
+            {uid && <LineOaCard ownerUid={uid} buildingId={buildingId} />}
             <ListingSettingsSection config={config} ownerUid={uid} buildingId={buildingId} />
             <OwnerLineSection ownerUid={uid} />
 

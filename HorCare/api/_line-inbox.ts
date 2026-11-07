@@ -173,7 +173,7 @@ async function handleAuthorized(
         return;
     }
     // the OA this tenant / vendor linked through must be set up on the server
-    const token = roomLineToken(room.data());
+    const token = await roomLineToken(room.data());
     if (!token) {
         res.status(503).json({ error: 'line_not_configured', message: 'ยังไม่ได้ตั้งค่า LINE บนเซิร์ฟเวอร์' });
         return;

@@ -30,11 +30,11 @@ describe('which OA a resident message goes through', () => {
         expect(currentLineChannel()).toBe('tenant');
     });
 
-    it('pushes to a room through the OA it linked through; older links stay on the tenant OA', () => {
-        expect(roomLineToken({ line_channel: 'market' })).toBe('market-token');
-        expect(roomLineToken({ line_channel: 'tenant' })).toBe('tenant-token');
-        expect(roomLineToken({})).toBe('tenant-token');
-        expect(roomLineToken(undefined)).toBe('tenant-token');
+    it('pushes to a room through the OA it linked through; older links stay on the tenant OA', async () => {
+        expect(await roomLineToken({ line_channel: 'market' })).toBe('market-token');
+        expect(await roomLineToken({ line_channel: 'tenant' })).toBe('tenant-token');
+        expect(await roomLineToken({})).toBe('tenant-token');
+        expect(await roomLineToken(undefined)).toBe('tenant-token');
     });
 });
 

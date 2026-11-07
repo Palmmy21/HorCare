@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const dorm = ((await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/data/config`).get()).data()?.bill_customization?.dorm_name as string | undefined) || 'หอพัก';
             const text = announcementLineText(ann, dorm);
             await runPooled(ids, PUSH_CONCURRENCY, async lineUserId => {
-                try { await linePush(lineUserId, [{ type: 'text', text }], roomLineToken(rooms.get(roomOf.get(lineUserId) ?? ''))); ann.line_sent++; } catch { ann.line_failed++; }
+                try { await linePush(lineUserId, [{ type: 'text', text }], await roomLineToken(rooms.get(roomOf.get(lineUserId) ?? ''))); ann.line_sent++; } catch { ann.line_failed++; }
             });
         }
         await db.doc(`${col}/${ann.id}`).set(ann);

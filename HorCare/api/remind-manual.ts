@@ -111,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     })
                 ];
 
-                await linePush(lineUserId, messages, roomLineToken(roomData));
+                await linePush(lineUserId, messages, await roomLineToken(roomData));
                 
                 await billDoc.ref.update({ 
                     last_reminded_at: new Date().toISOString(),

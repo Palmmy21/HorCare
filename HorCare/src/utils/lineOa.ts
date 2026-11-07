@@ -6,3 +6,7 @@ export function residentOaId(buildingType: string | undefined): string | undefin
   if (buildingType === 'market' && market) return market;
   return import.meta.env.VITE_LINE_OA_ID as string | undefined;
 }
+
+/** Opens a chat with the OA with the code typed in: the resident only presses send. */
+export const oaRegistrationLink = (oaId: string, code: string): string =>
+  `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(code)}`;

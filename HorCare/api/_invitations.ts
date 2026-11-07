@@ -1,10 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash, randomInt } from 'node:crypto';
-import { admin, db } from './_firebase.js';
-import { currentLineChannel } from './_line.js';
+import { db } from './_firebase.js';
+import { channelAllowsOwner, currentLineChannel } from './_line.js';
+import { propertyOaId } from './_line-oa.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { raiseBindingAlert } from './_security-alerts.js';
+import { bindingDisplay, prepareBinding } from './_line-binding.js';
 
 export const config = { maxDuration: 15 };
 
@@ -18,8 +20,10 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const DEFAULT_TTL_HOURS = 72;
 const MAX_TTL_HOURS = 24 * 30;
-/** Rooms on one printable QR sheet. */
-const MAX_SHEET = 500;
+const SLOTS = 'invitation_slots';
+const slotPath = (ownerUid: string, buildingId: string, roomId: string) => `users/${ownerUid}/buildings/${buildingId}/${SLOTS}/${roomId}`;
+/** One live code per room; the room id is a single path segment, so a forged one can't reach another path. */
+const isRoomId = (x: unknown): x is string => typeof x === 'string' && x.length > 0 && x.length <= 128 && !x.includes('/');
 
 export function isInvitationToken(text: string): boolean {
     return TOKEN_RE.test(text.trim().toUpperCase());
@@ -56,9 +60,8 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
     const preview = await inviteRef.get();
     if (!preview.exists) return { ok: false, reason: 'not_found' };
     const p = preview.data()!;
-    const cfgSnap = await db.doc(`users/${p.owner_uid}/buildings/${p.building_id}/data/config`).get();
-    const dueDay = cfgSnap.data()?.bill_customization?.due_day ?? 5;
-    const dormName: string = cfgSnap.data()?.bill_customization?.dorm_name || p.dorm_name || '';
+    if (!channelAllowsOwner(p.owner_uid)) return { ok: false, reason: 'not_found' };
+    const { dormName, dueDay } = await bindingDisplay(p.owner_uid, p.building_id, p.dorm_name);
 
     const result = await db.runTransaction<RedeemResult>(async (tx) => {
         const inviteSnap = await tx.get(inviteRef);
@@ -71,37 +74,14 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
         const sameUser = inv.used_by_line_user === lineUserId;
         if (!sameUser && (inv.status === 'used' || inv.use_count >= inv.max_uses)) return { ok: false, reason: 'used' };
 
-        const roomRef = db.doc(`users/${inv.owner_uid}/buildings/${inv.building_id}/rooms/${inv.room_id}`);
-        const roomSnap = await tx.get(roomRef);
-        if (!roomSnap.exists || roomSnap.data()?.is_active === false) return { ok: false, reason: 'room_unavailable' };
-        const room = roomSnap.data()!;
-
-        const existingLine = room.line_user_id as string | undefined;
-        if (existingLine && existingLine !== lineUserId && !inv.replace_existing) return { ok: false, reason: 'room_taken' };
-
-        const prevRoomSnap = await tx.get(db.collection('line_rooms').doc(lineUserId));
-        const prevLink = prevRoomSnap.exists ? prevRoomSnap.data()! : null;
-        const prevRoomRef = prevLink && prevLink.room_id !== inv.room_id
-            ? db.doc(`users/${prevLink.uid}/buildings/${prevLink.building_id}/rooms/${prevLink.room_id}`)
-            : null;
-        const prevRoomDoc = prevRoomRef ? await tx.get(prevRoomRef) : null;
+        const binding = await prepareBinding(tx, { lineUserId, ownerUid: inv.owner_uid, buildingId: inv.building_id, roomId: inv.room_id });
+        const slotRef = db.doc(slotPath(inv.owner_uid, inv.building_id, inv.room_id));
+        const slotSnap = await tx.get(slotRef);
+        if (!binding.room || binding.room.is_active === false) return { ok: false, reason: 'room_unavailable' };
+        if (binding.effects.replacedExisting && !inv.replace_existing) return { ok: false, reason: 'room_taken' };
 
         // ── all reads done; writes below ──
-        tx.update(roomRef, { line_user_id: lineUserId, line_channel: currentLineChannel() });
-        if (existingLine && existingLine !== lineUserId) tx.delete(db.collection('line_rooms').doc(existingLine));
-        if (prevRoomRef && prevRoomDoc?.exists && prevRoomDoc.data()?.line_user_id === lineUserId) {
-            tx.update(prevRoomRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete() });
-        }
-        tx.set(db.collection('line_rooms').doc(lineUserId), {
-            uid: inv.owner_uid,
-            building_id: inv.building_id,
-            room_id: inv.room_id,
-            room_number: room.room_number,
-            dorm_name: dormName,
-            due_day: dueDay,
-            invitation_id: inviteRef.id,
-            registered_at: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        binding.commit({ channel: currentLineChannel(), dormName, dueDay, extra: { invitation_id: inviteRef.id } });
         const nextUse = sameUser ? inv.use_count : inv.use_count + 1;
         tx.update(inviteRef, {
             use_count: nextUse,
@@ -109,12 +89,13 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
             used_by_line_user: lineUserId,
             used_at: new Date().toISOString(),
         });
+        // codes issued before slots existed have none; a newer code owns the slot if there is one
+        if (slotSnap.data()?.invitation_id === inviteRef.id) {
+            tx.update(slotRef, { status: nextUse >= inv.max_uses ? 'used' : 'active', used_at: new Date().toISOString() });
+        }
         return {
             ok: true, ownerUid: inv.owner_uid, buildingId: inv.building_id,
-            roomId: inv.room_id, roomNumber: room.room_number, dormName,
-            replacedExisting: !!existingLine && existingLine !== lineUserId,
-            movedFromRoomNumber: prevLink && prevLink.room_id !== inv.room_id ? String(prevLink.room_number ?? '') || null : null,
-            alreadyBound: existingLine === lineUserId && prevLink?.room_id === inv.room_id,
+            roomId: inv.room_id, roomNumber: binding.room.room_number, dormName, ...binding.effects,
         };
     });
 
@@ -136,7 +117,7 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
 }
 
 interface Body {
-    action?: 'create' | 'create_sheet' | 'list' | 'revoke';
+    action?: 'create' | 'list' | 'revoke';
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -145,8 +126,22 @@ interface Body {
     one_time?: boolean;
     replace_existing?: boolean;
     invitation_id?: string;
-    /** create_sheet: the rooms to print; omitted = every active room not linked to LINE yet */
-    room_ids?: unknown;
+}
+
+/** Writes one room's new code and makes it the room's only live one: the code it replaces can no longer be redeemed. */
+function issueCode(tx: FirebaseFirestore.Transaction, ctx: { ownerUid: string; uid: string }, buildingId: string, roomId: string,
+    prevSlot: FirebaseFirestore.DocumentData | undefined, token: string,
+    invitation: Record<string, unknown> & { room_number: string; expires_at: number; created_at: string }) {
+    const id = hashToken(token);
+    if (prevSlot?.status === 'active' && prevSlot.invitation_id) {
+        tx.set(db.collection(COLLECTION).doc(prevSlot.invitation_id), {
+            status: 'revoked', revoked_at: invitation.created_at, revoked_by: ctx.uid, revoked_reason: 'reissued',
+        }, { merge: true });
+    }
+    tx.set(db.collection(COLLECTION).doc(id), invitation);
+    tx.set(db.doc(slotPath(ctx.ownerUid, buildingId, roomId)), {
+        room_id: roomId, invitation_id: id, status: 'active', expires_at: invitation.expires_at, issued_at: invitation.created_at,
+    });
 }
 
 /** Owner/staff-facing: create, list and revoke room invitations. */
@@ -159,13 +154,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.action === 'list') {
         const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'invitation.read' });
         if (!ctx) return;
-        // Single-field query; sorted in memory to avoid needing a composite index.
-        const snap = await db.collection(COLLECTION)
-            .where('owner_uid', '==', ctx.ownerUid)
-            .get();
+        // Equality filters only, so Firestore serves this from single-field indexes; sorted in memory. Scoping to the room
+        // is what keeps one room's history right in a property with thousands of codes.
+        let query = db.collection(COLLECTION).where('owner_uid', '==', ctx.ownerUid).where('building_id', '==', buildingId);
+        if (isRoomId(body.room_id)) query = query.where('room_id', '==', body.room_id);
+        const snap = await query.get();
         const invitations = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }) as unknown as Record<string, unknown> & { building_id: string; created_at: string })
-            .filter(i => i.building_id === buildingId)
+            .map(d => ({ id: d.id, ...d.data() }) as unknown as Record<string, unknown> & { created_at: string })
             .sort((a, b) => b.created_at.localeCompare(a.created_at))
             .slice(0, 200);
         res.status(200).json({ invitations });
@@ -184,6 +179,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return;
         }
         await ref.update({ status: 'revoked', revoked_at: new Date().toISOString(), revoked_by: ctx.uid });
+        const slotRef = db.doc(slotPath(ctx.ownerUid, buildingId, String(snap.data()?.room_id)));
+        if ((await slotRef.get()).data()?.invitation_id === ref.id) await slotRef.update({ status: 'revoked' });
         await writeAudit({
             ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
             action: 'DELETE', resourceType: 'invitation', resourceId: ref.id,
@@ -226,21 +223,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const now = Date.now();
         const cfgSnap = await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/data/config`).get();
 
-        await db.collection(COLLECTION).doc(hashToken(token)).set({
-            owner_uid: ctx.ownerUid,
-            building_id: buildingId,
-            room_id: roomId,
-            room_number: room.room_number,
-            tenant_name: tenantName,
-            dorm_name: cfgSnap.data()?.bill_customization?.dorm_name ?? '',
-            one_time: oneTime,
-            max_uses: oneTime ? 1 : 25,
-            use_count: 0,
-            replace_existing: replace,
-            status: 'active',
-            created_at: new Date(now).toISOString(),
-            created_by: ctx.uid,
-            expires_at: now + ttl * 3600 * 1000,
+        const slotRef = db.doc(slotPath(ctx.ownerUid, buildingId, roomId));
+        await db.runTransaction(async tx => {
+            const slotSnap = await tx.get(slotRef);
+            issueCode(tx, ctx, buildingId, roomId, slotSnap.data(), token, {
+                owner_uid: ctx.ownerUid,
+                building_id: buildingId,
+                room_id: roomId,
+                room_number: room.room_number,
+                tenant_name: tenantName,
+                dorm_name: cfgSnap.data()?.bill_customization?.dorm_name ?? '',
+                one_time: oneTime,
+                max_uses: oneTime ? 1 : 25,
+                use_count: 0,
+                replace_existing: replace,
+                status: 'active',
+                created_at: new Date(now).toISOString(),
+                created_by: ctx.uid,
+                expires_at: now + ttl * 3600 * 1000,
+            });
         });
         await writeAudit({
             ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
@@ -248,56 +249,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             resourceLabel: `Room ${room.room_number}`, after: { tenant_name: tenantName, one_time: oneTime, ttl_hours: ttl }, req,
         });
         // The plaintext code is returned exactly once.
-        res.status(200).json({ code: token, expires_at: now + ttl * 3600 * 1000, one_time: oneTime, room_number: room.room_number });
-        return;
-    }
-
-    // A printable sheet: one single-use code per room, for an owner moving residents over from another system
-    // ("scan, press send, done"). Same rules as one invitation — single use, expires, never takes a room that already
-    // has LINE — but no tenant name is needed: the resident proves the room by holding its paper.
-    if (body.action === 'create_sheet') {
-        const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'invitation.create' });
-        if (!ctx) return;
-        const base = `users/${ctx.ownerUid}/buildings/${buildingId}`;
-        const wanted = Array.isArray(body.room_ids) ? new Set(body.room_ids.filter((x): x is string => typeof x === 'string').slice(0, MAX_SHEET)) : null;
-        const [roomsSnap, tenantsSnap, cfgSnap] = await Promise.all([
-            db.collection(`${base}/rooms`).get(),
-            db.collection(`${base}/tenants`).get(),
-            db.doc(`${base}/data/config`).get(),
-        ]);
-        const names = new Map(tenantsSnap.docs.map(d => [d.id, String(d.data().full_name ?? '').trim()]));
-        const rooms = roomsSnap.docs
-            .filter(d => d.data().is_active !== false && !d.data().line_user_id && (!wanted || wanted.has(d.id)))
-            .sort((a, b) => String(a.data().room_number).localeCompare(String(b.data().room_number), 'th', { numeric: true }))
-            .slice(0, MAX_SHEET);
-        if (rooms.length === 0) { res.status(200).json({ codes: [] }); return; }
-
-        const ttl = Math.min(Math.max(Number(body.expires_in_hours) || MAX_TTL_HOURS, 1), MAX_TTL_HOURS);
-        const now = Date.now();
-        const dorm = cfgSnap.data()?.bill_customization?.dorm_name ?? '';
-        const codes: { room_id: string; room_number: string; code: string }[] = [];
-        for (let i = 0; i < rooms.length; i += 400) {
-            const batch = db.batch();
-            for (const r of rooms.slice(i, i + 400)) {
-                const token = generateToken();
-                const roomNumber = String(r.data().room_number ?? r.id);
-                batch.set(db.collection(COLLECTION).doc(hashToken(token)), {
-                    owner_uid: ctx.ownerUid, building_id: buildingId, room_id: r.id, room_number: roomNumber,
-                    tenant_name: names.get(r.id) || `ผู้เช่าห้อง ${roomNumber}`, dorm_name: dorm,
-                    one_time: true, max_uses: 1, use_count: 0, replace_existing: false, status: 'active', source: 'sheet',
-                    created_at: new Date(now).toISOString(), created_by: ctx.uid, expires_at: now + ttl * 3600 * 1000,
-                });
-                codes.push({ room_id: r.id, room_number: roomNumber, code: token });
-            }
-            await batch.commit();
-        }
-        await writeAudit({
-            ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
-            action: 'CREATE', resourceType: 'invitation', resourceId: null, resourceLabel: `QR sheet ${codes.length} rooms`,
-            after: { rooms: codes.length, ttl_hours: ttl }, req,
-        });
-        // plaintext codes go back exactly once, for printing
-        res.status(200).json({ codes, expires_at: now + ttl * 3600 * 1000, dorm_name: dorm });
+        res.status(200).json({ code: token, expires_at: now + ttl * 3600 * 1000, one_time: oneTime, room_number: room.room_number, oa_id: await propertyOaId(ctx.ownerUid, buildingId) });
         return;
     }
 

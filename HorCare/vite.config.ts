@@ -70,6 +70,8 @@ export default defineConfig(({ mode, command }) => {
         // Precache only JS, CSS, HTML, SVG — skip large PNGs
         globPatterns: ['**/*.{js,css,html,svg,ico,woff2}'],
         cleanupOutdatedCaches: true,
+        // A room QR must reach the server even on a phone that has the app installed, or it opens the app instead of LINE.
+        navigateFallbackDenylist: [/^\/r\//],
         skipWaiting: true,
         runtimeCaching: [
           // App icons & logos — revalidate in background, cacheName v2 to clear old stale logos
