@@ -182,13 +182,58 @@ describe('redeeming invitations', () => {
         expect(await redeemInvitation(LINE_A, code)).toEqual({ ok: false, reason: 'room_unavailable' });
     });
 
+    const second = async () => ((await create(OWNER, { room_id: 'room-102', tenant_name: 'Somchai' })).body as { code: string }).code;
+    const R101 = `users/${OWNER}/buildings/${BLD}/rooms/${ROOM}`;
+    const R102 = `users/${OWNER}/buildings/${BLD}/rooms/room-102`;
+
+    it('someone with a room is asked whether a second code means moving or one more room; asking uses nothing up', async () => {
+        await redeemInvitation(LINE_A, await issue());
+        const code = await second();
+        expect(await redeemInvitation(LINE_A, code)).toEqual({ ok: false, reason: 'choose', roomNumber: '102', currentRoomNumbers: ['101'] });
+        expect(read(R102)?.line_user_id).toBeUndefined();
+        expect(read(R101)?.line_user_id).toBe(LINE_A);
+        expect((await redeemInvitation(LINE_A, code, 'move')).ok).toBe(true);   // the code is still good
+    });
+
     it('moving a LINE user to a new room releases their old room', async () => {
-        const first = await issue();
-        await redeemInvitation(LINE_A, first);
-        const res = await create(OWNER, { room_id: 'room-102', tenant_name: 'Somchai' });
-        await redeemInvitation(LINE_A, (res.body as { code: string }).code);
-        expect(read(`users/${OWNER}/buildings/${BLD}/rooms/${ROOM}`)?.line_user_id).toBeUndefined();
-        expect(read(`users/${OWNER}/buildings/${BLD}/rooms/room-102`)?.line_user_id).toBe(LINE_A);
+        await redeemInvitation(LINE_A, await issue());
+        const r = await redeemInvitation(LINE_A, await second(), 'move');
+        expect(r).toMatchObject({ ok: true, movedFromRoomNumber: '101', keptRoomNumbers: [] });
+        expect(read(R101)?.line_user_id).toBeUndefined();
+        expect(read(R102)?.line_user_id).toBe(LINE_A);
+        expect(read(`line_rooms/${LINE_A}`)).toMatchObject({ room_id: 'room-102', room_number: '102' });
+        expect(read(`line_rooms/${LINE_A}`)?.rooms).toBeUndefined();
+    });
+
+    it('adding a room keeps the first: one LINE account, both rooms, first room stays the primary', async () => {
+        await redeemInvitation(LINE_A, await issue());
+        const r = await redeemInvitation(LINE_A, await second(), 'add');
+        expect(r).toMatchObject({ ok: true, roomNumber: '102', movedFromRoomNumber: null, keptRoomNumbers: ['101'] });
+        expect(read(R101)?.line_user_id).toBe(LINE_A);
+        expect(read(R102)?.line_user_id).toBe(LINE_A);
+        const link = read(`line_rooms/${LINE_A}`)!;
+        expect(link).toMatchObject({ uid: OWNER, building_id: BLD, room_id: ROOM, room_number: '101' });
+        expect((link.rooms as { room_number: string }[]).map(x => x.room_number)).toEqual(['101', '102']);
+    });
+
+    it('with several rooms already, another code can only add: nothing is asked and nothing is released', async () => {
+        seed(`users/${OWNER}/buildings/${BLD}/rooms/room-103`, { room_number: '103', is_active: true });
+        await redeemInvitation(LINE_A, await issue());
+        await redeemInvitation(LINE_A, await second(), 'add');
+        const third = ((await create(OWNER, { room_id: 'room-103', tenant_name: 'Somchai' })).body as { code: string }).code;
+        expect(await redeemInvitation(LINE_A, third)).toMatchObject({ ok: true, keptRoomNumbers: ['101', '102'] });
+        expect([R101, R102, `users/${OWNER}/buildings/${BLD}/rooms/room-103`].map(p => read(p)?.line_user_id)).toEqual([LINE_A, LINE_A, LINE_A]);
+    });
+
+    it('taking a room from someone with several rooms leaves them their others', async () => {
+        await redeemInvitation(LINE_A, await issue());
+        await redeemInvitation(LINE_A, await second(), 'add');
+        const takeover = ((await create(OWNER, { room_id: 'room-102', tenant_name: 'Malee', replace_existing: true })).body as { code: string }).code;
+        expect((await redeemInvitation(LINE_B, takeover)).ok).toBe(true);
+        expect(read(R102)?.line_user_id).toBe(LINE_B);
+        expect(read(R101)?.line_user_id).toBe(LINE_A);
+        expect(read(`line_rooms/${LINE_A}`)).toMatchObject({ room_id: ROOM });
+        expect(read(`line_rooms/${LINE_A}`)?.rooms).toBeUndefined();
     });
 
     it('records an audit event for the redemption', async () => {

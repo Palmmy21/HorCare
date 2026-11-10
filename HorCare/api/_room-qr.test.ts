@@ -165,11 +165,32 @@ describe('scanning', () => {
         expect((await scanRoomCode(lineId(99), code)).outcome).toBe('too_many_requests');
     });
 
+    it('someone with a room who scans another is asked what they mean, and nothing changes until they say', async () => {
+        await scanRoomCode(LINE_A, await codeOf('r101'));
+        expect(await scanRoomCode(LINE_A, await codeOf('r102'))).toEqual({ outcome: 'choose', roomNumber: '102', dormName: 'Dorm A', currentRoomNumbers: ['101'] });
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBe(LINE_A);
+        expect(read(`${B}/rooms/r102`)?.line_user_id).toBeUndefined();
+    });
+
     it('moving to a free room releases the old one', async () => {
         await scanRoomCode(LINE_A, await codeOf('r101'));
-        expect((await scanRoomCode(LINE_A, await codeOf('r102'))).outcome).toBe('bound');
+        expect((await scanRoomCode(LINE_A, await codeOf('r102'), 'move')).outcome).toBe('bound');
         expect(read(`${B}/rooms/r101`)?.line_user_id).toBeUndefined();
         expect(read(`${B}/rooms/r102`)?.line_user_id).toBe(LINE_A);
+    });
+
+    it('one more room from a door QR is never automatic: it waits for an admin, who then keeps both rooms on the account', async () => {
+        await scanRoomCode(LINE_A, await codeOf('r101'));
+        const code = await codeOf('r102');
+        expect(await scanRoomCode(LINE_A, code, 'add')).toMatchObject({ outcome: 'requested', adding: true });
+        expect(read(`${B}/rooms/r102`)?.line_user_id).toBeUndefined();
+        expect((await call(OWNER, { action: 'status' })).body.requests[0]).toMatchObject({ room_number: '102', add: true, other_rooms: '101' });
+        expect(await scanRoomCode(LINE_A, code, 'add')).toMatchObject({ outcome: 'already_requested', adding: true });
+
+        expect((await call(OWNER, { action: 'approve', request_id: await pendingId() })).statusCode).toBe(200);
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBe(LINE_A);
+        expect(read(`${B}/rooms/r102`)?.line_user_id).toBe(LINE_A);
+        expect((read(`line_rooms/${LINE_A}`)?.rooms as { room_number: string }[]).map(r => r.room_number)).toEqual(['101', '102']);
     });
 
     it('unknown codes and deactivated rooms bind nothing', async () => {

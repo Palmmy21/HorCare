@@ -13,6 +13,11 @@
  * its own only while the room has no LINE account. When the room is taken the scan becomes a request and nobody loses
  * the room until someone with `tenant.update` on that property approves it.
  *
+ * One LINE account may hold several rooms (a teacher renting three for students). A first room, or a tenant changing
+ * rooms, binds as above. Someone who already has a room and scans another is asked which they mean: moving binds as
+ * before, an ADDED room always goes to an admin first — a QR on a door is no proof the owner wants this person to
+ * collect rooms. (A one-time invitation from the owner adds straight away: see _invitations.ts.)
+ *
  * `room_codes/{code}`                    code → room (backend only)
  * `.../buildings/{b}/room_qr/{roomId}`   room → its code, for reprinting
  * `.../buildings/{b}/line_requests/{id}` scans of a taken room
@@ -30,6 +35,7 @@ import { sendFCMToOwner } from './_notify-owner.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { raiseBindingAlert, raiseRequestAlert } from './_security-alerts.js';
 import { MAX_PENDING_PER_ROOM, QR_CHUNK, REJECT_COOLDOWN_MS, type RoomLineRequest } from '../src/shared/roomQr.js';
+import { isBindMode, roomNumbersText, type BindMode } from '../src/shared/lineRooms.js';
 
 export const config = { maxDuration: 15 };
 
@@ -97,7 +103,8 @@ async function liffScan(req: VercelRequest, res: VercelResponse, body: Body) {
     // this LINE id means nothing to a team's OA: such a room can only be registered from its own chat
     if (entry?.status === 'active' && oaId && oaId !== process.env.VITE_LINE_OA_ID) { res.status(409).json({ error: 'use_chat', url: chatLink(oaId, code) }); return; }
 
-    const scan = await runInLineChannel('tenant', () => scanRoomCode(lineUserId, code));
+    const mode = isBindMode(body.mode) ? body.mode : undefined;
+    const scan = await runInLineChannel('tenant', () => scanRoomCode(lineUserId, code, mode));
     const friend = scan.outcome === 'bound' || scan.outcome === 'already_yours' ? await isLineFriend(lineUserId, await resolveLineToken('tenant')) : null;
     if (friend !== null) await recordFriendship(lineUserId, friend);
     if (scan.outcome === 'bound' && friend) await notify(lineUserId, 'tenant', `🎉 ลงทะเบียนห้อง ${scan.roomNumber} สำเร็จ!\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`);
@@ -105,6 +112,8 @@ async function liffScan(req: VercelRequest, res: VercelResponse, body: Body) {
         outcome: scan.outcome,
         room_number: 'roomNumber' in scan ? scan.roomNumber : undefined,
         dorm_name: 'dormName' in scan ? scan.dormName : undefined,
+        current_rooms: scan.outcome === 'choose' ? scan.currentRoomNumbers : undefined,
+        adding: scan.outcome === 'requested' || scan.outcome === 'already_requested' ? scan.adding : undefined,
         add_friend_url: friend === false && oaId ? `https://line.me/R/ti/p/${encodeURIComponent(oaId)}` : undefined,
     });
 }
@@ -112,11 +121,19 @@ async function liffScan(req: VercelRequest, res: VercelResponse, body: Body) {
 export type ScanResult =
     | { outcome: 'bound'; roomNumber: string; dormName: string }
     | { outcome: 'already_yours'; roomNumber: string; dormName: string }
-    | { outcome: 'requested' | 'already_requested' | 'recently_rejected' | 'too_many_requests'; roomNumber: string; dormName: string }
+    /** `adding`: the room is free, but this account already has another, so an admin decides. */
+    | { outcome: 'requested' | 'already_requested'; roomNumber: string; dormName: string; adding: boolean }
+    | { outcome: 'recently_rejected' | 'too_many_requests'; roomNumber: string; dormName: string }
+    /** Has one other room and did not say what this scan means: ask "ย้ายห้อง" or "เพิ่มห้อง", then scan again with a mode. */
+    | { outcome: 'choose'; roomNumber: string; dormName: string; currentRoomNumbers: string[] }
+    | { outcome: 'too_many_rooms'; roomNumber: string; dormName: string }
     | { outcome: 'invalid' | 'room_unavailable' };
 
-/** A LINE user sent a room's code (the QR pre-fills it, or they typed it off the card). */
-export async function scanRoomCode(lineUserId: string, rawCode: string): Promise<ScanResult> {
+/**
+ * A LINE user sent a room's code (the QR pre-fills it, or they typed it off the card).
+ * `mode` is their answer when they already have a room: 'move' leaves it, 'add' keeps it.
+ */
+export async function scanRoomCode(lineUserId: string, rawCode: string, mode?: BindMode): Promise<ScanResult> {
     const code = rawCode.trim().toUpperCase();
     if (!isRoomCode(code)) return { outcome: 'invalid' };
     const entry = (await db.collection(CODES).doc(code).get()).data();
@@ -129,11 +146,15 @@ export async function scanRoomCode(lineUserId: string, rawCode: string): Promise
     const channel = currentLineChannel();
 
     const bound = await db.runTransaction(async tx => {
-        const b = await prepareBinding(tx, { lineUserId, ownerUid, buildingId, roomId });
+        const b = await prepareBinding(tx, { lineUserId, ownerUid, buildingId, roomId, mode });
         if (!b.room || b.room.is_active === false) return { unavailable: true as const };
         const roomNumber = String(b.room.room_number);
         if (b.effects.alreadyBound) return { roomNumber, already: true as const };
-        if (b.effects.replacedExisting) return { roomNumber, taken: true as const };
+        if (b.choice === 'full') return { roomNumber, full: true as const };
+        if (b.choice === 'ask' && !mode) return { roomNumber, ask: b.currentRooms.map(r => r.room_number) };
+        const adding = b.effects.keptRoomNumbers.length > 0;
+        // taken by someone else, or one more room for an account that has some: an admin decides
+        if (b.effects.replacedExisting || adding) return { roomNumber, taken: true as const, adding, kept: b.effects.keptRoomNumbers };
         b.commit({ channel, dormName, dueDay, extra: { via: 'room_qr' } });
         return { roomNumber, effects: b.effects };
     });
@@ -141,6 +162,9 @@ export async function scanRoomCode(lineUserId: string, rawCode: string): Promise
     if ('unavailable' in bound) return { outcome: 'room_unavailable' };
     const { roomNumber } = bound;
     if ('already' in bound) return { outcome: 'already_yours', roomNumber, dormName };
+    if ('full' in bound) return { outcome: 'too_many_rooms', roomNumber, dormName };
+    if ('ask' in bound) return { outcome: 'choose', roomNumber, dormName, currentRoomNumbers: bound.ask! };
+    const adding = 'adding' in bound && bound.adding === true;
 
     if ('effects' in bound) {
         await raiseBindingAlert(ownerUid, buildingId, {
@@ -158,7 +182,7 @@ export async function scanRoomCode(lineUserId: string, rawCode: string): Promise
     const col = db.collection(`${base(ownerUid, buildingId)}/line_requests`);
     const id = requestId(lineUserId, roomId);
     const prev = (await col.doc(id).get()).data() as RoomLineRequest | undefined;
-    if (prev?.status === 'pending') return { outcome: 'already_requested', roomNumber, dormName };
+    if (prev?.status === 'pending') return { outcome: 'already_requested', roomNumber, dormName, adding };
     if (prev?.status === 'rejected' && Date.now() - Date.parse(prev.decided_at ?? '') < REJECT_COOLDOWN_MS) {
         return { outcome: 'recently_rejected', roomNumber, dormName };
     }
@@ -171,13 +195,14 @@ export async function scanRoomCode(lineUserId: string, rawCode: string): Promise
     const request: RoomLineRequest = {
         id, room_id: roomId, room_number: roomNumber, line_user_id: lineUserId, line_ref: lineUserId.slice(-4),
         display_name: profile, channel, status: 'pending', created_at: new Date().toISOString(),
+        ...(adding && 'kept' in bound ? { add: true, other_rooms: roomNumbersText((bound.kept ?? []).map(n => ({ room_number: n }))) } : {}),
     };
     await col.doc(id).set(request);
     await raiseRequestAlert(ownerUid, buildingId, { roomId, roomNumber, lineUserId, displayName: profile });
     await sendFCMToOwner(ownerUid, {
-        building_id: buildingId, title: 'มีคำขอลงทะเบียน LINE ซ้อน', body: `ห้อง ${roomNumber} รอการอนุมัติ`,
+        building_id: buildingId, title: adding ? 'มีคำขอเพิ่มห้องให้ LINE เดิม' : 'มีคำขอลงทะเบียน LINE ซ้อน', body: `ห้อง ${roomNumber} รอการอนุมัติ`,
     }).catch(() => undefined);
-    return { outcome: 'requested', roomNumber, dormName };
+    return { outcome: 'requested', roomNumber, dormName, adding };
 }
 
 async function lineProfileName(lineUserId: string, token: string): Promise<string> {
@@ -198,6 +223,8 @@ interface Body {
     request_id?: string;
     access_token?: unknown;
     code?: unknown;
+    /** liff_scan: the scanner's answer when they already have a room ('move' | 'add'). */
+    mode?: unknown;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -300,13 +327,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const s = await tx.get(reqRef);
             const r = s.data() as RoomLineRequest | undefined;
             if (!r || r.status !== 'pending') return { error: 'request_not_pending' as const };
-            const b = await prepareBinding(tx, { lineUserId: r.line_user_id, ownerUid: ctx.ownerUid, buildingId, roomId: r.room_id });
+            const b = await prepareBinding(tx, { lineUserId: r.line_user_id, ownerUid: ctx.ownerUid, buildingId, roomId: r.room_id, mode: r.add ? 'add' : 'move' });
             if (!b.room || b.room.is_active === false) return { error: 'room_unavailable' as const };
             b.commit({ channel: roomLineChannel({ line_channel: r.channel }), dormName, dueDay, extra: { via: 'room_qr_approved', approved_by: ctx.uid } });
             tx.update(reqRef, { status: 'approved', ...decided });
             // the room is decided: the rest of the queue for it would otherwise approve over this tenant
             for (const o of others.docs) if (o.id !== reqRef.id) tx.update(o.ref, { status: 'rejected', ...decided });
-            return { r, replaced: b.effects.replacedExisting ? b.existingLine! : null, moved: b.effects.movedFromRoomNumber, oldChannel: b.room.line_channel };
+            return { r, replaced: b.effects.replacedExisting ? b.existingLine! : null, moved: b.effects.movedFromRoomNumber, kept: b.effects.keptRoomNumbers, oldChannel: b.room.line_channel };
         });
         if ('error' in result) { res.status(409).json({ error: result.error }); return; }
 
@@ -323,7 +350,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (await isLineFriend(r.line_user_id, await resolveLineToken(roomLineChannel({ line_channel: r.channel }))) === false) {
             await db.doc(`${base(ctx.ownerUid, buildingId)}/rooms/${r.room_id}`).update({ line_unreachable: true }).catch(() => undefined);
         }
-        await notify(r.line_user_id, roomLineChannel({ line_channel: r.channel }), `🎉 ลงทะเบียนห้อง ${r.room_number} สำเร็จแล้วค่ะ\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`);
+        await notify(r.line_user_id, roomLineChannel({ line_channel: r.channel }), result.kept.length > 0
+            ? `🎉 เพิ่มห้อง ${r.room_number} ให้ LINE นี้แล้วค่ะ\n\nตอนนี้คุณดูแลห้อง ${roomNumbersText([...result.kept, r.room_number].map(n => ({ room_number: n })))} บิลของทุกห้องจะส่งมาที่แชทนี้ พิมพ์ "บิล" เพื่อดูได้เลย 💬`
+            : `🎉 ลงทะเบียนห้อง ${r.room_number} สำเร็จแล้วค่ะ\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`);
         if (result.replaced) {
             await notify(result.replaced, roomLineChannel({ line_channel: result.oldChannel }), `ℹ️ บัญชี LINE นี้ไม่ได้ผูกกับห้อง ${r.room_number} แล้ว หากไม่ถูกต้อง กรุณาติดต่อเจ้าของหอค่ะ`);
         }

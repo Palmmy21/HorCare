@@ -7,6 +7,7 @@ import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { raiseBindingAlert } from './_security-alerts.js';
 import { bindingDisplay, prepareBinding } from './_line-binding.js';
+import type { BindMode } from '../src/shared/lineRooms.js';
 
 export const config = { maxDuration: 15 };
 
@@ -42,8 +43,12 @@ function generateToken(): string {
 export type RedeemResult =
     | { ok: true; ownerUid: string; buildingId: string; roomId: string; roomNumber: string; dormName: string;
           /** What this binding changed — drives the admin's security alert. */
-          replacedExisting: boolean; movedFromRoomNumber: string | null; alreadyBound: boolean }
-    | { ok: false; reason: 'not_found' | 'expired' | 'used' | 'revoked' | 'room_unavailable' | 'room_taken' };
+          replacedExisting: boolean; movedFromRoomNumber: string | null; alreadyBound: boolean;
+          /** The other rooms this account keeps: the invitation added a room. */
+          keptRoomNumbers: string[] }
+    | { ok: false; reason: 'not_found' | 'expired' | 'used' | 'revoked' | 'room_unavailable' | 'room_taken' | 'too_many_rooms' }
+    /** Has one other room and did not say what this code means: ask, then redeem again with a mode. Nothing was used up. */
+    | { ok: false; reason: 'choose'; roomNumber: string; currentRoomNumbers: string[] };
 
 /**
  * Bind a LINE user to the room named by an invitation. The room id comes from the
@@ -51,8 +56,11 @@ export type RedeemResult =
  * cannot claim a different room by typing a different number.
  *
  * Runs in a transaction so a one-time code cannot be redeemed twice concurrently.
+ *
+ * `mode` is the person's answer when they already have a room: 'move' leaves it, 'add' keeps it. The owner made this
+ * code for this room, so an added room needs no further approval (unlike a room's permanent QR).
  */
-export async function redeemInvitation(lineUserId: string, rawToken: string): Promise<RedeemResult> {
+export async function redeemInvitation(lineUserId: string, rawToken: string, mode?: BindMode): Promise<RedeemResult> {
     if (!isInvitationToken(rawToken)) return { ok: false, reason: 'not_found' };
     const inviteRef = db.collection(COLLECTION).doc(hashToken(rawToken));
 
@@ -74,11 +82,15 @@ export async function redeemInvitation(lineUserId: string, rawToken: string): Pr
         const sameUser = inv.used_by_line_user === lineUserId;
         if (!sameUser && (inv.status === 'used' || inv.use_count >= inv.max_uses)) return { ok: false, reason: 'used' };
 
-        const binding = await prepareBinding(tx, { lineUserId, ownerUid: inv.owner_uid, buildingId: inv.building_id, roomId: inv.room_id });
+        const binding = await prepareBinding(tx, { lineUserId, ownerUid: inv.owner_uid, buildingId: inv.building_id, roomId: inv.room_id, mode });
         const slotRef = db.doc(slotPath(inv.owner_uid, inv.building_id, inv.room_id));
         const slotSnap = await tx.get(slotRef);
         if (!binding.room || binding.room.is_active === false) return { ok: false, reason: 'room_unavailable' };
         if (binding.effects.replacedExisting && !inv.replace_existing) return { ok: false, reason: 'room_taken' };
+        if (!binding.effects.alreadyBound && binding.choice === 'full') return { ok: false, reason: 'too_many_rooms' };
+        if (!binding.effects.alreadyBound && binding.choice === 'ask' && !mode) {
+            return { ok: false, reason: 'choose', roomNumber: String(binding.room.room_number), currentRoomNumbers: binding.currentRooms.map(r => r.room_number) };
+        }
 
         // ── all reads done; writes below ──
         binding.commit({ channel: currentLineChannel(), dormName, dueDay, extra: { invitation_id: inviteRef.id } });

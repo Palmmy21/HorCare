@@ -7,7 +7,9 @@ import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } fro
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { isRoomCode, scanRoomCode } from './_room-qr.js';
 import { propertyOaId } from './_line-oa.js';
-import { recordFriendship } from './_line-binding.js';
+import { linkedRooms, recordFriendship } from './_line-binding.js';
+import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
+import { readSlipDetails } from './_slip-ai.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
 import { raiseBindingAlert } from './_security-alerts.js';
@@ -94,7 +96,9 @@ async function handleEvent(event: LineEvent) {
         if (event.type === 'follow' && event.source?.userId && event.replyToken) {
             try {
                 const link = (await db.collection('line_rooms').doc(event.source.userId).get()).data() ?? null;
-                await lineReply(event.replyToken, [botText(welcomeText(link, isMarket()), link ? TENANT_QUICK : GUEST_QUICK)]);
+                const mine = roomsOfLink(link);
+                const shown = link && mine.length > 1 ? { ...link, room_number: roomNumbersText(mine) } : link;
+                await lineReply(event.replyToken, [botText(welcomeText(shown, isMarket()), link ? TENANT_QUICK : GUEST_QUICK)]);
             } catch (err) {
                 console.error('LINE welcome failed:', (err as Error).message);
             }
@@ -127,7 +131,9 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     // ── "แบ่งจ่าย" buttons: on an invoice (split mode) or on a slip card ─────────────
     if (event.type === 'postback') {
         const modeReq = parseSplitModePostback(event.postback?.data);
-        if (modeReq) await handleSplitMode(lineUserId, replyToken, modeReq);
+        const slipRoom = parseSlipRoomPostback(event.postback?.data);
+        if (slipRoom) await handleSlipRoomChoice(lineUserId, replyToken, slipRoom);
+        else if (modeReq) await handleSplitMode(lineUserId, replyToken, modeReq);
         else await handleSplitPostback(lineUserId, replyToken, event.postback?.data);
         return;
     }
@@ -276,6 +282,22 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
             await handleRoomNumber(lineUserId, replyToken, text, pending);
             return;
         }
+
+        // Already has a room and sent the code of another: are they moving, or taking one more?
+        if (pending.step === 'choose_bind' && typeof pending.code === 'string') {
+            if (Number(pending.until ?? 0) < Date.now()) {
+                await pendingSnap.ref.delete();
+            } else {
+                const mode: BindMode | null = text === BIND_ADD ? 'add' : text === BIND_MOVE ? 'move' : null;
+                if (!mode) {
+                    await lineReply(replyToken, [botText(`กรุณาเลือก "${BIND_ADD}" หรือ "${BIND_MOVE}" ค่ะ (หรือพิมพ์ "ยกเลิก")`, [BIND_ADD, BIND_MOVE, 'ยกเลิก'])]);
+                    return;
+                }
+                if (pending.kind === 'invite') await handleInvitation(lineUserId, replyToken, pending.code, mode);
+                else await handleRoomCode(lineUserId, replyToken, pending.code, mode);
+                return;
+            }
+        }
     }
 
     // ── 6. Default ─────────────────────────────────────────────────
@@ -362,7 +384,22 @@ async function getOldestUnpaidFine(
 
 /** รับรหัสเชิญรายห้อง (HCI-...) — ห้องถูกกำหนดจากฝั่งเซิร์ฟเวอร์ ผู้เช่าเลือกเองไม่ได้ */
 /** The welcome message. The chat link does not require adding the OA, but bills are pushed: catch a non-friend now, not at billing. */
-async function replyRegistered(lineUserId: string, replyToken: string, dormName: string, roomNumber: string) {
+const BIND_ADD = 'เพิ่มห้อง';
+const BIND_MOVE = 'ย้ายห้อง';
+
+/** Someone with a room sent the code of another: keep the code for ten minutes and ask what they mean by it. */
+async function askMoveOrAdd(lineUserId: string, replyToken: string, kind: 'room' | 'invite', code: string, roomNumber: string, current: string[]) {
+    await db.collection('line_pending').doc(lineUserId).set({ step: 'choose_bind', kind, code, until: Date.now() + 10 * 60 * 1000 });
+    const mine = current.join(', ');
+    await lineReply(replyToken, [botText(
+        `คุณลงทะเบียนห้อง ${mine} ไว้แล้วค่ะ ต้องการทำอย่างไรกับห้อง ${roomNumber}?\n\n` +
+        `• ${BIND_ADD} — ดูแลทั้งห้อง ${mine} และ ${roomNumber} บิลของทุกห้องส่งมาที่แชทนี้\n` +
+        `• ${BIND_MOVE} — เลิกห้อง ${mine} แล้วใช้ห้อง ${roomNumber} แทน`,
+        [BIND_ADD, BIND_MOVE, 'ยกเลิก'],
+    )]);
+}
+
+async function replyRegistered(lineUserId: string, replyToken: string, dormName: string, roomNumber: string, kept: string[] = []) {
     await db.collection('line_pending').doc(lineUserId).delete();
     const friend = await isLineFriend(lineUserId);
     if (friend !== null) await recordFriendship(lineUserId, friend);
@@ -373,18 +410,27 @@ async function replyRegistered(lineUserId: string, replyToken: string, dormName:
         : '';
     await lineReply(replyToken, [{
         type: 'text',
-        text: `🎉 ลงทะเบียนสำเร็จ!\n\n🏠 หอพัก: ${dormName || '-'}\n🚪 ห้อง: ${roomNumber}\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬${addFriend}`,
+        text: kept.length > 0
+            ? `🎉 เพิ่มห้อง ${roomNumber} สำเร็จ!\n\n🏠 ${dormName || '-'}\n🚪 LINE นี้ดูแลห้อง ${roomNumbersText([...kept, roomNumber].map(n => ({ room_number: n })))}\n\nบิลของทุกห้องจะส่งมาที่แชทนี้ พิมพ์ "บิล" เพื่อดูได้เลย 💬${addFriend}`
+            : `🎉 ลงทะเบียนสำเร็จ!\n\n🏠 หอพัก: ${dormName || '-'}\n🚪 ห้อง: ${roomNumber}\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬${addFriend}`,
     }]);
 }
 
-async function handleRoomCode(lineUserId: string, replyToken: string, code: string) {
-    const r = await scanRoomCode(lineUserId, code);
+async function handleRoomCode(lineUserId: string, replyToken: string, code: string, mode?: BindMode) {
+    const r = await scanRoomCode(lineUserId, code, mode);
     if (r.outcome === 'bound') { await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber); return; }
+    if (r.outcome === 'choose') { await askMoveOrAdd(lineUserId, replyToken, 'room', code, r.roomNumber, r.currentRoomNumbers); return; }
+    await db.collection('line_pending').doc(lineUserId).delete();
     const room = 'roomNumber' in r ? r.roomNumber : '';
+    const adding = (r.outcome === 'requested' || r.outcome === 'already_requested') && r.adding;
     const text = {
         already_yours: `✅ คุณลงทะเบียนห้อง ${room} ไว้แล้วค่ะ\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`,
-        requested: `📝 ห้อง ${room} มีผู้ลงทะเบียนอยู่แล้ว ระบบส่งคำขอให้แอดมินแล้วค่ะ\n\nเมื่ออนุมัติแล้วจะแจ้งในแชทนี้`,
+        requested: adding
+            ? `📝 ส่งคำขอเพิ่มห้อง ${room} ให้แอดมินแล้วค่ะ\n\nเมื่ออนุมัติแล้วจะแจ้งในแชทนี้ ระหว่างนี้ห้องเดิมของคุณใช้งานได้ตามปกติ`
+            : `📝 ห้อง ${room} มีผู้ลงทะเบียนอยู่แล้ว ระบบส่งคำขอให้แอดมินแล้วค่ะ\n\nเมื่ออนุมัติแล้วจะแจ้งในแชทนี้`,
         already_requested: `⏳ คำขอลงทะเบียนห้อง ${room} กำลังรอแอดมินอนุมัติอยู่ค่ะ`,
+        too_many_rooms: '⚠️ LINE นี้ลงทะเบียนไว้หลายห้องเต็มจำนวนแล้ว กรุณาติดต่อเจ้าของหอค่ะ',
+        choose: '',
         recently_rejected: `⚠️ คำขอลงทะเบียนห้อง ${room} ไม่ได้รับการอนุมัติ กรุณาติดต่อเจ้าของหอค่ะ`,
         too_many_requests: `⚠️ ห้อง ${room} มีคำขอรออนุมัติหลายรายการ กรุณาติดต่อเจ้าของหอค่ะ`,
         room_unavailable: '⚠️ ห้องนี้ไม่พร้อมใช้งาน กรุณาติดต่อเจ้าของหอ',
@@ -393,12 +439,14 @@ async function handleRoomCode(lineUserId: string, replyToken: string, code: stri
     await lineReply(replyToken, [{ type: 'text', text }]);
 }
 
-async function handleInvitation(lineUserId: string, replyToken: string, token: string) {
-    const r = await redeemInvitation(lineUserId, token);
+async function handleInvitation(lineUserId: string, replyToken: string, token: string, mode?: BindMode) {
+    const r = await redeemInvitation(lineUserId, token, mode);
     if (r.ok) {
-        await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber);
+        await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber, r.keptRoomNumbers);
         return;
     }
+    if (r.reason === 'choose') { await askMoveOrAdd(lineUserId, replyToken, 'invite', token, r.roomNumber, r.currentRoomNumbers); return; }
+    await db.collection('line_pending').doc(lineUserId).delete();
     const messages: Record<string, string> = {
         not_found: '❌ ไม่พบรหัสเชิญนี้ กรุณาตรวจสอบรหัส หรือขอรหัสใหม่จากเจ้าของหอ',
         expired: '⌛ รหัสเชิญนี้หมดอายุแล้ว กรุณาขอรหัสใหม่จากเจ้าของหอ',
@@ -406,6 +454,7 @@ async function handleInvitation(lineUserId: string, replyToken: string, token: s
         revoked: '⚠️ รหัสเชิญนี้ถูกยกเลิกแล้ว กรุณาขอรหัสใหม่จากเจ้าของหอ',
         room_unavailable: '⚠️ ห้องนี้ไม่พร้อมใช้งาน กรุณาติดต่อเจ้าของหอ',
         room_taken: '⚠️ ห้องนี้มีผู้ลงทะเบียน LINE ไว้แล้ว กรุณาติดต่อเจ้าของหอ',
+        too_many_rooms: '⚠️ LINE นี้ลงทะเบียนไว้หลายห้องเต็มจำนวนแล้ว กรุณาติดต่อเจ้าของหอค่ะ',
     };
     await lineReply(replyToken, [{ type: 'text', text: messages[r.reason] ?? messages.not_found }]);
 }
@@ -482,6 +531,12 @@ async function handleRoomNumber(
     }
 
     const prevLink = (await db.collection('line_rooms').doc(lineUserId).get()).data();
+    // typing a room number replaces the registration: not something to do to an account that holds several rooms
+    if (roomsOfLink(prevLink).length > 1) {
+        await db.collection('line_pending').doc(lineUserId).delete();
+        await lineReply(replyToken, [{ type: 'text', text: '⚠️ LINE นี้ลงทะเบียนไว้หลายห้องแล้วค่ะ หากต้องการเพิ่มหรือเปลี่ยนห้อง กรุณาขอลิงก์เชิญจากเจ้าของหอ' }]);
+        return;
+    }
     const alreadyBound = existingLineUserId === lineUserId && prevLink?.room_id === roomDoc.id;
 
     const batch = db.batch();
@@ -523,6 +578,9 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
         return;
     }
 
+    const mine = await linkedRooms(lineUserId);
+    if (mine.length > 1) { await replyBillsOfRooms(replyToken, mine); return; }
+
     const { uid, building_id, room_id, room_number, dorm_name, due_day } = lineRoomSnap.data()!;
 
     const billDoc = await getLatestSavedBill(uid, building_id, room_id);
@@ -540,6 +598,64 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
     await lineReply(replyToken, [buildBillFlex(bill as MonthlyBill, dorm_name || '-', due_day ?? 5, bill.month as string, { pay })]);
 }
 
+/** LINE takes five messages in a reply: up to four bill cards, then a line about whatever did not fit. */
+const MAX_BILL_CARDS = 4;
+
+/** The latest bill of every room one LINE account looks after, unpaid ones first. */
+async function replyBillsOfRooms(replyToken: string, rooms: LinkedRoom[]) {
+    const accounts = new Map<string, Awaited<ReturnType<typeof loadPayAccount>>>();
+    const cards: { card: object; paid: boolean; room: string }[] = [];
+    const noBill: string[] = [];
+    for (const r of rooms) {
+        const billDoc = await getLatestSavedBill(r.uid, r.building_id, r.room_id);
+        if (!billDoc) { noBill.push(r.room_number); continue; }
+        const bill = billDoc.data();
+        const key = `${r.uid}/${r.building_id}`;
+        if (!accounts.has(key)) accounts.set(key, await loadPayAccount(r.uid, r.building_id));
+        const pay = invoicePay(accounts.get(key)!, bill.total_bill as number, appBaseUrl());
+        cards.push({
+            card: buildBillFlex(bill as MonthlyBill, r.dorm_name || '-', r.due_day ?? 5, bill.month as string, { pay }),
+            paid: bill.payment_status === 'paid', room: r.room_number,
+        });
+    }
+    cards.sort((a, b) => Number(a.paid) - Number(b.paid));
+    const shown = cards.slice(0, MAX_BILL_CARDS);
+    const rest = cards.slice(MAX_BILL_CARDS);
+    const notes: string[] = [];
+    if (shown.length > 0) notes.push(`📋 บิลล่าสุดของห้อง ${roomNumbersText(shown.map(c => ({ room_number: c.room })))} (ห้องละ 1 ใบ โอนแยกทีละห้องนะคะ)`);
+    if (rest.length > 0) notes.push(`ยังมีบิลของห้อง ${roomNumbersText(rest.map(c => ({ room_number: c.room })))} พิมพ์ "พอร์ทัล" แล้วเลือกห้องเพื่อดูได้ค่ะ`);
+    if (noBill.length > 0) notes.push(`ห้อง ${roomNumbersText(noBill.map(n => ({ room_number: n })))} ยังไม่มีบิลค่ะ`);
+    await lineReply(replyToken, [botText(notes.join('\n\n')), ...shown.map(c => c.card)]);
+}
+
+/** One button per room, for an account that looks after several. */
+async function replyPortalChoice(replyToken: string, rooms: LinkedRoom[], intro?: string) {
+    const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
+    const unit = botVocab(isMarket()).unit;
+    const buttons = await Promise.all(rooms.slice(0, 10).map(async r => ({
+        type: 'button', style: 'primary', color: '#0A6CC2', height: 'sm', margin: 'sm',
+        action: {
+            type: 'uri', label: `${unit} ${r.room_number}`.slice(0, 20),
+            uri: `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: r.uid, buildingId: r.building_id, roomId: r.room_id }))}`,
+        },
+    })));
+    await lineReply(replyToken, [...(intro ? [botText(intro)] : []), {
+        type: 'flex',
+        altText: `🏠 พอร์ทัลผู้เช่า ${unit} ${roomNumbersText(rooms)}`,
+        contents: {
+            type: 'bubble', size: 'kilo',
+            header: {
+                type: 'box', layout: 'vertical', paddingAll: '16px', backgroundColor: '#0A6CC2',
+                contents: [
+                    { type: 'text', text: '🏠 พอร์ทัลผู้เช่า', color: '#ffffff', size: 'sm', weight: 'bold' },
+                    { type: 'text', text: `เลือก${unit}ที่ต้องการเปิด`, color: '#ffffffcc', size: 'xs' },
+                ],
+            },
+            body: { type: 'box', layout: 'vertical', paddingAll: '12px', contents: buttons },
+        },
+    }]);
+}
+
 /** ส่งลิงก์พอร์ทัลส่วนตัวของลูกหอ */
 async function handlePortalCommand(lineUserId: string, replyToken: string, intro?: string) {
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
@@ -547,6 +663,9 @@ async function handlePortalCommand(lineUserId: string, replyToken: string, intro
         await lineReply(replyToken, [botText(notRegisteredText(isMarket()), GUEST_QUICK)]);
         return;
     }
+
+    const mine = await linkedRooms(lineUserId);
+    if (mine.length > 1) { await replyPortalChoice(replyToken, mine, intro); return; }
 
     const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
     const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
@@ -686,6 +805,8 @@ async function handleSlipImage(
     replyToken: string,
     messageId: string,
     preloaded?: { img: { buffer: Buffer; contentType: string }; qr: SlipQR },
+    /** The room this slip pays, when the account has several and the person (or the amount) already said which. */
+    chosen?: LinkedRoom,
 ) {
     // 1. ต้องลงทะเบียนก่อน
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
@@ -696,7 +817,16 @@ async function handleSlipImage(
         }]);
         return;
     }
-    const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
+    // One room: exactly as before. Several: find out which room the money is for before anything is written.
+    let target: LinkedRoom | undefined = chosen;
+    if (!target && roomsOfLink(lineRoomSnap.data()).length > 1) {
+        const mine = await linkedRooms(lineUserId);
+        if (mine.length > 1) {
+            target = await pickSlipRoom(lineUserId, replyToken, messageId, mine, lineRoomSnap.data()!, preloaded) ?? undefined;
+            if (!target) return;   // asked which room, or already answered
+        }
+    }
+    const { uid, building_id, room_id, room_number, dorm_name } = (target ?? lineRoomSnap.data()!) as LinkedRoom;
 
     // 2. หาบิลล่าสุดของห้อง
     const billDoc = await getLatestSavedBill(uid, building_id, room_id);
@@ -907,10 +1037,9 @@ const SPLIT_MODE_MS = 30 * 60_000;
 async function handleSplitMode(lineUserId: string, replyToken: string, req: { kind: 'bill' | 'fine'; itemId: string }) {
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
     if (!lineRoomSnap.exists) return;
-    const { uid, building_id, room_id } = lineRoomSnap.data()!;
-    const snap = await db.doc(`users/${uid}/buildings/${building_id}/${req.kind === 'bill' ? 'bills' : 'fines'}/${req.itemId}`).get();
-    const item = snap.data();
-    if (!item || item.room_id !== room_id) { await lineReply(replyToken, [{ type: 'text', text: 'ไม่พบรายการนี้ค่ะ' }]); return; }
+    const found = await findItemRoom(await linkedRooms(lineUserId), req.kind, req.itemId);
+    const item = found?.item;
+    if (!item) { await lineReply(replyToken, [{ type: 'text', text: 'ไม่พบรายการนี้ค่ะ' }]); return; }
     const owed = outstandingSatang(req.kind, item as PaidItem) / 100;
     if (owed <= 0) { await lineReply(replyToken, [{ type: 'text', text: '✅ รายการนี้ชำระครบแล้วค่ะ ขอบคุณค่ะ 🙏' }]); return; }
 
@@ -931,7 +1060,11 @@ async function handleSplitPostback(lineUserId: string, replyToken: string, data:
     if (!req) return;
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
     if (!lineRoomSnap.exists) return;
-    const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
+    const mine = await linkedRooms(lineUserId);
+    // the room the item belongs to; with one room this is that room, as before
+    const owner = (await findItemRoom(mine, req.kind, req.itemId))?.room ?? mine[0];
+    if (!owner) return;
+    const { uid, building_id, room_id, room_number, dorm_name } = owner;
     const r = await applySlipSplit({ ownerUid: uid, buildingId: building_id, kind: req.kind, itemId: req.itemId, roomId: room_id, slipRef: req.slipRef });
     if (r.status !== 'ok') {
         const text = r.status === 'not_found' ? 'ไม่พบรายการนี้ค่ะ'
@@ -945,4 +1078,116 @@ async function handleSplitPostback(lineUserId: string, replyToken: string, data:
         paid: r.paid, total: r.total, outstanding: r.outstanding,
     })]);
     await autoPostSafe(uid, building_id);
+}
+
+// ── One LINE account, several rooms ───────────────────────────────────────────
+
+/** The room among `rooms` that a bill / fine belongs to, with the item. Null when it is none of theirs. */
+async function findItemRoom(rooms: LinkedRoom[], kind: 'bill' | 'fine', itemId: string): Promise<{ room: LinkedRoom; item: FirebaseFirestore.DocumentData } | null> {
+    const seen = new Set<string>();
+    for (const r of rooms) {
+        const key = `${r.uid}/${r.building_id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const item = (await db.doc(`users/${r.uid}/buildings/${r.building_id}/${kind === 'bill' ? 'bills' : 'fines'}/${itemId}`).get()).data();
+        if (!item) continue;
+        const room = rooms.find(x => x.uid === r.uid && x.building_id === r.building_id && x.room_id === item.room_id);
+        if (room) return { room, item };
+    }
+    return null;
+}
+
+const SLIP_CHOICE_MS = 30 * 60_000;
+const slipRoomPostbackData = (r: LinkedRoom) => `sliproom|${r.uid}|${r.building_id}|${r.room_id}`;
+function parseSlipRoomPostback(data: string | undefined): Pick<LinkedRoom, 'uid' | 'building_id' | 'room_id'> | null {
+    const p = (data ?? '').split('|');
+    return p.length === 4 && p[0] === 'sliproom' && p.slice(1).every(x => x && !x.includes('/')) ? { uid: p[1], building_id: p[2], room_id: p[3] } : null;
+}
+
+/** What a room still owes on its latest bill, else on its oldest unpaid fine. Null when nothing is due. */
+async function roomDue(r: LinkedRoom): Promise<{ room: LinkedRoom; owed: number } | null> {
+    const billDoc = await getLatestSavedBill(r.uid, r.building_id, r.room_id);
+    if (billDoc && billDoc.data().payment_status !== 'paid') return { room: r, owed: outstandingSatang('bill', billDoc.data() as PaidItem) / 100 };
+    const fineDoc = billDoc ? await getOldestUnpaidFine(r.uid, r.building_id, r.room_id) : null;
+    return fineDoc ? { room: r, owed: outstandingSatang('fine', fineDoc.data() as PaidItem) / 100 } : null;
+}
+
+/**
+ * Which room a slip pays, for an account that looks after several. In order: the room whose "แบ่งจ่าย" is open; the only
+ * room with something due; the only room whose amount due equals the amount on the slip. Otherwise the person is asked
+ * (the photo is kept by its LINE message id for half an hour) and null is returned.
+ */
+async function pickSlipRoom(
+    lineUserId: string, replyToken: string, messageId: string, rooms: LinkedRoom[], link: FirebaseFirestore.DocumentData,
+    preloaded?: { img: { buffer: Buffer; contentType: string }; qr: SlipQR },
+): Promise<LinkedRoom | null> {
+    const mode = link.split_mode as { kind?: string; item_id?: string; until?: string } | undefined;
+    if (mode?.item_id && (mode.kind === 'bill' || mode.kind === 'fine') && Date.parse(mode.until ?? '') > Date.now()) {
+        const found = await findItemRoom(rooms, mode.kind, mode.item_id);
+        if (found) return found.room;
+    }
+
+    const dues = (await Promise.all(rooms.map(roomDue))).filter((d): d is { room: LinkedRoom; owed: number } => !!d && d.owed > 0);
+    if (dues.length === 0) {
+        await lineReply(replyToken, [botText(`✅ ห้อง ${roomNumbersText(rooms)} ไม่มียอดค้างชำระค่ะ ขอบคุณค่ะ 🙏`)]);
+        return null;
+    }
+    if (dues.length === 1) return dues[0].room;
+
+    // the amount on the slip settles it when exactly one room owes that much (AI reading: paid plans, as for checking slips)
+    try {
+        const owner = (await db.collection('users').doc(dues[0].room.uid).get()).data();
+        if (isPaidPlan(effectiveLicense(owner))) {
+            const img = preloaded?.img ?? await getLineImageContent(messageId);
+            const dataUrl = img ? await compressSlipToDataUrl(img.buffer) : null;
+            const m = dataUrl ? dataUrl.match(/^data:(image\/\w+);base64,(.+)$/) : null;
+            const amount = m ? (await readSlipDetails(m[2], m[1]))?.amount : null;
+            if (typeof amount === 'number') {
+                const same = dues.filter(d => Math.abs(d.owed - amount) < 0.005);
+                if (same.length === 1) return same[0].room;
+            }
+        }
+    } catch (err) {
+        console.warn('[slip-room] could not read the amount:', (err as Error).message);
+    }
+
+    await db.collection('line_rooms').doc(lineUserId).update({ slip_choice: { message_id: messageId, until: Date.now() + SLIP_CHOICE_MS } });
+    const unit = botVocab(isMarket()).unit;
+    await lineReply(replyToken, [{
+        type: 'flex',
+        altText: `สลิปนี้จ่ายของ${unit}ไหนคะ`,
+        contents: {
+            type: 'bubble', size: 'kilo',
+            body: {
+                type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'sm',
+                contents: [
+                    { type: 'text', text: `สลิปนี้จ่ายของ${unit}ไหนคะ`, weight: 'bold', size: 'md', wrap: true },
+                    { type: 'text', text: 'กดเลือกด้านล่าง ระบบจะตัดยอดให้ถูกห้อง', size: 'xs', color: '#888888', wrap: true },
+                    ...dues.slice(0, 10).map(d => ({
+                        type: 'button', style: 'primary', color: '#0A6CC2', height: 'sm', margin: 'sm',
+                        action: {
+                            type: 'postback', data: slipRoomPostbackData(d.room),
+                            label: `${unit} ${d.room.room_number} · ฿${d.owed.toLocaleString()}`.slice(0, 20),
+                            displayText: `${unit} ${d.room.room_number}`,
+                        },
+                    })),
+                ],
+            },
+        },
+    }]);
+    return null;
+}
+
+/** The person pressed a room under "สลิปนี้จ่ายของห้องไหนคะ": run the slip they sent against that room. */
+async function handleSlipRoomChoice(lineUserId: string, replyToken: string, key: Pick<LinkedRoom, 'uid' | 'building_id' | 'room_id'>) {
+    const ref = db.collection('line_rooms').doc(lineUserId);
+    const choice = (await ref.get()).data()?.slip_choice as { message_id?: string; until?: number } | undefined;
+    const room = (await linkedRooms(lineUserId)).find(r => sameRoom(r, key));
+    if (!room) return;                       // not a room of theirs (any more)
+    if (!choice?.message_id || Number(choice.until ?? 0) < Date.now()) {
+        await lineReply(replyToken, [botText('ไม่พบสลิปที่รออยู่ค่ะ กรุณาส่งรูปสลิปอีกครั้งนะคะ')]);
+        return;
+    }
+    await ref.update({ slip_choice: admin.firestore.FieldValue.delete() });
+    await handleSlipImage(lineUserId, replyToken, choice.message_id, undefined, room);
 }

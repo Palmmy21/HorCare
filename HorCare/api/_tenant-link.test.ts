@@ -63,7 +63,7 @@ describe('binding alerts', () => {
 
     it('moving a LINE account to another room raises a warning naming both rooms', async () => {
         await redeemInvitation(LINE_A, await invite('r101'));
-        await redeemInvitation(LINE_A, await invite('r102'));
+        await redeemInvitation(LINE_A, await invite('r102'), 'move');
         const moved = alerts().find(a => a.type === 'line_moved')!;
         expect(moved).toMatchObject({ severity: 'warning', room_number: '102', from_room_number: '101' });
     });

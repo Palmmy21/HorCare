@@ -144,7 +144,9 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
 
     const decide = async (r: PendingRequest, action: 'approve' | 'reject') => {
         const ok = action === 'approve'
-            ? confirm(`อนุมัติให้ "${r.display_name || `LINE …${r.line_ref}`}" เป็นผู้ลงทะเบียน${unitName} ${r.room_number}?\nบัญชีเดิมของ${unitName}นี้จะถูกถอดออก`)
+            ? confirm(r.add
+                ? `อนุมัติให้ "${r.display_name || `LINE …${r.line_ref}`}" รับบิลของ${unitName} ${r.room_number} เพิ่มอีก${unitName}?\nบัญชีนี้ดูแล${unitName} ${r.other_rooms || '-'} อยู่แล้ว และจะได้รับบิลของทุก${unitName}`
+                : `อนุมัติให้ "${r.display_name || `LINE …${r.line_ref}`}" เป็นผู้ลงทะเบียน${unitName} ${r.room_number}?\nบัญชีเดิมของ${unitName}นี้จะถูกถอดออก`)
             : confirm(`ปฏิเสธคำขอของ${unitName} ${r.room_number}?`);
         if (!ok) return;
         setDeciding(r.id);
@@ -222,6 +224,7 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
                                             <span className="qr-desk-room">{r.room_number}</span>
                                             <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>
                                                 {r.display_name || 'ไม่ทราบชื่อ'} · LINE …{r.line_ref}
+                                                {r.add && <strong> · ขอเพิ่ม{unitName} (มี{unitName} {r.other_rooms || '-'} อยู่แล้ว)</strong>}
                                                 <span className="qr-desk-when"> · {new Date(r.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
                                             </span>
                                             {canDecide ? (

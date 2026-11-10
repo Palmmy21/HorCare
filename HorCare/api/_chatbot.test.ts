@@ -29,6 +29,9 @@ beforeEach(() => {
     // two tenants of this property, one of another property
     seed(`line_rooms/${T1}`, { uid: OWNER, building_id: BLD, room_id: 'r1', room_number: '101' });
     seed(`line_rooms/${T2}`, { uid: OWNER, building_id: BLD, room_id: 'r2', room_number: '102' });
+    seed(`${B}/rooms/r1`, { id: 'r1', line_user_id: T1 });
+    seed(`${B}/rooms/r2`, { id: 'r2', line_user_id: T2 });
+    seed(`${B}/rooms/r3`, { id: 'r3', line_user_id: T2 });   // T2 looks after two rooms: still one message
     seed(`line_rooms/${TX}`, { uid: 'other-owner', building_id: 'bld-X', room_id: 'rX', room_number: 'X1' });
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({ ok: true, status: 200, text: async () => '', headers: new Headers() });

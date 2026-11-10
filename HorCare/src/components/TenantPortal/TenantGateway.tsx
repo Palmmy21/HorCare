@@ -13,11 +13,25 @@ type GatewayState =
   | { status: 'not_registered' }
   | { status: 'no_liff' }
   | { status: 'room_result'; ok: boolean; title: string; message: string; addFriendUrl?: string }
+  /** This LINE account looks after several rooms: which portal? */
+  | { status: 'pick_room'; rooms: { portal: string; room_number: string; dorm_name: string }[] }
+  /** Already has a room and scanned another: moving, or taking one more? */
+  | { status: 'choose'; code: string; roomNumber: string; currentRooms: string[]; busy: boolean }
   | { status: 'error'; message: string };
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string | undefined;
 
-interface ScanResponse { outcome?: string; room_number?: string; dorm_name?: string; add_friend_url?: string; url?: string; error?: string }
+interface ScanResponse { outcome?: string; room_number?: string; dorm_name?: string; add_friend_url?: string; url?: string; error?: string; current_rooms?: string[]; adding?: boolean }
+
+/** Ask the server to register the scanned room for this LINE account. `mode` answers "move or add" when it was asked. */
+async function scanRoom(code: string, mode?: 'move' | 'add'): Promise<{ ok: boolean; data: ScanResponse }> {
+  const res = await fetch('/api/room-qr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'liff_scan', access_token: window.liff.getAccessToken(), code, ...(mode ? { mode } : {}) }),
+  });
+  return { ok: res.ok, data: await res.json().catch(() => ({})) as ScanResponse };
+}
 
 /** What a person sees after scanning a room's QR. */
 function roomResult(r: ScanResponse): Extract<GatewayState, { status: 'room_result' }> {
@@ -29,7 +43,13 @@ function roomResult(r: ScanResponse): Extract<GatewayState, { status: 'room_resu
     case 'bound': return { status: 'room_result', ok: true, title: 'ลงทะเบียนสำเร็จ', message: `${room}${where}.${friendNote}`, addFriendUrl };
     case 'already_yours': return { status: 'room_result', ok: true, title: 'ลงทะเบียนไว้แล้ว', message: `คุณลงทะเบียน${room}ไว้แล้ว${friendNote}`, addFriendUrl };
     case 'requested':
-    case 'already_requested': return { status: 'room_result', ok: true, title: 'รอแอดมินอนุมัติ', message: `${room}มีผู้ลงทะเบียนอยู่แล้ว ระบบส่งคำขอให้แอดมินแล้ว เมื่ออนุมัติจะแจ้งทาง LINE` };
+    case 'already_requested': return {
+      status: 'room_result', ok: true, title: 'รอแอดมินอนุมัติ',
+      message: r.adding
+        ? `ส่งคำขอเพิ่ม${room}ให้แอดมินแล้ว เมื่ออนุมัติจะแจ้งทาง LINE ระหว่างนี้ห้องเดิมของคุณใช้งานได้ตามปกติ`
+        : `${room}มีผู้ลงทะเบียนอยู่แล้ว ระบบส่งคำขอให้แอดมินแล้ว เมื่ออนุมัติจะแจ้งทาง LINE`,
+    };
+    case 'too_many_rooms': return { status: 'room_result', ok: false, title: 'ลงทะเบียนไว้หลายห้องแล้ว', message: 'LINE นี้ลงทะเบียนไว้เต็มจำนวนแล้ว กรุณาติดต่อเจ้าของหอ' };
     case 'recently_rejected': return { status: 'room_result', ok: false, title: 'ไม่ได้รับการอนุมัติ', message: 'คำขอนี้ไม่ได้รับการอนุมัติ กรุณาติดต่อเจ้าของหอ' };
     case 'too_many_requests': return { status: 'room_result', ok: false, title: 'มีคำขอจำนวนมาก', message: `${room}มีคำขอรออนุมัติหลายรายการ กรุณาติดต่อเจ้าของหอ` };
     case 'room_unavailable': return { status: 'room_result', ok: false, title: 'ห้องไม่พร้อมใช้งาน', message: 'กรุณาติดต่อเจ้าของหอ' };
@@ -76,15 +96,14 @@ export default function TenantGateway() {
         }
 
         if (roomCode) {
-          const res = await fetch('/api/room-qr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'liff_scan', access_token: window.liff.getAccessToken(), code: roomCode }),
-          });
-          const data = await res.json().catch(() => ({})) as ScanResponse;
+          const { ok, data } = await scanRoom(roomCode);
           if (data.error === 'use_chat' && data.url) { window.location.replace(data.url); return; }
-          if (!res.ok) {
+          if (!ok) {
             setState({ status: 'error', message: 'ลงทะเบียนไม่สำเร็จ กรุณาสแกนอีกครั้ง' });
+            return;
+          }
+          if (data.outcome === 'choose') {
+            setState({ status: 'choose', code: roomCode, roomNumber: data.room_number ?? '', currentRooms: data.current_rooms ?? [], busy: false });
             return;
           }
           setState(roomResult(data));
@@ -108,7 +127,12 @@ export default function TenantGateway() {
           return;
         }
 
-        const { portal, room_number, dorm_name } = await res.json() as { portal: string; room_number?: string; dorm_name?: string };
+        const found = await res.json() as { portal: string; room_number?: string; dorm_name?: string; rooms?: { portal: string; room_number: string; dorm_name: string }[] };
+        if (found.rooms && found.rooms.length > 1) {
+          setState({ status: 'pick_room', rooms: found.rooms });
+          return;
+        }
+        const { portal, room_number, dorm_name } = found;
         setState({ status: 'redirecting', roomNumber: room_number ?? '', dormName: dorm_name ?? '' });
         window.location.replace(`/?p=${encodeURIComponent(portal)}`);
       } catch (err) {
@@ -209,6 +233,62 @@ export default function TenantGateway() {
               3. กดลิงก์ → พิมพ์เลขห้อง → ลงทะเบียนสำเร็จ
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Several rooms on this LINE account: which one? ──
+  if (state.status === 'pick_room') {
+    return (
+      <div style={cardStyle}>
+        <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(10, 108, 194, 0.25)' }} />
+        <div style={boxStyle}>
+          <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center', color: '#0A6CC2' }}><Building2 size={40} /></div>
+          <h2 style={{ fontWeight: 800, color: '#102A43', margin: '0 0 0.25rem', fontSize: '1.2rem' }}>เลือกห้อง</h2>
+          <p style={{ color: '#3E5872', fontSize: '0.875rem', lineHeight: 1.65, margin: 0 }}>LINE นี้ดูแล {state.rooms.length} ห้อง</p>
+          {state.rooms.map(r => (
+            <a key={r.portal} href={`/?p=${encodeURIComponent(r.portal)}`}
+              style={{ display: 'block', marginTop: '0.75rem', padding: '0.875rem 1rem', borderRadius: 14, background: '#0A6CC2', color: '#fff', fontWeight: 700, textDecoration: 'none' }}>
+              ห้อง {r.room_number}{r.dorm_name ? <span style={{ fontWeight: 500, opacity: 0.85 }}> · {r.dorm_name}</span> : null}
+            </a>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Has a room already: moving, or one more? ──
+  if (state.status === 'choose') {
+    const mine = state.currentRooms.join(', ');
+    const answer = async (mode: 'move' | 'add') => {
+      setState({ ...state, busy: true });
+      try {
+        const { ok, data } = await scanRoom(state.code, mode);
+        setState(ok ? roomResult(data) : { status: 'error', message: 'ลงทะเบียนไม่สำเร็จ กรุณาสแกนอีกครั้ง' });
+      } catch {
+        setState({ status: 'error', message: 'ลงทะเบียนไม่สำเร็จ กรุณาสแกนอีกครั้ง' });
+      }
+    };
+    const choiceBtn: React.CSSProperties = {
+      display: 'block', width: '100%', padding: '0.875rem 1rem', borderRadius: 14, border: '1px solid #CFE2F6', background: '#FFFFFF',
+      textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', marginTop: '0.75rem', opacity: state.busy ? 0.6 : 1,
+    };
+    return (
+      <div style={cardStyle}>
+        <img src={horcareLogo} alt="HorCare" style={{ width: 72, height: 72, borderRadius: 18, marginBottom: '1.5rem', boxShadow: '0 8px 32px rgba(10, 108, 194, 0.25)' }} />
+        <div style={boxStyle}>
+          <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center', color: '#0A6CC2' }}><Building2 size={40} /></div>
+          <h2 style={{ fontWeight: 800, color: '#102A43', margin: '0 0 0.5rem', fontSize: '1.2rem' }}>คุณมีห้อง {mine} อยู่แล้ว</h2>
+          <p style={{ color: '#3E5872', fontSize: '0.875rem', lineHeight: 1.65, margin: 0 }}>ต้องการทำอย่างไรกับห้อง {state.roomNumber}?</p>
+          <button type="button" style={choiceBtn} disabled={state.busy} onClick={() => void answer('add')}>
+            <strong style={{ display: 'block', color: '#102A43', fontSize: '1rem' }}>เพิ่มห้อง {state.roomNumber}</strong>
+            <span style={{ color: '#557089', fontSize: '0.8125rem' }}>ดูแลทั้งห้อง {mine} และ {state.roomNumber} · ต้องรอแอดมินอนุมัติ</span>
+          </button>
+          <button type="button" style={choiceBtn} disabled={state.busy} onClick={() => void answer('move')}>
+            <strong style={{ display: 'block', color: '#102A43', fontSize: '1rem' }}>ย้ายไปห้อง {state.roomNumber}</strong>
+            <span style={{ color: '#557089', fontSize: '0.8125rem' }}>เลิกห้อง {mine} แล้วใช้ห้อง {state.roomNumber} แทน</span>
+          </button>
         </div>
       </div>
     );

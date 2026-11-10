@@ -18,6 +18,10 @@ export interface RoomLineRequest {
   created_at: string;
   decided_by?: string;
   decided_at?: string;
+  /** The room is free: this account already holds other rooms and asks for one more (approving keeps them all). */
+  add?: boolean;
+  /** Those other rooms, as text for the person deciding ("101 และ 102"). */
+  other_rooms?: string;
 }
 
 /** Open requests one room can hold, so a photo of a door can't flood the queue. */

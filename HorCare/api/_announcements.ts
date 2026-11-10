@@ -86,12 +86,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         if (body.send_line === true) {
             if (!process.env.LINE_CHANNEL_ACCESS_TOKEN && !process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN) { res.status(503).json({ error: 'line_not_configured', message: 'ยังไม่ได้ตั้งค่า LINE บนเซิร์ฟเวอร์' }); return; }
-            // Only tenants linked to THIS property (line_rooms carries owner + building).
-            const links = await db.collection('line_rooms').where('uid', '==', ctx.ownerUid).where('building_id', '==', buildingId).get();
-            const ids = [...new Set(links.docs.map(d => d.id))];
-            // each tenant / vendor hears it through the OA their room linked through
-            const roomOf = new Map(links.docs.map(d => [d.id, String(d.data().room_id ?? '')]));
+            // Only tenants linked to THIS property: the LINE account on each of its rooms, once each — a person with
+            // several rooms here gets one message, and one whose first room is elsewhere is not missed.
             const rooms = new Map((await db.collection(`users/${ctx.ownerUid}/buildings/${buildingId}/rooms`).get()).docs.map(d => [d.id, d.data()]));
+            // each tenant / vendor hears it through the OA their room linked through
+            const roomOf = new Map<string, string>();
+            for (const [roomId, room] of rooms) {
+                const lid = room.line_user_id as string | undefined;
+                if (lid && room.is_active !== false && !roomOf.has(lid)) roomOf.set(lid, roomId);
+            }
+            const ids = [...roomOf.keys()];
             const dorm = ((await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/data/config`).get()).data()?.bill_customization?.dorm_name as string | undefined) || 'หอพัก';
             const text = announcementLineText(ann, dorm);
             await runPooled(ids, PUSH_CONCURRENCY, async lineUserId => {

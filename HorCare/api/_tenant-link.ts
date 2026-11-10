@@ -14,6 +14,8 @@ import { admin, db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { linePush, roomLineChannel, roomLineToken } from './_line.js';
+import { unlinkRoomInTx } from './_line-binding.js';
+import { roomsOfLink, sameRoom } from '../src/shared/lineRooms.js';
 
 export const config = { maxDuration: 15 };
 
@@ -62,13 +64,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const threadRef = db.doc(`${base}/line_threads/${lineUserId}`);
             const threadSnap = await tx.get(threadRef);
             const linkSnap = await tx.get(linkRef);
-            const link = linkSnap.exists ? (linkSnap.data() as { uid?: string; building_id?: string }) : null;
-            // the registration must belong to this very property, or we'd be editing someone else's binding
-            if (link && (link.uid !== ctx.ownerUid || link.building_id !== buildingId)) throw new HttpError(409, 'link_mismatch');
+            const link = linkSnap.exists ? linkSnap.data()! : null;
+            const fromKey = { uid: ctx.ownerUid, building_id: buildingId, room_id: body.room_id! };
+            // the account may hold other rooms, here or elsewhere: only this room's entry is ever touched
+            const listed = roomsOfLink(link).some(r => sameRoom(r, fromKey));
+            // an account registered only somewhere else is someone else's binding, not ours to edit
+            if (link && !listed && !roomsOfLink(link).some(r => r.uid === ctx.ownerUid && r.building_id === buildingId)) throw new HttpError(409, 'link_mismatch');
 
             if (body.action === 'unlink') {
                 tx.update(fromRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete(), line_unreachable: admin.firestore.FieldValue.delete() });
-                if (link) tx.delete(linkRef);
+                if (link) unlinkRoomInTx(tx, lineUserId, link, fromKey);
                 return { lineUserId, fromNumber: from.room_number, toNumber: null as string | null };
             }
 
@@ -80,7 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 line_user_id: lineUserId, line_channel: roomLineChannel(from as { line_channel?: string }),
                 line_unreachable: (from as { line_unreachable?: boolean }).line_unreachable ? true : admin.firestore.FieldValue.delete(),
             });
-            if (link) tx.update(linkRef, { room_id: body.to_room_id, room_number: to.room_number });
+            if (link && listed) unlinkRoomInTx(tx, lineUserId, link, fromKey, { ...fromKey, room_id: body.to_room_id!, room_number: String(to.room_number) });
+            else if (link) tx.update(linkRef, { room_id: body.to_room_id, room_number: to.room_number });
             else tx.set(linkRef, { uid: ctx.ownerUid, building_id: buildingId, room_id: body.to_room_id, room_number: to.room_number, registered_at: new Date().toISOString() });
             tx.update(fromRef, { line_user_id: admin.firestore.FieldValue.delete(), line_channel: admin.firestore.FieldValue.delete(), line_unreachable: admin.firestore.FieldValue.delete() });
             if (threadSnap.exists) tx.update(threadRef, { room_id: body.to_room_id, room_number: to.room_number });

@@ -290,6 +290,17 @@ async function liffAction(req: VercelRequest, res: VercelResponse, body: Body) {
     if (!lineUserId) { res.status(401).json({ error: 'invalid_token' }); return; }
     const reg = await db.collection('line_rooms').doc(lineUserId).get();
     if (!reg.exists) { res.status(404).json({ error: 'not_registered' }); return; }
+    // an account that looks after several rooms chooses which portal to open
+    const { linkedRooms } = await import('./_line-binding.js');
+    const mine = await linkedRooms(lineUserId);
+    if (mine.length > 1) {
+        res.status(200).json({
+            rooms: await Promise.all(mine.map(async r => ({
+                portal: await portalLinkFor({ ownerUid: r.uid, buildingId: r.building_id, roomId: r.room_id }), room_number: r.room_number, dorm_name: r.dorm_name ?? '',
+            }))),
+        });
+        return;
+    }
     const { uid, building_id, room_id, room_number, dorm_name } = reg.data() as { uid: string; building_id: string; room_id: string; room_number?: string; dorm_name?: string };
     const room = await db.doc(`users/${uid}/buildings/${building_id}/rooms/${room_id}`).get();
     if (!room.exists) { res.status(404).json({ error: 'not_registered' }); return; }
