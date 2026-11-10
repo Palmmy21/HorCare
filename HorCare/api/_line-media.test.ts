@@ -78,10 +78,10 @@ describe('saveMedia (stored in Firestore chunks — no Cloud Storage needed)', (
         expect(r.ok && r.media.content_type).toBe('audio/m4a');
     });
 
-    it('refuses empty files, files over the cap, and types that are not photos/audio', async () => {
+    it('refuses empty files, files over the cap, and kinds of file that are not kept', async () => {
         expect(await saveMedia({ ...base, kind: 'image', buffer: Buffer.alloc(0), contentType: 'image/jpeg' })).toEqual({ ok: false, reason: 'too_large' });
         expect(await saveMedia({ ...base, kind: 'audio', buffer: bytes(MAX_MEDIA_BYTES + 1), contentType: 'audio/m4a' })).toEqual({ ok: false, reason: 'too_large' });
-        expect(await saveMedia({ ...base, kind: 'video', buffer: jpeg, contentType: 'video/mp4' })).toEqual({ ok: false, reason: 'unsupported' });
+        expect(await saveMedia({ ...base, kind: 'file', buffer: jpeg, contentType: 'application/octet-stream', fileName: 'run.exe' })).toEqual({ ok: false, reason: 'unsupported' });
         expect(listPaths(`${messagePath(OWNER, BLD, TENANT, '555')}/chunks/`)).toHaveLength(0);
     });
 
@@ -116,7 +116,7 @@ describe('saveMedia (stored in Firestore chunks — no Cloud Storage needed)', (
         expect(normalizeContentType('image', 'IMAGE/PNG; charset=x')).toBe('image/png');
         expect(isAllowedMedia('image', 'image/svg+xml')).toBe(false);
         expect(isAllowedMedia('audio', 'audio/m4a')).toBe(true);
-        expect(isAllowedMedia('video', 'video/mp4')).toBe(false);
+        expect(isAllowedMedia('video', 'video/x-flv')).toBe(false);
     });
 });
 

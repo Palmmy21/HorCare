@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { isPaidPlan } from '../src/shared/plans.js';
-import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
+import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, getLineContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { isRoomCode, scanRoomCode } from './_room-qr.js';
@@ -20,7 +20,8 @@ import { buildSlipResultFlex, buildSplitPaidFlex, parseSplitPostback, splitPostb
 import { applySlipSplit, outstandingSatang, recordSlipPayment } from './_slip-payment.js';
 import type { PaidItem } from './_accounting-data.js';
 import { formatMonthLabel } from './_translations.js';
-import { SLIP_WINDOW_MS, isSlipImage, saveMedia } from './_line-media.js';
+import { MAX_MEDIA_BYTES, MAX_VIDEO_BYTES, SLIP_WINDOW_MS, fileContentType, isSlipImage, saveMedia } from './_line-media.js';
+import { fileSizeText, type LineMessage, type MessageKind } from '../src/shared/messages.js';
 import type { MonthlyBill } from '../src/types/index.js';
 import { autoPostSafe } from './_ledger-auto.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
@@ -86,7 +87,17 @@ interface LineEvent {
     type?: string;
     replyToken?: string;
     source?: { userId?: string };
-    message?: { type?: string; id: string; text?: string };
+    message?: {
+        type?: string; id: string; text?: string;
+        /** audio / video */
+        duration?: number;
+        /** file */
+        fileName?: string; fileSize?: number;
+        /** location */
+        title?: string; address?: string; latitude?: number; longitude?: number;
+        /** sticker */
+        packageId?: string; stickerId?: string;
+    };
     postback?: { data?: string };
 }
 
@@ -144,20 +155,24 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
         return;
     }
 
-    // Voice messages and other files go to the HorCare inbox (never treated as slips).
-    if (event.message?.type === 'audio') {
-        await handleInboxMedia(lineUserId, replyToken, event.message.id, 'audio');
-        return;
-    }
-    if (event.message?.type === 'video' || event.message?.type === 'file') {
-        const kind = event.message.type as 'video' | 'file';
-        await recordInbound(lineUserId, { kind, text: kind === 'video' ? '[วิดีโอ]' : '[ไฟล์]', messageId: String(event.message.id) }).catch(() => undefined);
-        return;
-    }
-
-    // Stickers carry no command but are still part of the conversation in the HorCare inbox.
-    if (event.message?.type === 'sticker') {
-        await recordInbound(lineUserId, { kind: 'sticker', text: '[สติกเกอร์]' }).catch(() => undefined);
+    // Voice messages, videos, documents, places and stickers are conversation: they go to the HorCare inbox, each in
+    // a form the owner can open (never treated as slips). Someone not registered is told how to register instead.
+    const type = event.message?.type;
+    if (type === 'audio' || type === 'video' || type === 'file' || type === 'location' || type === 'sticker') {
+        if (!(await getTenantLink(lineUserId))) {
+            if (type !== 'sticker') await lineReply(replyToken, [botText(notRegisteredText(isMarket()), GUEST_QUICK)]);
+            return;
+        }
+        const m = event.message!;
+        if (type === 'audio') await handleInboxAudio(lineUserId, replyToken, m.id, m.duration);
+        else if (type === 'video') await handleInboxVideo(lineUserId, replyToken, m.id, m.duration);
+        else if (type === 'file') await handleInboxFile(lineUserId, replyToken, m.id, m.fileName, m.fileSize);
+        else if (type === 'location') await handleInboxLocation(lineUserId, replyToken, m);
+        else {
+            // a sticker carries no command, but the owner sees which one it was
+            const sticker = m.packageId && m.stickerId ? { package_id: String(m.packageId), sticker_id: String(m.stickerId) } : undefined;
+            await recordInbound(lineUserId, { kind: 'sticker', text: '[สติกเกอร์]', ...(sticker ? { extra: { sticker } } : {}) }).catch(() => undefined);
+        }
         return;
     }
 
@@ -730,26 +745,32 @@ async function handlePortalCommand(lineUserId: string, replyToken: string, intro
 const MEDIA_ACK_TEXT = 'ได้รับรูปแล้วค่ะ 🙏 เจ้าของหอจะดูและตอบกลับโดยเร็วที่สุด\n\nหากเป็นสลิปโอนเงิน กรุณากดเมนู "ส่งสลิป" แล้วส่งรูปที่เห็น QR ชัดเจนนะคะ';
 const VOICE_ACK_TEXT = 'ได้รับข้อความเสียงแล้วค่ะ 🙏 เจ้าของหอจะฟังและตอบกลับโดยเร็วที่สุด';
 
-/** Download a tenant's photo / voice message, keep it in Storage and add it to the inbox. */
+const KIND_LABEL: Partial<Record<MessageKind, string>> = { image: '[รูปภาพ]', audio: '[ข้อความเสียง]', video: '[วิดีโอ]', file: '[ไฟล์]' };
+const NOT_STORED = { recorded: false, shouldAck: false };
+const logStoreFailure = (err: unknown) => { console.error('storeInboxMedia failed:', (err as Error).message); return NOT_STORED; };
+
+/** Keep a file a tenant sent (photo, voice message, short video, document) and add it to the inbox. */
 async function storeInboxMedia(
     lineUserId: string,
     messageId: string,
-    kind: 'image' | 'audio',
+    kind: 'image' | 'audio' | 'video' | 'file',
     content: { buffer: Buffer; contentType: string },
     caption?: string,
+    extra?: Pick<LineMessage, 'file_name' | 'duration_ms'>,
 ) {
     const link = await getTenantLink(lineUserId);
-    if (!link) return { recorded: false, shouldAck: false };
+    if (!link) return NOT_STORED;
     const saved = await saveMedia({
         ownerUid: link.uid, buildingId: link.building_id, lineUserId, messageId,
-        kind, buffer: content.buffer, contentType: content.contentType,
+        kind, buffer: content.buffer, contentType: content.contentType, fileName: extra?.file_name,
     });
     if (!saved.ok) console.warn('[line-inbox] media not stored:', saved.reason, kind);
-    const label = kind === 'image' ? (caption ?? '[รูปภาพ]') : '[ข้อความเสียง]';
+    const label = caption ?? KIND_LABEL[kind] ?? '[ไฟล์]';
     // If the file can't be stored the tenant's message still reaches the owner, as text.
     return recordInbound(lineUserId, {
         kind, text: saved.ok ? label : `${label} (เปิดไฟล์ไม่ได้)`, messageId,
         ...(saved.ok ? { media: saved.media } : {}),
+        ...(extra ? { extra } : {}),
     });
 }
 
@@ -774,7 +795,7 @@ async function handleImage(lineUserId: string, replyToken: string, messageId: st
     const slip = isSlipImage({ hasQr: !!qr.payload, expectedUntil: link.slip_expected_until });
 
     const inbound = await storeInboxMedia(lineUserId, messageId, 'image', img, slip ? '[รูปภาพ — สลิปโอนเงิน]' : undefined)
-        .catch(err => { console.error('storeInboxMedia failed:', (err as Error).message); return { recorded: false, shouldAck: false }; });
+        .catch(logStoreFailure);
 
     if (slip) {
         await handleSlipImage(lineUserId, replyToken, messageId, { img, qr });
@@ -783,17 +804,91 @@ async function handleImage(lineUserId: string, replyToken: string, messageId: st
     if (inbound.shouldAck) await lineReply(replyToken, [{ type: 'text', text: MEDIA_ACK_TEXT }]);
 }
 
-async function handleInboxMedia(lineUserId: string, replyToken: string, messageId: string, kind: 'audio') {
-    const link = await getTenantLink(lineUserId);
-    if (!link) {
-        await lineReply(replyToken, [{ type: 'text', text: 'สวัสดีค่ะ 😊\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนก่อนนะคะ' }]);
-        return;
-    }
+// The handlers below are only reached for a registered tenant (dispatchEvent checks first).
+
+async function handleInboxAudio(lineUserId: string, replyToken: string, messageId: string, duration?: number) {
     const content = await getLineImageContent(messageId);
     if (!content) return;
-    const inbound = await storeInboxMedia(lineUserId, messageId, kind, content)
-        .catch(err => { console.error('storeInboxMedia failed:', (err as Error).message); return { recorded: false, shouldAck: false }; });
+    const inbound = await storeInboxMedia(lineUserId, messageId, 'audio', content, undefined, duration ? { duration_ms: duration } : undefined).catch(logStoreFailure);
     if (inbound.shouldAck) await lineReply(replyToken, [{ type: 'text', text: VOICE_ACK_TEXT }]);
+}
+
+const ownerWord = () => botVocab(isMarket()).owner;
+
+/**
+ * A video. A short clip is kept and plays in the inbox. A long one cannot be (files live in the database, with a hard
+ * size limit): the owner gets LINE's still picture of it and its size, and the tenant is told, so nobody waits for an
+ * answer to a video that was never seen.
+ */
+async function handleInboxVideo(lineUserId: string, replyToken: string, messageId: string, duration?: number) {
+    const extra = duration ? { duration_ms: duration } : undefined;
+    const content = await getLineContent(messageId, MAX_VIDEO_BYTES);
+    if (content.status === 'ok') {
+        const inbound = await storeInboxMedia(lineUserId, messageId, 'video', content, undefined, extra).catch(logStoreFailure);
+        if (inbound.shouldAck) await lineReply(replyToken, [botText(`ได้รับวิดีโอแล้วค่ะ 🙏 ${ownerWord()}จะดูและตอบกลับโดยเร็วที่สุด`)]);
+        return;
+    }
+    if (content.status === 'unavailable') {
+        await recordInbound(lineUserId, { kind: 'video', text: '[วิดีโอ] (เปิดไฟล์ไม่ได้)', messageId, ...(extra ? { extra } : {}) }).catch(() => undefined);
+        await lineReply(replyToken, [botText('ขออภัยค่ะ โหลดวิดีโอไม่สำเร็จ กรุณาส่งใหม่อีกครั้งนะคะ')]);
+        return;
+    }
+    // too large: keep the still picture so the owner at least sees what it is about
+    const label = `[วิดีโอ ${fileSizeText(content.size)} — ใหญ่เกินกว่าจะเก็บ แสดงเฉพาะภาพตัวอย่าง]`;
+    const still = await getLineContent(messageId, MAX_MEDIA_BYTES, { preview: true });
+    const link = await getTenantLink(lineUserId);
+    const saved = still.status === 'ok' && link
+        ? await saveMedia({ ownerUid: link.uid, buildingId: link.building_id, lineUserId, messageId, kind: 'image', buffer: still.buffer, contentType: still.contentType })
+        : null;
+    await recordInbound(lineUserId, {
+        kind: 'video', text: label, messageId,
+        ...(saved?.ok ? { media: { ...saved.media, preview: true } } : {}),
+        ...(extra ? { extra } : {}),
+    }).catch(() => undefined);
+    await lineReply(replyToken, [botText(
+        `ได้รับวิดีโอแล้วค่ะ แต่ไฟล์ใหญ่เกินไป (${fileSizeText(content.size)}) ${ownerWord()}จะเห็นเฉพาะภาพตัวอย่าง\n\nหากเป็นเรื่องสำคัญ กรุณาส่งเป็นคลิปสั้น ๆ (ประมาณ 10 วินาที) หรือถ่ายเป็นรูปภาพแทนนะคะ`,
+    )]);
+}
+
+/** A document (PDF, picture, Word / Excel, text). Kept when it is a kind the inbox can hand back and small enough. */
+async function handleInboxFile(lineUserId: string, replyToken: string, messageId: string, fileName?: string, fileSize?: number) {
+    const name = (fileName ?? 'ไฟล์').slice(0, 120);
+    const extra = { file_name: name };
+    const placeholder = async (why: string, tell: string) => {
+        await recordInbound(lineUserId, { kind: 'file', text: `[ไฟล์] ${name} (${why})`, messageId, extra }).catch(() => undefined);
+        await lineReply(replyToken, [botText(tell)]);
+    };
+    if (!fileContentType(name)) {
+        await placeholder('ชนิดไฟล์นี้เปิดในระบบไม่ได้', `ได้รับไฟล์ "${name}" แล้วค่ะ แต่ระบบเปิดไฟล์ชนิดนี้ไม่ได้ กรุณาส่งเป็น PDF หรือรูปภาพแทนนะคะ`);
+        return;
+    }
+    const content = typeof fileSize === 'number' && fileSize > MAX_MEDIA_BYTES
+        ? { status: 'too_large' as const, size: fileSize }
+        : await getLineContent(messageId, MAX_MEDIA_BYTES);
+    if (content.status === 'too_large') {
+        await placeholder(`${fileSizeText(content.size)} ใหญ่เกิน ${fileSizeText(MAX_MEDIA_BYTES)}`, `ได้รับไฟล์ "${name}" แล้วค่ะ แต่ไฟล์ใหญ่เกินไป (${fileSizeText(content.size)}) กรุณาส่งไฟล์ที่เล็กกว่า ${fileSizeText(MAX_MEDIA_BYTES)} หรือถ่ายเป็นรูปภาพแทนนะคะ`);
+        return;
+    }
+    if (content.status === 'unavailable') {
+        await placeholder('เปิดไฟล์ไม่ได้', 'ขออภัยค่ะ โหลดไฟล์ไม่สำเร็จ กรุณาส่งใหม่อีกครั้งนะคะ');
+        return;
+    }
+    const inbound = await storeInboxMedia(lineUserId, messageId, 'file', content, `[ไฟล์] ${name}`, extra).catch(logStoreFailure);
+    if (inbound.shouldAck) await lineReply(replyToken, [botText(`ได้รับไฟล์แล้วค่ะ 🙏 ${ownerWord()}จะดูและตอบกลับโดยเร็วที่สุด`)]);
+}
+
+/** A place shared from LINE's map: the owner gets the address and a pin they can open. */
+async function handleInboxLocation(lineUserId: string, replyToken: string, m: NonNullable<LineEvent['message']>) {
+    const lat = Number(m.latitude);
+    const lng = Number(m.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+    const title = typeof m.title === 'string' ? m.title.trim().slice(0, 100) : '';
+    const address = typeof m.address === 'string' ? m.address.trim().slice(0, 300) : '';
+    const inbound = await recordInbound(lineUserId, {
+        kind: 'location', text: `[ตำแหน่ง] ${[title, address].filter(Boolean).join(' · ') || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}`, messageId: m.id,
+        extra: { location: { lat, lng, ...(title ? { title } : {}), ...(address ? { address } : {}) } },
+    }).catch(() => NOT_STORED);
+    if (inbound.shouldAck) await lineReply(replyToken, [botText(`ได้รับตำแหน่งแล้วค่ะ 🙏 ${ownerWord()}จะดูและตอบกลับโดยเร็วที่สุด`)]);
 }
 
 /**

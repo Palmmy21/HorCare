@@ -203,3 +203,44 @@ describe('a team\'s tenants', () => {
         expect(await propertyOaId(OWNER, BLD)).toBe('@shared');
     });
 });
+
+describe('status says what is left to do in LINE', () => {
+    let endpoint: { status: number; body: object };
+    beforeEach(async () => {
+        await connect();
+        const base = fetchMock.getMockImplementation()!;
+        endpoint = { status: 200, body: { active: true, endpoint: `https://hor-care.vercel.app/api/line-team-webhook/${oaId()}` } };
+        fetchMock.mockImplementation(async (url: string, init?: object) =>
+            String(url).endsWith('/channel/webhook/endpoint') ? json(endpoint.body, endpoint.status) : base(url, init));
+    });
+    const status = async () => (await call(OWNER, { action: 'status' })).body;
+
+    it('all good: webhook on, still pointing here, token alive', async () => {
+        expect(await status()).toMatchObject({ connected: true, oa_id: '@teama', webhook_active: true, webhook_matches: true, token_valid: true });
+    });
+
+    it('"Use webhook" still off', async () => {
+        endpoint.body = { active: false, endpoint: `https://hor-care.vercel.app/api/line-team-webhook/${oaId()}/` };
+        expect(await status()).toMatchObject({ webhook_active: false, webhook_matches: true });
+    });
+
+    it('someone pointed the webhook at another system', async () => {
+        endpoint.body = { active: true, endpoint: 'https://other-bot.example/hook' };
+        expect(await status()).toMatchObject({ webhook_active: true, webhook_matches: false });
+    });
+
+    it('the token was reissued in the console', async () => {
+        endpoint = { status: 401, body: {} };
+        expect(await status()).toMatchObject({ connected: true, token_valid: false, webhook_active: null });
+    });
+
+    it('LINE not answering is "unknown", never "broken"', async () => {
+        endpoint = { status: 500, body: {} };
+        expect(await status()).toMatchObject({ connected: true, webhook_active: null, webhook_matches: null, token_valid: null });
+    });
+
+    it('accepts values pasted with stray spaces and upper case', async () => {
+        const res = await connect(OWNER, { channel_secret: ` ${SECRET.toUpperCase().slice(0, 16)} ${SECRET.slice(16)}\n`, access_token: ` ${TOKEN}\n` });
+        expect(res.statusCode).toBe(200);
+    });
+});

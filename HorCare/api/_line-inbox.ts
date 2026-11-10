@@ -42,7 +42,7 @@ export async function getTenantLink(lineUserId: string): Promise<TenantLink | nu
 
 export async function recordInbound(
     lineUserId: string,
-    input: { kind: MessageKind; text: string; media?: MessageMedia; messageId?: string },
+    input: { kind: MessageKind; text: string; media?: MessageMedia; messageId?: string; extra?: Pick<LineMessage, 'location' | 'sticker' | 'file_name' | 'duration_ms'> },
 ): Promise<RecordResult> {
     const link = await getTenantLink(lineUserId);
     if (!link) return { recorded: false, shouldAck: false };
@@ -60,6 +60,7 @@ export async function recordInbound(
     const msg: LineMessage = {
         id: input.messageId ?? randomUUID(), direction: 'in', kind: input.kind, text, at: nowIso, by: null,
         ...(input.media ? { media: input.media } : {}),
+        ...(input.extra ?? {}),
     };
 
     // One transaction so two quick messages can't lose an unread increment.

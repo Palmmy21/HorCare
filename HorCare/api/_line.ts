@@ -98,6 +98,33 @@ export async function getLineImageContent(messageId: string): Promise<{ buffer: 
     return { buffer, contentType };
 }
 
+export type LineContent =
+    | { status: 'ok'; buffer: Buffer; contentType: string }
+    | { status: 'too_large'; size: number }
+    | { status: 'unavailable' };
+
+/**
+ * A file a person sent (video, document, …), refused before it is read into memory when LINE says it is larger than
+ * `maxBytes`: a phone video can be hundreds of megabytes. `preview` asks for LINE's small still picture of a video.
+ */
+export async function getLineContent(messageId: string, maxBytes: number, opts: { preview?: boolean } = {}): Promise<LineContent> {
+    const token = residentLineToken();
+    if (!token) return { status: 'unavailable' };
+    try {
+        const res = await fetch(`https://api-data.line.me/v2/bot/message/${messageId}/content${opts.preview ? '/preview' : ''}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return { status: 'unavailable' };   // also 202: LINE is still preparing a video
+        const declared = Number(res.headers.get('content-length') ?? '');
+        if (Number.isFinite(declared) && declared > maxBytes) return { status: 'too_large', size: declared };
+        const buffer = Buffer.from(await res.arrayBuffer());
+        if (buffer.length > maxBytes) return { status: 'too_large', size: buffer.length };
+        return { status: 'ok', buffer, contentType: res.headers.get('content-type') || 'application/octet-stream' };
+    } catch {
+        return { status: 'unavailable' };
+    }
+}
+
 export async function linePush(to: string, messages: object[], token: string | undefined = residentLineToken()): Promise<void> {
     if (!token) return;
 

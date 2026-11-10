@@ -94,6 +94,26 @@ async function roomsOn(ownerUid: string, id: string): Promise<number> {
     return counts.reduce((a, b) => a + b, 0);
 }
 
+/**
+ * What LINE says about a connected OA right now. `webhook_active`: "Use webhook" is on. `webhook_matches`: it still
+ * points here. `token_valid`: the stored token still works (false after someone reissues it in the console).
+ * Each is null when LINE could not be asked, so a slow answer never reads as a broken connection.
+ */
+async function liveWebhook(id: string): Promise<{ webhook_active: boolean | null; webhook_matches: boolean | null; token_valid: boolean | null }> {
+    const unknown = { webhook_active: null, webhook_matches: null, token_valid: null };
+    const oa = await loadTeamOa(id, { fresh: true });
+    if (!oa) return unknown;
+    try {
+        const r = await fetch(`${LINE}/channel/webhook/endpoint`, { headers: { Authorization: `Bearer ${oa.token}` }, signal: AbortSignal.timeout(5000) });
+        if (r.status === 401) return { webhook_active: null, webhook_matches: null, token_valid: false };
+        if (!r.ok) return unknown;
+        const e = await r.json() as { endpoint?: string; active?: boolean };
+        return { webhook_active: e.active === true, webhook_matches: (e.endpoint ?? '').replace(/\/$/, '') === webhookUrl(id), token_valid: true };
+    } catch {
+        return unknown;
+    }
+}
+
 interface Body { action?: 'status' | 'connect' | 'disconnect'; owner_uid?: string; building_id?: string; channel_secret?: unknown; access_token?: unknown }
 
 const webhookUrl = (id: string) => `${appBaseUrl()}/api/line-team-webhook/${id}`;
@@ -113,9 +133,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (body.action === 'status') {
         const d = current?.data();
-        res.status(200).json(d
-            ? { connected: true, oa_id: d.oa_id, display_name: d.display_name, connected_at: d.connected_at, webhook_url: webhookUrl(current!.id) }
-            : { connected: false, encryption_ready: !!encKey() });
+        if (!d) { res.status(200).json({ connected: false, encryption_ready: !!encKey() }); return; }
+        // Asked of LINE each time, so the page can say what is still left to do in LINE's own console:
+        // "Use webhook" can only be switched on there, and someone may have pointed the webhook elsewhere since.
+        const live = await liveWebhook(current!.id);
+        res.status(200).json({
+            connected: true, oa_id: d.oa_id, display_name: d.display_name, connected_at: d.connected_at, webhook_url: webhookUrl(current!.id),
+            ...live,
+        });
         return;
     }
 
@@ -132,8 +157,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (body.action === 'connect') {
-        const secret = typeof body.channel_secret === 'string' ? body.channel_secret.trim() : '';
-        const token = typeof body.access_token === 'string' ? body.access_token.trim() : '';
+        // pasted from a web page: stray spaces and line breaks inside the values are never part of them
+        const secret = typeof body.channel_secret === 'string' ? body.channel_secret.replace(/\s+/g, '').toLowerCase() : '';
+        const token = typeof body.access_token === 'string' ? body.access_token.replace(/\s+/g, '') : '';
         if (!/^[0-9a-f]{32}$/.test(secret) || !token || token.length > 2000) { res.status(400).json({ error: 'invalid_input' }); return; }
         if (!encKey()) { res.status(503).json({ error: 'encryption_not_configured' }); return; }
 

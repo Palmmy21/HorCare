@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, Search, Send, Loader2, ArrowLeft, MessageCircle, Play } from 'lucide-react';
+import { MessageSquare, Search, Send, Loader2, ArrowLeft, MessageCircle, Play, MapPin, Video, FileDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useThreadMessages } from '../../hooks/useLineThreads';
 import { apiPost, ApiError } from '../../utils/api';
-import { MAX_OUTGOING_CHARS, type LineMessage, type LineThread } from '../../shared/messages';
+import { MAX_OUTGOING_CHARS, fileSizeText, mapUrl, stickerUrl, type LineMessage, type LineThread } from '../../shared/messages';
 
 interface Props {
     ownerUid: string;
@@ -45,16 +45,21 @@ async function fetchMediaUrl(ownerUid: string, buildingId: string, lineUserId: s
     return data_url;
 }
 
-/** A tenant's photo or voice message. Files are fetched through a permission-checked signed link. */
+/**
+ * What a tenant sent that is not plain text: a photo, a voice message, a video, a document, a place or a sticker.
+ * Files are fetched through /api/line-inbox (permission-checked). Photos load at once; anything heavier waits for a tap.
+ */
 function MediaBubble({ ownerUid, buildingId, lineUserId, message, onZoom }: {
     ownerUid: string; buildingId: string; lineUserId: string; message: LineMessage; onZoom: (url: string) => void;
 }) {
     const [url, setUrl] = useState<string | null>(null);
     const [failed, setFailed] = useState(false);
-    const [loadingAudio, setLoadingAudio] = useState(false);
-    const isImage = message.kind === 'image';
+    const [loading, setLoading] = useState(false);
+    const [stickerBroken, setStickerBroken] = useState(false);
+    const media = message.media;
+    // a video too large to keep is stored as its still picture
+    const isImage = !!media && (message.kind === 'image' || media.content_type.startsWith('image/') && message.kind === 'video');
 
-    // Photos load as soon as they appear; voice messages wait until the owner presses play.
     useEffect(() => {
         if (!isImage) return;
         let cancelled = false;
@@ -64,12 +69,69 @@ function MediaBubble({ ownerUid, buildingId, lineUserId, message, onZoom }: {
         return () => { cancelled = true; };
     }, [isImage, ownerUid, buildingId, lineUserId, message.id]);
 
+    const open = (onReady?: (u: string) => void) => {
+        setLoading(true);
+        fetchMediaUrl(ownerUid, buildingId, lineUserId, message.id)
+            .then(u => { setUrl(u); onReady?.(u); })
+            .catch(() => toast.error('เปิดไฟล์ไม่ได้ กรุณาลองใหม่'))
+            .finally(() => setLoading(false));
+    };
+    const tapStyle: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'inherit', fontWeight: 600, textAlign: 'left', font: 'inherit' };
+    const note: React.CSSProperties = { fontSize: '0.75rem', color: 'var(--color-gray-500)', marginTop: 4 };
+
+    if (message.kind === 'location' && message.location) {
+        const l = message.location;
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 180 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}><MapPin size={16} aria-hidden /> {l.title || 'ตำแหน่งที่ส่งมา'}</span>
+                {l.address && <span style={{ fontSize: '0.8125rem' }}>{l.address}</span>}
+                <a href={mapUrl(l)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm" style={{ alignSelf: 'flex-start', marginTop: 4 }}>เปิดแผนที่</a>
+            </div>
+        );
+    }
+
+    if (message.kind === 'sticker') {
+        return message.sticker && !stickerBroken
+            ? <img src={stickerUrl(message.sticker.sticker_id)} alt="สติกเกอร์" width={96} height={96} loading="lazy" style={{ display: 'block', objectFit: 'contain' }} onError={() => setStickerBroken(true)} />
+            : <span style={{ fontStyle: 'italic' }}>{message.text}</span>;
+    }
+
+    if (!media) return <>{message.text}</>;
+
     if (isImage) {
         if (failed) return <div style={{ fontSize: '0.8rem', fontStyle: 'italic' }}>โหลดรูปไม่ได้</div>;
         if (!url) return <div style={{ width: 160, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loader2 size={18} className="spin" /></div>;
         return (
-            <button type="button" onClick={() => onZoom(url)} aria-label="ขยายรูป" style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}>
-                <img src={url} alt="รูปจากผู้เช่า" loading="lazy" style={{ maxWidth: 240, maxHeight: 280, borderRadius: 10, display: 'block' }} />
+            <>
+                <button type="button" onClick={() => onZoom(url)} aria-label="ขยายรูป" style={{ padding: 0, border: 'none', background: 'none', cursor: 'zoom-in' }}>
+                    <img src={url} alt={media.preview ? 'ภาพตัวอย่างวิดีโอจากผู้เช่า' : 'รูปจากผู้เช่า'} loading="lazy" style={{ maxWidth: 240, maxHeight: 280, borderRadius: 10, display: 'block' }} />
+                </button>
+                {media.preview && <div style={note}>{message.text.replace(/^\[|\]$/g, '')}</div>}
+            </>
+        );
+    }
+
+    if (message.kind === 'video') {
+        if (url) return <video controls autoPlay playsInline src={url} style={{ maxWidth: 260, maxHeight: 320, borderRadius: 10, display: 'block' }} />;
+        return (
+            <button type="button" disabled={loading} onClick={() => open()} style={tapStyle}>
+                {loading ? <Loader2 size={16} className="spin" /> : <Video size={16} />} เล่นวิดีโอ ({fileSizeText(media.size)})
+            </button>
+        );
+    }
+
+    if (message.kind === 'file') {
+        const name = message.file_name || 'ไฟล์';
+        const save = (u: string) => {
+            const link = document.createElement('a');
+            link.href = u;
+            link.download = name;
+            link.click();
+        };
+        return (
+            <button type="button" disabled={loading} onClick={() => (url ? save(url) : open(save))} style={tapStyle}>
+                {loading ? <Loader2 size={16} className="spin" /> : <FileDown size={16} />}
+                <span>{name}<span style={{ ...note, display: 'block', marginTop: 0, fontWeight: 400 }}>{fileSizeText(media.size)} · กดเพื่อดาวน์โหลด</span></span>
             </button>
         );
     }
@@ -77,18 +139,9 @@ function MediaBubble({ ownerUid, buildingId, lineUserId, message, onZoom }: {
     // audio
     if (url) return <audio controls autoPlay src={url} style={{ maxWidth: 240 }} />;
     return (
-        <button
-            type="button" disabled={loadingAudio}
-            onClick={() => {
-                setLoadingAudio(true);
-                fetchMediaUrl(ownerUid, buildingId, lineUserId, message.id)
-                    .then(setUrl)
-                    .catch(() => toast.error('เปิดข้อความเสียงไม่ได้ กรุณาลองใหม่'))
-                    .finally(() => setLoadingAudio(false));
-            }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'inherit', fontWeight: 600 }}
-        >
-            {loadingAudio ? <Loader2 size={16} className="spin" /> : <Play size={16} />} ฟังข้อความเสียง
+        <button type="button" disabled={loading} onClick={() => open()} style={tapStyle}>
+            {loading ? <Loader2 size={16} className="spin" /> : <Play size={16} />} ฟังข้อความเสียง
+            {message.duration_ms ? ` (${Math.max(1, Math.round(message.duration_ms / 1000))} วินาที)` : ''}
         </button>
     );
 }
@@ -221,9 +274,9 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                                             <div style={{
                                                 padding: '0.5rem 0.75rem', borderRadius: 14, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                                                 background: mine ? '#06C755' : '#fff', color: mine ? '#fff' : 'var(--color-gray-800)',
-                                                border: mine ? 'none' : '1px solid var(--color-gray-200)', fontStyle: m.kind === 'sticker' ? 'italic' : 'normal',
+                                                border: mine ? 'none' : '1px solid var(--color-gray-200)',
                                             }}>
-                                                {(m.kind === 'image' || m.kind === 'audio') && m.media ? (
+                                                {m.media || m.location || m.kind === 'sticker' ? (
                                                     <MediaBubble ownerUid={ownerUid} buildingId={buildingId} lineUserId={selected.line_user_id} message={m} onZoom={setZoomUrl} />
                                                 ) : m.text}
                                             </div>

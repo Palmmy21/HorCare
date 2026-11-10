@@ -4,7 +4,7 @@
 //   users/{owner}/buildings/{b}/line_threads/{lineUserId}/messages/{id}
 
 export type MessageDirection = 'in' | 'out';
-export type MessageKind = 'text' | 'sticker' | 'image' | 'audio' | 'video' | 'file';
+export type MessageKind = 'text' | 'sticker' | 'image' | 'audio' | 'video' | 'file' | 'location';
 
 /** Files from tenants (photos, voice messages) are kept in Firestore chunks; the message only describes them. */
 export interface MessageMedia {
@@ -12,7 +12,12 @@ export interface MessageMedia {
   size: number;
   /** Number of base64 chunks stored under the message (see api/_line-media.ts). */
   chunks: number;
+  /** The stored file is a still picture of a video that was too large to keep. */
+  preview?: boolean;
 }
+
+/** A place the tenant shared from LINE's map. */
+export interface MessageLocation { title?: string; address?: string; lat: number; lng: number }
 
 export interface LineThread {
   /** The tenant's LINE user id (also the document id). */
@@ -38,8 +43,25 @@ export interface LineMessage {
   at: string;
   /** For outgoing messages: who sent it (display name). */
   by: string | null;
-  /** Present for stored photos / voice messages. */
+  /** Present for stored photos, voice messages, videos and files. */
   media?: MessageMedia;
+  location?: MessageLocation;
+  /** LINE sticker ids: enough to show the sticker's picture. */
+  sticker?: { package_id: string; sticker_id: string };
+  /** The name the tenant's file had. */
+  file_name?: string;
+  /** Length of a voice message or video. */
+  duration_ms?: number;
+}
+
+/** Where a shared place opens on a map. */
+export const mapUrl = (l: Pick<MessageLocation, 'lat' | 'lng'>): string => `https://www.google.com/maps?q=${l.lat},${l.lng}`;
+/** A LINE sticker's picture (static; animated stickers show their first frame). */
+export const stickerUrl = (stickerId: string): string => `https://stickershop.line-scdn.net/stickershop/v1/sticker/${encodeURIComponent(stickerId)}/android/sticker.png`;
+
+/** "1.4 MB", "320 KB". */
+export function fileSizeText(bytes: number): string {
+  return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1000))} KB`;
 }
 
 export const MAX_OUTGOING_CHARS = 1000;
