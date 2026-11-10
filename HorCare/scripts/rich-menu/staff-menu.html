@@ -1,0 +1,82 @@
+<!doctype html>
+<!--
+  Artwork for the staff LINE OA rich menu (technicians, housekeepers, owners).
+  Rendered to staff-menu.png at exactly 2500×1686 by:  node scripts/setup-staff-rich-menu.mjs --render
+  The tap areas live in setup-staff-rich-menu.mjs (AREAS) and must match this grid.
+-->
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 2500px; height: 1686px; overflow: hidden; }
+  body {
+    font-family: 'Anuphan', 'Leelawadee UI', 'Noto Sans Thai', sans-serif;
+    background: #DCE5EF;               /* shows through as 6px hairlines between tiles */
+    display: grid;
+    grid-template-columns: 833px 834px 833px;
+    grid-template-rows: 843px 843px;
+    gap: 0;
+  }
+  .tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; background: #FFFFFF; color: #102A43;
+    border: 3px solid #DCE5EF;
+  }
+  .tile svg { width: 250px; height: 250px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .label { font-size: 124px; font-weight: 700; line-height: 1.2; margin-top: 44px; letter-spacing: -0.01em; }
+  .sub { font-size: 68px; font-weight: 500; line-height: 1.3; margin-top: 18px; color: #557089; }
+
+  .jobs {
+    grid-column: 1 / span 2; background: #0A5DAA; color: #FFFFFF; border-color: #0A5DAA;
+    flex-direction: row; gap: 110px; text-align: left; padding: 0 60px;
+  }
+  .jobs svg { width: 400px; height: 400px; stroke-width: 1.4; color: #FFB36B; flex: none; }
+  .jobs .label { font-size: 200px; margin-top: 0; }
+  .jobs .sub { font-size: 84px; color: #CFE3F7; margin-top: 26px; }
+
+  .help svg { color: #0A6CC2; }
+  .owner svg { color: #E8740C; }
+  .tag {
+    font-size: 54px; font-weight: 600; color: #C2410C; background: rgba(245, 158, 46, 0.16);
+    padding: 8px 34px 10px; border-radius: 999px; margin-bottom: 40px;
+  }
+  .owner svg { width: 210px; height: 210px; }
+  .owner .label { margin-top: 30px; }
+</style>
+</head>
+<body>
+  <div class="tile jobs">
+    <svg viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
+    <div>
+      <div class="label">งานของฉัน</div>
+      <div class="sub">งานซ่อม · งานทำความสะอาด</div>
+    </div>
+  </div>
+
+  <div class="tile help">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+    <div class="label">ช่วยเหลือ</div>
+    <div class="sub">ลงทะเบียน · สถานะ</div>
+  </div>
+
+  <div class="tile owner">
+    <div class="tag">สำหรับเจ้าของ</div>
+    <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+    <div class="label">ยอดเดือนนี้</div>
+  </div>
+
+  <div class="tile owner">
+    <div class="tag">สำหรับเจ้าของ</div>
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <div class="label">ค้างชำระ</div>
+  </div>
+
+  <div class="tile owner">
+    <div class="tag">สำหรับเจ้าของ</div>
+    <svg viewBox="0 0 24 24"><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></svg>
+    <div class="label">ห้องว่าง</div>
+  </div>
+</body>
+</html>
