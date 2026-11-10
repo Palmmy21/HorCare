@@ -23,6 +23,8 @@ import {
     type BotReply, type RegSession, type StaffRegistration,
 } from '../src/shared/staffRegistration.js';
 import type { WorkStaff } from '../src/shared/workOrders.js';
+import { ADMIN_HELP, REGISTER_HELP, quickLabels, staffHelpText } from '../src/shared/staffBot.js';
+import { staffIdentity, syncStaffMenu } from './_staff-menu.js';
 
 export const config = { maxDuration: 20 };
 
@@ -36,12 +38,26 @@ const DAY_MS = 86_400_000;
 const quick = (labels: string[]) => ({
     items: labels.map(label => ({ type: 'action', action: { type: 'message', label, text: label } })),
 });
-const text = (t: string, labels?: string[]) => ({ type: 'text', text: t, ...(labels ? { quickReply: quick(labels) } : {}) });
+const text = (t: string, labels?: string[]) => ({ type: 'text', text: t, ...(labels?.length ? { quickReply: quick(labels) } : {}) });
 
-export const HELP =
-    'สวัสดีค่ะ 👋 นี่คือ LINE สำหรับรับงานช่าง/แม่บ้านของ HorCare\n\n' +
-    '• ยังไม่ได้ลงทะเบียน: ขอ "รหัสลงทะเบียน" (ขึ้นต้น HCR-) หรือสแกน QR จากผู้จัดการ แล้วพิมพ์ส่งมาในแชทนี้\n' +
-    '• ผู้จัดการเพิ่มชื่อคุณไว้แล้ว: พิมพ์ "รหัสเชื่อม LINE" (ขึ้นต้น HCS-) ที่ได้รับ';
+export const HELP = `สวัสดีค่ะ 👋 นี่คือ LINE สำหรับทีมงาน (ช่าง แม่บ้าน ผู้ดูแล)\n\n${REGISTER_HELP}`;
+
+const IN_REGISTRATION = '📝 คุณกำลังลงทะเบียนค้างอยู่ ตอบคำถามล่าสุดต่อได้เลย หรือพิมพ์ "ยกเลิก" เพื่อเริ่มใหม่ค่ะ';
+
+/**
+ * What this person can do in the team OA, by who they are: a linked technician / housekeeper gets their jobs (and, for
+ * housekeeping, meters), a linked admin the admin menu, and anyone else how to register.
+ */
+export async function staffHelp(lineUserId: string, now: number = Date.now()): Promise<object[]> {
+    const [who, sessionSnap] = await Promise.all([staffIdentity(lineUserId), db.doc(`staff_reg_sessions/${lineUserId}`).get()]);
+    const parts: string[] = [];
+    if (who.admin) parts.push(ADMIN_HELP);
+    else if (who.staff.length > 0) parts.push(staffHelpText({ name: who.staff[0].staff.name, roles: who.staff.map(s => s.staff.role) }));
+    else parts.push(HELP);
+    const session = sessionSnap.exists ? (sessionSnap.data() as RegSession) : null;
+    if (session && !sessionExpired(session, now)) parts.push(IN_REGISTRATION);
+    return [text(parts.join('\n\n'), quickLabels(who.menu))];
+}
 
 export function replyMessages(reply: BotReply): object[] {
     switch (reply.kind) {
@@ -121,9 +137,10 @@ export async function handleStaffChat(lineUserId: string, rawText: string, now: 
     if (idx.exists) {
         const { owner_uid, building_id, registration_id } = idx.data() as { owner_uid: string; building_id: string; registration_id: string };
         const reg = await db.doc(`${baseOf(owner_uid, building_id)}/staff_registrations/${registration_id}`).get();
-        if (reg.exists) return [text(STATUS_MESSAGES[(reg.data() as StaffRegistration).status])];
+        // approved: what they can do now is more use than "you are registered"
+        if (reg.exists && (reg.data() as StaffRegistration).status !== 'approved') return [text(STATUS_MESSAGES[(reg.data() as StaffRegistration).status])];
     }
-    return [text(HELP)];
+    return staffHelp(lineUserId, now);
 }
 
 async function submitRegistration(s: RegSession, a: Extract<BotReply, { kind: 'submit' }>, now: number): Promise<void> {
@@ -271,7 +288,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         await regRef.update({ status: 'approved', decided_at: now, decided_by: ctx.displayName, staff_id: staff.id });
         await audit('CREATE', staff.id, staff.name, 'staff approved from LINE registration', { after: { role: staff.role } });
-        await linePush(reg.line_user_id, [text(`✅ อนุมัติแล้วค่ะ ยินดีต้อนรับคุณ ${staff.name} (${ROLE_TH[staff.role]})\nงานที่ได้รับมอบหมายจะส่งมาที่แชทนี้`)], staffLineToken()).catch(() => undefined);
+        // the working menu replaces the registration menu the moment they are approved
+        const menu = await syncStaffMenu(reg.line_user_id);
+        await linePush(reg.line_user_id, [text(
+            `✅ อนุมัติแล้วค่ะ ยินดีต้อนรับคุณ ${staff.name} (${ROLE_TH[staff.role]})\n\nเมนูด้านล่างเปลี่ยนเป็นเมนูทำงานแล้ว กด "งานของฉัน" เพื่อดูงานได้เลย งานใหม่จะเด้งเข้ามาในแชทนี้เอง`,
+            quickLabels(menu ?? (staff.role === 'housekeeping' ? 'housekeeping' : 'technician')),
+        )], staffLineToken()).catch(() => undefined);
         res.status(200).json({ ok: true, staff_id: staff.id });
     } catch (e) {
         if (e instanceof HttpError) { res.status(e.status).json({ error: e.code }); return; }

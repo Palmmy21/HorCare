@@ -8,6 +8,7 @@ import StaffWorkPage from './components/WorkOrders/StaffWorkPage.tsx'
 import WalkInPage from './components/Market/WalkInPage.tsx'
 import ListingPage from './components/Listing/ListingPage.tsx'
 import StaffPortalPage from './components/StaffPortal/StaffPortalPage.tsx'
+import StaffGuidePage from './components/StaffPortal/StaffGuidePage.tsx'
 
 // ── Firestore internal assertion error → auto silent reload ──────────────────
 // Firebase SDK can enter a broken state when too many listeners are created /
@@ -39,6 +40,7 @@ window.addEventListener('unhandledrejection', (e) => {
 //        ?uid=&bid=&rid=    → TenantPortalPage, which explains that old links no longer open a portal
 // Route: ?w=<link>           → StaffWorkPage (technician / housekeeper job, opened from LINE)
 // Route: ?sp=<token>         → StaffPortalPage (all of one technician's / housekeeper's jobs; token from the team LINE OA)
+// Route: ?guide=staff        → StaffGuidePage (how to register and work in the team LINE OA; public, no data)
 // Route: ?walkin=1&uid=&bid= → WalkInPage (public form for walk-in market vendors)
 // Route: ?listing=<slug>     → ListingPage (public vacancy page + viewing requests, checked by /api/listing)
 // Route: everything else    → Owner App
@@ -47,6 +49,7 @@ const isTenantGateway = window.location.pathname === '/portal';
 const isTenantPortal = params.has('p') || (params.has('uid') && params.has('bid') && params.has('rid'));
 const isStaffWork = params.has('w');
 const isStaffPortal = params.has('sp');
+const isStaffGuide = params.get('guide') === 'staff';
 const isWalkIn = params.has('walkin') && params.has('uid') && params.has('bid');
 const isListing = params.has('listing');
 
@@ -55,6 +58,7 @@ function Root() {
   if (isTenantGateway) return <TenantGateway />;
   if (isStaffWork) return <StaffWorkPage />;
   if (isStaffPortal) return <StaffPortalPage />;
+  if (isStaffGuide) return <StaffGuidePage />;
   if (isWalkIn) return <WalkInPage />;
   if (isListing) return <ListingPage />;
   if (isTenantPortal) return <TenantPortalPage />;

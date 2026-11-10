@@ -131,6 +131,15 @@ export async function authenticateHousekeeper(phone: string, passcode: string): 
   return data.session;
 }
 
+/**
+ * Start a housekeeper session from a sign-in the server already decided on (the team LINE OA's "จดมิเตอร์": the LINE
+ * account is the proof, see /api/staff-portal `housekeeper_session`). The app then opens as that housekeeper.
+ */
+export async function startHousekeeperSession(token: string, session: HousekeeperSession): Promise<void> {
+  await signInWithCustomToken(auth, token);
+  localStorage.setItem('horcare_maid_session', JSON.stringify(session));
+}
+
 /** End a housekeeper session (also signs the custom-token user out of Firebase). */
 export async function signOutHousekeeper() {
   localStorage.removeItem('horcare_maid_session');

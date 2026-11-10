@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { apiPost } from '../../utils/api';
 import { OWNER_HELP } from '../../shared/ownerCommands';
 
-/** Settings → การเชื่อมต่อ: read the figures in LINE (#ยอด #ค้าง #ห้องว่าง) through the team's LINE OA. */
+/** Settings → การเชื่อมต่อ: link this account to the team LINE OA — the admin menu, and figures (#ยอด #ค้าง #ห้องว่าง) for those who may see them. */
 export default function OwnerLineSection({ ownerUid }: { ownerUid?: string }) {
     const [linked, setLinked] = useState<boolean | null>(null);
     const [code, setCode] = useState<{ code: string; expires_at: number } | null>(null);
@@ -25,7 +25,7 @@ export default function OwnerLineSection({ ownerUid }: { ownerUid?: string }) {
         try {
             setCode(await apiPost<{ code: string; expires_at: number }>('owner-line', { action: 'code', owner_uid: ownerUid }));
         } catch (err) {
-            toast.error((err as { code?: string }).code === 'forbidden' ? 'บัญชีนี้ไม่มีสิทธิ์ดูยอดเงิน' : `สร้างรหัสไม่สำเร็จ: ${(err as Error).message}`);
+            toast.error((err as { code?: string }).code === 'forbidden' ? 'บัญชีนี้ไม่มีสิทธิ์เชื่อม LINE ผู้ดูแล' : `สร้างรหัสไม่สำเร็จ: ${(err as Error).message}`);
         } finally {
             setBusy(false);
         }
@@ -52,12 +52,12 @@ export default function OwnerLineSection({ ownerUid }: { ownerUid?: string }) {
         <div className="settings-section">
             <h3 className="settings-title">
                 <MessageCircle size={20} color="#06C755" />
-                ดูยอดผ่าน LINE
+                เชื่อม LINE ผู้ดูแล
                 {linked && <span className="badge badge-success" style={{ marginLeft: 'auto' }}>เชื่อมแล้ว</span>}
             </h3>
             <p className="form-hint" style={{ marginBottom: '1rem' }}>
-                พิมพ์ <strong>#ยอด</strong> <strong>#ค้าง</strong> หรือ <strong>#ห้องว่าง</strong> ในแชท LINE ของทีมงาน HorCare แล้วได้สรุปทันที ไม่ต้องเปิดแอป
-                ใช้ LINE OA เดียวกับที่ช่างและแม่บ้านใช้รับงาน
+                เชื่อมบัญชีนี้กับ LINE ของทีมงาน (HorCare Maintenance) เมนูใน LINE จะเปลี่ยนเป็นเมนูผู้ดูแล: งานทั้งหมด ทีมงาน และจดมิเตอร์
+                บัญชีที่มีสิทธิ์ดูการเงินพิมพ์ <strong>#ยอด</strong> <strong>#ค้าง</strong> หรือ <strong>#ห้องว่าง</strong> ในแชทเพื่อดูสรุปได้ด้วย
             </p>
 
             {code ? (
@@ -76,7 +76,7 @@ export default function OwnerLineSection({ ownerUid }: { ownerUid?: string }) {
             <ol className="owner-line-steps">
                 <li>{addFriend ? <>เพิ่มเพื่อน <a href={addFriend} target="_blank" rel="noopener noreferrer">LINE ของทีมงาน HorCare</a></> : 'เพิ่มเพื่อน LINE OA ของทีมงาน (ตั้งค่าในหน้าทีมงาน → การเชื่อมต่อ LINE)'}</li>
                 <li>กด "สร้างรหัสเชื่อม LINE" แล้วส่งรหัส HCO- ในแชทนั้น</li>
-                <li>พิมพ์ #ยอด เพื่อดูสรุป</li>
+                <li>เมนูด้านล่างของแชทจะเปลี่ยนเป็นเมนูผู้ดูแล</li>
             </ol>
 
             <div className="listing-actions">

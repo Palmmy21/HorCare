@@ -13,7 +13,8 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { appBaseUrl, notify, type NotifyResult } from './_notify.js';
-import { parseJobKey, resolvePortalToken } from './_staff-portal.js';
+import { endLineHousekeeping, parseJobKey, resolvePortalToken } from './_staff-portal.js';
+import { syncStaffMenu } from './_staff-menu.js';
 import {
     MAX_WORK_IMAGES, WORK_TYPE_LABELS_TH, canTransition, isPriority, isWorkType,
     type StaffRole, type StaffWorkView, type WorkImageKind, type WorkOrder, type WorkStaff, type WorkStatus,
@@ -232,6 +233,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (body.active !== undefined) { if (typeof body.active !== 'boolean') { res.status(400).json({ error: 'invalid_input' }); return; } updates.active = body.active; }
             if (Object.keys(updates).length === 0) { res.status(400).json({ error: 'nothing_to_update' }); return; }
             await ref.update(updates);
+            if (updates.active !== undefined || updates.phone !== undefined) {
+                if (updates.active === false || updates.phone !== undefined) await endLineHousekeeping(ctx.ownerUid, buildingId, staff, updates.active === false);
+                await syncStaffMenu(staff.line_user_id);
+            }
             await audit('UPDATE', 'staff', staff.id, staff.name, { before: { active: staff.active }, after: updates });
             res.status(200).json({ ok: true });
             return;
@@ -239,6 +244,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (action === 'staff_unlink') {
             await ref.update({ line_user_id: null, linked_at: null });
+            await endLineHousekeeping(ctx.ownerUid, buildingId, staff, false);
+            await syncStaffMenu(staff.line_user_id);
             await audit('UPDATE', 'staff', staff.id, staff.name, { note: 'LINE unlinked' });
             res.status(200).json({ ok: true });
             return;

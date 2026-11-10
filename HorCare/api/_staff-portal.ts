@@ -8,12 +8,18 @@
  *   3. The portal calls this route with the token. Every call re-reads who the token belongs to and which staff
  *      records carry that LINE id, so unlinking or deactivating someone closes their portal at once.
  *
- * /api/staff-portal (public, token-authenticated): overview | cleaning_update
+ *   4. A housekeeper's "จดมิเตอร์" opens the app's meter page: `housekeeper_session` signs them in as the property's housekeeper
+ *      account with the same phone (the one Firestore rules already let record meters), creating a passcode-less one
+ *      when the manager never made it. Switching the staff record off, unlinking LINE or changing the phone ends it.
+ *
+ * /api/staff-portal (public, token-authenticated): overview | cleaning_update | housekeeper_session
  * Work-order actions from the portal go to /api/work-orders with { portal, job } in place of the per-job link.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHash, randomBytes } from 'node:crypto';
-import { db } from './_firebase.js';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { admin, db } from './_firebase.js';
+import { housekeeperUid } from './_housekeepers.js';
+import { writeAudit } from './_audit.js';
 import { appBaseUrl } from './_notify.js';
 import { rateLimit } from './_abuse-guard.js';
 import type { WorkOrder, WorkStaff } from '../src/shared/workOrders.js';
@@ -22,6 +28,9 @@ import { CLOSED_CLEANING, OPEN_WORK, phoneKey, type PortalCleaningJob, type Port
 export const config = { maxDuration: 30 };
 
 const TOKEN_TTL_MS = 30 * 24 * 3600 * 1000;
+/** A compressed photo (900px JPEG) is ~100–250 KB as a data URL; documents must stay well under Firestore's 1 MiB. */
+const MAX_PHOTO_CHARS = 700_000;
+const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
 /** Issue a portal link for a LINE user (called by the team-OA webhook). Null when they are not linked anywhere. */
@@ -57,6 +66,71 @@ export async function linkedStaff(lineUserId: string): Promise<LinkedStaff[]> {
     }
     return out;
 }
+
+// ── housekeeper sign-in from LINE (the meter page) ────────────────────────────
+
+const hkCol = (owner: string, bld: string) => `users/${owner}/buildings/${bld}/housekeepers`;
+interface HkAccount { id: string; name: string; phone: string; session_version: number }
+
+/**
+ * The housekeeper account a housekeeping staff record signs in as: the property's account with the same phone, or a new
+ * one made for LINE sign-in only (it has no passcode, so nobody can sign in to it from the login page).
+ * Null when the manager switched that account off: LINE is not a way around it.
+ */
+async function housekeeperAccountFor(s: LinkedStaff): Promise<HkAccount | null> {
+    if (s.staff.role !== 'housekeeping' || !s.staff.phone) return null;
+    const mine = phoneKey(s.staff.phone);
+    const docs = (await db.collection(hkCol(s.ownerUid, s.buildingId)).get()).docs
+        .filter(d => phoneKey(String(d.data().phone ?? '')) === mine);
+    const now = new Date().toISOString();
+    const pick = (d: (typeof docs)[number], version?: number): HkAccount =>
+        ({ id: d.id, name: String(d.data().name ?? s.staff.name), phone: String(d.data().phone ?? ''), session_version: version ?? Number(d.data().session_version ?? 0) });
+
+    const active = docs.find(d => d.data().is_active !== false);
+    if (active) return pick(active);
+    // switched off because the staff record was (endLineHousekeeping); that record is active again, so is this
+    const paused = docs.find(d => d.data().via_line === true && d.data().off_by_staff === true);
+    if (paused) {
+        const version = Number(paused.data().session_version ?? 0) + 1;
+        await paused.ref.update({ is_active: true, status: 'active', off_by_staff: false, session_version: version, updated_at: now });
+        return pick(paused, version);
+    }
+    if (docs.length > 0) return null;
+
+    const id = `maid_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    const phone = s.staff.phone.replace(/\D/g, '');
+    await db.doc(`${hkCol(s.ownerUid, s.buildingId)}/${id}`).set({
+        id, name: s.staff.name, phone, notes: 'สร้างอัตโนมัติจากการลงทะเบียนทาง LINE (เข้าใช้ผ่าน LINE เท่านั้น ไม่มีรหัสผ่าน)',
+        is_active: true, status: 'active', session_version: 0, needs_passcode: true, via_line: true, staff_id: s.staff.id,
+        created_at: now, updated_at: now,
+    });
+    await writeAudit({
+        ownerUid: s.ownerUid, propertyId: s.buildingId, userId: `line:${s.staff.line_user_id ?? ''}`, userName: s.staff.name, role: 'housekeeping',
+        action: 'CREATE', resourceType: 'housekeeper', resourceId: id, resourceLabel: s.staff.name, note: 'housekeeper sign-in created from LINE registration',
+    });
+    return { id, name: s.staff.name, phone, session_version: 0 };
+}
+
+/**
+ * A housekeeping staff record was switched off, unlinked from LINE, or given another phone: end the housekeeper
+ * sessions opened for it, and switch off the account when it was made for LINE sign-in (`disable`).
+ */
+export async function endLineHousekeeping(ownerUid: string, buildingId: string, staff: Pick<WorkStaff, 'role' | 'phone'>, disable: boolean): Promise<void> {
+    if (staff.role !== 'housekeeping' || !staff.phone) return;
+    const mine = phoneKey(staff.phone);
+    const docs = (await db.collection(hkCol(ownerUid, buildingId)).get()).docs.filter(d => phoneKey(String(d.data().phone ?? '')) === mine);
+    for (const d of docs) {
+        const off = disable && d.data().via_line === true && d.data().is_active !== false;
+        await d.ref.update({
+            session_version: Number(d.data().session_version ?? 0) + 1, updated_at: new Date().toISOString(),
+            ...(off ? { is_active: false, status: 'off', off_by_staff: true } : {}),
+        });
+        await admin.auth().revokeRefreshTokens(housekeeperUid(ownerUid, buildingId, d.id)).catch(() => undefined);
+    }
+}
+
+const dormNameOf = async (ownerUid: string, buildingId: string): Promise<string> =>
+    ((await db.doc(`users/${ownerUid}/buildings/${buildingId}/data/config`).get()).data()?.bill_customization?.dorm_name as string | undefined) || 'อาคาร';
 
 /** 'owner~building~id' — how the portal names a job; the server re-checks it belongs to the caller. */
 export function parseJobKey(v: unknown): { ownerUid: string; buildingId: string; id: string } | null {
@@ -108,12 +182,16 @@ async function overview(lineUserId: string): Promise<PortalOverview> {
             }
         }
     }
-    return { name: [...names.keys()][0] ?? '', properties: records.length, work, cleaning };
+    return {
+        name: [...names.keys()][0] ?? '', properties: records.length, work, cleaning,
+        roles: [...new Set(records.map(r => r.staff.role))],
+        can_meter: records.some(r => r.staff.role === 'housekeeping' && !!r.staff.phone),
+    };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'method_not_allowed' }); return; }
-    const body = (req.body ?? {}) as { action?: string; token?: unknown; job?: unknown; status?: unknown; note?: unknown };
+    const body = (req.body ?? {}) as { action?: string; token?: unknown; job?: unknown; status?: unknown; note?: unknown; place?: unknown; photo?: unknown };
     const limited = await rateLimit(req, `staff-portal:${body.action ?? ''}`, 240, 3600);
     if (!limited.ok) { res.status(429).json({ error: 'too_many_requests' }); return; }
 
@@ -132,6 +210,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const to = body.status;
         if (!job || (to !== 'in_progress' && to !== 'completed')) { res.status(400).json({ error: 'invalid_input' }); return; }
         const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
+        // the "after" photo sent with a finished job (optional)
+        const photo = body.photo === undefined || body.photo === null ? null
+            : typeof body.photo === 'string' && body.photo.length <= MAX_PHOTO_CHARS && IMAGE_DATA_URL.test(body.photo) ? body.photo : undefined;
+        if (photo === undefined || (photo && to !== 'completed')) { res.status(400).json({ error: 'invalid_input' }); return; }
         // the request must be assigned to a housekeeper account with this person's phone, at a property they work for
         const mine = (await linkedStaff(lineUserId)).filter(s => s.ownerUid === job.ownerUid && s.buildingId === job.buildingId && s.staff.role === 'housekeeping' && s.staff.phone);
         const base = `users/${job.ownerUid}/buildings/${job.buildingId}`;
@@ -141,10 +223,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const owns = !!maid && mine.some(s => phoneKey(s.staff.phone!) === phoneKey(String(maid.phone ?? '')));
         if (!r || !owns || CLOSED_CLEANING.includes(r.status)) { res.status(404).json({ error: 'not_found' }); return; }
         const now = new Date().toISOString();
+        // kept beside the request, not in it, so listing requests stays light
+        if (photo) await db.doc(`${base}/cleaning_images/${job.id}__done`).set({ data: photo, created_at: now });
         await ref.update(to === 'in_progress'
             ? { status: 'in_progress', accepted_at: r.accepted_at ?? now, updated_at: now }
-            : { status: 'completed', completed_at: now, completed_by: 'maid', ...(note ? { completion_notes: note, completed_note: note } : {}), updated_at: now });
+            : {
+                status: 'completed', completed_at: now, completed_by: 'maid', updated_at: now,
+                ...(note ? { completion_notes: note, completed_note: note } : {}),
+                ...(photo ? { completion_has_photo: true } : {}),
+            });
         res.status(200).json({ ok: true });
+        return;
+    }
+
+    if (body.action === 'housekeeper_session') {
+        const places = (await linkedStaff(lineUserId)).filter(s => s.staff.role === 'housekeeping' && s.staff.phone);
+        if (places.length === 0) { res.status(403).json({ error: 'not_housekeeping' }); return; }
+        const keyOf = (s: LinkedStaff) => `${s.ownerUid}~${s.buildingId}`;
+        const chosen = places.length === 1 ? places[0] : places.find(s => keyOf(s) === body.place);
+        if (!chosen) {
+            // works at several properties: the page asks which one
+            res.status(200).json({ places: await Promise.all(places.map(async s => ({ key: keyOf(s), name: await dormNameOf(s.ownerUid, s.buildingId) }))) });
+            return;
+        }
+        const account = await housekeeperAccountFor(chosen);
+        if (!account) { res.status(403).json({ error: 'account_disabled' }); return; }
+        const token = await admin.auth().createCustomToken(housekeeperUid(chosen.ownerUid, chosen.buildingId, account.id), {
+            hk_owner: chosen.ownerUid, hk_building: chosen.buildingId, hk_maid: account.id, hk_ver: account.session_version,
+        });
+        res.status(200).json({
+            token,
+            session: {
+                owner_uid: chosen.ownerUid, building_id: chosen.buildingId, building_name: await dormNameOf(chosen.ownerUid, chosen.buildingId),
+                maid_id: account.id, name: account.name, maid_name: account.name, phone: account.phone,
+            },
+        });
         return;
     }
 

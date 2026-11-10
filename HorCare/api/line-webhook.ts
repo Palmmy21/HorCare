@@ -23,6 +23,7 @@ import type { MonthlyBill } from '../src/types/index.js';
 import { autoPostSafe } from './_ledger-auto.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
+import { GUEST_QUICK, TENANT_QUICK, ackText, botText, botVocab, helpText, notRegisteredText, parseTenantCommand, welcomeText } from '../src/shared/tenantBot.js';
 
 export const config = {
     api: {
@@ -90,6 +91,14 @@ interface LineEvent {
 async function handleEvent(event: LineEvent) {
     if (event.type === 'follow' || event.type === 'unfollow') {
         if (event.source?.userId) await recordFriendship(event.source.userId, event.type === 'follow');
+        if (event.type === 'follow' && event.source?.userId && event.replyToken) {
+            try {
+                const link = (await db.collection('line_rooms').doc(event.source.userId).get()).data() ?? null;
+                await lineReply(event.replyToken, [botText(welcomeText(link, isMarket()), link ? TENANT_QUICK : GUEST_QUICK)]);
+            } catch (err) {
+                console.error('LINE welcome failed:', (err as Error).message);
+            }
+        }
         return;
     }
     if (event.type !== 'message' && event.type !== 'postback') return;
@@ -110,6 +119,9 @@ async function handleEvent(event: LineEvent) {
         } catch { /* reply token อาจหมดอายุ — ปล่อยผ่าน */ }
     }
 }
+
+/** The vendor OA words its replies for a market (ตลาด / แผง), the others for a dorm. */
+const isMarket = () => currentLineChannel() === 'market';
 
 async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: string) {
     // ── "แบ่งจ่าย" buttons: on an invoice (split mode) or on a slip card ─────────────
@@ -146,50 +158,57 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     if (event.message?.type !== 'text') return;
     const text: string = event.message.text?.trim() ?? '';
 
+    // What the message asks for, tolerant of spacing, case and polite particles ("ขอดูบิลหน่อยครับ" = บิล).
+    const cmd = parseTenantCommand(text);
+    const market = isMarket();
+
     // ── 1. บิล / ดูบิล ────────────────────────────────────────────
-    if (['บิล', 'ดูบิล', 'bill'].includes(text.toLowerCase())) {
+    if (cmd === 'bill') {
         await handleBillCommand(lineUserId, replyToken);
         return;
     }
 
     // ── 2. ยกเลิก ──────────────────────────────────────────────────
-    if (['ยกเลิก', 'cancel'].includes(text.toLowerCase())) {
+    if (cmd === 'cancel') {
         await db.collection('line_pending').doc(lineUserId).delete();
-        await lineReply(replyToken, [{ type: 'text', text: 'ยกเลิกแล้วค่ะ 👋\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุด หรือกดลิ้งก์จากเจ้าของหอเพื่อลงทะเบียน' }]);
+        const registered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
+        await lineReply(replyToken, [botText(
+            registered ? 'ยกเลิกแล้วค่ะ 👋\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย' : `ยกเลิกแล้วค่ะ 👋\n\nเมื่อพร้อม สแกน QR หรือกดลิงก์จาก${botVocab(market).owner}เพื่อลงทะเบียนได้เลย`,
+            registered ? TENANT_QUICK : GUEST_QUICK,
+        )]);
         return;
     }
 
     // ── 2b. Rich Menu — ส่งสลิป ──────────────────────────────────
-    if (text === 'ส่งสลิป') {
+    if (cmd === 'slip') {
         const isRegistered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
         // For the next 30 minutes any photo from this tenant is treated as a slip, even if its QR is unreadable.
         if (isRegistered) {
             await db.collection('line_rooms').doc(lineUserId).update({ slip_expected_until: Date.now() + SLIP_WINDOW_MS });
         }
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: isRegistered
-                ? '📷 กรุณาถ่ายรูปสลิปการโอนเงิน แล้วส่งมาในแชทนี้ได้เลยค่ะ\n\n(ส่งรูปได้โดยตรง ไม่ต้องพิมพ์ข้อความ)'
-                : '🏠 ยังไม่ได้ลงทะเบียนค่ะ\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนก่อนนะคะ',
-        }]);
+        await lineReply(replyToken, [isRegistered
+            ? botText('📷 กรุณาถ่ายรูปสลิปการโอนเงิน แล้วส่งมาในแชทนี้ได้เลยค่ะ\n\n(ส่งรูปได้โดยตรง ไม่ต้องพิมพ์ข้อความ)')
+            : botText(notRegisteredText(market), GUEST_QUICK)]);
         return;
     }
 
     // ── 2c. Rich Menu — พอร์ทัล ──────────────────────────────────
-    if (text === 'พอร์ทัล' || text.toLowerCase() === 'portal') {
+    if (cmd === 'portal') {
         await handlePortalCommand(lineUserId, replyToken);
         return;
     }
 
     // ── 2c2. ประกาศ — latest notices from the property (registered tenants only) ──
-    if (text === 'ประกาศ') {
+    if (cmd === 'announcements') {
         const link = await getTenantLink(lineUserId);
         const msg = link ? await latestAnnouncementsText(link).catch(() => null) : null;
-        await lineReply(replyToken, [{ type: 'text', text: link ? (msg ?? 'ตอนนี้ยังไม่มีประกาศค่ะ') : 'กรุณาลงทะเบียนกับหอพักก่อนนะคะ' }]);
+        await lineReply(replyToken, [link
+            ? botText(msg ?? 'ตอนนี้ยังไม่มีประกาศค่ะ', TENANT_QUICK)
+            : botText(notRegisteredText(market), GUEST_QUICK)]);
         return;
     }
     // ── 2d. Rich Menu — ติดต่อแอดมิน ──────────────────────────────
-    if (text === 'ติดต่อแอดมิน') {
+    if (cmd === 'contact') {
         await lineReply(replyToken, [{
             type: 'text',
             text: '📞 ติดต่อทีมงาน HorCare\n\n💬 LINE Official: @060iuutx\n⏰ เวลาทำการ: จ-ศ 9:00–18:00 น.\n\nหากมีปัญหาการใช้งานหรือต้องการความช่วยเหลือ พิมพ์มาได้เลยค่ะ เราพร้อมช่วยเสมอ 🙏',
@@ -217,7 +236,7 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     }
 
     // ── 4. ลงทะเบียน (manual flow — fallback) ─────────────────────
-    if (text === 'ลงทะเบียน' || text.toLowerCase() === 'register') {
+    if (cmd === 'register') {
         await db.collection('line_pending').doc(lineUserId).set({
             step: 'waiting_dorm_code',
             expires_at: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * 60 * 1000),
@@ -226,6 +245,18 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
             type: 'text',
             text: '🏠 ยินดีต้อนรับสู่ HorCare!\n\nกรุณาพิมพ์รหัสหอพักที่ได้รับจากเจ้าของหอ\n(เช่น HC-K7MN2P)\n\nหรือพิมพ์ "ยกเลิก" เพื่อออก',
         }]);
+        return;
+    }
+
+    // ── 4b. เมนู / แจ้งซ่อม: the owner's own Q&A answer wins when it has one ──
+    if (cmd === 'help' || cmd === 'repair') {
+        const link = await getTenantLink(lineUserId);
+        if (link && await answerFromFaq(lineUserId, replyToken, link, text)) return;
+        if (cmd === 'repair' && link) {
+            await handlePortalCommand(lineUserId, replyToken, '🔧 แจ้งซ่อมได้ในพอร์ทัลค่ะ กดปุ่มด้านล่าง แล้วเลือกหัวข้อ "แจ้งซ่อม"');
+            return;
+        }
+        await lineReply(replyToken, [botText(helpText(!!link, market), link ? TENANT_QUICK : GUEST_QUICK)]);
         return;
     }
 
@@ -264,27 +295,29 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
             await recordBotReply(lineUserId, answer).catch(() => undefined);
             return;
         }
-        if (inbound.shouldAck) {
-            await lineReply(replyToken, [{
-                type: 'text',
-                text: 'ได้รับข้อความแล้วค่ะ 🙏 เจ้าของหอจะตอบกลับโดยเร็วที่สุด\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลยนะคะ',
-            }]);
-        }
+        if (inbound.shouldAck) await lineReply(replyToken, [botText(ackText(market), TENANT_QUICK)]);
         return;
     }
     const isRegistered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
     if (isRegistered) {
-        // Registered, but the message couldn't be stored — keep the old helpful reply.
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: 'สวัสดีค่ะ 😊\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุด',
-        }]);
+        // Registered, but the message couldn't be stored: say what the chat can do.
+        await lineReply(replyToken, [botText(helpText(true, market), TENANT_QUICK)]);
     } else {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: 'สวัสดีค่ะ 😊\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนรับบิลค่ะ\nหรือพิมพ์ "ลงทะเบียน" เพื่อใส่รหัสหอด้วยตนเอง',
-        }]);
+        await lineReply(replyToken, [botText(notRegisteredText(market), GUEST_QUICK)]);
     }
+}
+
+/**
+ * A soft command (เมนู, แจ้งซ่อม) the property has its own Q&A answer for: store the question in the inbox and send that
+ * answer, exactly as ordinary conversation is handled. False when there is no such answer.
+ */
+async function answerFromFaq(lineUserId: string, replyToken: string, link: { uid: string; building_id: string }, text: string): Promise<boolean> {
+    const answer = await findFaqAnswer(link, text).catch(() => null);
+    if (!answer) return false;
+    await recordInbound(lineUserId, { kind: 'text', text }).catch(() => undefined);
+    await lineReply(replyToken, [{ type: 'text', text: answer }]);
+    await recordBotReply(lineUserId, answer).catch(() => undefined);
+    return true;
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -486,10 +519,7 @@ async function handleRoomNumber(
 async function handleBillCommand(lineUserId: string, replyToken: string) {
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
     if (!lineRoomSnap.exists) {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: '🏠 ยังไม่ได้ลงทะเบียนค่ะ\n\nกดลิ้งก์ที่เจ้าของหอส่งให้ แล้วพิมพ์เลขห้องของคุณได้เลย\nหรือพิมพ์ "ลงทะเบียน" เพื่อใส่รหัสเอง',
-        }]);
+        await lineReply(replyToken, [botText(notRegisteredText(isMarket()), GUEST_QUICK)]);
         return;
     }
 
@@ -511,13 +541,10 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
 }
 
 /** ส่งลิงก์พอร์ทัลส่วนตัวของลูกหอ */
-async function handlePortalCommand(lineUserId: string, replyToken: string) {
+async function handlePortalCommand(lineUserId: string, replyToken: string, intro?: string) {
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
     if (!lineRoomSnap.exists) {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: '🏠 ยังไม่ได้ลงทะเบียนค่ะ\n\nกดลิ้งก์ที่เจ้าของหอส่งให้เพื่อลงทะเบียนก่อนนะคะ',
-        }]);
+        await lineReply(replyToken, [botText(notRegisteredText(isMarket()), GUEST_QUICK)]);
         return;
     }
 
@@ -525,9 +552,9 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
     const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
     const portalUrl = `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: room_id }))}`;
 
-    await lineReply(replyToken, [{
+    await lineReply(replyToken, [...(intro ? [botText(intro)] : []), {
         type: 'flex',
-        altText: `🏠 พอร์ทัลผู้เช่า ห้อง ${room_number}`,
+        altText: `🏠 พอร์ทัลผู้เช่า ${botVocab(isMarket()).unit} ${room_number}`,
         contents: {
             type: 'bubble',
             size: 'kilo',
@@ -535,7 +562,7 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
                 type: 'box',
                 layout: 'vertical',
                 paddingAll: '16px',
-                backgroundColor: '#4F46E5',
+                backgroundColor: '#0A6CC2',
                 contents: [
                     { type: 'text', text: '🏠 พอร์ทัลผู้เช่า', color: '#ffffff', size: 'sm', weight: 'bold' },
                     { type: 'text', text: dorm_name || 'HorCare', color: '#ffffffcc', size: 'xs' },
@@ -550,8 +577,8 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
                     {
                         type: 'box', layout: 'horizontal',
                         contents: [
-                            { type: 'text', text: 'ห้อง', color: '#888888', size: 'sm', flex: 2 },
-                            { type: 'text', text: room_number, size: 'sm', weight: 'bold', flex: 3, align: 'end' },
+                            { type: 'text', text: botVocab(isMarket()).unit, color: '#888888', size: 'sm', flex: 2 },
+                            { type: 'text', text: String(room_number), size: 'sm', weight: 'bold', flex: 3, align: 'end' },
                         ],
                     },
                     { type: 'separator', margin: 'md' },
@@ -573,7 +600,7 @@ async function handlePortalCommand(lineUserId: string, replyToken: string) {
                     type: 'button',
                     action: { type: 'uri', label: '🔗 เปิดพอร์ทัล', uri: portalUrl },
                     style: 'primary',
-                    color: '#4F46E5',
+                    color: '#0A6CC2',
                     height: 'sm',
                 }],
             },

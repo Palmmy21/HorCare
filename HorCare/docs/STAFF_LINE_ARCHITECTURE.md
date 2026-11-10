@@ -8,7 +8,7 @@ No staff member ever has a HorCare password: **their LINE account is their ident
 | Channel | Who talks to it | Webhook | Used for |
 |---|---|---|---|
 | Tenant OA (one HorCare OA) | tenants | `/api/line-webhook` | bills, slips, tenant portal |
-| **Team OA** | technicians, housekeepers, owners | `/api/line-staff-webhook` | staff linking, job cards, **staff portal**, owner `#ยอด` |
+| **Team OA** (HorCare Maintenance) | technicians, housekeepers, admins | `/api/line-staff-webhook` | registration, job cards, **staff portal**, meters, the admin menu |
 | Support OA | owners | (push only) | plan expiry notices |
 
 Staff and tenants never share a channel, so a tenant cannot reach staff tooling and vice versa.
@@ -79,13 +79,47 @@ Properties of the design:
 - **Least data.** The portal returns job fields only — no owner ids beyond the opaque job key, no tenant contact
   details, no other staff. Unknown job, wrong person and wrong secret all answer the same `404`.
 - **Per-job cards keep working** alongside the portal; both end in the same server-side checks.
-- Tokens and codes are server-only collections (`staff_portal_tokens`, `staff_links`, `staff_reg_codes`):
+- Tokens, codes and menu state are server-only collections (`staff_portal_tokens`, `staff_links`, `staff_reg_codes`, `staff_line_menus`):
   Firestore rules deny all client access.
 
-## Optional: rich menu
+## Rich menus: one per kind of person
 
-Add a rich-menu button on the team OA whose action sends the text **งานของฉัน**. No code change is needed; the
-webhook already treats `งานของฉัน`, `งาน`, `portal`, `my jobs` as a portal request (`src/shared/staffPortal.ts`).
+`scripts/setup-staff-rich-menu.mjs` draws and installs four menus (deploy the server first, then run it):
+
+| Menu | Who | Buttons (each sends that word) |
+|---|---|---|
+| `register` | everyone not linked — the OA's **default** | ลงทะเบียน · คู่มือ · ช่วยเหลือ |
+| `technician` | ช่าง | งานของฉัน · ส่งงาน · ช่วยเหลือ |
+| `housekeeping` | แม่บ้าน | งานของฉัน · จดมิเตอร์ · ส่งงาน · ช่วยเหลือ |
+| `admin` | a linked HorCare account (owner, manager, front desk) | งานทั้งหมด · ทีมงาน · จดมิเตอร์ · ช่วยเหลือ |
+
+- **Switching.** `api/_staff-menu.ts` `syncStaffMenu(lineUserId)` links the person to the menu `menuFor()` picks
+  (admin, else housekeeping, else technician) and unlinks them — back to `register` — when they are no longer
+  linked. It runs after every message and follow, on approval, and when a manager deactivates or unlinks someone, so
+  the working menu appears the moment registration is approved and disappears the moment access ends. Menus are found
+  on LINE by name (`horcare-staff-<menu>`), so reinstalling them needs no configuration; `staff_line_menus/{lineUserId}`
+  remembers what was linked to avoid repeat calls. Best effort: a failed switch never fails a reply.
+- **No link is baked into a menu.** A button sends a word (`src/shared/staffBot.ts`); the webhook answers with one card
+  and one big button whose link is made for that person at that moment. Staff links carry a portal token
+  (`/?sp=…`, `&go=next` opens the next job, `&go=meter` the meter page); admin links open the app
+  (`/?view=operations&tab=team`, `/?view=recording`) where they sign in with their own account.
+- **Admins** link with an `HCO-` code from Settings → การเชื่อมต่อ (`api/_owner-line.ts`): the owner, or a member whose
+  role has `finance.read` or `work_order.create`. Access is re-read on every use; a binding whose account lost both is
+  deleted. `#ยอด / #ค้าง / #ห้องว่าง` still answer accounts with `finance.read`, but are in no menu.
+- **Guide.** `/?guide=staff` (`StaffGuidePage`): registration and daily use in numbered picture steps.
+
+## Housekeepers: meters and photos
+
+- **จดมิเตอร์** → `/?sp=<token>&go=meter` → `POST /api/staff-portal { action: housekeeper_session }` signs the person in as
+  the property's **housekeeper account** with the same phone — the session Firestore rules already allow to record
+  meters (`isHousekeeper`) — and the app opens on the meter page. If the manager never made that account, one is
+  created for LINE sign-in only (`via_line`, no passcode, so the login page cannot open it). A manager's own account
+  that is switched off is never reopened this way.
+- Deactivating the staff record, unlinking LINE or changing the phone bumps the account's `session_version` (every
+  open session ends) and switches a `via_line` account off; reactivating the staff record brings it back.
+- **Finished cleaning with a photo**: `cleaning_update { status: completed, photo }` stores the picture in
+  `cleaning_images/{id}__done` and marks the request `completion_has_photo`; the manager sees it on งานแม่บ้าน.
+- Photos sent into the chat itself are not read; the bot says so and points at "ส่งงาน".
 
 ## Files
 
@@ -94,7 +128,11 @@ webhook already treats `งานของฉัน`, `งาน`, `portal`, `my
 | Team OA webhook | `api/line-staff-webhook.ts` |
 | Staff link codes, job links, staff actions | `api/_work-orders.ts` |
 | Self-registration chat | `api/_staff-registration.ts` |
-| Portal tokens, overview, housekeeping updates | `api/_staff-portal.ts` |
+| Portal tokens, overview, housekeeping updates, housekeeper sign-in | `api/_staff-portal.ts` |
+| Rich menu per person | `api/_staff-menu.ts`, `scripts/setup-staff-rich-menu.mjs` |
+| Admin link (HCO-) and figures | `api/_owner-line.ts` |
+| Words, menus and wording of the team OA | `src/shared/staffBot.ts` |
+| Guide page | `src/components/StaffPortal/StaffGuidePage.tsx` |
 | Shared types / ordering / phone matching | `src/shared/staffPortal.ts` |
 | Portal page | `src/components/StaffPortal/StaffPortalPage.tsx` |
 | One-job page (card and portal) | `src/components/WorkOrders/StaffWorkPage.tsx` |

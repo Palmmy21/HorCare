@@ -112,6 +112,77 @@ describe('a second person scans a taken room', () => {
     });
 });
 
+describe('what the bot says', () => {
+    const text = (t: string, user = LINE_USER) => ({ type: 'message', replyToken: 'rt', source: { userId: user }, message: { type: 'text', text: t } });
+    const reply = () => {
+        const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/v2/bot/message/reply'));
+        return call ? (JSON.parse(call[1].body) as { messages: { type: string; text?: string; quickReply?: { items: { action: { text: string } }[] } }[] }).messages : null;
+    };
+    const STRANGER = 'U' + 'c'.repeat(32);
+
+    it('greets a new friend with how to register', async () => {
+        await post([{ type: 'follow', replyToken: 'rt', source: { userId: STRANGER } }]);
+        expect(reply()![0].text).toContain('ยังไม่ได้ลงทะเบียน');
+        expect(reply()![0].quickReply!.items.map(i => i.action.text)).toEqual(['ลงทะเบียน']);
+    });
+
+    it('greets a registered friend by room, with the menu one tap away', async () => {
+        await scanCard();
+        fetchMock.mockClear();
+        await post([{ type: 'follow', replyToken: 'rt', source: { userId: LINE_USER } }]);
+        expect(reply()![0].text).toContain('ห้อง 101');
+        expect(reply()![0].quickReply!.items.map(i => i.action.text)).toEqual(['บิล', 'ส่งสลิป', 'พอร์ทัล', 'ประกาศ']);
+    });
+
+    it('understands a politely worded command', async () => {
+        await scanCard();
+        fetchMock.mockClear();
+        await post([text('ขอดูบิลหน่อยครับ')]);
+        expect(reply()![0].text).toContain('ยังไม่มีบิล');
+    });
+
+    it('answers "เมนู" with what the chat can do, and does not file it as a message for the owner', async () => {
+        await scanCard();
+        fetchMock.mockClear();
+        await post([text('เมนู')]);
+        expect(reply()![0].text).toContain('"ส่งสลิป"');
+        expect(read(`users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`)).toBeUndefined();
+    });
+
+    it('lets the property\'s own Q&A answer "แจ้งซ่อม" when it has one, else opens the portal', async () => {
+        process.env.APP_URL = 'https://app.example';
+        process.env.PORTAL_TOKEN_SECRET = 'portal-secret';
+        await scanCard();
+        fetchMock.mockClear();
+        await post([text('แจ้งซ่อม')]);
+        expect(reply()!.map(m => m.type)).toEqual(['text', 'flex']);
+
+        seed(`users/${OWNER}/buildings/${BLD}/faqs/f1`, { id: 'f1', title: 'ซ่อม', keywords: ['แจ้งซ่อม'], answer: 'โทรหาช่าง 081-000-0000', enabled: true, hit_count: 0, created_at: '2026-01-01', updated_at: '2026-01-01' });
+        fetchMock.mockClear();
+        await post([text('แจ้งซ่อม')]);
+        expect(reply()![0].text).toBe('โทรหาช่าง 081-000-0000');
+        expect(read(`users/${OWNER}/buildings/${BLD}/faqs/f1`)?.hit_count).toBe(1);
+        delete process.env.APP_URL;
+        delete process.env.PORTAL_TOKEN_SECRET;
+    });
+
+    it('still passes real conversation to the owner, acknowledged once', async () => {
+        await scanCard();
+        fetchMock.mockClear();
+        await post([text('บิลเดือนที่แล้วผิดค่ะ ช่วยดูหน่อย')]);
+        expect(reply()![0].text).toContain('ได้รับข้อความแล้ว');
+        expect(read(`users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`)?.unread_count).toBe(1);
+        fetchMock.mockClear();
+        await post([text('ขอบคุณค่ะ')]);
+        expect(reply()).toBeNull();
+    });
+
+    it('tells a stranger how to register instead of showing a menu', async () => {
+        await post([text('เมนู', STRANGER)]);
+        expect(reply()![0].text).toContain('ยังไม่ได้ลงทะเบียน');
+    });
+});
+
 describe('friendship follows LINE', () => {
     it('blocking flags the room, adding back clears it', async () => {
         await scanCard();

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Calendar, CheckCircle2, ChevronRight, Loader2, MapPin, PlayCircle, RefreshCw, Sparkles, Wrench } from 'lucide-react';
+import { AlertTriangle, Calendar, Camera, CheckCircle2, ChevronRight, Gauge, Loader2, MapPin, PlayCircle, RefreshCw, Sparkles, Wrench } from 'lucide-react';
+import { startHousekeeperSession } from '../../hooks/useHousekeepers';
+import { compressImage } from '../../utils/imageCompress';
+import type { HousekeeperSession } from '../../types';
 import StaffWorkPage from '../WorkOrders/StaffWorkPage';
 import { PRIORITY_LABELS_TH, WORK_STATUS_LABELS_TH, WORK_TYPE_LABELS_TH } from '../../shared/workOrders';
 import { sortWork, type PortalCleaningJob, type PortalOverview, type PortalWorkJob } from '../../shared/staffPortal';
@@ -20,9 +23,25 @@ async function post<T>(body: object): Promise<{ ok: boolean; status: number; dat
 /**
  * Staff portal (/?sp=<token>): every job assigned to this technician / housekeeper, at every property they work for.
  * The token comes from the team LINE OA ("งานของฉัน"); there is no password. See docs/STAFF_LINE_ARCHITECTURE.md.
+ *
+ * The rich menu's other buttons land here too: `&go=next` opens the job to do next, `&go=meter` signs a housekeeper in
+ * to the app's meter page. Built for people who rarely use apps: few words, large buttons, and the phone's back button
+ * returns to the list instead of closing the page.
  */
+interface HkState { state: 'idle' | 'busy' | 'choose' | 'error'; places?: { key: string; name: string }[]; message?: string }
+const HK_ERRORS: Record<string, string> = {
+    account_disabled: 'บัญชีแม่บ้านของคุณถูกปิดอยู่ กรุณาแจ้งผู้จัดการ',
+    not_housekeeping: 'หน้านี้เปิดให้แม่บ้านเท่านั้น กรุณาแจ้งผู้จัดการ',
+};
+
 export default function StaffPortalPage() {
-    const token = new URLSearchParams(window.location.search).get('sp') ?? '';
+    const [{ token, go }] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        return { token: p.get('sp') ?? '', go: p.get('go') };
+    });
+    const [hk, setHk] = useState<HkState>({ state: 'idle' });
+    const [photos, setPhotos] = useState<Record<string, string>>({});
+    const [sendError, setSendError] = useState<string | null>(null);
     const [data, setData] = useState<PortalOverview | null>(null);
     const [state, setState] = useState<'loading' | 'ready' | 'gone'>(token ? 'loading' : 'gone');
     const [openJob, setOpenJob] = useState<string | null>(null);
@@ -35,6 +54,35 @@ export default function StaffPortalPage() {
         setState('ready');
     }, [token]);
 
+    // Open the app's meter page as this housekeeper.
+    const openMeter = useCallback(async (place?: string) => {
+        setHk({ state: 'busy' });
+        const r = await post<{ token?: string; session?: HousekeeperSession; places?: { key: string; name: string }[] }>({ action: 'housekeeper_session', token, place });
+        if (r.ok && r.data.places) { setHk({ state: 'choose', places: r.data.places }); return; }
+        if (!r.ok || !r.data.token || !r.data.session) {
+            setHk({ state: 'error', message: HK_ERRORS[r.data.error ?? ''] ?? 'เปิดหน้านี้ไม่ได้ กรุณาลองใหม่อีกครั้ง' });
+            return;
+        }
+        try {
+            await startHousekeeperSession(r.data.token, r.data.session);
+            window.location.replace('/?view=recording');
+        } catch {
+            setHk({ state: 'error', message: 'เปิดหน้านี้ไม่ได้ กรุณาลองใหม่อีกครั้ง' });
+        }
+    }, [token]);
+
+    // One job at a time on screen; the phone's back button returns to the list.
+    const openJobPage = useCallback((key: string) => {
+        window.history.pushState({ spJob: key }, '');
+        setOpenJob(key);
+    }, []);
+    useEffect(() => {
+        const onPop = (e: PopStateEvent) => setOpenJob((e.state as { spJob?: string } | null)?.spJob ?? null);
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, []);
+
+    // First load. A rich-menu button may have asked for more than the list: the meter page, or the job to do next.
     useEffect(() => {
         if (!token) return;
         let cancelled = false;
@@ -43,19 +91,37 @@ export default function StaffPortalPage() {
             if (!r.ok) { setState('gone'); return; }
             setData(r.data);
             setState('ready');
+            if (go === 'meter') void openMeter();
+            if (go === 'next') {
+                const next = sortWork(r.data.work).find(j => j.status !== 'completed');
+                if (next) openJobPage(next.key);
+            }
         });
         return () => { cancelled = true; };
-    }, [token]);
+    }, [token, go, openMeter, openJobPage]);
 
     const updateCleaning = async (job: PortalCleaningJob, status: 'in_progress' | 'completed') => {
         setBusy(job.key);
-        await post({ action: 'cleaning_update', token, job: job.key, status });
+        setSendError(null);
+        const photo = status === 'completed' ? photos[job.key] : undefined;
+        const r = await post({ action: 'cleaning_update', token, job: job.key, status, ...(photo ? { photo } : {}) });
         setBusy(null);
+        if (!r.ok) { setSendError('ส่งงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); return; }
+        setPhotos(p => { const rest = { ...p }; delete rest[job.key]; return rest; });
         await load();
     };
 
+    // The "after" photo for a housekeeping job, kept until the job is sent.
+    const addPhoto = async (jobKey: string, file: File | undefined) => {
+        if (!file) return;
+        try {
+            const { base64 } = await compressImage(file, 900);
+            setPhotos(p => ({ ...p, [jobKey]: `data:image/jpeg;base64,${base64}` }));
+        } catch { setSendError('อ่านรูปไม่ได้ กรุณาถ่ายใหม่'); }
+    };
+
     if (openJob) {
-        return <StaffWorkPage portal={{ token, job: openJob, onBack: () => { setOpenJob(null); void load(); } }} />;
+        return <StaffWorkPage portal={{ token, job: openJob, onBack: () => { window.history.back(); void load(); } }} />;
     }
     if (state === 'loading') {
         return <div className="sp-page sp-center"><Loader2 size={32} className="spin" aria-label="กำลังโหลด" /></div>;
@@ -89,10 +155,33 @@ export default function StaffPortalPage() {
             </header>
 
             <main className="sp-main">
+                {data.can_meter && (
+                    <button type="button" className="sp-tile" disabled={hk.state === 'busy'} onClick={() => void openMeter()}>
+                        {hk.state === 'busy' ? <Loader2 size={34} className="spin" aria-hidden /> : <Gauge size={34} aria-hidden />}
+                        <span className="sp-tile-text">
+                            <strong>จดมิเตอร์</strong>
+                            <span>พิมพ์เลข หรือถ่ายรูปมิเตอร์น้ำ-ไฟ</span>
+                        </span>
+                        <ChevronRight size={22} className="sp-tile-go" aria-hidden />
+                    </button>
+                )}
+                {hk.state === 'choose' && hk.places && (
+                    <section className="sp-card" role="dialog" aria-label="เลือกสถานที่">
+                        <p className="sp-choose-title">เลือกสถานที่</p>
+                        <div className="sp-choose">
+                            {hk.places.map(p => (
+                                <button key={p.key} type="button" className="btn btn-outline" onClick={() => void openMeter(p.key)}>{p.name}</button>
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {hk.state === 'error' && <div className="sp-card sp-alert" role="alert"><AlertTriangle size={20} aria-hidden /> {hk.message}</div>}
+                {sendError && <div className="sp-card sp-alert" role="alert"><AlertTriangle size={20} aria-hidden /> {sendError}</div>}
+
                 {todo.length > 0 && (
                     <section>
                         <h2 className="sp-section"><Wrench size={16} aria-hidden /> ใบงาน</h2>
-                        <ul className="sp-list">{todo.map(j => <WorkRow key={j.key} job={j} onOpen={() => setOpenJob(j.key)} />)}</ul>
+                        <ul className="sp-list">{todo.map(j => <WorkRow key={j.key} job={j} onOpen={() => openJobPage(j.key)} />)}</ul>
                     </section>
                 )}
 
@@ -112,6 +201,12 @@ export default function StaffPortalPage() {
                                         {c.preferred_date && <span><Calendar size={13} aria-hidden /> {c.preferred_date}{c.preferred_time_slot ? ` ${c.preferred_time_slot}` : ''}</span>}
                                         {c.urgent && <span className="sp-urgent">ด่วน</span>}
                                     </p>
+                                    {photos[c.key] && <img className="sp-job-photo" src={photos[c.key]} alt="รูปหลังทำความสะอาด" />}
+                                    <label className="btn btn-outline sp-photo-btn">
+                                        <Camera size={18} aria-hidden /> {photos[c.key] ? 'ถ่ายรูปใหม่' : 'ถ่ายรูปหลังทำ'}
+                                        <input type="file" accept="image/*" capture="environment" hidden
+                                            onChange={e => { void addPhoto(c.key, e.target.files?.[0]); e.target.value = ''; }} />
+                                    </label>
                                     <div className="sp-job-actions">
                                         {c.status !== 'in_progress' ? (
                                             <button type="button" className="btn btn-outline" disabled={busy === c.key} onClick={() => void updateCleaning(c, 'in_progress')}>
@@ -131,7 +226,7 @@ export default function StaffPortalPage() {
                 {waiting.length > 0 && (
                     <section>
                         <h2 className="sp-section sp-muted">ส่งแล้ว รอผู้จัดการตรวจ</h2>
-                        <ul className="sp-list">{waiting.map(j => <WorkRow key={j.key} job={j} onOpen={() => setOpenJob(j.key)} />)}</ul>
+                        <ul className="sp-list">{waiting.map(j => <WorkRow key={j.key} job={j} onOpen={() => openJobPage(j.key)} />)}</ul>
                     </section>
                 )}
 

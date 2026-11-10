@@ -8,6 +8,7 @@ vi.mock('./_supabase.js', async () => {
 
 import handler, { handleOwnerCommand, redeemOwnerLink } from './_owner-line.js';
 import { addAuthUser, fakeReq, fakeRes, read, resetFake, seed } from './_fake-firestore.js';
+import { isLineAdmin } from './_owner-line.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
 import { todayTh } from '../src/shared/market.js';
 
@@ -79,13 +80,31 @@ describe('owner LINE commands', () => {
         expect(sum).toContain('หอ B');
         expect(sum).not.toContain('หอ A');
 
-        expect((await call({ action: 'code' }, 'desk')).statusCode).toBe(403);
+    });
+
+    it('an admin without finance access can link (for the admin menu) but is not shown money', async () => {
+        await link('desk');
+        expect(replyText(await handleOwnerCommand(LINE_U, '#ยอด'))).toContain('ไม่มีสิทธิ์ดูยอดเงิน');
+        expect(read(`owner_line/${LINE_U}`)).toMatchObject({ account_uid: 'desk' });
+        expect(await isLineAdmin(LINE_U)).toBe(true);
+
+        // a role that neither sees money nor hands out work cannot link at all
+        seed(`users/${OWNER}/members/tech`, { uid: 'tech', role: 'technician', permissions: permissionsForRole('technician'), property_ids: ['*'], status: 'active' });
+        addAuthUser('tech', 'tech@x.com', 'Tech');
+        expect((await call({ action: 'code' }, 'tech')).statusCode).toBe(403);
+    });
+
+    it('stops treating a LINE account as an admin once its HorCare account is switched off', async () => {
+        await link('desk');
+        seed(`users/${OWNER}/members/desk`, { uid: 'desk', role: 'front_desk', property_ids: ['*'], status: 'disabled' });
+        expect(await isLineAdmin(LINE_U)).toBe(false);
+        expect(read(`owner_line/${LINE_U}`)).toBeUndefined();
     });
 
     it('forgets the binding when access is taken away, or on #ยกเลิก', async () => {
         await link('acct');
         seed(`users/${OWNER}/members/acct`, { uid: 'acct', role: 'finance', property_ids: ['bB'], status: 'disabled' });
-        expect(replyText(await handleOwnerCommand(LINE_U, '#ยอด'))).toContain('ไม่มีสิทธิ์ดูยอดเงินแล้ว');
+        expect(replyText(await handleOwnerCommand(LINE_U, '#ยอด'))).toContain('เลิกเชื่อม LINE ให้อัตโนมัติ');
         expect(read(`owner_line/${LINE_U}`)).toBeUndefined();
 
         await link(OWNER);

@@ -5,7 +5,7 @@ vi.mock('./_abuse-guard.js', async () => ({ ...(await vi.importActual<typeof imp
 
 import portal, { issuePortalLink } from './_staff-portal.js';
 import workOrders from './_work-orders.js';
-import { fakeReq, fakeRes, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
 
 const LINE = 'U' + 'a'.repeat(32);
 const OTHER_LINE = 'U' + 'b'.repeat(32);
@@ -42,6 +42,75 @@ beforeEach(() => {
     seed(`${B}/cleaning/c2`, { room_number: '202', service_type: 'general', status: 'completed', assigned_maid_id: 'm1' });
 });
 
+describe('housekeeper sign-in from LINE (meter page)', () => {
+    const claimsOf = (token: string) => JSON.parse(token) as { uid: string; claims: { hk_owner: string; hk_building: string; hk_maid: string; hk_ver: number } };
+    const session = async (line = LINE, place?: string) => call(portal, { action: 'housekeeper_session', token: tokenOf(await issuePortalLink(line)), place });
+    const manager = async (body: object) => {
+        const res = fakeRes();
+        await workOrders(fakeReq({ owner_uid: 'o2', building_id: 'bB', ...body }, 'o2') as never, res as never);
+        return res as unknown as { statusCode: number };
+    };
+    beforeEach(() => {
+        addAuthUser('o2', 'o2@x.com', 'Owner 2');
+        seed('users/o2', { uid: 'o2' });
+        seed('users/o2/buildings/bB', { id: 'bB' });
+    });
+
+    it('signs a housekeeper in as the property\'s housekeeper account with the same phone', async () => {
+        const r = await session();
+        expect(r.statusCode).toBe(200);
+        expect(r.body.session).toMatchObject({ owner_uid: 'o2', building_id: 'bB', building_name: 'หอ B', maid_id: 'm1', maid_name: 'เอ' });
+        expect(claimsOf(r.body.token).claims).toEqual({ hk_owner: 'o2', hk_building: 'bB', hk_maid: 'm1', hk_ver: 0 });
+        expect(listPaths(`${B}/housekeepers/`)).toHaveLength(1);
+    });
+
+    it('is refused to a technician, to a bad link, and when the manager switched the account off', async () => {
+        expect((await session(OTHER_LINE)).statusCode).toBe(403);
+        expect((await call(portal, { action: 'housekeeper_session', token: 'x'.repeat(32) })).statusCode).toBe(401);
+        seed(`${B}/housekeepers/m1`, { name: 'เอ', phone: '+66811112222', is_active: false });
+        expect((await session()).body.error).toBe('account_disabled');
+        expect(listPaths(`${B}/housekeepers/`)).toHaveLength(1);
+    });
+
+    it('makes a passcode-less account when the manager never made one, and reuses it', async () => {
+        seed(`${B}/staff/s9`, { id: 's9', name: 'เอ', phone: '0822223333', role: 'housekeeping', active: true, line_user_id: LINE });
+        const first = await session();
+        expect(first.statusCode).toBe(200);
+        const made = first.body.session.maid_id as string;
+        expect(made).not.toBe('m1');
+        expect(read(`${B}/housekeepers/${made}`)).toMatchObject({ name: 'เอ', phone: '0822223333', via_line: true, needs_passcode: true, is_active: true, staff_id: 's9' });
+        expect(read('housekeepers_auth/0822223333')).toBeUndefined();   // nothing to sign in to from the login page
+        expect((await session()).body.session.maid_id).toBe(made);
+        expect(listPaths(`${B}/housekeepers/`)).toHaveLength(2);
+    });
+
+    it('ends the session when the staff record is switched off or unlinked, and comes back when it is switched on', async () => {
+        seed(`${B}/staff/s9`, { id: 's9', name: 'เอ', phone: '0822223333', role: 'housekeeping', active: true, line_user_id: LINE });
+        const made = (await session()).body.session.maid_id as string;
+
+        expect((await manager({ action: 'staff_update_info', staff_id: 's9', active: false })).statusCode).toBe(200);
+        expect(read(`${B}/housekeepers/${made}`)).toMatchObject({ is_active: false, session_version: 1, off_by_staff: true });
+
+        expect((await manager({ action: 'staff_update_info', staff_id: 's9', active: true })).statusCode).toBe(200);
+        const again = await session();
+        expect(again.body.session.maid_id).toBe(made);
+        expect(claimsOf(again.body.token).claims.hk_ver).toBe(2);       // the token from before stays dead
+        expect(read(`${B}/housekeepers/${made}`)).toMatchObject({ is_active: true, session_version: 2 });
+
+        expect((await manager({ action: 'staff_unlink', staff_id: 's9' })).statusCode).toBe(200);
+        expect(read(`${B}/housekeepers/${made}`)).toMatchObject({ is_active: true, session_version: 3 });
+    });
+
+    it('asks which property when the person keeps house at more than one', async () => {
+        seed(`${A}/staff/s7`, { id: 's7', name: 'เอ', phone: '0811112222', role: 'housekeeping', active: true, line_user_id: LINE });
+        const ask = await session();
+        expect(ask.body.token).toBeUndefined();
+        expect(ask.body.places).toEqual(expect.arrayContaining([{ key: 'o1~bA', name: 'หอ A' }, { key: 'o2~bB', name: 'หอ B' }]));
+        expect((await session(LINE, 'o2~bB')).body.session.building_id).toBe('bB');
+        expect((await session(LINE, 'o9~nope')).body.token).toBeUndefined();
+    });
+});
+
 describe('staff portal', () => {
     it('only linked LINE accounts get a portal link', async () => {
         expect(await issuePortalLink('U' + 'z'.repeat(32))).toBeNull();
@@ -76,6 +145,26 @@ describe('staff portal', () => {
         expect((await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c2', status: 'completed' })).statusCode).toBe(404);
         const other = tokenOf(await issuePortalLink(OTHER_LINE));
         expect((await call(portal, { action: 'cleaning_update', token: other, job: 'o2~bB~c1', status: 'in_progress' })).statusCode).toBe(404);
+    });
+
+    it('takes an "after" photo with a finished housekeeping job, and only then', async () => {
+        const token = tokenOf(await issuePortalLink(LINE));
+        const photo = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+        expect((await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c1', status: 'in_progress', photo })).statusCode).toBe(400);
+        expect((await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c1', status: 'completed', photo: 'javascript:alert(1)' })).statusCode).toBe(400);
+        expect((await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c1', status: 'completed', photo: `data:image/jpeg;base64,${'A'.repeat(700_001)}` })).statusCode).toBe(400);
+        expect(read(`${B}/cleaning/c1`)?.status).toBe('assigned');
+
+        expect((await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c1', status: 'completed', photo })).statusCode).toBe(200);
+        expect(read(`${B}/cleaning/c1`)).toMatchObject({ status: 'completed', completion_has_photo: true });
+        expect(read(`${B}/cleaning_images/c1__done`)?.data).toBe(photo);
+    });
+
+    it('tells the page who may open the meter page', async () => {
+        const token = tokenOf(await issuePortalLink(LINE));
+        expect((await call(portal, { action: 'overview', token })).body).toMatchObject({ can_meter: true, roles: ['technician', 'housekeeping'] });
+        const other = tokenOf(await issuePortalLink(OTHER_LINE));
+        expect((await call(portal, { action: 'overview', token: other })).body).toMatchObject({ can_meter: false, roles: ['technician'] });
     });
 
     it('closes the portal when the person is deactivated or unlinked, and when the link expires', async () => {

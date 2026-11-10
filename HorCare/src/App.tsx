@@ -99,7 +99,21 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 /** Screens that follow the chosen building (ตึก) of the property. */
 const WING_VIEWS: string[] = ['dashboard', 'floorplan', 'parking', 'rooms', 'tenants', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels'];
 
-type ViewMode = 'dashboard' | 'floorplan' | 'rooms' | 'parking' | 'collections' | 'tenants' | 'maintenance' | 'cleaning' | 'operations' | 'recording' | 'summary' | 'archives' | 'payments' | 'parcels' | 'workorders' | 'messages' | 'announcements' | 'market' | 'accounting' | 'ledger' | 'leasing' | 'security' | 'settings' | 'admin' | 'pricing';
+const VIEW_MODES = ['dashboard', 'floorplan', 'rooms', 'parking', 'collections', 'tenants', 'maintenance', 'cleaning', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels', 'workorders', 'messages', 'announcements', 'market', 'accounting', 'ledger', 'leasing', 'security', 'settings', 'admin', 'pricing'] as const;
+type ViewMode = (typeof VIEW_MODES)[number];
+const isViewMode = (v: unknown): v is ViewMode => typeof v === 'string' && (VIEW_MODES as readonly string[]).includes(v);
+const OPS_TABS: OpsTab[] = ['maintenance', 'workorders', 'cleaning', 'team', 'vendors', 'stock', 'assets', 'expenses', 'fines', 'common_fees'];
+
+/**
+ * A link straight to one screen — /?view=recording, /?view=operations&tab=team — as the team LINE OA sends to admins and
+ * housekeepers. Read once at load; the screen still goes through the same sign-in, role and plan checks as the menu.
+ */
+const DEEP_LINK = (() => {
+  const p = new URLSearchParams(window.location.search);
+  const view = p.get('view');
+  const tab = p.get('tab') as OpsTab | null;
+  return { view: isViewMode(view) ? view : null, tab: tab && OPS_TABS.includes(tab) ? tab : null };
+})();
 
 function App() {
   const [minSplashDone, setMinSplashDone] = useState(false);
@@ -110,8 +124,34 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
-  const [opsTab, setOpsTab] = useState<OpsTab>('maintenance');
+  const [currentView, setCurrentView] = useState<ViewMode>(DEEP_LINK.view ?? 'dashboard');
+  const [opsTab, setOpsTab] = useState<OpsTab>(DEEP_LINK.tab ?? 'maintenance');
+
+  // The phone's (and the browser's) back button moves between screens instead of leaving the app, and the header's
+  // back button does the same. Each screen change is one history entry; `navDepth` is how far back there is to go.
+  const [navDepth, setNavDepth] = useState(0);
+  useEffect(() => {
+    const st = window.history.state as { hcView?: string; hcDepth?: number } | null;
+    if (st?.hcView === currentView) return;
+    if (!st?.hcView) {
+      // first screen: also drop ?view=… from the address, so a reload opens the app normally
+      window.history.replaceState({ hcView: currentView, hcDepth: 0 }, '', DEEP_LINK.view ? window.location.pathname : undefined);
+      return;
+    }
+    const depth = (st.hcDepth ?? 0) + 1;
+    window.history.pushState({ hcView: currentView, hcDepth: depth }, '');
+    setNavDepth(depth); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [currentView]);
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const st = e.state as { hcView?: string; hcDepth?: number } | null;
+      if (!isViewMode(st?.hcView)) return;
+      setCurrentView(st.hcView);
+      setNavDepth(st.hcDepth ?? 0);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   // ตึกย่อยที่เลือกดู ต่อหอ (property id → building_name); empty = every building
   const [wingChoice, setWingChoice] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem('horcare_wing_v1') || '{}'); } catch { return {}; }
@@ -875,6 +915,10 @@ function App() {
 
   // Plan tier checks
   const hasPaidSubscription = planProfile ? isPaidLicense(planProfile.license) : false;
+  // A screen opened by a link gets the same plan check the menu applies (corrected while rendering, like the guards above).
+  if (!maidSession && planProfile && !hasPaidSubscription && currentView === DEEP_LINK.view && START_ONLY_VIEWS.includes(currentView)) {
+    setCurrentView('dashboard');
+  }
   const maxBuildings = planProfile ? getMaxBuildings(planProfile.license) : 1;
   const canAddBuilding = maxBuildings > 1 && !isStaff; // only the owner creates buildings
   const lineEnabled = planProfile?.license ? canSendLine(planProfile.license) : true;
@@ -962,7 +1006,13 @@ function App() {
           )}
         </button>
         <span className="mobile-header-brand"><img src={horcareLogo} alt="" />HorCare</span>
-        <div style={{ width: 44 }}></div>
+        {navDepth > 0 ? (
+          <button type="button" className="mobile-back-btn" onClick={() => window.history.back()} aria-label="ย้อนกลับ">
+            <ChevronLeft size={20} strokeWidth={2.4} aria-hidden /> กลับ
+          </button>
+        ) : (
+          <div style={{ width: 44 }}></div>
+        )}
       </div>
 
       {/* Sidebar */}

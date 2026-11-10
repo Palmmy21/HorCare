@@ -141,7 +141,7 @@ describe('approval', () => {
         expect(pushed[0].to).toBe(LINE_A);
         expect(pushed[0].messages[0].text).toContain('อนุมัติแล้ว');
         expect(await pending()).toEqual([]);
-        expect(await say(LINE_A, 'สวัสดี')).toContain('ลงทะเบียนเรียบร้อย');
+        expect(await say(LINE_A, 'สวัสดี')).toContain('งานของฉัน');
         expect((await call('desk', { action: 'approve', registration_id: p.id })).body.error).toBe('already_decided');
         expect(listPaths(`users/${OWNER}/audit_logs/`).length).toBeGreaterThan(0);
     });

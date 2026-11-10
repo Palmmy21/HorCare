@@ -2291,6 +2291,26 @@ textarea,
     height: 22px;
   }
 
+  /* back to the previous screen; same as the phone's own back button */
+  .mobile-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 44px;
+    height: 40px;
+    padding: 0 var(--space-2) 0 var(--space-1);
+    margin-right: calc(-1 * var(--space-2));
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mobile-back-btn:active { background: rgba(255, 255, 255, 0.16); }
+
   .mobile-menu-btn:active {
     background: rgba(255, 255, 255, 0.1);
   }
@@ -3429,6 +3449,41 @@ textarea,
 .sp-urgent { color: #DC2626; font-weight: 700; }
 .sp-job-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 .sp-job-actions .btn { flex: 1; min-height: 48px; justify-content: center; font-weight: 600; }
+.sp-tile {
+  display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: 88px;
+  padding: var(--space-4); border: 1px solid var(--color-gray-200); border-radius: var(--radius-xl);
+  background: var(--color-white); color: var(--color-gray-900); font: inherit; text-align: left; cursor: pointer;
+}
+.sp-tile > svg:first-child { flex-shrink: 0; color: var(--color-primary); }
+.sp-tile-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.sp-tile-text strong { font-size: 1.1875rem; font-weight: 700; }
+.sp-tile-text span { font-size: 0.875rem; color: var(--color-gray-500); line-height: 1.4; }
+.sp-tile-go { flex-shrink: 0; color: var(--color-gray-400); }
+.sp-tile:active { background: var(--color-gray-50); }
+.sp-tile:disabled { opacity: 0.6; }
+.sp-job-photo { width: 100%; max-height: 200px; object-fit: cover; border-radius: var(--radius-lg); margin-top: var(--space-2); }
+.sp-photo-btn { min-height: 48px; justify-content: center; font-weight: 600; margin-top: var(--space-2); cursor: pointer; }
+.sg-main { gap: var(--space-4); }
+.sg-title { font-size: 1.25rem; font-weight: 700; color: var(--color-gray-900); margin-bottom: var(--space-3); }
+.sg-sub { display: flex; align-items: center; gap: 0.375rem; font-size: 1rem; font-weight: 700; color: var(--color-primary); margin: var(--space-4) 0 var(--space-2); }
+.sg-steps { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.sg-steps li { display: flex; align-items: center; gap: var(--space-3); }
+.sg-num {
+  flex-shrink: 0; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--color-primary); color: var(--color-white); font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums;
+}
+.sg-icon { flex-shrink: 0; display: flex; color: var(--color-gray-500); }
+.sg-text { font-size: 1.0625rem; line-height: 1.5; color: var(--color-gray-800); }
+.sg-note { margin-top: var(--space-3); font-size: 0.9375rem; line-height: 1.6; color: var(--color-gray-600); }
+.sg-cta { display: flex; justify-content: center; min-height: 52px; margin-top: var(--space-4); font-size: 1rem; font-weight: 700; }
+.sg-safe { display: flex; gap: var(--space-3); align-items: flex-start; }
+.sg-safe svg { flex-shrink: 0; color: var(--color-success); margin-top: 2px; }
+.sg-safe strong { display: block; font-size: 1rem; color: var(--color-gray-900); margin-bottom: 0.25rem; }
+.sg-safe p { font-size: 0.9375rem; line-height: 1.6; color: var(--color-gray-600); }
+.sp-choose-title { font-weight: 700; margin-bottom: var(--space-2); color: var(--color-gray-900); }
+.sp-choose { display: flex; flex-direction: column; gap: var(--space-2); }
+.sp-choose .btn { min-height: 52px; justify-content: center; font-size: 1rem; }
+.sp-alert { display: flex; align-items: center; gap: var(--space-2); color: #9A3412; background: rgba(245, 158, 46, 0.14); border-color: transparent; }
 .sp-empty, .sp-gone { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); text-align: center; color: var(--color-gray-600); }
 .sp-empty svg { color: var(--color-success); }
 .sp-gone { max-width: 420px; }

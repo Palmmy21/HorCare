@@ -1,5 +1,5 @@
 // Staff portal (technicians & housekeepers): what the portal shows, shared by /api/staff-portal and the page.
-import type { Priority, WorkStatus, WorkType } from './workOrders.js';
+import type { Priority, StaffRole, WorkStatus, WorkType } from './workOrders.js';
 
 /** Work-order statuses still in the staff member's hands (completed = waiting for the manager's check). */
 export const OPEN_WORK: WorkStatus[] = ['assigned', 'accepted', 'in_progress', 'completed'];
@@ -40,6 +40,10 @@ export interface PortalCleaningJob {
 
 export interface PortalOverview {
     name: string;
+    /** the jobs this person holds across their properties */
+    roles: StaffRole[];
+    /** a housekeeper with a phone number on file: may open the meter page */
+    can_meter: boolean;
     /** how many staff records (properties) this LINE account is linked to */
     properties: number;
     work: PortalWorkJob[];

@@ -20,6 +20,31 @@ const MAID_SAVE_ERRORS: Record<string, string> = {
   forbidden: 'บัญชีนี้ไม่มีสิทธิ์จัดการแม่บ้านของอาคารนี้',
 };
 
+/** The "after" photo a housekeeper sent with the finished job (loaded on demand). */
+function DonePhoto({ uid, buildingId, reqId }: { uid: string; buildingId: string; reqId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [state, setState] = useState<'closed' | 'loading' | 'open' | 'missing'>('closed');
+  const toggle = async () => {
+    if (state === 'open') { setState('closed'); return; }
+    if (src) { setState('open'); return; }
+    setState('loading');
+    try {
+      const snap = await getDoc(doc(db, `users/${uid}/buildings/${buildingId}/cleaning_images`, `${reqId}__done`));
+      if (snap.exists()) { setSrc(snap.data().data as string); setState('open'); } else setState('missing');
+    } catch { setState('missing'); }
+  };
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <button type="button" className="btn btn-outline btn-sm" onClick={() => void toggle()} disabled={state === 'loading'}>
+        {state === 'loading' ? 'กำลังโหลด...' : state === 'open' ? 'ซ่อนรูปหลังทำ' : state === 'missing' ? 'เปิดรูปไม่ได้' : 'ดูรูปหลังทำ'}
+      </button>
+      {state === 'open' && src && (
+        <img src={src} alt="รูปหลังทำความสะอาด" style={{ display: 'block', marginTop: '0.5rem', width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #DCE5EF' }} />
+      )}
+    </div>
+  );
+}
+
 // ── Lazy Photo Component ───────────────────────────────────────────────────────
 function CleaningPhoto({ uid, buildingId, req }: { uid: string; buildingId: string; req: CleaningRequest }) {
   const [src, setSrc] = useState<string | null>(req.image_url || req.photo_url || null);
@@ -598,6 +623,7 @@ export default function CleaningPage({ uid, buildingId, embedded = false }: Prop
                           <strong>บันทึกปิดงาน:</strong> {req.completed_note || req.completion_notes}
                         </div>
                       )}
+                      {req.completion_has_photo && <DonePhoto uid={uid} buildingId={buildingId} reqId={req.id} />}
                     </div>
 
                     {/* Card Footer: Timestamps & Action Buttons */}

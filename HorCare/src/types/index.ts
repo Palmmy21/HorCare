@@ -651,6 +651,8 @@ export interface CleaningRequest {
   completion_notes?: string;
   completed_note?: string;
   completion_photo_url?: string | null;
+  /** The housekeeper sent an "after" photo from the LINE portal; it is in cleaning_images/{id}__done. */
+  completion_has_photo?: boolean;
   fee?: number;
   created_at: string;
   updated_at?: string;
