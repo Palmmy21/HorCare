@@ -80,6 +80,54 @@ export function upcomingClosures(list: ShopClosure[], today: string): ShopClosur
   return list.filter(c => c.status === 'active' && c.to_date >= today).sort((a, b) => a.from_date.localeCompare(b.from_date) || a.room_number.localeCompare(b.room_number, 'th', { numeric: true }));
 }
 
+// ── The market itself closes (power cut, flood, an event) ───────────────────
+
+export const MARKET_CLOSURE_REASONS = ['power', 'water', 'flood', 'storm', 'event', 'maintenance', 'other'] as const;
+export type MarketClosureReason = (typeof MARKET_CLOSURE_REASONS)[number];
+export const MARKET_CLOSURE_REASON_LABELS_TH: Record<MarketClosureReason, string> = {
+  power: 'ไฟดับ', water: 'น้ำไม่ไหล', flood: 'น้ำท่วม', storm: 'พายุ / ฝนตกหนัก', event: 'มีงาน / กิจกรรมพิเศษ', maintenance: 'ปรับปรุงพื้นที่', other: 'อื่นๆ',
+};
+/** A closure can be recorded after the fact (the power cut was yesterday), up to this many days back. */
+export const MARKET_CLOSURE_MAX_DAYS_BACK = 120;
+
+export interface MarketClosure {
+  id: string;
+  from_date: string;
+  to_date: string;
+  /** null = the whole market. */
+  zones: string[] | null;
+  reason: MarketClosureReason;
+  note: string | null;
+  /** Monthly-rent stalls get the days off their rent (pro rata). Daily / weekly stalls never pay for days the market was shut. */
+  waive_rent: boolean;
+  status: 'active' | 'cancelled';
+  created_at: string;
+  created_by: string;
+}
+
+export interface MarketClosureInput { from_date: string; to_date: string; zones: string[] | null; reason: MarketClosureReason; note: string | null; waive_rent: boolean }
+
+export function cleanMarketClosureInput(raw: Record<string, unknown>, now: Date = new Date()): MarketClosureInput | null {
+  if (!isValidDate(raw.from_date) || !isValidDate(raw.to_date)) return null;
+  if (raw.to_date < raw.from_date || daysBetween(raw.from_date, raw.to_date) + 1 > MAX_CLOSURE_DAYS) return null;
+  if (raw.from_date < addDays(todayTh(now), -MARKET_CLOSURE_MAX_DAYS_BACK)) return null;
+  if (typeof raw.reason !== 'string' || !(MARKET_CLOSURE_REASONS as readonly string[]).includes(raw.reason)) return null;
+  let zones: string[] | null = null;
+  if (raw.zones !== undefined && raw.zones !== null) {
+    if (!Array.isArray(raw.zones) || raw.zones.length > 50) return null;
+    const z = [...new Set(raw.zones.map(v => (typeof v === 'string' ? v.trim() : '')).filter(Boolean))];
+    if (z.length !== raw.zones.length || z.some(v => v.length > 60)) return null;
+    zones = z.length > 0 ? z : null;
+  }
+  let note: string | null = null;
+  if (raw.note !== undefined && raw.note !== null && raw.note !== '') {
+    if (typeof raw.note !== 'string' || raw.note.trim().length > 300) return null;
+    note = raw.note.trim() || null;
+  }
+  if (raw.waive_rent !== undefined && typeof raw.waive_rent !== 'boolean') return null;
+  return { from_date: raw.from_date, to_date: raw.to_date, zones, reason: raw.reason as MarketClosureReason, note, waive_rent: raw.waive_rent === true };
+}
+
 // ── Walk-in vendors ─────────────────────────────────────────────────────────
 
 export type WalkInStatus = 'pending' | 'approved' | 'rejected';

@@ -4,6 +4,7 @@ import type { Room, DormConfig } from '../../types';
 import { getWorkspaceTerms } from '../../utils/workspaceTerminology';
 import { DonutChart, RateChart } from '../Accounting/charts';
 import type { Occupancy, RoomStatus } from '../../shared/roomOccupancy';
+import { occupancyRateLabel } from '../../shared/planLayers';
 
 export type { RoomStatus };
 
@@ -103,7 +104,7 @@ export default function RoomStatusDashboard({
       >
         <span className="room-map-title">
           {terms.isMarket ? `ผังสถานะ${terms.unitNamePlural}` : `สถานะ${terms.unitNamePlural}`}
-          <span className="room-map-occ">มีผู้เช่า {occupancyPct}%</span>
+          <span className="room-map-occ">{terms.occupiedUnitLabel} {occupancyPct}%</span>
         </span>
         <span className="room-map-counts">
           {ORDER.map(s => (
@@ -125,7 +126,7 @@ export default function RoomStatusDashboard({
               <DonutChart
                 items={ORDER.map(s => ({ key: s, label: labelOf(s), value: counts[s], color: STATUS_CONFIG[s].dot }))}
                 title={`สถานะ${terms.unitNamePlural}`}
-                centerLabel="อัตราเข้าพัก"
+                centerLabel={occupancyRateLabel(terms.unitName)}
                 centerValue={`${occupancyPct}%`}
                 format={n => `${n} ${terms.unitName}`}
                 size={152}
@@ -133,9 +134,9 @@ export default function RoomStatusDashboard({
             </div>
             {history && (
               <div className="room-map-chart">
-                <h3 className="room-map-chart-title">อัตราการเข้าพัก {history.labels.length} เดือน</h3>
+                <h3 className="room-map-chart-title">{occupancyRateLabel(terms.unitName).replace('อัตราเข้าพัก', 'อัตราการเข้าพัก')} {history.labels.length} เดือน</h3>
                 {showTrend
-                  ? <RateChart labels={history.labels} values={rateValues!} color="var(--series-1)" title="อัตราการเข้าพัก" />
+                  ? <RateChart labels={history.labels} values={rateValues!} color="var(--series-1)" title={occupancyRateLabel(terms.unitName)} />
                   : <p className="room-map-chart-empty">ยังไม่มีบิลย้อนหลังพอจะแสดงแนวโน้ม · กราฟจะขึ้นเมื่อบันทึกบิลเดือนก่อน ๆ แล้ว</p>}
               </div>
             )}
@@ -155,7 +156,7 @@ export default function RoomStatusDashboard({
                     type="button"
                     onClick={() => onOpenRoom?.(room)}
                     disabled={!onOpenRoom}
-                    title={`${label}${onOpenRoom ? ' · แตะเพื่อเปิดข้อมูลผู้เช่า' : ''}`}
+                    title={`${label}${onOpenRoom ? ` · แตะเพื่อเปิดข้อมูล${terms.tenantLabel}` : ''}`}
                     aria-label={label}
                     className={`room-status-tile ${status}`}
                   >
@@ -177,9 +178,9 @@ export default function RoomStatusDashboard({
             </div>
           )}
           <p className="room-map-hint">
-            สถานะคิดจากสัญญาเช่าและข้อมูลผู้เช่า
+            สถานะคิดจากสัญญาเช่าและข้อมูล{terms.tenantLabel}
             {showTrend && <> · อัตราเดือนก่อน ๆ คิดจาก{terms.unitName}ที่ออกบิลค่าเช่า</>}
-            {onOpenRoom && <> · แตะเลข{terms.unitName}เพื่อเปิดข้อมูลผู้เช่า</>}
+            {onOpenRoom && <> · แตะเลข{terms.unitName}เพื่อเปิดข้อมูล{terms.tenantLabel}</>}
             {onOpenPlan && <> · <button type="button" className="link-btn room-map-plan-link" onClick={onOpenPlan}>เปิดผังเต็ม</button></>}
             {overridden > 0 && <> · <PenLine size={11} aria-hidden /> ปรับเอง {overridden} {terms.unitName}</>}
             {needsLook > 0 && <> · <AlertCircle size={11} aria-hidden /> ควรตรวจสัญญา {needsLook} {terms.unitName}</>}

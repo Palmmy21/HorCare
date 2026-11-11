@@ -20,7 +20,7 @@ export const VIEW_PERMISSIONS: Record<string, Permission[] | null | 'owner'> = {
   ledger: ['ledger.read'],
   accounting: ['accounting.export'],
   leasing: ['leasing.read'],
-  market: ['shop.read', 'visitor.read'],
+  market: ['shop.read', 'visitor.read', 'finance.read'],
   parcels: ['parcel.read'],
   workorders: ['work_order.read'],
   messages: ['message.read'],

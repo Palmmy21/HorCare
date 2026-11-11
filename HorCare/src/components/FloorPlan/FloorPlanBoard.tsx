@@ -91,7 +91,7 @@ export default function FloorPlanBoard({ plan, units, marks, tenantGroups, group
                   const key = `${g.id}:${c.col}:${c.row}`;
                   const group = tenantGroups[c.room_id];
                   const isSel = selected.includes(c.room_id);
-                  const label = u ? `${u.number}${u.sub ? ` ${u.sub}` : ''} · ${m?.label ?? ''}${group ? ` · ผู้เช่าเดียวกัน ${group.length} ยูนิต` : ''}` : 'กำลังสร้าง';
+                  const label = u ? `${u.number}${u.sub ? ` ${u.sub}` : ''} · ${m?.label ?? ''}${group ? ` · รวมกลุ่มเดียวกัน ${group.length} ${unitLabel}` : ''}` : 'กำลังสร้าง';
                   return (
                     <button key={c.room_id} type="button"
                       className={`plan-unit tone-${m?.tone ?? 'base'}${isSel ? ' selected' : ''}${highlight.has(c.room_id) ? ' linked' : ''}${dropAt === key ? ' over' : ''}`}

@@ -34,3 +34,15 @@ describe('legendOf', () => {
     ]);
   });
 });
+
+describe('layer names follow the property', () => {
+    it('a dorm keeps "การเข้าพัก"; a market and a shophouse are rented', async () => {
+        const { layerLabel, occupancyRateLabel } = await import('./planLayers');
+        expect(layerLabel('occupancy', 'ห้อง')).toBe('การเข้าพัก');
+        expect(layerLabel('occupancy', 'แผง')).toBe('การเช่าแผง');
+        expect(layerLabel('occupancy', 'คูหา')).toBe('การเช่าคูหา');
+        expect(layerLabel('payment', 'แผง')).toBe('การจ่ายเงิน');
+        expect(occupancyRateLabel('ห้อง')).toBe('อัตราเข้าพัก');
+        expect(occupancyRateLabel('แผง')).toBe('อัตราการเช่าแผง');
+    });
+});

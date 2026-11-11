@@ -560,7 +560,7 @@ function App() {
     { id: 'summary'     as ViewMode, icon: Send,            label: 'ออกบิล & ส่งบิล' },
     { id: 'archives'    as ViewMode, icon: Archive,         label: 'คลังเอกสาร' },
     { id: 'parcels'     as ViewMode, icon: Package,         label: 'พัสดุ' },
-    ...(terms.isMarket ? [{ id: 'market' as ViewMode, icon: Store, label: 'ร้านค้า & ขาจร' }] : []),
+    ...(terms.isMarket ? [{ id: 'market' as ViewMode, icon: Store, label: 'ตลาด & ตรวจยอด' }] : []),
     { id: 'messages'    as ViewMode, icon: MessageSquare,   label: 'ข้อความ LINE' },
     { id: 'announcements' as ViewMode, icon: Megaphone, label: 'ประกาศ & ตอบอัตโนมัติ' },
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
@@ -1918,7 +1918,7 @@ function App() {
         )}
 
         {currentView === 'market' && user && activeBuildingId && !maidSession && terms.isMarket && (
-          <MarketPage ownerUid={orgUid} buildingId={activeBuildingId} />
+          <MarketPage ownerUid={orgUid} buildingId={activeBuildingId} permissions={staffPermissions} dormName={config?.bill_customization?.dorm_name} />
         )}
 
         {currentView === 'announcements' && user && activeBuildingId && !maidSession && (

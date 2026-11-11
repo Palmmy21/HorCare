@@ -10,7 +10,7 @@ import {
   addGap, addGroup, autoPlan, planForWing, linkUnits, moveGroup, moveUnit, placeUnit, planKindOf, PLAN_LABELS, reconcile, removeGap,
   removeGroup, renameGroup, resizeUnit, setCols, unlinkUnit, MAX_COLS, MAX_SPAN, MIN_COLS, daysUntil, type FloorPlan,
 } from '../../shared/floorPlan';
-import { LAYER_LABELS, legendOf, type PlanLayer, type UnitMark } from '../../shared/planLayers';
+import { layerLabel, legendOf, type PlanLayer, type UnitMark } from '../../shared/planLayers';
 import type { RoundStatus } from '../../shared/collections';
 import { todayTh } from '../../shared/market';
 import { useFloorPlan } from '../../hooks/useFloorPlan';
@@ -241,7 +241,7 @@ export default function FloorPlanPage(props: Props) {
 
       {editing ? (
         <div className="plan-editbar" role="region" aria-label="แก้ไขผัง">
-          <p>ลาก{unitName}เพื่อย้ายหรือสลับ · กด <Plus size={13} aria-hidden /> ที่ช่องว่างเพื่อเพิ่ม{unitName}หรือเว้นช่อง · กด{unitName}แล้วปรับขนาดหรือพื้นที่ได้ทางขวา · Shift+คลิกเลือกหลาย{unitName}เพื่อรวมผู้เช่า</p>
+          <p>ลาก{unitName}เพื่อย้ายหรือสลับ · กด <Plus size={13} aria-hidden /> ที่ช่องว่างเพื่อเพิ่ม{unitName}หรือเว้นช่อง · กด{unitName}แล้วปรับขนาดหรือพื้นที่ได้ทางขวา · Shift+คลิกเลือกหลาย{unitName}เพื่อรวม{terms.tenantLabel}</p>
           <div className="plan-editbar-actions">
             <form onSubmit={e => { e.preventDefault(); apply(addGroup(plan, newGroup), `ชื่อ${L.group}ซ้ำหรือว่าง`); setNewGroup(''); }} className="plan-inline-form">
               <input className="form-input" value={newGroup} onChange={e => setNewGroup(e.target.value)} placeholder={`${L.group}ใหม่ เช่น ${kind === 'floors' ? 'ชั้น 5' : kind === 'zones' ? 'โซน F' : 'ซอย 3'}`} aria-label={`ชื่อ${L.group}ใหม่`} />
@@ -269,7 +269,7 @@ export default function FloorPlanPage(props: Props) {
           <div className="seg" role="tablist" aria-label="เลเยอร์">
             {layers.map(l => (
               <button key={l} type="button" role="tab" aria-selected={layer === l} className={`seg-item${layer === l ? ' active' : ''}`} onClick={() => setLayer(l)}>
-                {l === 'payment' ? `${LAYER_LABELS[l]} · ${formatMonthThai(currentMonth)}` : LAYER_LABELS[l]}
+                {l === 'payment' ? `${layerLabel(l, unitName)} · ${formatMonthThai(currentMonth)}` : layerLabel(l, unitName)}
               </button>
             ))}
           </div>
@@ -315,8 +315,8 @@ export default function FloorPlanPage(props: Props) {
               <div className="plan-panel-sec">
                 <p className="plan-panel-note">{selected.map(id => roomsById.get(id)?.room_number).join(', ')}</p>
                 {editing
-                  ? <button type="button" className="btn btn-primary btn-sm" onClick={() => { apply(linkUnits(plan, selected), 'เลือกอย่างน้อย 2 ยูนิต'); toast.success('รวมเป็นผู้เช่าเดียวกันแล้ว (กดบันทึกผัง)'); }}><Link2 size={14} /> รวมเป็นผู้เช่าเดียวกัน</button>
-                  : <p className="plan-panel-note">กด "แก้ไขผัง" เพื่อรวม{unitName}เหล่านี้เป็นผู้เช่าเดียวกัน</p>}
+                  ? <button type="button" className="btn btn-primary btn-sm" onClick={() => { apply(linkUnits(plan, selected), 'เลือกอย่างน้อย 2 ยูนิต'); toast.success(`รวมเป็น${terms.tenantLabel}เดียวกันแล้ว (กดบันทึกผัง)`); }}><Link2 size={14} /> รวมเป็น{terms.tenantLabel}เดียวกัน</button>
+                  : <p className="plan-panel-note">กด "แก้ไขผัง" เพื่อรวม{unitName}เหล่านี้เป็น{terms.tenantLabel}เดียวกัน</p>}
               </div>
             )}
 
@@ -324,7 +324,7 @@ export default function FloorPlanPage(props: Props) {
               <>
                 <dl className="plan-facts">
                   <div><dt>สถานะ</dt><dd>{occLabel(occ?.status)}{occ && <small>{occ.override ? `ปรับเอง: ${occ.override.reason}` : occ.detail}</small>}</dd></div>
-                  {layer !== 'occupancy' && <div><dt>{LAYER_LABELS[layer]}</dt><dd>{markText(view.marks[focus.id])}</dd></div>}
+                  {layer !== 'occupancy' && <div><dt>{layerLabel(layer, unitName)}</dt><dd>{markText(view.marks[focus.id])}</dd></div>}
                   <div><dt>{terms.tenantLabel}</dt><dd>{focusTerms?.tenant ?? '—'}</dd></div>
                   {focusGroup && <div><dt>เช่ารวม</dt><dd>{focusGroup.map(id => roomsById.get(id)?.room_number).filter(Boolean).join(', ')}</dd></div>}
                   <div><dt>สัญญาถึง</dt><dd>{focusTerms?.end ? <>{thDate(focusTerms.end)} <small>{daysUntil(focusTerms.end, todayTh()) < 0 ? 'หมดแล้ว' : `อีก ${daysUntil(focusTerms.end, todayTh())} วัน`}</small></> : '—'}</dd></div>
@@ -372,7 +372,7 @@ export default function FloorPlanPage(props: Props) {
                       </form>
                     )}
                     {focusGroup && (
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setDraft(unlinkUnit(plan, focus.id))}><Unlink size={14} /> แยกออกจากกลุ่มผู้เช่า</button>
+                      <button type="button" className="btn btn-outline btn-sm" onClick={() => setDraft(unlinkUnit(plan, focus.id))}><Unlink size={14} /> แยกออกจากกลุ่ม{terms.tenantLabel}</button>
                     )}
                     {canDelete && (confirmDelete ? (
                       <div className="plan-confirm danger">

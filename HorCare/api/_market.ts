@@ -7,6 +7,8 @@
  *   closure_submit | closure_cancel | closure_list | walkin_submit
  * Staff (signed in, property-checked):
  *   closure_ack / closure_add – shop.update     walkin_decide / walkin_add – visitor.create
+ *   market_closure_add / market_closure_cancel – shop.update   market_closure_list – shop.read
+ *     (the whole market, or some zones, shut for a day: power cut, flood … — the revenue audit excuses those days)
  * Reading the lists is straight from Firestore under rules needing shop.read / visitor.read.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -19,14 +21,16 @@ import { honeypotTripped, rateLimit, verifyCaptcha } from './_abuse-guard.js';
 import { resolvePortalLink } from './_portal-link.js';
 import {
     CLOSURE_REASON_LABELS_TH, MAX_ACTIVE_CLOSURES_PER_ROOM, WALKIN_MAX_PER_DAY,
-    cleanClosureInput, cleanWalkInInput, todayTh, upcomingClosures,
-    type ShopClosure, type WalkIn,
+    MARKET_CLOSURE_REASON_LABELS_TH, cleanClosureInput, cleanMarketClosureInput, cleanWalkInInput, todayTh, upcomingClosures,
+    type MarketClosure, type ShopClosure, type WalkIn,
 } from '../src/shared/market.js';
 
 export const config = { maxDuration: 15 };
 
 interface Body {
-    action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'closure_add' | 'walkin_submit' | 'walkin_add' | 'walkin_decide';
+    action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'closure_add' | 'walkin_submit' | 'walkin_add' | 'walkin_decide'
+        | 'market_closure_add' | 'market_closure_cancel' | 'market_closure_list';
+    zones?: unknown; waive_rent?: unknown; market_closure_id?: unknown;
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -48,7 +52,10 @@ const PUBLIC = new Set(['closure_submit', 'closure_cancel', 'closure_list', 'wal
 const PUBLIC_LIMITS: Record<string, number> = { closure_submit: 10, walkin_submit: 5, closure_cancel: 30, closure_list: 120 };
 const WRITES = new Set(['closure_submit', 'walkin_submit']);
 
-const STAFF_PERM = { closure_ack: 'shop.update', closure_add: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create' } as const;
+const STAFF_PERM = {
+    closure_ack: 'shop.update', closure_add: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create',
+    market_closure_add: 'shop.update', market_closure_cancel: 'shop.update', market_closure_list: 'shop.read',
+} as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -93,10 +100,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const base = `users/${owner}/buildings/${buildingId}`;
     const now = new Date();
     const nowIso = now.toISOString();
-    const audit = (act: 'CREATE' | 'UPDATE', type: 'shop_closure' | 'walkin', id: string, label: string, extra: object = {}) => staff && writeAudit({
+    const audit = (act: 'CREATE' | 'UPDATE', type: 'shop_closure' | 'walkin' | 'market_closure', id: string, label: string, extra: object = {}) => staff && writeAudit({
         ownerUid: owner, propertyId: buildingId, userId: staff.uid, userName: staff.displayName, role: staff.role,
         action: act, resourceType: type, resourceId: id, resourceLabel: label, req, ...extra,
     });
+
+    // ── the whole market (or some zones) shut ───────────────────────────────
+    if (action === 'market_closure_add' || action === 'market_closure_cancel' || action === 'market_closure_list') {
+        const mcol = `${base}/market_closures`;
+        if (action === 'market_closure_list') {
+            const list = (await db.collection(mcol).get()).docs.map(d => d.data() as MarketClosure)
+                .filter(c => c.status === 'active').sort((a, b) => b.from_date.localeCompare(a.from_date));
+            res.status(200).json({ closures: list.slice(0, 200) });
+            return;
+        }
+        if (action === 'market_closure_cancel') {
+            if (typeof body.market_closure_id !== 'string' || !body.market_closure_id) { res.status(400).json({ error: 'invalid_input' }); return; }
+            const ref = db.doc(`${mcol}/${body.market_closure_id}`);
+            const snap = await ref.get();
+            if (!snap.exists) { res.status(404).json({ error: 'not_found' }); return; }
+            const c = snap.data() as MarketClosure;
+            await ref.update({ status: 'cancelled' });
+            await audit('UPDATE', 'market_closure', c.id, `ตลาดหยุด ${c.from_date} – ${c.to_date}`, { note: 'cancelled' });
+            res.status(200).json({ ok: true });
+            return;
+        }
+        const input = cleanMarketClosureInput(body as Record<string, unknown>, now);
+        if (!input) { res.status(400).json({ error: 'invalid_input' }); return; }
+        const closure: MarketClosure = { id: randomUUID(), ...input, status: 'active', created_at: nowIso, created_by: staff!.displayName };
+        await db.doc(`${mcol}/${closure.id}`).set(closure);
+        await audit('CREATE', 'market_closure', closure.id, `ตลาดหยุด ${input.from_date} – ${input.to_date} (${MARKET_CLOSURE_REASON_LABELS_TH[input.reason]})`);
+        res.status(200).json({ closure });
+        return;
+    }
 
     // ── stall closures ──────────────────────────────────────────────────────
     // closure_add: staff records a closure on a stall's behalf (already acknowledged)

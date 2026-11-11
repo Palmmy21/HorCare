@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Store, Footprints, Check, X, Loader2, Copy, Plus, BellOff } from 'lucide-react';
+import { Store, Footprints, Check, X, Loader2, Copy, Plus, BellOff, ShieldCheck, CloudRain } from 'lucide-react';
+import RevenueAudit from './RevenueAudit';
+import MarketClosures from './MarketClosures';
+import type { Permission } from '../../shared/permissions';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { useShopClosures, useWalkIns } from '../../hooks/useMarketData';
@@ -188,16 +191,39 @@ function WalkInsTab({ ownerUid, buildingId }: Props) {
     );
 }
 
-export default function MarketPage({ ownerUid, buildingId }: Props) {
-    const [tab, setTab] = useState<'closures' | 'walkins'>('closures');
+type MarketTab = 'audit' | 'closures' | 'market_closures' | 'walkins';
+
+/**
+ * ตลาด: the revenue audit (ตรวจยอดรายได้), stalls' own closure notices, days the market itself shut, and walk-ins.
+ * Each tab shows only for those who may use it (`permissions` null = the owner); the server checks again.
+ */
+export default function MarketPage({ ownerUid, buildingId, permissions = null, dormName }: Props & { permissions?: readonly Permission[] | null; dormName?: string }) {
+    const can = (p: Permission) => permissions === null || permissions.includes(p);
+    const tabs: { id: MarketTab; label: string; Icon: typeof Store; show: boolean }[] = [
+        { id: 'audit', label: 'ตรวจยอดรายได้', Icon: ShieldCheck, show: can('finance.read') },
+        { id: 'closures', label: 'ผู้ค้าแจ้งหยุด', Icon: Store, show: can('shop.read') },
+        { id: 'market_closures', label: 'ตลาดหยุด', Icon: CloudRain, show: can('shop.read') },
+        { id: 'walkins', label: 'ขาจร', Icon: Footprints, show: can('visitor.read') },
+    ];
+    const open = tabs.filter(t => t.show);
+    const [tab, setTab] = useState<MarketTab>(open[0]?.id ?? 'closures');
+    const current = open.some(t => t.id === tab) ? tab : open[0]?.id;
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h1 style={{ margin: 0, fontSize: '1.4rem' }}>ร้านค้า & ขาจร</h1>
-            <div style={{ display: 'flex', gap: 6 }}>
-                <button className={tab === 'closures' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'} onClick={() => setTab('closures')} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Store size={14} /> แจ้งหยุด</button>
-                <button className={tab === 'walkins' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'} onClick={() => setTab('walkins')} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Footprints size={14} /> ขาจร</button>
+            <h1 style={{ margin: 0, fontSize: '1.4rem' }}>ตลาด</h1>
+            <div className="market-tabs" role="tablist" aria-label="เมนูตลาด">
+                {open.map(t => (
+                    <button key={t.id} type="button" role="tab" aria-selected={current === t.id} className={current === t.id ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}
+                        onClick={() => setTab(t.id)} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                        <t.Icon size={14} aria-hidden /> {t.label}
+                    </button>
+                ))}
             </div>
-            {tab === 'closures' ? <ClosuresTab ownerUid={ownerUid} buildingId={buildingId} /> : <WalkInsTab ownerUid={ownerUid} buildingId={buildingId} />}
+            {current === 'audit' && <RevenueAudit ownerUid={ownerUid} buildingId={buildingId} dormName={dormName} />}
+            {current === 'closures' && <ClosuresTab ownerUid={ownerUid} buildingId={buildingId} />}
+            {current === 'market_closures' && <MarketClosures ownerUid={ownerUid} buildingId={buildingId} canEdit={can('shop.update')} />}
+            {current === 'walkins' && <WalkInsTab ownerUid={ownerUid} buildingId={buildingId} />}
+            {open.length === 0 && <p style={{ color: 'var(--color-gray-500)' }}>บัญชีนี้ไม่มีสิทธิ์ใช้งานเมนูตลาด</p>}
         </div>
     );
 }

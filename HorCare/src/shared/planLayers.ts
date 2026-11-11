@@ -24,6 +24,17 @@ export const LAYER_LABELS: Record<PlanLayer, string> = {
   occupancy: 'การเข้าพัก', payment: 'การจ่ายเงิน', contract: 'สัญญา', jobs: 'งานค้าง', today: 'วันนี้',
 };
 
+/** A layer's name in the property's own words: people stay in a room, but a stall or a shophouse is rented. */
+export function layerLabel(layer: PlanLayer, unitName: string): string {
+  if (layer === 'occupancy' && unitName && unitName !== 'ห้อง') return `การเช่า${unitName}`;
+  return LAYER_LABELS[layer];
+}
+
+/** "อัตราเข้าพัก" for rooms; "อัตราการเช่าแผง", "อัตราการเช่าคูหา" … otherwise. */
+export function occupancyRateLabel(unitName: string): string {
+  return unitName && unitName !== 'ห้อง' ? `อัตราการเช่า${unitName}` : 'อัตราเข้าพัก';
+}
+
 export function unitMark(layer: PlanLayer, f: UnitFacts, today: string, labels: { occupied: string; vacant: string; reserved: string }): UnitMark {
   const vacant = f.status === 'vacant';
   switch (layer) {
