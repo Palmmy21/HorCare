@@ -1,3 +1,4 @@
+import { collectionStyleOf, rentOnMeterBill, utilitiesBilledApart } from '../../utils/workspaceTerminology';
 import { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import {
@@ -145,7 +146,7 @@ export default function MeterRecording({
     // move-in or move-out when the property turns that on (Settings → บิล).
     const stays = useTenantStays(config.prorate_rent ? ownerUid : null, buildingId);
     const rentFor = (room: Room): { rent: number; prorate: RentProrate | null } => {
-        const full = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+        const full = rentOnMeterBill(config, room);
         const prorate = config.prorate_rent ? prorateRent(full, currentMonth, stays[room.id]) : null;
         return { rent: proratedAmount(full, prorate), prorate };
     };
@@ -984,6 +985,11 @@ export default function MeterRecording({
                 <div>
                     <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={28} /> จดมิเตอร์</h1>
                     <p className="page-subtitle">กรอกเลขมิเตอร์และกดบันทึกแต่ละห้อง</p>
+                    {utilitiesBilledApart(config) && (
+                        <p className="page-subtitle" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
+                            บิลนี้คิดเฉพาะค่าน้ำ ค่าไฟ และค่าบริการ — ค่าเช่าเก็บแยกที่หน้า "{collectionStyleOf(config) === 'stall' ? 'เก็บเงินแผง' : 'เก็บค่าห้อง'}"
+                        </p>
+                    )}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
                     {(() => {

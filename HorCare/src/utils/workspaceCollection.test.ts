@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  collectionStyleOf, defaultCollectionStyle, defaultRentType, getWorkspaceTerms, rentTypeLabel, rentTypeOptions, rentUnitLabel, BUILDING_TYPE_LABELS,
+  collectionStyleOf, defaultCollectionStyle, rentOnMeterBill, utilitiesBilledApart, defaultRentType, getWorkspaceTerms, rentTypeLabel, rentTypeOptions, rentUnitLabel, BUILDING_TYPE_LABELS,
 } from './workspaceTerminology';
 
 describe('each asset type collects money its own way', () => {
@@ -38,10 +38,18 @@ describe('each asset type collects money its own way', () => {
     expect(rentUnitLabel('monthly', 'dormitory')).toBe('เดือน');
   });
 
-  it('hotels and resorts have no meters; everything else does', () => {
-    expect(getWorkspaceTerms('resort').usesMeters).toBe(false);
-    expect(getWorkspaceTerms('hotel').usesMeters).toBe(false);
-    for (const t of ['dormitory', 'market', 'commercial', 'apartment'] as const) expect(getWorkspaceTerms(t).usesMeters).toBe(true);
+  it('every type can bill water and electricity; rent rides on the meter bill only where rent is billed monthly', () => {
+    for (const t of ['dormitory', 'market', 'commercial', 'apartment', 'resort', 'hotel'] as const) expect(getWorkspaceTerms(t).usesMeters).toBe(true);
+    const room = { rent_type: 'monthly', rent_amount: 3000 };
+    expect(rentOnMeterBill({ building_type: 'dormitory', room_rent: 3500 }, room)).toBe(3000);
+    expect(rentOnMeterBill({ building_type: 'commercial', room_rent: 3500 }, {})).toBe(3500);
+    // market (stall round) and resort / hotel (stays): utilities only, the rent is collected on its own screen
+    expect(rentOnMeterBill({ building_type: 'market', room_rent: 3500 }, room)).toBe(0);
+    expect(rentOnMeterBill({ building_type: 'resort', room_rent: 3500 }, room)).toBe(0);
+    expect(rentOnMeterBill({ building_type: 'market', collection_style: 'monthly', room_rent: 3500 }, room)).toBe(3000);
+    expect(rentOnMeterBill({ building_type: 'dormitory', room_rent: 3500 }, { rent_type: 'daily', rent_amount: 300 })).toBe(0);
+    expect(utilitiesBilledApart({ building_type: 'market' })).toBe(true);
+    expect(utilitiesBilledApart({ building_type: 'office' })).toBe(false);
   });
 
   it('every building type has a name for the branch card', () => {

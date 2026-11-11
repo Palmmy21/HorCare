@@ -223,9 +223,9 @@ export function stallWeekCharge(plan: StallPlan, weekStartDate: string, closedDa
 
 // ── Charges and payments ────────────────────────────────────────────────────
 
-export const CHARGE_KINDS = ['stay', 'stall_week', 'stall_day', 'walk_in', 'extra'] as const;
+export const CHARGE_KINDS = ['stay', 'stall_week', 'stall_day', 'stall_month', 'walk_in', 'extra'] as const;
 export type ChargeKind = (typeof CHARGE_KINDS)[number];
-export const CHARGE_KIND_LABELS_TH: Record<ChargeKind, string> = { stay: 'ค่าห้องพัก', stall_week: 'ค่าแผงรายสัปดาห์', stall_day: 'ค่าแผงรายวัน', walk_in: 'ค่าที่ขาจร', extra: 'ค่าบริการเพิ่มเติม' };
+export const CHARGE_KIND_LABELS_TH: Record<ChargeKind, string> = { stay: 'ค่าห้องพัก', stall_week: 'ค่าแผงรายสัปดาห์', stall_day: 'ค่าแผงรายวัน', stall_month: 'ค่าเช่าแผงรายเดือน', walk_in: 'ค่าที่ขาจร', extra: 'ค่าบริการเพิ่มเติม' };
 
 export interface Charge {
   id: string; kind: ChargeKind; room_id: string | null; room_number: string | null; party_name: string; party_phone: string | null;
@@ -259,18 +259,61 @@ export function cleanPaymentInput(raw: Record<string, unknown>): PaymentInput | 
 
 // ── The collector's round ───────────────────────────────────────────────────
 
-export type RoundStatus = 'due' | 'partial' | 'paid' | 'closed' | 'absent' | 'not_trading';
+export type RoundStatus = 'due' | 'partial' | 'paid' | 'closed' | 'absent' | 'not_trading' | 'vacant' | 'billed';
+/** How a stall pays: a stall plan's mode, or 'monthly' for a monthly-rent stall with no plan. */
+export type RoundMode = CollectionMode | 'monthly';
+
+/** What the round needs to know about a stall. A stall with no plan collects by its own rent (rent_type + rent). */
+export interface RoundStall {
+  id: string; room_number: string; zone?: string | null;
+  rent_type?: string | null;
+  /** The stall's rent per its rent_type, satang. */
+  rent_satang?: number;
+  /** Known to have nobody on it (a contract ended, a move-out): a monthly or weekly stall is shown, but not counted as owed. */
+  vacant?: boolean;
+  /** This month's monthly bill already carries the rent (collected through the bill, not here). */
+  rent_billed?: boolean;
+}
 
 export interface RoundRow {
-  room_id: string; room_number: string; mode: CollectionMode | null;
+  room_id: string; room_number: string; zone: string | null; mode: RoundMode | null;
   /** What this visit would collect (outstanding of the live charge, or today's day rate). */
   expected_satang: number; paid_satang: number; status: RoundStatus; charge: Charge | null;
 }
 
+export const monthOf = (date: string) => date.slice(0, 7);
+export function monthBounds(date: string): { start: string; end: string } {
+  const [y, m] = date.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { start: `${monthOf(date)}-01`, end: `${monthOf(date)}-${String(last).padStart(2, '0')}` };
+}
+export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+export type ImplicitPlan = StallPlan & { implicit: true };
+export interface MonthlyRent { mode: 'monthly'; rate_satang: number; implicit: true }
+
+/**
+ * The plan a stall is collected under: its own stall plan when it has one, otherwise one read off the stall itself, so
+ * a stall is ready to collect the moment it is created — rent per day → paid each day it trades, per week → once a
+ * week in advance, per month (or a term / year) → once a month. Null when the stall has no rent to collect.
+ */
+export function effectivePlan(stall: RoundStall, plans: StallPlan[]): StallPlan | ImplicitPlan | MonthlyRent | null {
+  const plan = plans.find(p => p.room_id === stall.id && p.status === 'active');
+  if (plan) return plan;
+  const rate = stall.rent_satang ?? 0;
+  const base = { id: `implicit:${stall.id}`, room_id: stall.id, room_number: stall.room_number, open_days: ALL_DAYS, starts_on: '2000-01-01', ends_on: null, status: 'active' as const, implicit: true as const };
+  if (stall.rent_type === 'daily') return { ...base, mode: 'daily_actual', unit: 'day', rate_satang: rate > 0 ? rate : null };
+  if (stall.rent_type === 'weekly') return rate > 0 ? { ...base, mode: 'weekly_advance', unit: 'week', rate_satang: rate } : null;
+  return rate > 0 ? { mode: 'monthly', rate_satang: rate, implicit: true } : null;
+}
+
+export const stallMonthKey = (roomId: string, date: string) => `stall-month:${roomId}:${monthOf(date)}`;
+
 /**
  * One line per stall for a given day. A weekly-advance stall shows its week's charge (paid for the whole week after one
- * payment); a daily-actual stall shows today's day rate until the collector marks it. Stalls closed today by their own
- * notice, or not open that weekday, are not asked for money.
+ * payment); a daily-actual stall shows today's day rate until the collector marks it; a monthly stall shows the month's
+ * rent until it is paid. Stalls closed today by their own notice, or not open that weekday, are not asked for money;
+ * nor are monthly / weekly stalls with nobody on them.
  */
 export function buildRound(input: {
   date: string;
@@ -279,32 +322,43 @@ export function buildRound(input: {
   closedToday: Set<string>;
   /** Stalls the collector marked as not having turned up today (daily-actual stalls pay only when they trade). */
   absentToday?: Set<string>;
-  rooms: { id: string; room_number: string }[];
+  rooms: RoundStall[];
   dayRateOf: (roomId: string) => number | null;
   weekRateOf: (roomId: string) => number | null;
 }): RoundRow[] {
   const { date } = input;
   const wk = weekStart(date);
   const rows: RoundRow[] = [];
+  const absent = input.absentToday ?? new Set<string>();
+  const live = (key: string) => input.charges.find(c => c.dedupe_key === key && c.status !== 'void') ?? null;
   for (const room of input.rooms) {
-    const plan = input.plans.find(p => p.room_id === room.id && p.status === 'active');
-    const base = { room_id: room.id, room_number: room.room_number, mode: plan?.mode ?? null };
-    if (!plan || !planOpenOn(plan, date)) { rows.push({ ...base, expected_satang: 0, paid_satang: 0, status: 'not_trading', charge: null }); continue; }
-    if (input.closedToday.has(room.id)) { rows.push({ ...base, expected_satang: 0, paid_satang: 0, status: 'closed', charge: null }); continue; }
-
-    const absent = input.absentToday ?? new Set<string>();
-    const key = plan.mode === 'weekly_advance' ? `stall-week:${room.id}:${wk}` : `stall-day:${room.id}:${date}`;
-    const charge = input.charges.find(c => c.dedupe_key === key && c.status !== 'void') ?? null;
-    if (charge) {
+    const plan = effectivePlan(room, input.plans);
+    const base = { room_id: room.id, room_number: room.room_number, zone: room.zone ?? null, mode: plan?.mode ?? null };
+    const idle = (status: RoundStatus): RoundRow => ({ ...base, expected_satang: 0, paid_satang: 0, status, charge: null });
+    const fromCharge = (charge: Charge): RoundRow => {
       const out = outstanding(charge);
-      rows.push({ ...base, expected_satang: out, paid_satang: charge.paid_satang, status: out === 0 ? 'paid' : charge.paid_satang > 0 ? 'partial' : 'due', charge });
-    } else if (plan.mode === 'daily_actual' && absent.has(room.id)) {
-      rows.push({ ...base, expected_satang: 0, paid_satang: 0, status: 'absent', charge: null });
-    } else {
-      // not generated yet: weekly plans get their charge from the weekly run, daily plans when the stall is marked
-      const amount = plan.mode === 'daily_actual' ? (plan.rate_satang ?? input.dayRateOf(room.id) ?? 0) : stallWeekCharge(plan, wk, new Set(), input.dayRateOf(room.id), input.weekRateOf(room.id)).amount_satang;
-      rows.push({ ...base, expected_satang: amount, paid_satang: 0, status: 'due', charge: null });
+      return { ...base, expected_satang: out, paid_satang: charge.paid_satang, status: out === 0 ? 'paid' : charge.paid_satang > 0 ? 'partial' : 'due', charge };
+    };
+
+    if (plan?.mode === 'monthly') {
+      const charge = live(stallMonthKey(room.id, date));
+      if (charge) rows.push(fromCharge(charge));
+      else if (room.rent_billed) rows.push(idle('billed'));
+      else if (room.vacant) rows.push({ ...base, expected_satang: plan.rate_satang, paid_satang: 0, status: 'vacant', charge: null });
+      else rows.push({ ...base, expected_satang: plan.rate_satang, paid_satang: 0, status: 'due', charge: null });
+      continue;
     }
+    if (!plan || !planOpenOn(plan, date)) { rows.push(idle('not_trading')); continue; }
+    if (input.closedToday.has(room.id)) { rows.push(idle('closed')); continue; }
+
+    const key = plan.mode === 'weekly_advance' ? `stall-week:${room.id}:${wk}` : `stall-day:${room.id}:${date}`;
+    const charge = live(key);
+    if (charge) { rows.push(fromCharge(charge)); continue; }
+    const vacantWeek = 'implicit' in plan && plan.mode === 'weekly_advance' && room.vacant;
+    if (plan.mode === 'daily_actual' && absent.has(room.id)) { rows.push(idle('absent')); continue; }
+    // not generated yet: weekly plans get their charge from the weekly run, daily plans when the stall is marked
+    const amount = plan.mode === 'daily_actual' ? (plan.rate_satang ?? input.dayRateOf(room.id) ?? 0) : stallWeekCharge(plan, wk, new Set(), input.dayRateOf(room.id), input.weekRateOf(room.id)).amount_satang;
+    rows.push(amount > 0 ? { ...base, expected_satang: amount, paid_satang: 0, status: vacantWeek ? 'vacant' : 'due', charge: null } : idle('not_trading'));
   }
   return rows.sort((a, b) => a.room_number.localeCompare(b.room_number, 'th', { numeric: true }));
 }

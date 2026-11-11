@@ -314,7 +314,7 @@ describe('markets: stall plans, weekly and daily charges', () => {
         expect((await plan({ mode: 'daily_actual', unit: 'week' })).statusCode).toBe(400);
         expect((await call('mkt', { action: 'plan_save' })).statusCode).toBe(403); // market admin collects, the owner sets plans
         expect((await call(OWNER, { action: 'plan_end', plan_id: a.body.plan.id })).body.plan.status).toBe('ended');
-        expect((await call(OWNER, { action: 'stall_charge', room_id: 'r1', date: today })).body.error).toBe('no_stall_plan');
+        expect((await call(OWNER, { action: 'stall_charge', room_id: 'r1', date: today })).body.error).toBe('no_rent');
     });
 
     it('charges a weekly stall for its open days only, once, skipping days it announced it is closed', async () => {
@@ -363,6 +363,37 @@ describe('markets: stall plans, weekly and daily charges', () => {
         expect(b.body.created).toBe(0);
         expect(sb.rows('charges').filter(c => c.kind === 'stall_week')).toHaveLength(2);
         expect((await call('mkt', { action: 'week_generate', date: d(40) })).statusCode).toBe(400);
+    });
+
+    it('a stall needs no plan: it is collected by its own rent the day it is made — per day, per week or per month', async () => {
+        const rb = `users/${OWNER}/buildings/${B1}`;
+        seed(`${rb}/rooms/a22`, { room_number: 'A22', is_active: true, zone: 'โซน A', rent_type: 'monthly', rent_amount: 3000, room_status: 'vacant' });
+        seed(`${rb}/rooms/d1`, { room_number: 'D1', is_active: true, rent_type: 'daily', rent_amount: 80 });
+        seed(`${rb}/rooms/w1`, { room_number: 'W1', is_active: true, rent_type: 'weekly', rent_amount: 400 });
+
+        const m = (await call('mkt', { action: 'stall_charge', room_id: 'a22', date: today })).body.charge;
+        expect(m).toMatchObject({ kind: 'stall_month', amount_satang: 300000, dedupe_key: `stall-month:a22:${today.slice(0, 7)}`, period_start: `${today.slice(0, 7)}-01` });
+        expect((await call('mkt', { action: 'stall_charge', room_id: 'a22', date: today })).body.charge.id).toBe(m.id);   // once a month
+        expect((await call('mkt', { action: 'charge_pay', charge_id: m.id, method: 'cash', amount: 3000 })).body.charge.status).toBe('paid');
+
+        expect((await call('mkt', { action: 'stall_charge', room_id: 'd1', date: today })).body.charge).toMatchObject({ kind: 'stall_day', amount_satang: 8000 });
+        expect((await call('mkt', { action: 'stall_attendance', room_id: 'd1', date: today, present: false })).statusCode).toBe(200);
+        expect((await call('mkt', { action: 'stall_charge', room_id: 'w1', date: today })).body.charge).toMatchObject({ kind: 'stall_week', amount_satang: 40000 });
+        expect((await call('mkt', { action: 'week_generate', date: today })).body.created).toBe(0);   // W1's week already made
+
+        // the snapshot carries what the round needs, so every stall shows up straight away
+        const snap = (await call('mkt', { action: 'snapshot', from: today, to: d(7) })).body;
+        expect(snap.rooms.find((r: { id: string }) => r.id === 'a22')).toMatchObject({ rent_type: 'monthly', rent_satang: 300000, vacant: false, rent_billed: false });
+    });
+
+    it('a monthly stall whose monthly bill already carries the rent is collected through that bill, not twice', async () => {
+        const rb = `users/${OWNER}/buildings/${B1}`;
+        seed(`${rb}/rooms/a1`, { room_number: 'A1', is_active: true, rent_type: 'monthly', rent_amount: 3000 });
+        seed(`${rb}/bills/b1`, { room_id: 'a1', month: today.slice(0, 7), room_rent: 3000, total_bill: 3400, is_saved: true });
+        expect((await call('mkt', { action: 'stall_charge', room_id: 'a1', date: today })).body.error).toBe('rent_on_monthly_bill');
+        seed(`${rb}/rooms/a2`, { room_number: 'A2', is_active: true, rent_type: 'monthly', rent_amount: 3000 });
+        seed(`${rb}/bills/b2`, { room_id: 'a2', month: today.slice(0, 7), room_rent: 0, total_bill: 400, is_saved: true });   // utilities only
+        expect((await call('mkt', { action: 'stall_charge', room_id: 'a2', date: today })).body.charge.kind).toBe('stall_month');
     });
 
     it('walk-ins pay once for the day; their name and amount are required', async () => {

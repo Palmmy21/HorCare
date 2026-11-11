@@ -46,7 +46,11 @@ export async function getTenantLink(lineUserId: string): Promise<TenantLink | nu
 
 export async function recordInbound(
     lineUserId: string,
-    input: { kind: MessageKind; text: string; media?: MessageMedia; messageId?: string; extra?: Pick<LineMessage, 'location' | 'sticker' | 'file_name' | 'duration_ms'> },
+    input: {
+        kind: MessageKind; text: string; media?: MessageMedia; messageId?: string; extra?: Pick<LineMessage, 'location' | 'sticker' | 'file_name' | 'duration_ms'>;
+        /** A command the bot answers by itself (บิล, เมนู, ส่งสลิป…): kept in the thread, but no unread, no alert, no "received" reply. */
+        quiet?: boolean;
+    },
 ): Promise<RecordResult> {
     const link = await getTenantLink(lineUserId);
     if (!link) return { recorded: false, shouldAck: false };
@@ -72,13 +76,13 @@ export async function recordInbound(
     const shouldAck = await db.runTransaction<boolean>(async tx => {
         const snap = await tx.get(ref);
         const prev = snap.exists ? (snap.data() as LineThread) : null;
-        alert = !prev || prev.unread_count === 0 || prev.last_direction !== 'in'
-            || now.getTime() - Date.parse(prev.last_message_at) > CHAT_ALERT_QUIET_MS;
-        const ack = !prev?.last_ack_at || now.getTime() - Date.parse(prev.last_ack_at) > ACK_EVERY_MS;
+        alert = !input.quiet && (!prev || prev.unread_count === 0 || prev.last_direction !== 'in'
+            || now.getTime() - Date.parse(prev.last_message_at) > CHAT_ALERT_QUIET_MS);
+        const ack = !input.quiet && (!prev?.last_ack_at || now.getTime() - Date.parse(prev.last_ack_at) > ACK_EVERY_MS);
         const thread: LineThread = {
             line_user_id: lineUserId, room_id, room_number, tenant_name: tenantName,
             last_message_text: text.slice(0, 200), last_message_at: nowIso, last_direction: 'in',
-            unread_count: (prev?.unread_count ?? 0) + 1,
+            unread_count: (prev?.unread_count ?? 0) + (input.quiet ? 0 : 1),
             last_ack_at: ack ? nowIso : (prev?.last_ack_at ?? null),
         };
         tx.set(ref, thread);
@@ -105,7 +109,22 @@ export async function recordBotReply(lineUserId: string, text: string): Promise<
     const now = new Date().toISOString();
     const msg: LineMessage = { id: randomUUID(), direction: 'out', kind: 'text', text: text.slice(0, MAX_OUTGOING_CHARS), at: now, by: 'ตอบอัตโนมัติ' };
     await db.doc(`${ref.path}/messages/${msg.id}`).set(msg);
-    await ref.update({ last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out' });
+    const snap = await ref.get();
+    // while the tenant's message waits for a person, the list keeps showing it (not the bot's "received" note)
+    if (snap.exists) { if (!((snap.data() as LineThread).unread_count > 0)) await ref.update({ last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out' }); }
+    else await ref.set({ line_user_id: lineUserId, room_id: link.room_id, room_number: link.room_number, tenant_name: null, last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out', unread_count: 0, last_ack_at: null } satisfies LineThread);
+}
+
+/** How a reply the bot sent reads in the inbox: its text, or what a card / picture was about. */
+export function describeReply(messages: object[]): string {
+    return messages.map(m => {
+        const x = m as { type?: string; text?: string; altText?: string };
+        if (x.type === 'text') return x.text ?? '';
+        if (x.altText) return `[การ์ด] ${x.altText}`;
+        if (x.type === 'image') return '[รูปภาพ]';
+        if (x.type === 'sticker') return '[สติกเกอร์]';
+        return '';
+    }).filter(Boolean).join('\n\n');
 }
 interface Body {
     action?: 'send' | 'mark_read' | 'media';

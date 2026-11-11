@@ -1,3 +1,4 @@
+import { rentOnMeterBill } from '../../utils/workspaceTerminology';
 import { useMemo, useState } from 'react';
 import { FileText, Loader2, X, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -30,10 +31,10 @@ export default function RentBillModal({ rooms, bills, config, month, uid, buildi
         .filter(r => r.is_active !== false && !billed.has(r.id))
         .sort((a, b) => a.room_number.localeCompare(b.room_number, 'th', { numeric: true }))
         .map(room => {
-            const full = ['semester', 'yearly', 'daily'].includes(room.rent_type) ? 0 : (room.rent_amount ?? config.room_rent);
+            const full = rentOnMeterBill(config, room);
             const prorate = config.prorate_rent ? prorateRent(full, month, stays[room.id]) : null;
             return { room, full, prorate, rent: proratedAmount(full, prorate) };
-        }), [rooms, billed, config.room_rent, config.prorate_rent, month, stays]);
+        }), [rooms, billed, config, month, stays]);
     const [chosen, setChosen] = useState<Set<string> | null>(null); // null = all
     const isChosen = (id: string) => (chosen ? chosen.has(id) : true);
     const picked = rows.filter(r => isChosen(r.room.id));

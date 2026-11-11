@@ -28,10 +28,12 @@ import { compressSlipToDataUrl, decodeSlipQR, slipFingerprint } from './_slip.js
 import { addDays, daysBetween, isValidDate, todayTh, closuresOn, type ShopClosure } from '../src/shared/market.js';
 import {
     bookingActionBlock, cleanBookingInput, cleanDayCloseInput, cleanPaymentInput, cleanPlanInput, cleanRateInput, dayTotals,
-    outstanding, planOpenOn, quoteStay, resolveRate, stallWeekCharge, weekStart, UUID_RE, MAX_STAY_NIGHTS,
+    effectivePlan, monthBounds, outstanding, planOpenOn, quoteStay, resolveRate, stallMonthKey, stallWeekCharge, weekStart, UUID_RE, MAX_STAY_NIGHTS,
     type Booking, type Charge, type ChargePayment, type Rate, type StallPlan,
 } from '../src/shared/collections.js';
 import { cleanBaht } from '../src/shared/leasing.js';
+import { toSatang } from '../src/shared/accounting.js';
+import { loadRoundStalls } from './_round-stalls.js';
 import type { Permission } from '../src/shared/permissions.js';
 import type { BankAccount } from '../src/shared/banks.js';
 
@@ -100,18 +102,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const fail = (error: { code?: string; message?: string }): never => { const e = dbError(error); throw new HttpError(e.status, e.code); };
 
         // ── lookups ───────────────────────────────────────────────────────────
-        interface RoomInfo { id: string; room_number: string; zone: string | null; is_active: boolean }
+        interface RoomInfo { id: string; room_number: string; zone: string | null; is_active: boolean; rent_type: string; rent_satang: number }
+        type RoomDocLite = { room_number?: string; zone?: string; is_active?: boolean; rent_type?: string; rent_amount?: number };
+        const infoOf = (id: string, r: RoomDocLite | undefined): RoomInfo => ({
+            id, room_number: String(r?.room_number ?? id), zone: r?.zone ?? null, is_active: r?.is_active !== false,
+            rent_type: r?.rent_type ?? 'monthly', rent_satang: toSatang(Number(r?.rent_amount) || 0),
+        });
         const rooms = async (): Promise<RoomInfo[]> =>
-            (await db.collection(`${base}/rooms`).get()).docs.map(d => {
-                const r = d.data() as { room_number?: string; zone?: string; is_active?: boolean };
-                return { id: d.id, room_number: String(r.room_number ?? d.id), zone: r.zone ?? null, is_active: r.is_active !== false };
-            });
+            (await db.collection(`${base}/rooms`).get()).docs.map(d => infoOf(d.id, d.data() as RoomDocLite));
         const room = async (id: unknown): Promise<RoomInfo> => {
             if (typeof id !== 'string' || !id) throw new HttpError(400, 'invalid_input');
             const snap = await db.doc(`${base}/rooms/${id}`).get();
-            const r = snap.data() as { room_number?: string; zone?: string; is_active?: boolean } | undefined;
+            const r = snap.data() as RoomDocLite | undefined;
             if (!snap.exists || r?.is_active === false) throw new HttpError(404, 'room_not_found');
-            return { id, room_number: String(r?.room_number ?? id), zone: r?.zone ?? null, is_active: true };
+            return infoOf(id, r);
+        };
+        /** This month's monthly bill for the stall already carries its rent (then the rent is collected through that bill). */
+        const rentOnBill = async (roomId: string, date: string): Promise<boolean> => {
+            const snap = await db.collection(`${base}/bills`).where('room_id', '==', roomId).where('month', '==', date.slice(0, 7)).get();
+            return snap.docs.some(d => { const b = d.data() as { is_saved?: boolean; room_rent?: number }; return b.is_saved !== false && (Number(b.room_rent) || 0) > 0; });
         };
         const closures = async (): Promise<ShopClosure[]> =>
             (await db.collection(`${base}/shop_closures`).get()).docs.map(d => d.data() as ShopClosure);
@@ -173,7 +182,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
             const mine = (q: ReturnType<typeof sb.from>) => q.select('*').eq('owner_uid', owner).eq('building_id', buildingId);
             const [roomList, closureList, rateList, plans, bookings, chargesInWindow, chargesOpen, attendance, closes] = await Promise.all([
-                rooms(), closures(), rates(),
+                loadRoundStalls(owner, buildingId, today, sb), closures(), rates(),
                 pull('stall_plans', q => mine(q).eq('status', 'active').limit(2000)),
                 pull('bookings', q => mine(q).lte('check_in', to).gt('check_out', from).limit(3000)),
                 pull('charges', q => mine(q).lte('period_start', to).gte('period_end', from).limit(5000)),
@@ -291,8 +300,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const date = body.date;
             if (!isValidDate(date) || date > addDays(today, 7)) throw new HttpError(400, 'invalid_input');
             const info = await room(body.room_id);
-            const plan = await activePlan(info.id);
-            if (!plan) throw new HttpError(409, 'no_stall_plan');
+            const own = await activePlan(info.id);
+            // no plan set up: the stall is collected by its own rent (per day / week / month), ready from the day it is made
+            const plan = effectivePlan({ id: info.id, room_number: info.room_number, rent_type: info.rent_type, rent_satang: info.rent_satang }, own ? [own] : []);
+            if (!plan) throw new HttpError(409, 'no_rent');
+            if (plan.mode === 'monthly') {
+                if (action === 'stall_attendance') throw new HttpError(400, 'invalid_input');
+                if (date > today) throw new HttpError(400, 'invalid_input');
+                const key = stallMonthKey(info.id, date);
+                const had = await sb.from('charges').select('*').eq('owner_uid', owner).eq('building_id', buildingId).eq('dedupe_key', key).neq('status', 'void').maybeSingle();
+                if (had.error) fail(had.error);
+                if (!had.data && await rentOnBill(info.id, date)) throw new HttpError(409, 'rent_on_monthly_bill');
+                const { start, end } = monthBounds(date);
+                let charge: Charge;
+                try {
+                    charge = (had.data as Charge | null) ?? await ensureCharge({
+                        kind: 'stall_month', room: info, party: `แผง ${info.room_number}`, start, end,
+                        desc: `ค่าเช่าแผง ${info.room_number} เดือน ${date.slice(0, 7)}`, amount: plan.rate_satang, key,
+                    });
+                } catch (e) {
+                    // the database has not been given the monthly kind yet (supabase/migrations/20261111000000_stall_month.sql)
+                    // (a check-constraint failure; everything else in this charge is made by the server)
+                    if (e instanceof HttpError && e.status === 400 && e.code === 'invalid_input') throw new HttpError(503, 'monthly_not_enabled');
+                    throw e;
+                }
+                res.status(200).json({ charge });
+                return;
+            }
             if (action === 'stall_attendance') {
                 if (plan.mode !== 'daily_actual' || typeof body.present !== 'boolean') throw new HttpError(400, 'invalid_input');
                 if (date > today) throw new HttpError(400, 'invalid_input');
@@ -301,6 +335,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const upd = await sb.from('stall_attendance').update({ present: body.present, marked_by: ctx.uid }).eq('owner_uid', owner).eq('building_id', buildingId).eq('room_id', info.id).eq('visit_date', date);
                     if (upd.error) fail(upd.error);
                 } else if (error) fail(error);
+                // "did not come" after the stall was opened to collect: today's charge, still unpaid, is withdrawn
+                if (!body.present) {
+                    const off = await sb.from('charges').update({ status: 'void' }).eq('owner_uid', owner).eq('building_id', buildingId)
+                        .eq('dedupe_key', `stall-day:${info.id}:${date}`).eq('status', 'open').eq('paid_satang', 0).select();
+                    if (off.error) fail(off.error);
+                    for (const c of (off.data ?? []) as Charge[]) await audit('UPDATE', 'charge', c.id, `void: stall ${info.room_number} absent ${date}`);
+                }
                 res.status(200).json({ ok: true });
                 return;
             }
@@ -322,7 +363,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (had.error) fail(had.error);
             const existing = new Set(((had.data ?? []) as { dedupe_key: string }[]).map(x => x.dedupe_key));
             let created = 0;
-            for (const plan of (planRows ?? []) as StallPlan[]) {
+            // stalls with no plan whose rent is per week are collected weekly too
+            const planned = new Set(((planRows ?? []) as StallPlan[]).map(p => p.room_id));
+            const { data: allPlans } = await sb.from('stall_plans').select('room_id').eq('owner_uid', owner).eq('building_id', buildingId).eq('status', 'active').limit(5000);
+            for (const p of (allPlans ?? []) as { room_id: string }[]) planned.add(p.room_id);
+            const implicitWeekly = roomList
+                .filter(r => r.is_active && !planned.has(r.id) && r.rent_type === 'weekly' && r.rent_satang > 0)
+                .map(r => effectivePlan({ id: r.id, room_number: r.room_number, rent_type: r.rent_type, rent_satang: r.rent_satang }, []) as StallPlan);
+            for (const plan of [...((planRows ?? []) as StallPlan[]), ...implicitWeekly]) {
                 const info = infoOf.get(plan.room_id);
                 if (!info?.is_active) continue;
                 const c = await stallChargeFor(plan.room_id, date, plan, rateList, closureList, info);

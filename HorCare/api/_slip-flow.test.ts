@@ -87,8 +87,20 @@ describe('evaluateSlip', () => {
         expect((await run({ billCreatedAt: new Date(Date.now() - 2 * 86400_000).toISOString() })).autoApprove).toBe(false);
     });
 
-    it('falls back to the legacy note and no AI call without a QR, image, or paid plan', async () => {
-        for (const over of [{ qrPayload: null }, { imageBase64: null }, { isPro: false }]) {
+    it('a slip whose QR could not be read is still read by the AI and checked, but never approved on its own', async () => {
+        fetchMock.mockResolvedValue(aiReply(goodSlip()));
+        const e = await run({ qrPayload: null });
+        expect(e.autoApprove).toBe(false);
+        expect(e.outcome).toBe('review');
+        expect(e.aiAmount).toBe(3500);
+        expect(e.fields).toMatchObject({ slip_amount: 3500, slip_account_id: 'acc1' });
+        expect(e.fields.paid_method).toBeUndefined();
+        expect(e.verifyNote).toContain('ตรงกับยอดที่ต้องชำระ');
+        expect(e.verifyNote).toContain('อ่าน QR ไม่ได้');
+    });
+
+    it('falls back to the legacy note and no AI call without an image or a paid plan', async () => {
+        for (const over of [{ qrPayload: null, imageBase64: null }, { imageBase64: null }, { isPro: false }]) {
             const e = await run(over);
             expect(e.autoApprove).toBe(false);
             expect(e.fields).toEqual({});

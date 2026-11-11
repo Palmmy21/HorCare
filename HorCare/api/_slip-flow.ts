@@ -81,7 +81,31 @@ export async function evaluateSlip(input: {
         autoApprove: false, outcome: 'review', problems: [], qrPresent, bankVerified: false, details: null, verdict: null, fields: {}, verifyNote: legacyNote, aiAmount: null, splitAmount: null,
     };
 
-    if (!input.isPro || !qrPresent) return none;
+    if (!input.isPro) return none;
+
+    // No QR could be read (a blurry photo, a cropped screenshot): the AI still reads the picture and checks the amount,
+    // the receiver and the time, so the owner sees what it says — but it is never approved on its own (nothing then
+    // stops the same slip being sent twice).
+    if (!qrPresent) {
+        if (!input.imageBase64) return none;
+        const read = await readSlipDetails(input.imageBase64, input.mimeType).catch(() => null);
+        if (!read) return none;
+        const { candidates: cands } = await loadReceiverCandidates(input.ownerUid, input.buildingId);
+        const v = verifySlip({ details: read, qrPresent: false, duplicate: false, expectedAmount: input.expectedAmount, candidates: cands, billCreatedAt: input.billCreatedAt });
+        const m = v.matched_candidate_id ? cands.find(c => c.id === v.matched_candidate_id) : undefined;
+        const amountOk = v.checks.amount === 'pass';
+        return {
+            ...none, outcome: 'review', details: read, verdict: { ...v, auto_approve: false }, aiAmount: read.amount ?? null,
+            fields: compact({
+                slip_amount: read.amount, slip_ai_amount: read.amount, slip_sender: read.sender_name, slip_bank: read.sender_bank,
+                slip_receiver_name: read.receiver_name, slip_receiver_account: read.receiver_account, slip_datetime: read.datetime_iso,
+                slip_account_id: m?.id, transaction_ref: read.reference, slip_checks: v.checks,
+            }),
+            verifyNote: amountOk
+                ? `AI อ่านสลิปได้ ยอด ฿${read.amount} ตรงกับยอดที่ต้องชำระ — แต่อ่าน QR ไม่ได้ จึงรอเจ้าหน้าที่ยืนยัน`
+                : `AI อ่านได้ยอด ${read.amount != null ? `฿${read.amount}` : 'ไม่ชัด'} — อ่าน QR ไม่ได้ โปรดตรวจสลิปด้วยตา`,
+        };
+    }
 
     // 1. ask the bank about the transfer behind the QR
     const bank: BankSlipResult = await verifyBankSlip(input.qrPayload, { bankShort: code => bankByCode(code)?.short ?? null });

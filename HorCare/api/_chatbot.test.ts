@@ -94,7 +94,8 @@ describe('recordBotReply', () => {
     it('stores the answer in the thread without clearing unread', async () => {
         seed(`${B}/line_threads/${T1}`, { line_user_id: T1, unread_count: 2, last_message_text: 'q', last_direction: 'in' });
         await recordBotReply(T1, 'คำตอบ');
-        expect(read(`${B}/line_threads/${T1}`)).toMatchObject({ unread_count: 2, last_direction: 'out', last_message_text: 'คำตอบ' });
+        // the tenant's question still waits for a person, so the list keeps showing it
+        expect(read(`${B}/line_threads/${T1}`)).toMatchObject({ unread_count: 2, last_direction: 'in', last_message_text: 'q' });
         const msgs = listPaths(`${B}/line_threads/${T1}/messages/`).map(p => read(p)!);
         expect(msgs[0]).toMatchObject({ direction: 'out', by: 'ตอบอัตโนมัติ' });
     });

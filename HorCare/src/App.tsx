@@ -1872,7 +1872,7 @@ function App() {
             canSendLine={lineEnabled}
             onUpgrade={() => setCurrentView('pricing')}
             onEditBillExtras={staffPermissions === null || staffPermissions.includes('payment.update') ? updateBillExtras : undefined}
-            onCreateRentBills={staffPermissions === null || staffPermissions.includes('meter.record') ? createRentBills : undefined}
+            onCreateRentBills={collectionStyle === 'monthly' && (staffPermissions === null || staffPermissions.includes('meter.record')) ? createRentBills : undefined}
             unitName={terms.unitName}
           />
         )}

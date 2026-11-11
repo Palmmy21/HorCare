@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { isPaidPlan } from '../src/shared/plans.js';
-import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, getLineContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
+import { verifyLineSignature, lineReply as sendLineReply, buildBillFlex, getLineImageContent, getLineContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { claimRoom, isRoomCode, scanRoomCode, type ScanResult } from './_room-qr.js';
@@ -10,7 +10,8 @@ import { propertyOaId } from './_line-oa.js';
 import { linkedRooms, recordFriendship } from './_line-binding.js';
 import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
 import { readSlipDetails } from './_slip-ai.js';
-import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
+import { describeReply, getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { findFaqAnswer } from './_chatbot.js';
 
 import { latestAnnouncementsText } from './_announcements.js';
@@ -27,6 +28,7 @@ import { autoPostSafe } from './_ledger-auto.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { raiseAlert } from './_alerts.js';
+import { applyRoundSlip, openRoundCharges } from './_slip-round.js';
 import { handleVendorClosurePostback, isVendorClosurePostback, listVendorClosures, startVendorClosure } from './_vendor-closure.js';
 import { GUEST_QUICK, TENANT_QUICK, ackText, botText, botVocab, helpText, notRegisteredText, parseTenantCommand, welcomeText } from '../src/shared/tenantBot.js';
 
@@ -103,7 +105,24 @@ interface LineEvent {
     postback?: { data?: string; params?: { date?: string } };
 }
 
+/** Who this event is from, so every reply sent while handling it is also kept in that tenant's inbox thread. */
+const conversation = new AsyncLocalStorage<{ lineUserId: string }>();
+
+/** Reply in LINE, and keep what the bot said in the inbox (the owner sees the whole conversation, automatic answers included). */
+async function lineReply(replyToken: string, messages: object[]): Promise<void> {
+    await sendLineReply(replyToken, messages);
+    const who = conversation.getStore();
+    const said = who ? describeReply(messages) : '';
+    if (who && said) await recordBotReply(who.lineUserId, said).catch(err => console.warn('[line-inbox] bot reply not kept:', (err as Error).message));
+}
+
 async function handleEvent(event: LineEvent) {
+    const userId = event.source?.userId;
+    if (!userId) return handleEventInner(event);
+    return conversation.run({ lineUserId: userId }, () => handleEventInner(event));
+}
+
+async function handleEventInner(event: LineEvent) {
     if (event.type === 'follow' || event.type === 'unfollow') {
         if (event.source?.userId) await recordFriendship(event.source.userId, event.type === 'follow');
         if (event.type === 'follow' && event.source?.userId && event.replyToken) {
@@ -145,6 +164,14 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     if (event.type === 'postback') {
         const modeReq = parseSplitModePostback(event.postback?.data);
         const slipRoom = parseSlipRoomPostback(event.postback?.data);
+        const data = event.postback?.data ?? '';
+        // a photo the tenant says is (or is not) a slip
+        if (data === SLIP_IMAGE_NO) { await lineReply(replyToken, [{ type: 'text', text: MEDIA_ACK_TEXT }]); return; }
+        if (data.startsWith(SLIP_IMAGE_POSTBACK)) {
+            const id = data.slice(SLIP_IMAGE_POSTBACK.length);
+            if (LINE_MESSAGE_ID_RE.test(id)) await handleSlipImage(lineUserId, replyToken, id);
+            return;
+        }
         if (isVendorClosurePostback(event.postback?.data)) await lineReply(replyToken, await handleVendorClosurePostback(lineUserId, event.postback!.data!, event.postback?.params?.date));
         else if (slipRoom) await handleSlipRoomChoice(lineUserId, replyToken, slipRoom);
         else if (modeReq) await handleSplitMode(lineUserId, replyToken, modeReq);
@@ -185,6 +212,14 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     // What the message asks for, tolerant of spacing, case and polite particles ("ขอดูบิลหน่อยครับ" = บิล).
     const cmd = parseTenantCommand(text);
     const market = isMarket();
+
+    // Every message from a registered tenant goes to the inbox, commands included (quietly: the bot answers those
+    // itself, so they do not count as unread or ring anyone). The bot's answers are kept too (lineReply below).
+    const quiet = cmd !== null || isInvitationToken(text) || isRoomCode(text) || DORM_CODE_RE.test(text.toUpperCase());
+    const inbound = await recordInbound(lineUserId, { kind: 'text', text, quiet }).catch(err => {
+        console.error('recordInbound failed:', (err as Error).message);
+        return { recorded: false, shouldAck: false };
+    });
 
     // ── 1. บิล / ดูบิล ────────────────────────────────────────────
     if (cmd === 'bill') {
@@ -327,17 +362,12 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     // Free text from a registered tenant is a message for the property: it goes to the
     // HorCare inbox, and the tenant gets one short acknowledgement (throttled to once per
     // few hours so a chatty conversation isn't answered by a bot every time).
-    const inbound = await recordInbound(lineUserId, { kind: 'text', text }).catch(err => {
-        console.error('recordInbound failed:', (err as Error).message);
-        return { recorded: false, shouldAck: false };
-    });
     if (inbound.recorded) {
         // The owner's own Q&A answers first; anything it can't answer is left for a person.
         const link = await getTenantLink(lineUserId);
         const answer = link ? await findFaqAnswer(link, text).catch(() => null) : null;
         if (answer) {
             await lineReply(replyToken, [{ type: 'text', text: answer }]);
-            await recordBotReply(lineUserId, answer).catch(() => undefined);
             return;
         }
         if (inbound.shouldAck) await lineReply(replyToken, [botText(ackText(market), TENANT_QUICK)]);
@@ -356,12 +386,10 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
  * A soft command (เมนู, แจ้งซ่อม) the property has its own Q&A answer for: store the question in the inbox and send that
  * answer, exactly as ordinary conversation is handled. False when there is no such answer.
  */
-async function answerFromFaq(lineUserId: string, replyToken: string, link: { uid: string; building_id: string }, text: string): Promise<boolean> {
+async function answerFromFaq(_lineUserId: string, replyToken: string, link: { uid: string; building_id: string }, text: string): Promise<boolean> {
     const answer = await findFaqAnswer(link, text).catch(() => null);
     if (!answer) return false;
-    await recordInbound(lineUserId, { kind: 'text', text }).catch(() => undefined);
-    await lineReply(replyToken, [{ type: 'text', text: answer }]);
-    await recordBotReply(lineUserId, answer).catch(() => undefined);
+    await lineReply(replyToken, [{ type: 'text', text: answer }]);   // the question is already in the inbox (dispatchEvent)
     return true;
 }
 
@@ -765,7 +793,34 @@ async function handleImage(lineUserId: string, replyToken: string, messageId: st
         await handleSlipImage(lineUserId, replyToken, messageId, { img, qr });
         return;
     }
+    // No QR could be read, but money is owed: it may well be a slip — one tap sends it through the slip check.
+    if (await owesMoney(link)) {
+        await lineReply(replyToken, [{
+            type: 'text', text: 'ได้รับรูปแล้วค่ะ 📷\n\nถ้าเป็นสลิปโอนเงิน กดปุ่ม "นี่คือสลิป" ด้านล่าง ระบบจะตรวจยอดให้ทันทีค่ะ',
+            quickReply: { items: [
+                { type: 'action', action: { type: 'postback', label: 'นี่คือสลิป', data: `${SLIP_IMAGE_POSTBACK}${messageId}`, displayText: 'นี่คือสลิปโอนเงิน' } },
+                { type: 'action', action: { type: 'postback', label: 'ไม่ใช่สลิป', data: SLIP_IMAGE_NO, displayText: 'ไม่ใช่สลิป' } },
+            ] },
+        }]);
+        return;
+    }
     if (inbound.shouldAck) await lineReply(replyToken, [{ type: 'text', text: MEDIA_ACK_TEXT }]);
+}
+
+const SLIP_IMAGE_POSTBACK = 'slipimg|';
+const SLIP_IMAGE_NO = 'slipimg-no';
+const LINE_MESSAGE_ID_RE = /^\d{6,30}$/;
+
+/** Something is waiting to be paid: the latest monthly bill, a fine, or a charge on the collection round. */
+async function owesMoney(link: { uid: string; building_id: string; room_id: string }): Promise<boolean> {
+    try {
+        const bill = await getLatestSavedBill(link.uid, link.building_id, link.room_id);
+        if (bill && bill.data().payment_status !== 'paid') return true;
+        if (await getOldestUnpaidFine(link.uid, link.building_id, link.room_id)) return true;
+        return (await openRoundCharges(link.uid, link.building_id, link.room_id)).length > 0;
+    } catch {
+        return false;
+    }
 }
 
 // The handlers below are only reached for a registered tenant (dispatchEvent checks first).
@@ -889,6 +944,28 @@ async function handleSlipImage(
 
     // 2. หาบิลล่าสุดของห้อง
     const billDoc = await getLatestSavedBill(uid, building_id, room_id);
+
+    /** No monthly bill to pay: the money may be owed on the collection round (a stall's day / week / month). */
+    const payRound = async (): Promise<boolean> => {
+        if ((await openRoundCharges(uid, building_id, room_id)).length === 0) return false;
+        const img = preloaded?.img ?? await getLineImageContent(messageId);
+        if (!img) { await lineReply(replyToken, [botText('ขออภัยค่ะ โหลดรูปสลิปไม่สำเร็จ กรุณาส่งใหม่อีกครั้งนะคะ')]); return true; }
+        const qr = preloaded?.qr ?? await decodeSlipQR(img.buffer);
+        const r = await applyRoundSlip({ owner: uid, buildingId: building_id, roomId: room_id, roomNumber: String(room_number), lineUserId, img, qr });
+        if (r.status === 'none') return false;
+        const unit = botVocab(isMarket()).unit;
+        const owed = (r.owed_satang ?? 0) / 100;
+        await lineReply(replyToken, [botText(
+            r.status === 'duplicate' ? `⚠️ สลิปนี้ถูกใช้ไปแล้วค่ะ\n\nหากเพิ่งโอนสำหรับ${unit} ${room_number} กรุณาส่งสลิปจริงของรอบนี้นะคะ`
+                : r.status === 'recorded' ? `✅ ได้รับยอด ฿${owed.toLocaleString('th-TH')} แล้วค่ะ\n${r.charge?.description ?? ''}\n\nขอบคุณค่ะ 🙏`
+                : `📩 ได้รับสลิปแล้วค่ะ${r.evaluation?.aiAmount != null ? ` (ยอด ฿${r.evaluation.aiAmount.toLocaleString('th-TH')})` : ''}\nยอดที่ต้องชำระ ฿${owed.toLocaleString('th-TH')} · ${r.charge?.description ?? ''}\n\nเจ้าหน้าที่จะตรวจและยืนยันให้โดยเร็วค่ะ`,
+            TENANT_QUICK,
+        )]);
+        return true;
+    };
+
+    if (!billDoc && await payRound()) return;
+    if (billDoc && billDoc.data().payment_status === 'paid' && !(await getOldestUnpaidFine(uid, building_id, room_id)) && await payRound()) return;
 
     if (!billDoc) {
         await lineReply(replyToken, [{

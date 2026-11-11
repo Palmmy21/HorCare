@@ -6,7 +6,7 @@ import { closuresOn, type ShopClosure } from '../shared/market';
 
 export interface CollectionsSnapshot {
   today: string;
-  rooms: { id: string; room_number: string; zone: string | null; is_active: boolean }[];
+  rooms: { id: string; room_number: string; zone: string | null; is_active: boolean; rent_type?: string; rent_satang?: number; vacant?: boolean; rent_billed?: boolean }[];
   closures: ShopClosure[];
   rates: Rate[];
   plans: StallPlan[];
@@ -23,7 +23,7 @@ export function todayRoundOf(data: CollectionsSnapshot): RoundRow[] {
   const absentToday = new Set(data.attendance.filter(a => a.visit_date === data.today && !a.present).map(a => a.room_id));
   const zone = new Map(data.rooms.map(r => [r.id, r.zone]));
   return buildRound({
-    date: data.today, plans: data.plans, charges: data.charges, closedToday, absentToday, rooms: data.rooms.map(r => ({ id: r.id, room_number: r.room_number })),
+    date: data.today, plans: data.plans, charges: data.charges, closedToday, absentToday, rooms: data.rooms,
     dayRateOf: id => resolveRate(data.rates, { purpose: 'stall', unit: 'day', roomId: id, zone: zone.get(id), date: data.today })?.amount_satang ?? null,
     weekRateOf: id => resolveRate(data.rates, { purpose: 'stall', unit: 'week', roomId: id, zone: zone.get(id), date: data.today })?.amount_satang ?? null,
   });
@@ -41,6 +41,9 @@ const ERRORS: Record<string, string> = {
   charge_void: 'รายการนี้ถูกยกเลิกแล้ว',
   nothing_to_collect: 'ไม่มียอดที่ต้องเก็บ',
   no_stall_plan: 'แผงนี้ยังไม่มีแผนการเก็บเงิน',
+  no_rent: 'แผงนี้ยังไม่ได้ใส่ค่าเช่า — ใส่ที่หน้า "จัดการแผงค้า" ก่อน',
+  rent_on_monthly_bill: 'แผงนี้มีบิลรายเดือนที่รวมค่าเช่าแล้ว — รับชำระที่หน้า "การชำระเงิน"',
+  monthly_not_enabled: 'ระบบยังไม่เปิดการเก็บค่าเช่ารายเดือนที่หน้านี้ — แจ้งผู้ดูแลระบบ (ต้องอัปเดตฐานข้อมูล)',
   duplicate_slip: 'สลิปนี้ถูกใช้แล้ว',
   invalid_image: 'ไฟล์สลิปไม่ถูกต้อง (รองรับ JPG / PNG)',
   too_early: 'ยังไม่ถึงวันเช็กอิน',

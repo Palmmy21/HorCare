@@ -1,3 +1,4 @@
+import { rentOnMeterBill } from '../../utils/workspaceTerminology';
 import { useState, useRef } from 'react';
 import { useBankAccounts } from '../../hooks/useBankAccounts';
 import {
@@ -654,7 +655,7 @@ export default function Summary({
                                                 ) : <div className="text-muted">-</div>}
                                             </td>
                                             <td className="text-right mono">
-                                                {formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}
+                                                {formatCurrency(hasBill ? bill.room_rent : rentOnMeterBill(config, room))}
                                             </td>
                                             <td className="text-right mono">
                                                 {hasBill && bill.common_fee ? (
@@ -786,7 +787,7 @@ export default function Summary({
                                         </div>
                                         <div className="summary-bill-card-row">
                                             <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Home size={14} color="#15803D" /> ค่าห้อง</span>
-                                            <span className="mono">{formatCurrency(hasBill ? bill.room_rent : (room.rent_type === 'semester' ? 0 : (room.rent_amount ?? config.room_rent)))}</span>
+                                            <span className="mono">{formatCurrency(hasBill ? bill.room_rent : rentOnMeterBill(config, room))}</span>
                                         </div>
                                         {hasBill && bill.common_fee ? (
                                             <div className="summary-bill-card-row">

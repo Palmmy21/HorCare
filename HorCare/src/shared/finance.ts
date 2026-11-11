@@ -19,7 +19,7 @@ export interface PaymentLike {
   paid_at: string; gross_satang: number; method: 'cash' | 'bank_transfer' | 'qr_gateway' | 'other'; status: 'active' | 'void'; verification?: string;
 }
 export interface ChargeLike {
-  id: string; kind: 'stay' | 'stall_week' | 'stall_day' | 'walk_in' | 'extra'; room_number: string | null; party_name: string;
+  id: string; kind: 'stay' | 'stall_week' | 'stall_day' | 'stall_month' | 'walk_in' | 'extra'; room_number: string | null; party_name: string;
   period_start: string; period_end: string; amount_satang: number; paid_satang: number; status: 'open' | 'paid' | 'void';
 }
 export interface ChargePaymentLike { amount_satang: number; method: 'cash' | 'transfer'; received_at: string }
@@ -34,7 +34,7 @@ export interface BilledLine { month: string; category: RevenueCategory; satang: 
 export interface CollectedLine { month: string; satang: number; method: Method }
 export interface OpenItem { id: string; label: string; due: string; outstanding_satang: number }
 
-const CHARGE_CATEGORY: Record<ChargeLike['kind'], RevenueCategory> = { stay: 'stay', stall_week: 'stall', stall_day: 'stall', walk_in: 'walk_in', extra: 'other_income' };
+const CHARGE_CATEGORY: Record<ChargeLike['kind'], RevenueCategory> = { stay: 'stay', stall_week: 'stall', stall_day: 'stall', stall_month: 'stall', walk_in: 'walk_in', extra: 'other_income' };
 const monthOf = (iso: string) => thDate(iso).slice(0, 7);
 const isPaid = (s?: string) => s === 'paid';
 

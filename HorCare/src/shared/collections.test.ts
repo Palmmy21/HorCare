@@ -211,6 +211,25 @@ describe('the collector round', () => {
     expect(rows.find(r => r.room_id === 's2')).toMatchObject({ status: 'absent', expected_satang: 0 });
     expect(rows.find(r => r.room_id === 's1')).toMatchObject({ status: 'due', expected_satang: 20000 });
   });
+  it('a stall with no plan is collected by its own rent straight away: per day, per week or per month', () => {
+    const own = [
+      { id: 'm1', room_number: 'A22', rent_type: 'monthly', rent_satang: 300000 },
+      { id: 'm2', room_number: 'A23', rent_type: 'monthly', rent_satang: 300000, vacant: true },
+      { id: 'm3', room_number: 'A24', rent_type: 'monthly', rent_satang: 300000, rent_billed: true },
+      { id: 'd1', room_number: 'B1', rent_type: 'daily', rent_satang: 8000 },
+      { id: 'w1', room_number: 'C1', rent_type: 'weekly', rent_satang: 40000 },
+      { id: 'z1', room_number: 'D1', rent_type: 'monthly', rent_satang: 0 },
+    ];
+    const rows = buildRound({ date: '2026-10-08', plans: [], charges: [charge({ id: 'cm', kind: 'stall_month', room_id: 'm1', dedupe_key: 'stall-month:m1:2026-10', amount_satang: 300000, paid_satang: 300000, status: 'paid' })], closedToday: new Set(), rooms: own, dayRateOf: () => null, weekRateOf: () => null });
+    const by = (id: string) => rows.find(r => r.room_id === id)!;
+    expect(by('m1')).toMatchObject({ status: 'paid', mode: 'monthly', paid_satang: 300000 });   // paid for the month
+    expect(by('m2')).toMatchObject({ status: 'vacant', expected_satang: 300000 });              // shown, collectable, not owed
+    expect(by('m3').status).toBe('billed');                                                      // rent already on the monthly bill
+    expect(by('d1')).toMatchObject({ status: 'due', mode: 'daily_actual', expected_satang: 8000 });
+    expect(by('w1')).toMatchObject({ status: 'due', mode: 'weekly_advance', expected_satang: 40000 });
+    expect(by('z1').status).toBe('not_trading');                                                 // no rent set
+    expect(roundTotals(rows)).toMatchObject({ unpaid: 2, to_collect_satang: 48000 });
+  });
   it('totals count only stalls that trade', () => {
     const t = roundTotals(run([charge({ dedupe_key: 'stall-week:s1:2026-10-05', paid_satang: 20000, status: 'paid' })]));
     expect(t).toEqual({ stalls: 2, to_collect_satang: 5000, collected_satang: 20000, unpaid: 1 });

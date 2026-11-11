@@ -34,13 +34,31 @@ export async function decodeSlipQR(image: Buffer): Promise<SlipQR> {
         if (img.bitmap.width > 1400) {
             img.resize({ w: 1400 });
         }
-        const { data, width, height } = img.bitmap;
-        const code = jsQR(
-            new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength),
-            width,
-            height,
-        );
-        const payload = code?.data?.trim() || null;
+        const scan = (j: { bitmap: { data: Buffer; width: number; height: number } }): string | null => {
+            const { data, width, height } = j.bitmap;
+            const code = jsQR(new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength), width, height);
+            return code?.data?.trim() || null;
+        };
+        // The slip QR is small and usually in the lower part (often bottom-right) of a phone screenshot or photo, which
+        // LINE has also recompressed: look at the whole picture first, then at the likely corners enlarged, then sharper.
+        let payload = scan(img);
+        if (!payload) {
+            const { width: w, height: h } = img.bitmap;
+            const regions: [number, number, number, number][] = [
+                [0, Math.floor(h * 0.4), w, Math.ceil(h * 0.6)],                                   // lower 60%
+                [Math.floor(w * 0.35), Math.floor(h * 0.45), Math.ceil(w * 0.65), Math.ceil(h * 0.55)], // bottom-right
+                [0, Math.floor(h * 0.45), Math.ceil(w * 0.65), Math.ceil(h * 0.55)],                  // bottom-left
+                [0, 0, w, Math.ceil(h * 0.6)],                                                     // upper 60%
+            ];
+            for (const [x, y, cw, ch] of regions) {
+                if (cw < 40 || ch < 40) continue;
+                const part = img.clone().crop({ x, y, w: Math.min(cw, w - x), h: Math.min(ch, h - y) });
+                if (part.bitmap.width < 900) part.resize({ w: part.bitmap.width * 2 });
+                payload = scan(part) ?? scan(part.greyscale().contrast(0.4));
+                if (payload) break;
+            }
+            if (!payload) payload = scan(img.clone().greyscale().contrast(0.5));
+        }
         return { payload, looksLikeSlip: payload ? isThaiSlipQR(payload) : false };
     } catch {
         return { payload: null, looksLikeSlip: false };

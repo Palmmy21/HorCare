@@ -6,7 +6,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 
 import webhook from './line-webhook.js';
 import roomQr from './_room-qr.js';
-import { addAuthUser, fakeReq, fakeRes, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
 
 const OWNER = 'owner-1';
 const BLD = 'bld-A';
@@ -141,12 +141,16 @@ describe('what the bot says', () => {
         expect(reply()![0].text).toContain('ยังไม่มีบิล');
     });
 
-    it('answers "เมนู" with what the chat can do, and does not file it as a message for the owner', async () => {
+    it('answers "เมนู" with what the chat can do; the command and the answer are kept in the inbox without ringing anyone', async () => {
         await scanCard();
         fetchMock.mockClear();
         await post([text('เมนู')]);
         expect(reply()![0].text).toContain('"ส่งสลิป"');
-        expect(read(`users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`)).toBeUndefined();
+        const thread = `users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`;
+        expect(read(thread)).toMatchObject({ unread_count: 0 });
+        const msgs = listPaths(`${thread}/messages/`).map(p => read(p) as { direction: string; text: string; by: string | null });
+        expect(msgs.some(m => m.direction === 'in' && m.text === 'เมนู')).toBe(true);
+        expect(msgs.some(m => m.direction === 'out' && m.by === 'ตอบอัตโนมัติ' && m.text.includes('"ส่งสลิป"'))).toBe(true);
     });
 
     it('lets the property\'s own Q&A answer "แจ้งซ่อม" when it has one, else opens the portal', async () => {

@@ -22,8 +22,8 @@ export const VIEW_LABELS_TH: Record<string, string> = {
 
 export type ModuleStyle = 'monthly' | 'nightly' | 'stall';
 
-/** Views a workspace does not use: a hotel prices per night, so it has no monthly bill summary and no lease pipeline. */
-export const HIDDEN_VIEWS: Record<ModuleStyle, string[]> = { monthly: [], nightly: ['summary', 'leasing', 'recording'], stall: [] };
+/** Views a workspace does not use: a hotel prices per night, so it has no lease pipeline (its utilities, if any, still go on a meter bill). */
+export const HIDDEN_VIEWS: Record<ModuleStyle, string[]> = { monthly: [], nightly: ['leasing'], stall: [] };
 
 export function erpModules(isMarket: boolean, style: ModuleStyle = 'monthly'): ErpModule[] {
   const nightly = style === 'nightly';

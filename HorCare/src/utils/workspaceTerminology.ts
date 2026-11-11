@@ -225,7 +225,22 @@ export function getWorkspaceTerms(buildingType?: DormConfig['building_type']): W
 
     isMarket: false,
     isCommercial: ['resort', 'hotel', 'office'].includes(type),
-    usesMeters: !['resort', 'hotel'].includes(type),
+    // resorts and hotels too: water and electricity (a long stay, a shop on site) are billed on their own meter bill
+    usesMeters: true,
     buildingType: type,
   };
 }
+
+/**
+ * Rent a room's monthly (meter) bill carries. A property that collects rent on its own screen — a market's stall
+ * round, a hotel / resort's stays — gets utilities-only meter bills (water, electricity, fees): its rent is collected
+ * there, never twice. Term / year / day rents are billed elsewhere too.
+ */
+export function rentOnMeterBill(config: Pick<DormConfig, 'building_type' | 'collection_style' | 'room_rent'> | undefined, room: { rent_type?: string; rent_amount?: number }): number {
+  if (collectionStyleOf(config) !== 'monthly') return 0;
+  if (room.rent_type === 'semester' || room.rent_type === 'yearly' || room.rent_type === 'daily') return 0;
+  return room.rent_amount ?? config?.room_rent ?? 0;
+}
+
+/** Utilities are billed apart from the rent (see rentOnMeterBill). */
+export const utilitiesBilledApart = (config: Pick<DormConfig, 'building_type' | 'collection_style'> | undefined) => collectionStyleOf(config) !== 'monthly';

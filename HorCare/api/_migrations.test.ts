@@ -131,6 +131,12 @@ describe('collections: charges and payments', () => {
         expect((await q(`select amount_satang from charges where id=$1`, [a.id]))[0].amount_satang).toBe(100000); // first one wins
     });
 
+    it('a monthly stall rent is a charge kind of its own; unknown kinds are still refused', async () => {
+        const m = (await q<{ kind: string }>(`select * from collections_ensure_charge($1,$2,'stall_month','s2','A22','แผง A22',null,'2027-05-01','2027-05-31','ค่าเช่าแผง',300000,'stall-month:s2:2027-05','u')`, [O, B]))[0];
+        expect(m.kind).toBe('stall_month');
+        expect((await fails(`select * from collections_ensure_charge($1,$2,'stall_year','s2','A22','x',null,'2027-05-01','2027-05-31','x',1,'k-bad','u')`, [O, B])).code).toBe('23514');
+    });
+
     it('pay: partial then full; overpayment, zero and voided charges are refused', async () => {
         const c = await charge('k-pay');
         const pay = (amount: number, kind = 'payment') => q(`select * from collections_pay($1,$2,$3,$4,'cash',$5,null,null,'u','พนักงาน')`, [O, B, c.id, amount, kind]);

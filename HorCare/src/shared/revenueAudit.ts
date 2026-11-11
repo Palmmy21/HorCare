@@ -58,7 +58,7 @@ export interface AuditPlan {
 
 export interface AuditCharge {
     id: string;
-    kind: 'stall_week' | 'stall_day' | 'walk_in' | 'extra' | 'stay';
+    kind: 'stall_week' | 'stall_day' | 'stall_month' | 'walk_in' | 'extra' | 'stay';
     room_id: string | null;
     period_start: string;
     period_end: string;
@@ -361,8 +361,9 @@ export function auditRevenue(input: AuditInput): AuditReport {
                 let absentNoNotice = 0, notRecorded = 0, voidedCount = 0;
                 for (const d of tradingDays) {
                     if (chargedDays.has(d)) continue;
-                    if (voidedDays.has(d)) { voidedCount++; continue; }
                     const mark = marks.find(m => m.visit_date === d);
+                    // a charge withdrawn because the stall was then marked absent is an absence, not a cancelled collection
+                    if (voidedDays.has(d) && !(mark && !mark.present)) { voidedCount++; continue; }
                     if (mark && !mark.present) {
                         absentNoNotice++;
                         const k = mark.marked_by_name || 'ไม่ทราบชื่อ';

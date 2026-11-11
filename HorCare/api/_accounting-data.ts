@@ -62,7 +62,7 @@ export function legacyPayment(kind: 'bill' | 'fine', item: PaidItem): PaymentRec
 // ── daily / weekly collection charges (Supabase) ─────────────────────────────
 
 export interface ChargeRow {
-    id: string; kind: 'stay' | 'stall_week' | 'stall_day' | 'walk_in' | 'extra'; room_id: string | null; room_number: string | null;
+    id: string; kind: 'stay' | 'stall_week' | 'stall_day' | 'stall_month' | 'walk_in' | 'extra'; room_id: string | null; room_number: string | null;
     party_name: string; party_phone: string | null; period_start: string; amount_satang: number; status: 'open' | 'paid' | 'void'; created_at: string;
 }
 export interface ChargePaymentRow {
@@ -71,7 +71,7 @@ export interface ChargePaymentRow {
 }
 
 const CHARGE_CATEGORY: Record<ChargeRow['kind'], ReceivableDoc['lines'][number]['category']> = {
-    stay: 'stay', stall_week: 'stall', stall_day: 'stall', walk_in: 'walk_in', extra: 'other_income',
+    stay: 'stay', stall_week: 'stall', stall_day: 'stall', stall_month: 'stall', walk_in: 'walk_in', extra: 'other_income',
 };
 const roomKey = (c: Pick<ChargeRow, 'id' | 'room_id'>) => c.room_id || `charge-${c.id}`;
 

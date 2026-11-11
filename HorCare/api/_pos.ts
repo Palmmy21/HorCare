@@ -24,6 +24,7 @@ import { isRole, permissionsForRole, type Permission } from '../src/shared/permi
 import { POS_LINK_TTL_MS, POS_SESSION_TTL_MS, canClosePosDay, canUsePos, isPosLinkCode, type PosDaySummary } from '../src/shared/posCare.js';
 import { buildRound, dayTotals, resolveRate, type Charge, type ChargePayment, type Rate, type StallPlan } from '../src/shared/collections.js';
 import { addDays, closuresOn, todayTh, type MarketClosure, type ShopClosure } from '../src/shared/market.js';
+import { loadRoundStalls } from './_round-stalls.js';
 import type { BankAccount } from '../src/shared/banks.js';
 
 /** Same rule as the app (src/utils/workspaceTerminology.ts collectionStyleOf): the saved choice, else the building type's default. */
@@ -147,9 +148,7 @@ export async function posDaySummaries(places: PosPlace[], today = todayTh()): Pr
                         mine('collection_rates').limit(1000),
                     ]);
                     if (!plans.error && !charges.error) {
-                        const rooms = (await db.collection(`${base}/rooms`).get()).docs
-                            .filter(d => (d.data() as { is_active?: boolean }).is_active !== false)
-                            .map(d => ({ id: d.id, room_number: String((d.data() as { room_number?: string }).room_number ?? d.id), zone: (d.data() as { zone?: string }).zone ?? null }));
+                        const rooms = (await loadRoundStalls(p.owner_uid, p.building_id, today, sb)).filter(r => r.is_active);
                         const zone = new Map(rooms.map(r => [r.id, r.zone]));
                         const rateList = (rates.data ?? []) as Rate[];
                         const rows = buildRound({

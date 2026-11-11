@@ -15,7 +15,7 @@ import { authorize, buildingExists } from './_rbac.js';
 import { supabase } from './_supabase.js';
 import { toSatang } from '../src/shared/accounting.js';
 import { addDays, todayTh, type MarketClosure, type ShopClosure, type WalkIn, MARKET_CLOSURE_REASON_LABELS_TH } from '../src/shared/market.js';
-import { resolveRate, type Rate } from '../src/shared/collections.js';
+import { effectivePlan, resolveRate, type Rate } from '../src/shared/collections.js';
 import { contractOccupancy, effectiveOccupancy, type LeaseFacts, type ProfileFacts, type RoomStatus, type StatusOverride } from '../src/shared/roomOccupancy.js';
 import {
     auditRevenue, monthDays,
@@ -27,7 +27,7 @@ export const config = { maxDuration: 60 };
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 interface RoomDoc {
-    room_number?: string; zone?: string; is_active?: boolean; rent_amount?: number; room_status?: RoomStatus; status_override?: StatusOverride | null;
+    room_number?: string; zone?: string; is_active?: boolean; rent_amount?: number; rent_type?: string; room_status?: RoomStatus; status_override?: StatusOverride | null;
 }
 interface BillDoc {
     id?: string; room_id?: string; month?: string; is_saved?: boolean; room_rent?: number; total_bill?: number;
@@ -161,7 +161,36 @@ export async function buildAuditInput(owner: string, buildingId: string, month: 
                 : null;
             plans.push({ room_id: p.room_id, mode: p.mode, unit: p.unit, rate_satang: p.rate_satang, fallback_day_satang: fallback, open_days: p.open_days, starts_on: p.starts_on, ends_on: p.status === 'ended' && !p.ends_on ? from : p.ends_on });
         }
+        // a stall with no plan is collected by its own rent (src/shared/collections.ts effectivePlan): per day or per week
+        const planned = new Set(round.plans.map(p => p.room_id));
+        for (const d of roomsSnap.docs) {
+            const r = d.data() as RoomDoc;
+            if (r.is_active === false || planned.has(d.id)) continue;
+            const ep = effectivePlan({ id: d.id, room_number: String(r.room_number ?? d.id), rent_type: r.rent_type ?? 'monthly', rent_satang: toSatang(Number(r.rent_amount) || 0) }, []);
+            if (!ep || ep.mode === 'monthly') continue;
+            const fallback = ep.unit === 'day' && ep.rate_satang === null
+                ? resolveRate(round.rates, { purpose: 'stall', unit: 'day', roomId: d.id, zone: stallZone.get(d.id) ?? null, date: from })?.amount_satang ?? null
+                : null;
+            plans.push({ room_id: d.id, mode: ep.mode, unit: ep.unit, rate_satang: ep.rate_satang, fallback_day_satang: fallback, open_days: ep.open_days, starts_on: ep.starts_on, ends_on: null });
+        }
+
+        // monthly rent collected on the round counts like a rent bill for the month (utilities stay on the meter bill)
+        for (const c of round.charges) {
+            if (c.kind !== 'stall_month' || !c.room_id || c.status === 'void' || c.period_start < from || c.period_start > to) continue;
+            const amount = Number(c.amount_satang), paid = Number(c.paid_satang);
+            const line: AuditBill = {
+                id: c.id, room_id: c.room_id, rent_satang: amount, total_satang: amount, discount_satang: 0, discount_labels: [], prorated: false,
+                status: paid >= amount ? 'paid' : 'unpaid', paid_satang: paid, pending_slip_satang: 0, paid_method: null,
+            };
+            const prev = billOf.get(c.room_id);
+            billOf.set(c.room_id, prev ? {
+                ...prev, rent_satang: prev.rent_satang + amount, total_satang: prev.total_satang + amount, paid_satang: prev.paid_satang + paid,
+                status: prev.status === 'paid' && line.status === 'paid' ? 'paid' : prev.status === 'pending' ? 'pending' : 'unpaid',
+            } : line);
+        }
     }
+    // a utilities-only bill (no rent on it) says nothing about the rent: the rent has simply not been collected yet
+    for (const [id, b] of billOf) if (b.rent_satang === 0 && !plans.some(p => p.room_id === id)) billOf.delete(id);
 
     const walkInsByDay = new Map<string, { approved: number; charged: number }>();
     for (const d of walkSnap.docs) {
