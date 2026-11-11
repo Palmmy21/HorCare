@@ -4,6 +4,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { CleaningRequest, CleaningStatus } from '../types';
+import { raiseTeamAlert } from '../utils/alerts';
 
 export function useCleaningRequests(
   uid: string | null,
@@ -59,13 +60,21 @@ export function useCleaningRequests(
   const addRequest = useCallback(async (data: Partial<CleaningRequest>) => {
     if (!buildingPath) return;
     const now = new Date().toISOString();
-    return await addDoc(collection(db, buildingPath, 'cleaning'), {
+    const ref = await addDoc(collection(db, buildingPath, 'cleaning'), {
       status: 'pending',
       ...data,
       created_at: now,
       updated_at: now,
     });
-  }, [buildingPath]);
+    // written from the app (front desk, owner): the team hears about it, and the housekeepers on LINE
+    if (uid && buildingId && data.room_number) {
+      raiseTeamAlert({
+        ownerUid: uid, buildingId, type: 'cleaning', roomNumber: String(data.room_number),
+        title: `🧹 งานแม่บ้านใหม่ ห้อง ${data.room_number}`, body: [data.preferred_date, data.description].filter(Boolean).join(' · '),
+      });
+    }
+    return ref;
+  }, [buildingPath, uid, buildingId]);
 
   const assignMaid = useCallback(async (
     reqId: string,
@@ -111,7 +120,10 @@ export function useCleaningRequests(
       }
     }
     await updateDoc(doc(db, buildingPath, 'cleaning', reqId), updates);
-  }, [buildingPath]);
+    if (uid && buildingId) {
+      raiseTeamAlert({ ownerUid: uid, buildingId, type: 'job_status', kind: 'cleaning', title: `🧹 ${updates.assigned_maid_name || 'แม่บ้าน'}: รับงานทำความสะอาดแล้ว` });
+    }
+  }, [buildingPath, uid, buildingId]);
 
   const completeRequest = useCallback(async (
     reqId: string,
@@ -133,7 +145,10 @@ export function useCleaningRequests(
       ...(note && { completion_notes: note, completed_note: note }),
       updated_at: new Date().toISOString(),
     });
-  }, [buildingPath]);
+    if (uid && buildingId) {
+      raiseTeamAlert({ ownerUid: uid, buildingId, type: 'job_status', kind: 'cleaning', title: '✅ งานทำความสะอาดเสร็จแล้ว', body: note ?? '' });
+    }
+  }, [buildingPath, uid, buildingId]);
 
   const updateStatus = useCallback(async (
     reqId: string,

@@ -20,6 +20,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { admin, db } from './_firebase.js';
 import { housekeeperUid } from './_housekeepers.js';
 import { writeAudit } from './_audit.js';
+import { pushToLineStaff, raiseAlert } from './_alerts.js';
+import { linkCard } from '../src/shared/staffBot.js';
 import { appBaseUrl } from './_notify.js';
 import { rateLimit } from './_abuse-guard.js';
 import type { WorkOrder, WorkStaff } from '../src/shared/workOrders.js';
@@ -129,6 +131,34 @@ export async function endLineHousekeeping(ownerUid: string, buildingId: string, 
     }
 }
 
+const SERVICE_TH: Record<string, string> = {
+    general: 'ทำความสะอาดทั่วไป', general_cleaning: 'ทำความสะอาดทั่วไป', bathroom: 'ล้างห้องน้ำ', bathroom_cleaning: 'ล้างห้องน้ำ',
+    balcony: 'ล้างระเบียง', bed_linen: 'เปลี่ยนผ้าปู / ซักรีด', deep: 'บิ๊กคลีนนิ่ง', deep_cleaning: 'บิ๊กคลีนนิ่ง',
+    checkout: 'ทำความสะอาดก่อนย้ายออก', move_out_cleaning: 'ทำความสะอาดก่อนย้ายออก', other: 'อื่นๆ',
+};
+
+/**
+ * A housekeeping request just came in: every housekeeper of the property who linked LINE gets it at once on the team
+ * OA, with a button that opens their own job list (where the request waits to be taken). Returns how many were told.
+ */
+export async function notifyHousekeepersOfCleaning(
+    ownerUid: string, buildingId: string,
+    job: { roomNumber: string; serviceType?: string; date?: string | null; slot?: string | null; note?: string | null; urgent?: boolean },
+): Promise<number> {
+    const dorm = await dormNameOf(ownerUid, buildingId);
+    const when = [job.date, job.slot].filter(Boolean).join(' ');
+    const lines = [
+        `${dorm} · ห้อง ${job.roomNumber}`,
+        SERVICE_TH[job.serviceType ?? ''] ?? job.serviceType ?? '',
+        when ? `เวลาที่สะดวก: ${when}` : '',
+        job.note ? String(job.note).slice(0, 120) : '',
+    ].filter(Boolean);
+    return pushToLineStaff(ownerUid, buildingId, 'housekeeping', async staff => {
+        const url = await issuePortalLink(staff.line_user_id!);
+        return url ? linkCard(`🧹 งานแม่บ้านใหม่${job.urgent ? ' (ด่วน)' : ''}`, lines.join('\n'), 'เปิดงานของฉัน', url) : null;
+    });
+}
+
 const dormNameOf = async (ownerUid: string, buildingId: string): Promise<string> =>
     ((await db.doc(`users/${ownerUid}/buildings/${buildingId}/data/config`).get()).data()?.bill_customization?.dorm_name as string | undefined) || 'อาคาร';
 
@@ -167,6 +197,18 @@ async function overview(lineUserId: string): Promise<PortalOverview> {
             const mine = phoneKey(staff.phone);
             const maids = (await db.collection(`${base}/housekeepers`).get()).docs
                 .filter(m => m.data().is_active !== false && phoneKey(String(m.data().phone ?? '')) === mine).map(m => m.id);
+            // requests nobody has taken yet are offered to every housekeeper of the property
+            const open = await db.collection(`${base}/cleaning`).where('status', '==', 'pending').get();
+            for (const d of open.docs) {
+                const r = d.data();
+                if (r.assigned_maid_id) continue;
+                cleaning.push({
+                    key: jobKey(ownerUid, buildingId, d.id), dorm_name: dorm, room_number: String(r.room_number ?? ''),
+                    service_type: String(r.service_type ?? 'general'), description: r.description ?? null,
+                    preferred_date: r.preferred_date ?? null, preferred_time_slot: r.preferred_time_slot ?? null,
+                    status: 'pending', urgent: r.urgency === 'urgent', unassigned: true,
+                });
+            }
             for (const maidId of maids) {
                 const reqs = await db.collection(`${base}/cleaning`).where('assigned_maid_id', '==', maidId).get();
                 for (const d of reqs.docs) {
@@ -221,8 +263,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const r = (await ref.get()).data();
         const maid = r?.assigned_maid_id ? (await db.doc(`${base}/housekeepers/${r.assigned_maid_id}`).get()).data() : undefined;
         const owns = !!maid && mine.some(s => phoneKey(s.staff.phone!) === phoneKey(String(maid.phone ?? '')));
-        if (!r || !owns || CLOSED_CLEANING.includes(r.status)) { res.status(404).json({ error: 'not_found' }); return; }
+        // a request nobody has taken: a housekeeper of this property takes it by acting on it
+        const taking = !!r && !r.assigned_maid_id && mine.length > 0;
+        if (!r || (!owns && !taking) || CLOSED_CLEANING.includes(r.status)) { res.status(404).json({ error: 'not_found' }); return; }
         const now = new Date().toISOString();
+        const me = mine[0]?.staff;
+        if (taking) {
+            const account = await housekeeperAccountFor(mine[0]);
+            if (!account) { res.status(403).json({ error: 'account_disabled' }); return; }
+            await ref.update({ assigned_maid_id: account.id, assigned_maid_name: account.name, assigned_maid_phone: account.phone, assigned_at: now });
+        }
         // kept beside the request, not in it, so listing requests stays light
         if (photo) await db.doc(`${base}/cleaning_images/${job.id}__done`).set({ data: photo, created_at: now });
         await ref.update(to === 'in_progress'
@@ -232,6 +282,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ...(note ? { completion_notes: note, completed_note: note } : {}),
                 ...(photo ? { completion_has_photo: true } : {}),
             });
+        await raiseAlert({
+            ownerUid: job.ownerUid, buildingId: job.buildingId, type: 'job_status', kind: 'cleaning',
+            title: `${to === 'completed' ? '✅' : '🧹'} ${me?.name ?? 'แม่บ้าน'}: ${to === 'completed' ? 'ทำเสร็จแล้ว' : 'เริ่มทำ'} ห้อง ${r.room_number ?? ''}`,
+            body: to === 'completed' ? `${note || 'งานทำความสะอาดเสร็จแล้ว'}${photo ? ' · มีรูปหลังทำ' : ''}` : 'รับงานและกำลังทำความสะอาด',
+            url: '/?view=operations&tab=cleaning',
+        });
         res.status(200).json({ ok: true });
         return;
     }

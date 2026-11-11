@@ -212,7 +212,7 @@ function ActivityLogTab({ ownerUid, buildings }: { ownerUid: string; buildings: 
 }
 
 // ── Members tab ──────────────────────────────────────────────────────────────
-function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageProps) {
+function MembersTab({ ownerUid, buildings }: SecurityPageProps) {
     const [members, setMembers] = useState<MemberDoc[] | null>(null);
     const [email, setEmail] = useState('');
     const [role, setRole] = useState<Role>('front_desk');
@@ -259,26 +259,20 @@ function MembersTab({ ownerUid, buildings, config, onSaveConfig }: SecurityPageP
         return without.includes(id) ? without.filter(p => p !== id) : [...without, id];
     });
 
-    const claimMode = config.claim_mode ?? 'invitation_only';
-
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="card" style={{ padding: '1rem' }}>
                 <div style={{ fontWeight: 700, marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <Link2 size={16} /> การลงทะเบียนผู้เช่าผ่าน LINE
                 </div>
-                <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', fontSize: '0.875rem' }}>
-                    <input
-                        type="checkbox" checked={claimMode === 'invitation_only'}
-                        onChange={e => void onSaveConfig({ ...config, claim_mode: e.target.checked ? 'invitation_only' : 'legacy' })}
-                    />
-                    <span>
-                        ต้องใช้รหัสเชิญรายห้องเท่านั้น (แนะนำ)
-                        <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>
-                            ปิดตัวเลือกนี้จะกลับไปให้ผู้เช่าพิมพ์เลขห้องเองหลังใส่รหัสหอ ซึ่งเสี่ยงผูกผิดห้อง
-                        </span>
-                    </span>
-                </label>
+                <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--color-gray-700)' }}>
+                    ผู้เช่าลงทะเบียนได้ 3 วิธี ไม่ต้องเปิดหรือปิดอะไร: ลิงก์เชิญรายห้อง, QR รายห้อง, หรือรหัสหอแล้วพิมพ์เลขห้อง
+                </p>
+                <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.125rem', fontSize: '0.8125rem', lineHeight: 1.7, color: 'var(--color-gray-600)' }}>
+                    <li>ห้องที่ยังไม่เคยมีใครลงทะเบียน ระบบลงให้อัตโนมัติ</li>
+                    <li>ห้องที่มีคนลงทะเบียนอยู่แล้ว หรือผู้เช่าขอเพิ่มห้องให้ LINE เดิม จะเป็นคำขอรอเจ้าของหรือผู้ดูแลอนุมัติ (หน้าผู้เช่า → QR ลงทะเบียน LINE)</li>
+                    <li>ลิงก์เชิญที่คุณสร้างให้ห้องใดห้องหนึ่ง ถือว่าคุณอนุมัติห้องนั้นแล้ว</li>
+                </ul>
             </div>
 
             <AdminAccountForm ownerUid={ownerUid} buildings={buildings} onCreated={() => void load()} />

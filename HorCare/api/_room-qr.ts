@@ -13,6 +13,9 @@
  * its own only while the room has no LINE account. When the room is taken the scan becomes a request and nobody loses
  * the room until someone with `tenant.update` on that property approves it.
  *
+ * The same rules decide a room named another way — the property's code followed by the room number typed in the chat
+ * (`claimRoom`, used by the webhook): nothing has to be switched on for it, and it is exactly as safe as a scan.
+ *
  * One LINE account may hold several rooms (a teacher renting three for students). A first room, or a tenant changing
  * rooms, binds as above. Someone who already has a room and scans another is asked which they mean: moving binds as
  * before, an ADDED room always goes to an admin first — a QR on a door is no proof the owner wants this person to
@@ -31,7 +34,7 @@ import { writeAudit } from './_audit.js';
 import { bindingDisplay, prepareBinding, recordFriendship } from './_line-binding.js';
 import { channelAllowsOwner, currentLineChannel, isLineFriend, linePush, resolveLineToken, roomLineChannel, runInLineChannel, type LineChannel } from './_line.js';
 import { propertyOaId } from './_line-oa.js';
-import { sendFCMToOwner } from './_notify-owner.js';
+import { raiseAlert } from './_alerts.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { raiseBindingAlert, raiseRequestAlert } from './_security-alerts.js';
 import { MAX_PENDING_PER_ROOM, QR_CHUNK, REJECT_COOLDOWN_MS, type RoomLineRequest } from '../src/shared/roomQr.js';
@@ -138,9 +141,22 @@ export async function scanRoomCode(lineUserId: string, rawCode: string, mode?: B
     if (!isRoomCode(code)) return { outcome: 'invalid' };
     const entry = (await db.collection(CODES).doc(code).get()).data();
     if (!entry || entry.status !== 'active') return { outcome: 'invalid' };
-    const ownerUid = entry.owner_uid as string;
-    const buildingId = entry.building_id as string;
-    const roomId = entry.room_id as string;
+    return claimRoom(lineUserId, { ownerUid: entry.owner_uid as string, buildingId: entry.building_id as string, roomId: entry.room_id as string }, { mode, via: 'room_qr' });
+}
+
+/**
+ * A LINE account asks for a room. The room may have been named by its QR, or by the property's code and a room number
+ * typed in the chat: neither proves the person lives there, so both follow the same rules.
+ *   • the room has no LINE account and this is the person's first room (or they are moving) → registered at once
+ *   • the room already has someone, or this would be one more room for the account → a request an admin decides
+ *   • the person has one other room and has not said what they mean → 'choose'
+ */
+export async function claimRoom(
+    lineUserId: string, target: { ownerUid: string; buildingId: string; roomId: string },
+    opts: { mode?: BindMode; via: 'room_qr' | 'room_number' },
+): Promise<ScanResult> {
+    const { ownerUid, buildingId, roomId } = target;
+    const { mode, via } = opts;
     if (!channelAllowsOwner(ownerUid)) return { outcome: 'invalid' };
     const { dormName, dueDay } = await bindingDisplay(ownerUid, buildingId);
     const channel = currentLineChannel();
@@ -155,7 +171,7 @@ export async function scanRoomCode(lineUserId: string, rawCode: string, mode?: B
         const adding = b.effects.keptRoomNumbers.length > 0;
         // taken by someone else, or one more room for an account that has some: an admin decides
         if (b.effects.replacedExisting || adding) return { roomNumber, taken: true as const, adding, kept: b.effects.keptRoomNumbers };
-        b.commit({ channel, dormName, dueDay, extra: { via: 'room_qr' } });
+        b.commit({ channel, dormName, dueDay, extra: { via } });
         return { roomNumber, effects: b.effects };
     });
 
@@ -168,12 +184,13 @@ export async function scanRoomCode(lineUserId: string, rawCode: string, mode?: B
 
     if ('effects' in bound) {
         await raiseBindingAlert(ownerUid, buildingId, {
-            roomId, roomNumber, lineUserId, via: 'room_qr',
+            roomId, roomNumber, lineUserId, via,
             replacedExisting: false, movedFromRoomNumber: bound.effects!.movedFromRoomNumber,
         });
         await writeAudit({
             ownerUid, propertyId: buildingId, userId: `line:${lineUserId}`, role: 'tenant', action: 'UPDATE',
-            resourceType: 'line_link', resourceId: roomId, resourceLabel: `Room ${roomNumber}`, note: 'registered with room QR',
+            resourceType: 'line_link', resourceId: roomId, resourceLabel: `Room ${roomNumber}`,
+            note: via === 'room_qr' ? 'registered with room QR' : 'registered with property code and room number',
         });
         return { outcome: 'bound', roomNumber, dormName };
     }
@@ -199,9 +216,11 @@ export async function scanRoomCode(lineUserId: string, rawCode: string, mode?: B
     };
     await col.doc(id).set(request);
     await raiseRequestAlert(ownerUid, buildingId, { roomId, roomNumber, lineUserId, displayName: profile });
-    await sendFCMToOwner(ownerUid, {
-        building_id: buildingId, title: adding ? 'มีคำขอเพิ่มห้องให้ LINE เดิม' : 'มีคำขอลงทะเบียน LINE ซ้อน', body: `ห้อง ${roomNumber} รอการอนุมัติ`,
-    }).catch(() => undefined);
+    await raiseAlert({
+        ownerUid, buildingId, type: 'line_request',
+        title: adding ? `📝 ขอเพิ่มห้อง ${roomNumber} ให้ LINE เดิม` : `📝 ขอลงทะเบียน LINE ห้อง ${roomNumber} (มีคนอยู่แล้ว)`,
+        body: `${profile || 'ไม่ทราบชื่อ'} — กดเพื่ออนุมัติหรือปฏิเสธ`,
+    });
     return { outcome: 'requested', roomNumber, dormName, adding };
 }
 

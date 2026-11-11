@@ -3,6 +3,7 @@ import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'fireb
 import { db } from '../../firebase/config';
 import type { StockItem } from '../../types';
 import { Package, Plus, Edit2, Trash2, Check, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { raiseTeamAlert } from '../../utils/alerts';
 
 const STOCK_CATEGORIES = ['ไฟฟ้า', 'ประปา', 'ทั่วไป', 'ทำความสะอาด', 'เครื่องมือ', 'อะไหล่', 'อื่นๆ'];
 type StockForm = Omit<StockItem, 'id' | 'created_at' | 'updated_at'>;
@@ -66,6 +67,14 @@ export default function StockTab({ uid, buildingId }: Props) {
     if (isNaN(delta)) return;
     const next = Math.max(0, it.quantity + delta);
     await updateDoc(doc(db, col, it.id), { quantity: next, updated_at: new Date().toISOString() });
+    if (next !== it.quantity) {
+      const low = it.min_quantity > 0 && next <= it.min_quantity;
+      raiseTeamAlert({
+        ownerUid: uid, buildingId, type: 'stock',
+        title: `📦 ปรับสต๊อก: ${it.name}${low ? ' (ใกล้หมด)' : ''}`,
+        body: `${it.quantity} → ${next} ${it.unit} (${delta > 0 ? '+' : ''}${delta})`,
+      });
+    }
     setAdjId(null); setAdjDelta('');
   };
 

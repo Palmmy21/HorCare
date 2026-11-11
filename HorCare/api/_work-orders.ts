@@ -15,8 +15,9 @@ import { writeAudit } from './_audit.js';
 import { appBaseUrl, notify, type NotifyResult } from './_notify.js';
 import { endLineHousekeeping, parseJobKey, resolvePortalToken } from './_staff-portal.js';
 import { syncStaffMenu } from './_staff-menu.js';
+import { raiseAlert } from './_alerts.js';
 import {
-    MAX_WORK_IMAGES, WORK_TYPE_LABELS_TH, canTransition, isPriority, isWorkType,
+    MAX_WORK_IMAGES, WORK_STATUS_LABELS_TH, WORK_TYPE_LABELS_TH, canTransition, isPriority, isWorkType,
     type StaffRole, type StaffWorkView, type WorkImageKind, type WorkOrder, type WorkStaff, type WorkStatus,
 } from '../src/shared/workOrders.js';
 
@@ -92,6 +93,10 @@ export async function redeemStaffLink(lineUserId: string, rawCode: string): Prom
             action: 'UPDATE', resourceType: 'staff', resourceId: link.staff_id, resourceLabel: result.staffName,
             note: 'staff linked LINE account',
         });
+        await raiseAlert({
+            ownerUid: link.owner_uid, buildingId: link.building_id, type: 'staff_link',
+            title: `✅ ${result.staffName} เชื่อม LINE แล้ว`, body: 'งานที่มอบหมายจะส่งถึงทาง LINE ทันที',
+        });
     }
     return result;
 }
@@ -125,6 +130,7 @@ interface Body {
     staff_id?: string;
     name?: string;
     phone?: string;
+    specialty?: unknown;
     role?: string;
     active?: boolean;
     // work orders
@@ -204,13 +210,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'staff_create') {
         const name = text(body.name, 80);
         const phone = text(body.phone, 20);
-        if (!name || phone === undefined || (body.role !== 'technician' && body.role !== 'housekeeping')) {
+        const specialty = text(body.specialty, 40);
+        if (!name || phone === undefined || specialty === undefined || (body.role !== 'technician' && body.role !== 'housekeeping')) {
             res.status(400).json({ error: 'invalid_input' });
             return;
         }
         const id = randomUUID();
         const staff: WorkStaff = {
-            id, name, phone, role: body.role as StaffRole, active: true,
+            id, name, phone, role: body.role as StaffRole, active: true, ...(specialty ? { specialty } : {}),
             line_user_id: null, linked_at: null, created_at: new Date().toISOString(),
         };
         await db.doc(`${b}/staff/${id}`).set(staff);
@@ -231,6 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (body.name !== undefined) { const n = text(body.name, 80); if (!n) { res.status(400).json({ error: 'invalid_input' }); return; } updates.name = n; }
             if (body.phone !== undefined) { const p = text(body.phone, 20); if (p === undefined) { res.status(400).json({ error: 'invalid_input' }); return; } updates.phone = p; }
             if (body.active !== undefined) { if (typeof body.active !== 'boolean') { res.status(400).json({ error: 'invalid_input' }); return; } updates.active = body.active; }
+            if (body.specialty !== undefined) { const sp = text(body.specialty, 40); if (sp === undefined) { res.status(400).json({ error: 'invalid_input' }); return; } updates.specialty = sp; }
             if (Object.keys(updates).length === 0) { res.status(400).json({ error: 'nothing_to_update' }); return; }
             await ref.update(updates);
             if (updates.active !== undefined || updates.phone !== undefined) {
@@ -477,6 +485,13 @@ async function handleStaff(req: VercelRequest, res: VercelResponse, body: Body) 
         });
     }
     await ref.update(updates);
+    if (to) {
+        await raiseAlert({
+            ownerUid: link.ownerUid, buildingId: link.buildingId, type: 'job_status', kind: 'work_order',
+            title: `${to === 'completed' ? '✅' : '🔧'} ${staff.name}: ${WORK_STATUS_LABELS_TH[to]}`,
+            body: `${order.area}${note ? ` — ${note}` : ''}${to === 'completed' ? ' · กดเพื่อตรวจรับงาน' : ''}`,
+        });
+    }
     await writeAudit({
         ownerUid: link.ownerUid, propertyId: link.buildingId, userId: `staff:${staff.id}`, userName: staff.name, role: staff.role,
         action: 'UPDATE', resourceType: 'work_order', resourceId: order.id, resourceLabel: order.area,

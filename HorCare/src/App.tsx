@@ -39,7 +39,10 @@ import { apiPost } from './utils/api';
 import { isPaidLicense, getMaxRooms, getMaxBuildings, canSendLine, isPlusOrAbove } from './hooks/useSubscription';
 import { useMaintenanceRequests, useStockItems } from './hooks/useMaintenanceRequests';
 import { useCleaningRequests } from './hooks/useCleaningRequests';
-import SlipNotificationToast from './components/SlipNotificationToast';
+import SlipNotificationToast, { type ToastKind } from './components/SlipNotificationToast';
+import { InboxToasts, NotificationBell } from './components/Notifications/NotificationCenter';
+import { useInbox } from './hooks/useInbox';
+import { wantsAlert, type AlertType, type InboxItem } from './shared/alerts';
 import InstallPrompt, { isPWAStandalone } from './components/PWA/InstallPrompt';
 import AddBuildingModal from './components/Building/AddBuildingModal';
 import type { HousekeeperSession, DormConfig, InitialBuildingConfig } from './types';
@@ -231,11 +234,11 @@ function App() {
   // Signed out: the guest home (sample property) unless the visitor asked for sign in / sign up / the plans
   const [authScreen, setAuthScreen] = useState<'login' | 'register' | 'pricing' | null>(null);
 
-  // FCM push notification token — registers silently when permission is already granted
-  useFCMToken(user?.uid ?? null);
-
   // Browser push notification permission state & request helper
   const { permission: notifPermission, requestPermission: requestNotifPermission } = usePushNotification();
+
+  // FCM push notification token — registers silently when permission is already granted, and at once when it is given
+  useFCMToken(user?.uid ?? null, notifPermission);
   const [dismissedNotifBanner, setDismissedNotifBanner] = useState(() => {
     return sessionStorage.getItem('horcare_dismiss_notif_banner') === 'true';
   });
@@ -598,6 +601,9 @@ function App() {
     archives: 'คลังเอกสาร',
   };
 
+  // This account's alerts, live (the bell, the pop-ups). A housekeeper session has none: housekeepers hear on LINE.
+  const inbox = useInbox(user && !maidSession ? user.uid : null);
+
   const handleNavClick = (view: ViewMode) => {
     // แจ้งซ่อม / ใบงาน / งานแม่บ้าน are tabs of ระบบจัดการ (a housekeeper session keeps its own cleaning screen)
     if (!maidSession && (view === 'maintenance' || view === 'cleaning' || view === 'workorders')) {
@@ -612,6 +618,24 @@ function App() {
     setCurrentView(view);
     setMobileMenuOpen(false);
   };
+
+  /** An alert was tapped: open the screen it is about (links look like /?view=operations&tab=team). */
+  const openAlert = (url: string) => {
+    const p = new URLSearchParams(url.split('?')[1] ?? '');
+    const view = p.get('view');
+    const tab = p.get('tab') as OpsTab | null;
+    if (!isViewMode(view)) return;
+    if (view === 'operations' && tab && OPS_TABS.includes(tab)) setOpsTab(tab);
+    handleNavClick(view);
+  };
+  // The older pop-ups (slips, repairs, housekeeping — drawn from the data on screen) follow the same switches…
+  const TOAST_ALERT: Record<ToastKind, AlertType> = {
+    slip: 'payment', maintenance_new: 'maintenance', maintenance_status: 'job_status', cleaning_new: 'cleaning', cleaning_status: 'job_status',
+  };
+  const toastMuted = (kind: ToastKind) => !wantsAlert(inbox.prefs, TOAST_ALERT[kind]);
+  // …and already cover those kinds for the property on screen, so the inbox pop-up skips them there
+  const coveredByDataToasts = (i: InboxItem) => i.building_id === effectiveBuildingId
+    && (i.type === 'payment' || i.type === 'maintenance' || i.type === 'cleaning' || (i.type === 'job_status' && i.kind === 'cleaning'));
 
   // Sidebar: red badge count per view (paid features only), grouped into categories.
   const badgeOf = (id: string): number => {
@@ -960,6 +984,7 @@ function App() {
         onGoToPayments={() => handleNavClick('payments')}
         onGoToMaintenance={() => handleNavClick('maintenance')}
         onGoToCleaning={() => handleNavClick('cleaning')}
+        muted={toastMuted}
       />
       {/* Paid plan near-expiry reminder — nudge to renew before access lapses */}
       {licenseDaysLeft !== null && licenseDaysLeft <= 7 && (
@@ -1006,13 +1031,28 @@ function App() {
           )}
         </button>
         <span className="mobile-header-brand"><img src={horcareLogo} alt="" />HorCare</span>
-        {navDepth > 0 ? (
-          <button type="button" className="mobile-back-btn" onClick={() => window.history.back()} aria-label="ย้อนกลับ">
-            <ChevronLeft size={20} strokeWidth={2.4} aria-hidden /> กลับ
-          </button>
-        ) : (
-          <div style={{ width: 44 }}></div>
+        <div className="mobile-header-end">
+          {user && !maidSession && (
+            <NotificationBell inbox={inbox} permissions={staffPermissions} onOpen={openAlert}
+              pushPermission={notifPermission} onEnablePush={() => void requestNotifPermission()} />
+          )}
+          {navDepth > 0 ? (
+            <button type="button" className="mobile-back-btn" onClick={() => window.history.back()} aria-label="ย้อนกลับ">
+              <ChevronLeft size={20} strokeWidth={2.4} aria-hidden /> กลับ
+            </button>
+          ) : (!user || maidSession) && (
+            <div style={{ width: 44 }}></div>
+          )}
+        </div>
+      </div>
+
+      {/* The same bell on a wide screen, where there is no top bar */}
+      <div className="notif-desktop">
+        {user && !maidSession && (
+          <NotificationBell inbox={inbox} permissions={staffPermissions} onOpen={openAlert}
+            pushPermission={notifPermission} onEnablePush={() => void requestNotifPermission()} />
         )}
+        <InboxToasts inbox={inbox} onOpen={openAlert} skip={coveredByDataToasts} />
       </div>
 
       {/* Sidebar */}

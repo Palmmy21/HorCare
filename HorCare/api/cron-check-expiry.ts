@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_firebase.js';
 import { errorInfo } from '../src/shared/errorInfo.js';
+import { sendMonthlySummaries } from './_monthly-summary.js';
 
 export const config = { maxDuration: 60 };
 
@@ -97,7 +98,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
-        res.status(200).json({ ok: true, notifiedCount, skippedCount });
+        // "ยอดรายเดือน" rides on this daily job (it does something only on the 1st, once)
+        const monthly = await sendMonthlySummaries().catch(err => { console.error('monthly summary failed:', (err as Error).message); return { sent: 0, skipped: 'failed' }; });
+        res.status(200).json({ ok: true, notifiedCount, skippedCount, monthly });
     } catch (errRaw) {
         const err = errorInfo(errRaw);
         console.error('cron-check-expiry failed:', err.message);

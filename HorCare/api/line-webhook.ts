@@ -5,14 +5,14 @@ import { isPaidPlan } from '../src/shared/plans.js';
 import { verifyLineSignature, lineReply, buildBillFlex, getLineImageContent, getLineContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
-import { isRoomCode, scanRoomCode } from './_room-qr.js';
+import { claimRoom, isRoomCode, scanRoomCode, type ScanResult } from './_room-qr.js';
 import { propertyOaId } from './_line-oa.js';
 import { linkedRooms, recordFriendship } from './_line-binding.js';
 import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
 import { readSlipDetails } from './_slip-ai.js';
 import { getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
 import { findFaqAnswer } from './_chatbot.js';
-import { raiseBindingAlert } from './_security-alerts.js';
+
 import { latestAnnouncementsText } from './_announcements.js';
 import { evaluateSlip } from './_slip-flow.js';
 import { portalLinkFor } from './_portal-link.js';
@@ -26,6 +26,7 @@ import type { MonthlyBill } from '../src/types/index.js';
 import { autoPostSafe } from './_ledger-auto.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
+import { raiseAlert } from './_alerts.js';
 import { GUEST_QUICK, TENANT_QUICK, ackText, botText, botVocab, helpText, notRegisteredText, parseTenantCommand, welcomeText } from '../src/shared/tenantBot.js';
 
 export const config = {
@@ -299,7 +300,7 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
         }
 
         // Already has a room and sent the code of another: are they moving, or taking one more?
-        if (pending.step === 'choose_bind' && typeof pending.code === 'string') {
+        if (pending.step === 'choose_bind' && (typeof pending.code === 'string' || pending.room)) {
             if (Number(pending.until ?? 0) < Date.now()) {
                 await pendingSnap.ref.delete();
             } else {
@@ -309,6 +310,7 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
                     return;
                 }
                 if (pending.kind === 'invite') await handleInvitation(lineUserId, replyToken, pending.code, mode);
+                else if (pending.kind === 'number' && pending.room) await handleClaimByNumber(lineUserId, replyToken, pending.room, mode);
                 else await handleRoomCode(lineUserId, replyToken, pending.code, mode);
                 return;
             }
@@ -402,9 +404,14 @@ async function getOldestUnpaidFine(
 const BIND_ADD = 'เพิ่มห้อง';
 const BIND_MOVE = 'ย้ายห้อง';
 
-/** Someone with a room sent the code of another: keep the code for ten minutes and ask what they mean by it. */
-async function askMoveOrAdd(lineUserId: string, replyToken: string, kind: 'room' | 'invite', code: string, roomNumber: string, current: string[]) {
-    await db.collection('line_pending').doc(lineUserId).set({ step: 'choose_bind', kind, code, until: Date.now() + 10 * 60 * 1000 });
+/** What to try again once the person has said "เพิ่มห้อง" or "ย้ายห้อง": a code they sent, or a room they named by number. */
+type BindRetry =
+    | { kind: 'room' | 'invite'; code: string }
+    | { kind: 'number'; room: { ownerUid: string; buildingId: string; roomId: string } };
+
+/** Someone with a room asked for another: keep what they asked for ten minutes and ask what they mean by it. */
+async function askMoveOrAdd(lineUserId: string, replyToken: string, retry: BindRetry, roomNumber: string, current: string[]) {
+    await db.collection('line_pending').doc(lineUserId).set({ step: 'choose_bind', ...retry, until: Date.now() + 10 * 60 * 1000 });
     const mine = current.join(', ');
     await lineReply(replyToken, [botText(
         `คุณลงทะเบียนห้อง ${mine} ไว้แล้วค่ะ ต้องการทำอย่างไรกับห้อง ${roomNumber}?\n\n` +
@@ -432,9 +439,18 @@ async function replyRegistered(lineUserId: string, replyToken: string, dormName:
 }
 
 async function handleRoomCode(lineUserId: string, replyToken: string, code: string, mode?: BindMode) {
-    const r = await scanRoomCode(lineUserId, code, mode);
+    await replyClaim(lineUserId, replyToken, await scanRoomCode(lineUserId, code, mode), { kind: 'room', code });
+}
+
+/** A room named by the property's code and its number, with the person's answer to "เพิ่มห้อง / ย้ายห้อง" when asked. */
+async function handleClaimByNumber(lineUserId: string, replyToken: string, room: { ownerUid: string; buildingId: string; roomId: string }, mode?: BindMode) {
+    await replyClaim(lineUserId, replyToken, await claimRoom(lineUserId, room, { mode, via: 'room_number' }), { kind: 'number', room });
+}
+
+/** Tell the person what became of their request for a room (its QR, or its number), asking "move or add" when needed. */
+async function replyClaim(lineUserId: string, replyToken: string, r: ScanResult, retry: BindRetry) {
     if (r.outcome === 'bound') { await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber); return; }
-    if (r.outcome === 'choose') { await askMoveOrAdd(lineUserId, replyToken, 'room', code, r.roomNumber, r.currentRoomNumbers); return; }
+    if (r.outcome === 'choose') { await askMoveOrAdd(lineUserId, replyToken, retry, r.roomNumber, r.currentRoomNumbers); return; }
     await db.collection('line_pending').doc(lineUserId).delete();
     const room = 'roomNumber' in r ? r.roomNumber : '';
     const adding = (r.outcome === 'requested' || r.outcome === 'already_requested') && r.adding;
@@ -449,7 +465,7 @@ async function handleRoomCode(lineUserId: string, replyToken: string, code: stri
         recently_rejected: `⚠️ คำขอลงทะเบียนห้อง ${room} ไม่ได้รับการอนุมัติ กรุณาติดต่อเจ้าของหอค่ะ`,
         too_many_requests: `⚠️ ห้อง ${room} มีคำขอรออนุมัติหลายรายการ กรุณาติดต่อเจ้าของหอค่ะ`,
         room_unavailable: '⚠️ ห้องนี้ไม่พร้อมใช้งาน กรุณาติดต่อเจ้าของหอ',
-        invalid: '❌ QR นี้ใช้ไม่ได้แล้ว กรุณาขอใบใหม่จากเจ้าของหอ',
+        invalid: retry.kind === 'number' ? '❌ ลงทะเบียนห้องนี้จากบัญชี LINE นี้ไม่ได้ กรุณาติดต่อเจ้าของหอ' : '❌ QR นี้ใช้ไม่ได้แล้ว กรุณาขอใบใหม่จากเจ้าของหอ',
     }[r.outcome];
     await lineReply(replyToken, [{ type: 'text', text }]);
 }
@@ -460,7 +476,7 @@ async function handleInvitation(lineUserId: string, replyToken: string, token: s
         await replyRegistered(lineUserId, replyToken, r.dormName, r.roomNumber, r.keptRoomNumbers);
         return;
     }
-    if (r.reason === 'choose') { await askMoveOrAdd(lineUserId, replyToken, 'invite', token, r.roomNumber, r.currentRoomNumbers); return; }
+    if (r.reason === 'choose') { await askMoveOrAdd(lineUserId, replyToken, { kind: 'invite', code: token }, r.roomNumber, r.currentRoomNumbers); return; }
     await db.collection('line_pending').doc(lineUserId).delete();
     const messages: Record<string, string> = {
         not_found: '❌ ไม่พบรหัสเชิญนี้ กรุณาตรวจสอบรหัส หรือขอรหัสใหม่จากเจ้าของหอ',
@@ -486,16 +502,9 @@ async function handleDormCode(lineUserId: string, replyToken: string, dormCode: 
     }
     const { uid, building_id, dorm_name, due_day } = codeSnap.data()!;
 
-    // Typing a room number is not a safe way to claim a room (wrong/forged numbers).
-    // Unless the owner explicitly opted into the legacy flow, require an invitation.
-    const cfg = await db.doc(`users/${uid}/buildings/${building_id}/data/config`).get();
-    if (cfg.data()?.claim_mode !== 'legacy') {
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `✅ พบหอพัก: ${dorm_name || dormCode}\n\nหอพักนี้ลงทะเบียนผ่านลิงก์เชิญเฉพาะห้องเท่านั้น\nกรุณาขอ "ลิงก์เชิญ" หรือรหัสเชิญ (HCI-...) จากเจ้าของหอ แล้วกดลิงก์หรือพิมพ์รหัสมาในแชทนี้ค่ะ`,
-        }]);
-        return;
-    }
+    // The property's code and a room number always work: there is no setting to switch on. A typed number proves no
+    // more than a QR on a door, so it goes through the same rules (claimRoom): a room nobody registered is given at
+    // once, anything else waits for the owner or an admin.
     await db.collection('line_pending').doc(lineUserId).set({
         step: 'waiting_room_number',
         dorm_code: dormCode,
@@ -508,81 +517,30 @@ async function handleDormCode(lineUserId: string, replyToken: string, dormCode: 
     }]);
 }
 
-/** รับเลขห้อง บันทึกการลงทะเบียน (overwrite คนเก่าอัตโนมัติ) */
+/** รับเลขห้องหลังใส่รหัสหอ: ห้องที่ยังไม่มีใครลงทะเบียนได้เลย นอกนั้นรอเจ้าของหรือแอดมินอนุมัติ (claimRoom) */
 async function handleRoomNumber(
     lineUserId: string,
     replyToken: string,
     roomNumberInput: string,
     pending: FirebaseFirestore.DocumentData,
 ) {
-    const { uid, building_id, dorm_name, due_day } = pending;
-
-    const roomsSnap = await db
-        .collection(`users/${uid}/buildings/${building_id}/rooms`)
-        .where('room_number', '==', roomNumberInput)
-        .where('is_active', '==', true)
-        .limit(1)
-        .get();
+    const { uid, building_id } = pending;
+    const typed = roomNumberInput.trim();
+    const rooms = db.collection(`users/${uid}/buildings/${building_id}/rooms`);
+    let roomsSnap = await rooms.where('room_number', '==', typed).where('is_active', '==', true).get();
+    // "a02" for room "A02": the number is typed by hand
+    if (roomsSnap.empty && typed.toUpperCase() !== typed) {
+        roomsSnap = await rooms.where('room_number', '==', typed.toUpperCase()).where('is_active', '==', true).get();
+    }
 
     if (roomsSnap.empty) {
         await lineReply(replyToken, [{
             type: 'text',
-            text: `❌ ไม่พบห้อง "${roomNumberInput}" กรุณาตรวจสอบเลขห้องแล้วลองใหม่\n\nหรือพิมพ์ "ยกเลิก" เพื่อออก`,
+            text: `❌ ไม่พบห้อง "${typed}" กรุณาตรวจสอบเลขห้องแล้วลองใหม่\n\nหรือพิมพ์ "ยกเลิก" เพื่อออก`,
         }]);
         return;
     }
-
-    const roomDoc = roomsSnap.docs[0];
-    const existingLineUserId = roomDoc.data().line_user_id as string | undefined;
-
-    // ── ป้องกันการแย่งห้อง — ถ้าห้องมีคนลงทะเบียนอยู่แล้ว ปฏิเสธ ────
-    if (existingLineUserId && existingLineUserId !== lineUserId) {
-        await db.collection('line_pending').doc(lineUserId).delete();
-        await lineReply(replyToken, [{
-            type: 'text',
-            text: `⚠️ ห้อง ${roomNumberInput} มีผู้ลงทะเบียน LINE ไว้แล้วค่ะ\n\nกรุณาติดต่อเจ้าของหอเพื่อยกเลิกการลงทะเบียนเก่าก่อนนะคะ`,
-        }]);
-        return;
-    }
-
-    const prevLink = (await db.collection('line_rooms').doc(lineUserId).get()).data();
-    // typing a room number replaces the registration: not something to do to an account that holds several rooms
-    if (roomsOfLink(prevLink).length > 1) {
-        await db.collection('line_pending').doc(lineUserId).delete();
-        await lineReply(replyToken, [{ type: 'text', text: '⚠️ LINE นี้ลงทะเบียนไว้หลายห้องแล้วค่ะ หากต้องการเพิ่มหรือเปลี่ยนห้อง กรุณาขอลิงก์เชิญจากเจ้าของหอ' }]);
-        return;
-    }
-    const alreadyBound = existingLineUserId === lineUserId && prevLink?.room_id === roomDoc.id;
-
-    const batch = db.batch();
-
-    // ── บันทึกการลงทะเบียนใหม่ ────────────────────────────────────
-    batch.update(roomDoc.ref, { line_user_id: lineUserId, line_channel: currentLineChannel() });
-    batch.set(db.collection('line_rooms').doc(lineUserId), {
-        uid,
-        building_id,
-        room_id: roomDoc.id,
-        room_number: roomNumberInput,
-        dorm_name,
-        due_day,
-        registered_at: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    batch.delete(db.collection('line_pending').doc(lineUserId));
-
-    await batch.commit();
-
-    if (!alreadyBound) {
-        await raiseBindingAlert(uid, building_id, {
-            roomId: roomDoc.id, roomNumber: roomNumberInput, lineUserId, via: 'room_number',
-            replacedExisting: false,
-            movedFromRoomNumber: prevLink && prevLink.room_id !== roomDoc.id ? String(prevLink.room_number ?? '') || null : null,
-        });
-    }
-
-    await lineReply(replyToken, [{
-        type: 'text',
-        text: `🎉 ลงทะเบียนสำเร็จ!\n\n🏠 หอพัก: ${dorm_name || '-'}\n🚪 ห้อง: ${roomNumberInput}\n\nเดือนนี้เจ้าของหอจะส่งบิลค่าน้ำ-ไฟมาให้ทาง LINE ค่ะ\n\nพิมพ์ "บิล" เพื่อดูบิลล่าสุดได้เลย 💬`,
-    }]);
+    await handleClaimByNumber(lineUserId, replyToken, { ownerUid: uid, buildingId: building_id, roomId: roomsSnap.docs[0].id });
 }
 
 /** ดูบิลล่าสุดของห้องที่ลงทะเบียน */
@@ -1099,24 +1057,14 @@ async function handleSlipImage(
 
     if (autoVerified || split?.status === 'ok') await autoPostSafe(uid, building_id);
 
-    // แจ้งเจ้าของหอผ่าน FCM (best-effort)
-    try {
-        const fcmDoc = await db.doc(`users/${uid}/data/fcm`).get();
-        const tokensMap: Record<string, { token: string }> = fcmDoc.data()?.tokens ?? {};
-        const tokens = Object.values(tokensMap).map(v => v.token).filter(Boolean);
-        if (tokens.length > 0) {
-            await admin.messaging().sendEachForMulticast({
-                tokens,
-                notification: {
-                    title: `💳 สลิปใหม่ ห้อง ${room_number}`,
-                    body: evaluation.outcome === 'approved' ? `รับยอดอัตโนมัติแล้ว ฿${geminiAmount ?? ''}`
-                        : evaluation.outcome === 'mismatch' ? `สลิปไม่ตรง: ${evaluation.problems.join(' · ')}`
-                        : 'AI ตรวจไม่ได้ — กรุณาดูสลิปและยืนยันยอด',
-                },
-                webpush: { notification: { icon: '/logo-icon.png', badge: '/logo-icon.png', lang: 'th' }, fcmOptions: { link: '/' } },
-            });
-        }
-    } catch { /* best-effort */ }
+    // everyone who handles money at this property hears about it (in the app at once, and on their phone)
+    await raiseAlert({
+        ownerUid: uid, buildingId: building_id, type: 'payment',
+        title: `💳 สลิปใหม่ ห้อง ${room_number}`,
+        body: evaluation.outcome === 'approved' ? `รับยอดอัตโนมัติแล้ว ฿${geminiAmount ?? ''}`
+            : evaluation.outcome === 'mismatch' ? `สลิปไม่ตรง: ${evaluation.problems.join(' · ')}`
+            : 'AI ตรวจไม่ได้ — กรุณาดูสลิปและยืนยันยอด',
+    });
 }
 
 const slipItemLabel = (isFine: boolean, item: object) =>

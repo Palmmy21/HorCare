@@ -14,12 +14,16 @@ import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { linePush, roomLineToken } from './_line.js';
 import { loadMediaDataUrl } from './_line-media.js';
+import { raiseAlert } from './_alerts.js';
 import {
     MAX_INCOMING_CHARS, MAX_OUTGOING_CHARS,
     type LineMessage, type LineThread, type MessageKind, type MessageMedia,
 } from '../src/shared/messages.js';
 
 export const config = { maxDuration: 15 };
+
+/** A burst of messages from one tenant is one alert: the next comes after this much quiet, or once the thread was read. */
+export const CHAT_ALERT_QUIET_MS = 5 * 60 * 1000;
 
 /** Don't re-send the automatic acknowledgement more often than this. */
 export const ACK_EVERY_MS = 6 * 3600 * 1000;
@@ -64,9 +68,12 @@ export async function recordInbound(
     };
 
     // One transaction so two quick messages can't lose an unread increment.
+    let alert = false;
     const shouldAck = await db.runTransaction<boolean>(async tx => {
         const snap = await tx.get(ref);
         const prev = snap.exists ? (snap.data() as LineThread) : null;
+        alert = !prev || prev.unread_count === 0 || prev.last_direction !== 'in'
+            || now.getTime() - Date.parse(prev.last_message_at) > CHAT_ALERT_QUIET_MS;
         const ack = !prev?.last_ack_at || now.getTime() - Date.parse(prev.last_ack_at) > ACK_EVERY_MS;
         const thread: LineThread = {
             line_user_id: lineUserId, room_id, room_number, tenant_name: tenantName,
@@ -78,6 +85,12 @@ export async function recordInbound(
         tx.set(db.doc(`${ref.path}/messages/${msg.id}`), msg);
         return ack;
     });
+    if (alert) {
+        await raiseAlert({
+            ownerUid: uid, buildingId: building_id, type: 'chat',
+            title: `💬 ห้อง ${room_number}${tenantName ? ` · ${tenantName}` : ''}`, body: text.slice(0, 140),
+        });
+    }
     return { recorded: true, shouldAck };
 }
 

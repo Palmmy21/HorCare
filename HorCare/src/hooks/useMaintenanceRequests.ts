@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, doc, onSnapshot, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { MaintenanceRequest, MaintenancePartUsed, StockItem, Asset, AssetCondition, Vendor } from '../types';
+import { raiseTeamAlert } from '../utils/alerts';
 
 export function useMaintenanceRequests(
   uid: string | null,
@@ -115,6 +116,8 @@ export function useStockItems(uid: string | null, buildingId: string | null) {
         quantity: newQty, updated_at: now,
       });
     }));
+    const used = parts.map(p => { const it = stockMap.get(p.stock_id); return it ? `${it.name} -${p.qty} ${it.unit}` : ''; }).filter(Boolean);
+    if (used.length > 0) raiseTeamAlert({ ownerUid: uid, buildingId, type: 'stock', title: '📦 เบิกของจากสต๊อก (งานซ่อม)', body: used.join(' · ') });
   };
 
   return { items, loading, decrementMany };

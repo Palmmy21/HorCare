@@ -120,6 +120,7 @@ export interface DormConfig {
   portal_pin?: string; // PIN สำหรับเข้า tenant portal (4 หลัก)
   market_config?: MarketConfig; // ตั้งค่าเฉพาะตลาด / แผงค้า
   /** How tenants may claim a room over LINE. Undefined = 'invitation_only'. */
+  /** No longer read: every way of registering is always open, and the server decides what needs approval. */
   claim_mode?: 'invitation_only' | 'legacy';
   /** Owner-defined amenities, offered next to the built-in list in bulk room creation. */
   custom_amenities?: string[];

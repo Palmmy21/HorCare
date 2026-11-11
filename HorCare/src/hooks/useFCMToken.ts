@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { messagingPromise, firebaseConfig } from '../firebase/config';
-import { db } from '../firebase/config';
+import { apiPost } from '../utils/api';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
 const SW_PATH = '/firebase-messaging-sw.js';
@@ -31,7 +30,11 @@ async function registerFCMServiceWorker(): Promise<ServiceWorkerRegistration | n
     }
 }
 
-export function useFCMToken(uid: string | null) {
+/**
+ * Register this device for notifications that arrive with the app closed. `permission` is passed so that the moment
+ * the person allows notifications (from the bell), the device registers — without waiting for the next visit.
+ */
+export function useFCMToken(uid: string | null, permission?: string) {
     const [token, setToken] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const savedRef = useRef<string | null>(null);
@@ -61,15 +64,9 @@ export function useFCMToken(uid: string | null) {
                 // Persist token (upsert) so the backend can push to this device
                 if (savedRef.current !== fcmToken) {
                     savedRef.current = fcmToken;
-                    const tokenDocRef = doc(db, `users/${uid}/data/fcm`);
-                    const deviceKey = btoa(fcmToken.slice(-32)).replace(/[^a-z0-9]/gi, '').slice(0, 20);
-                    await setDoc(tokenDocRef, {
-                        [`tokens.${deviceKey}`]: {
-                            token: fcmToken,
-                            updated_at: serverTimestamp(),
-                            ua: navigator.userAgent.slice(0, 100),
-                        }
-                    }, { merge: true });
+                    // Through the server, not straight to the database: the rules only let an account with its own
+                    // active plan write here, which a staff account (accounting, front desk, …) never has.
+                    await apiPost('alerts', { action: 'token_save', token: fcmToken, ua: navigator.userAgent.slice(0, 100) });
                 }
 
                 // Foreground messages — show system notification while app is open
@@ -114,7 +111,7 @@ export function useFCMToken(uid: string | null) {
 
         init();
         return () => { cancelled = true; };
-    }, [uid]);
+    }, [uid, permission]);
 
     return { token, error };
 }

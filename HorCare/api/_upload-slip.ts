@@ -11,6 +11,7 @@ import { rateLimit } from './_abuse-guard.js';
 import { resolvePortalLink } from './_portal-link.js';
 import { errorInfo } from '../src/shared/errorInfo.js';
 import { autoPostSafe } from './_ledger-auto.js';
+import { raiseAlert } from './_alerts.js';
 
 /** A compressed slip (900px JPEG) is a few hundred KB as a data URL. */
 const MAX_SLIP_CHARS = 1_500_000;
@@ -157,6 +158,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (autoVerified) await autoPostSafe(uid, buildingId);
+        await raiseAlert({
+            ownerUid: uid, buildingId, type: 'payment',
+            title: `💳 สลิปใหม่ ห้อง ${String(targetData.room_number ?? '')}`,
+            body: evaluation.outcome === 'approved' ? `รับยอดอัตโนมัติแล้ว ฿${evaluation.aiAmount ?? ''}`
+                : evaluation.outcome === 'mismatch' ? `สลิปไม่ตรง: ${evaluation.problems.join(' · ')}`
+                : 'AI ตรวจไม่ได้ — กรุณาดูสลิปและยืนยันยอด',
+        });
         res.status(200).json({
             success: true, autoVerified, status: autoVerified ? 'paid' : 'pending',
             outcome: evaluation.outcome, problems: evaluation.problems,

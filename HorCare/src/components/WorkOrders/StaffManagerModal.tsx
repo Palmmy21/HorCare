@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, UserPlus, Loader2, MessageCircle, Copy, Link2Off, Wrench, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
-import { STAFF_ROLE_LABELS_TH, type StaffRole, type WorkStaff } from '../../shared/workOrders';
+import { STAFF_ROLE_LABELS_TH, type StaffRole, type WorkStaff, SPECIALTY_SUGGESTIONS } from '../../shared/workOrders';
 
 interface Props {
     ownerUid: string;
@@ -15,6 +15,7 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [role, setRole] = useState<StaffRole>('technician');
+    const [specialty, setSpecialty] = useState('');
     const [busy, setBusy] = useState<string | null>(null);
     const [codes, setCodes] = useState<Record<string, { code: string; expires_at: number }>>({});
     // Staff use their own LINE OA (not the tenant one)
@@ -37,8 +38,11 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
 
     const add = async () => {
         if (!name.trim()) return;
-        const r = await call('add', { action: 'staff_create', name: name.trim(), phone: phone.trim(), role }, 'เพิ่มพนักงานแล้ว');
-        if (r) { setName(''); setPhone(''); }
+        const r = await call('add', {
+            action: 'staff_create', name: name.trim(), phone: phone.trim(), role,
+            ...(role === 'technician' && specialty.trim() ? { specialty: specialty.trim() } : {}),
+        }, 'เพิ่มพนักงานแล้ว');
+        if (r) { setName(''); setPhone(''); setSpecialty(''); }
     };
 
     const issueCode = async (s: WorkStaff) => {
@@ -71,6 +75,12 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
                                 <select className="form-input" value={role} onChange={e => setRole(e.target.value as StaffRole)}>
                                     <option value="technician">ช่าง</option><option value="housekeeping">แม่บ้าน</option>
                                 </select></label>
+                            {role === 'technician' && (
+                                <label style={field}><span className="form-label">ความถนัด (ไม่บังคับ)</span>
+                                    <input className="form-input" maxLength={40} list="staff-specialties" placeholder="เช่น ช่างแอร์ ช่างไฟ" value={specialty} onChange={e => setSpecialty(e.target.value)} />
+                                    <datalist id="staff-specialties">{SPECIALTY_SUGGESTIONS.map(x => <option key={x} value={x} />)}</datalist>
+                                </label>
+                            )}
                         </div>
                         <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={add} disabled={!name.trim() || busy === 'add'}>
                             {busy === 'add' ? <Loader2 size={14} className="spin" /> : <UserPlus size={14} />} เพิ่ม
@@ -89,7 +99,7 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
                                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                                             {s.role === 'technician' ? <Wrench size={15} /> : <Sparkles size={15} />}
                                             <span style={{ fontWeight: 700 }}>{s.name}</span>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>{STAFF_ROLE_LABELS_TH[s.role]}{s.phone ? ` · ${s.phone}` : ''}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>{STAFF_ROLE_LABELS_TH[s.role]}{s.specialty ? ` · ${s.specialty}` : ''}{s.phone ? ` · ${s.phone}` : ''}</span>
                                             <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: s.line_user_id ? '#15803D' : '#C2410C', display: 'inline-flex', gap: 4, alignItems: 'center' }}>
                                                 <MessageCircle size={12} /> {s.line_user_id ? 'เชื่อม LINE แล้ว' : 'ยังไม่เชื่อม LINE'}
                                             </span>

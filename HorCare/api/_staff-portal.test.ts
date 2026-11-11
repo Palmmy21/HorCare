@@ -179,3 +179,36 @@ describe('staff portal', () => {
         try { expect((await call(portal, { action: 'overview', token })).statusCode).toBe(401); } finally { Date.now = now; }
     });
 });
+
+describe('a new housekeeping request reaches the housekeepers', () => {
+    it('is offered to every housekeeper of the property until one of them takes it', async () => {
+        seed(`${B}/cleaning/c9`, { room_number: '305', service_type: 'general', status: 'pending' });
+        const token = tokenOf(await issuePortalLink(LINE));
+        const before = (await call(portal, { action: 'overview', token })).body.cleaning as { key: string; unassigned?: boolean }[];
+        expect(before.find(c => c.key === 'o2~bB~c9')).toMatchObject({ unassigned: true, status: 'pending' });
+
+        expect((await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c9', status: 'in_progress' })).statusCode).toBe(200);
+        expect(read(`${B}/cleaning/c9`)).toMatchObject({ status: 'in_progress', assigned_maid_id: 'm1', assigned_maid_name: 'เอ' });
+        const after = (await call(portal, { action: 'overview', token })).body.cleaning as { key: string; unassigned?: boolean }[];
+        expect(after.filter(c => c.key === 'o2~bB~c9')).toHaveLength(1);
+        expect(after.find(c => c.key === 'o2~bB~c9')?.unassigned).toBeUndefined();
+    });
+
+    it('is not offered to, and cannot be taken by, a technician or someone from another property', async () => {
+        seed(`${B}/cleaning/c9`, { room_number: '305', service_type: 'general', status: 'pending' });
+        const other = tokenOf(await issuePortalLink(OTHER_LINE));
+        expect(((await call(portal, { action: 'overview', token: other })).body.cleaning as unknown[])).toEqual([]);
+        expect((await call(portal, { action: 'cleaning_update', token: other, job: 'o2~bB~c9', status: 'in_progress' })).statusCode).toBe(404);
+        expect(read(`${B}/cleaning/c9`)?.assigned_maid_id).toBeUndefined();
+    });
+
+    it('finishing a job tells the people who manage jobs', async () => {
+        seed('users/o2', { uid: 'o2' });
+        const token = tokenOf(await issuePortalLink(LINE));
+        await call(portal, { action: 'cleaning_update', token, job: 'o2~bB~c1', status: 'completed', note: 'เรียบร้อย' });
+        const inbox = listPaths('users/o2/inbox/').map(p => read(p)!);
+        expect(inbox).toHaveLength(1);
+        expect(inbox[0]).toMatchObject({ type: 'job_status', kind: 'cleaning', building_id: 'bB' });
+        expect(String(inbox[0].title)).toContain('ทำเสร็จแล้ว ห้อง 201');
+    });
+});

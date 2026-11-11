@@ -6269,3 +6269,142 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
 .oa-check svg { flex-shrink: 0; margin-top: 2px; color: #15803D; }
 .oa-check.is-todo { color: #9A3412; }
 .oa-check.is-todo svg { color: #C2410C; }
+
+/* ── Tenants page ─────────────────────────────────────────────────────────── */
+.tenants-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-3) var(--space-4); flex-wrap: wrap; }
+.tenants-head-text { min-width: 0; }
+.tenants-title { display: flex; align-items: center; gap: 0.5rem; }
+.tenants-toolbar { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.tenants-search {
+  display: flex; align-items: center; gap: var(--space-2); min-height: 44px; padding: 0 var(--space-3);
+  background: var(--color-gray-50); border: 1px solid var(--color-gray-200); border-radius: var(--radius-lg); color: var(--color-gray-400);
+}
+.tenants-search:focus-within { border-color: var(--color-primary); }
+.tenants-search input { flex: 1; min-width: 0; border: none; background: none; outline: none; font: inherit; font-size: 0.9375rem; color: var(--color-gray-900); }
+.tenants-search input::-webkit-search-cancel-button { display: none; }
+.tenants-search button { display: flex; padding: 4px; border: none; background: none; color: inherit; cursor: pointer; border-radius: 50%; }
+.tenants-filters {
+  display: flex; gap: 2px; padding: 3px; background: var(--color-gray-100); border-radius: var(--radius-lg);
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.tenants-filters::-webkit-scrollbar { display: none; }
+.tenants-filter {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; min-height: 38px;
+  padding: 0 var(--space-3); border: none; border-radius: var(--radius-md); background: transparent; cursor: pointer;
+  font: inherit; font-size: 0.8125rem; font-weight: 500; white-space: nowrap; color: var(--color-gray-500);
+}
+.tenants-filter.is-on { background: var(--color-white); color: var(--color-primary); font-weight: 700; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); }
+.tenants-filter.is-on.is-risk { background: rgba(220, 38, 38, 0.12); color: #DC2626; }
+.tenants-filter.is-on.is-signed { background: rgba(21, 128, 61, 0.12); color: #15803D; }
+
+.tenant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: var(--space-3); align-items: start; }
+.tenant-card {
+  display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-4);
+  border: 1px solid var(--color-gray-200); border-radius: var(--radius-xl); background: var(--color-white);
+  cursor: pointer; transition: box-shadow 0.15s, transform 0.15s;
+}
+.tenant-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.tenant-card.is-risk-high { border-color: rgba(220, 38, 38, 0.35); background: rgba(220, 38, 38, 0.04); }
+.tenant-card.is-risk-medium { border-color: rgba(245, 158, 46, 0.4); background: rgba(245, 158, 46, 0.05); }
+.tenant-card-top { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.tenant-card-avatar {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--color-gray-100); color: var(--color-gray-400); font-size: 1.125rem; font-weight: 800;
+}
+.tenant-card-avatar.is-filled { background: linear-gradient(135deg, #0F4C81, #E8740C); color: #fff; }
+.tenant-card-avatar.is-market { background: linear-gradient(135deg, #E8740C, #F59E2E); color: #fff; }
+.tenant-card-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tenant-card-name { display: flex; align-items: center; gap: 0.375rem; min-width: 0; font-size: 0.9375rem; font-weight: 700; color: var(--color-gray-900); }
+.tenant-card-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tenant-card-name svg { flex-shrink: 0; }
+.tenant-card-room { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8125rem; font-weight: 700; color: var(--color-gray-600); }
+.tenant-card-muted { font-weight: 400; color: var(--color-gray-500); }
+.tenant-card-go { flex-shrink: 0; color: var(--color-gray-300); }
+.tenant-card-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem 0.75rem; font-size: 0.8125rem; color: var(--color-gray-600); }
+.tenant-fact { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+.tenant-fact.is-blue { color: var(--color-primary); font-weight: 600; }
+.tenant-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; padding: 0.125rem 0.5rem; border-radius: 6px;
+  font-size: 0.75rem; font-weight: 600; background: rgba(85, 112, 137, 0.08); color: var(--color-gray-600);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tenant-chip svg { flex-shrink: 0; }
+.tenant-chip.is-green { background: rgba(21, 128, 61, 0.1); color: #15803D; }
+.tenant-chip.is-amber { background: #FDEBD3; color: #9A3412; }
+.tenant-chip.is-red { background: rgba(220, 38, 38, 0.1); color: #DC2626; }
+.tenant-card-risk {
+  display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.625rem; border-radius: var(--radius-md);
+  font-size: 0.8125rem; font-weight: 700; background: rgba(245, 158, 46, 0.16); color: #9A3412;
+}
+.tenant-card.is-risk-high .tenant-card-risk { background: rgba(220, 38, 38, 0.12); color: #B91C1C; }
+.tenant-card-actions { display: flex; gap: var(--space-2); }
+.tenant-card-btn {
+  flex: 1; min-width: 0; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+  padding: 0 var(--space-2); border-radius: var(--radius-md); cursor: pointer; font: inherit; font-size: 0.8125rem; font-weight: 700;
+  white-space: nowrap; background: rgba(15, 76, 129, 0.07); border: 1px solid rgba(15, 76, 129, 0.2); color: #0F4C81;
+}
+.tenant-card-btn.is-line { background: rgba(6, 199, 85, 0.08); border-color: rgba(6, 199, 85, 0.3); color: #15803D; }
+.tenant-card-btn.is-done { background: rgba(21, 128, 61, 0.1); border-color: rgba(21, 128, 61, 0.3); color: #15803D; }
+@media (max-width: 640px) {
+  .tenants-head { flex-direction: column; align-items: center; }
+  .tenants-title { justify-content: center; }
+  .tenants-head .btn { width: 100%; justify-content: center; }
+}
+
+/* QR desk: save one room's card as a picture, from its row */
+.qr-desk-save { margin-left: auto; flex-shrink: 0; }
+
+/* ── Alerts: the bell, its panel, the pop-ups ─────────────────────────────── */
+.notif-bell { position: relative; display: inline-flex; }
+.notif-bell-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  border: none; border-radius: 50%; background: transparent; color: inherit; cursor: pointer;
+}
+.notif-badge {
+  position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; background: #DC2626; color: #fff;
+  font-size: 0.6875rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.notif-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 1200; width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 560px);
+  display: flex; flex-direction: column; overflow: hidden; background: var(--color-white); color: var(--color-gray-800);
+  border: 1px solid var(--color-gray-200); border-radius: var(--radius-xl); box-shadow: 0 16px 40px rgba(16, 42, 67, 0.18);
+}
+.notif-panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-gray-100); font-size: 0.9375rem; }
+.notif-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0; border: none; border-radius: 50%; background: transparent; color: var(--color-gray-500); cursor: pointer; }
+.notif-icon-btn:hover { background: var(--color-gray-100); }
+.notif-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.notif-list li + li { border-top: 1px solid var(--color-gray-100); }
+.notif-item, .notif-toast-main { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: var(--space-3) var(--space-4); border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.notif-item:hover { background: var(--color-gray-50); }
+.notif-item-title { font-size: 0.875rem; font-weight: 700; color: var(--color-gray-900); overflow-wrap: anywhere; }
+.notif-item-body { font-size: 0.8125rem; line-height: 1.45; color: var(--color-gray-600); overflow-wrap: anywhere; }
+.notif-item-when { font-size: 0.6875rem; color: var(--color-gray-400); margin-top: 2px; }
+.notif-empty { margin: 0; padding: var(--space-6) var(--space-4); text-align: center; font-size: 0.875rem; line-height: 1.6; color: var(--color-gray-500); }
+.notif-settings { overflow-y: auto; padding: var(--space-2) var(--space-4) var(--space-4); display: flex; flex-direction: column; }
+.notif-push { padding: var(--space-2) 0 var(--space-3); border-bottom: 1px solid var(--color-gray-100); margin-bottom: var(--space-1); }
+.notif-switch { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; cursor: pointer; }
+.notif-switch span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.notif-switch strong { font-size: 0.875rem; font-weight: 600; color: var(--color-gray-900); }
+.notif-switch small { font-size: 0.75rem; line-height: 1.4; color: var(--color-gray-500); }
+.notif-switch input { flex-shrink: 0; width: 20px; height: 20px; accent-color: var(--color-primary); cursor: pointer; }
+.notif-note { display: flex; gap: var(--space-2); margin: 0; font-size: 0.8125rem; line-height: 1.5; color: var(--color-gray-600); }
+.notif-note svg { flex-shrink: 0; margin-top: 2px; }
+.notif-desktop { position: fixed; top: 14px; right: 18px; z-index: 1150; }
+.notif-desktop .notif-bell-btn { background: var(--color-white); color: var(--color-gray-700); border: 1px solid var(--color-gray-200); box-shadow: 0 2px 8px rgba(16, 42, 67, 0.08); }
+.notif-toasts { position: fixed; top: 64px; right: 18px; z-index: 1300; width: min(340px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: var(--space-2); }
+.notif-toast {
+  display: flex; align-items: flex-start; background: var(--color-white); border: 1px solid var(--color-gray-200); border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-lg); box-shadow: 0 12px 28px rgba(16, 42, 67, 0.16); overflow: hidden;
+}
+.notif-toast .notif-icon-btn { margin: 6px 6px 0 0; }
+.mobile-header-end { display: flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 44px; }
+@media (max-width: 768px) {
+  /* on a phone the bell lives in the top bar; the floating one keeps only the pop-ups */
+  .notif-desktop .notif-bell { display: none; }
+  .notif-toasts { top: calc(56px + env(safe-area-inset-top)); right: 12px; }
+}
+@media (min-width: 769px) {
+  .mobile-header-end .notif-bell { display: none; }
+}
+@media print { .notif-desktop, .notif-toasts { display: none !important; } }

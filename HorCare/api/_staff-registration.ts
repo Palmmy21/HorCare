@@ -25,6 +25,7 @@ import {
 import type { WorkStaff } from '../src/shared/workOrders.js';
 import { ADMIN_HELP, REGISTER_HELP, quickLabels, staffHelpText } from '../src/shared/staffBot.js';
 import { staffIdentity, syncStaffMenu } from './_staff-menu.js';
+import { raiseAlert } from './_alerts.js';
 
 export const config = { maxDuration: 20 };
 
@@ -152,6 +153,10 @@ async function submitRegistration(s: RegSession, a: Extract<BotReply, { kind: 's
     await db.doc(`${baseOf(s.owner_uid, s.building_id)}/staff_registrations/${id}`).set(reg);
     await db.doc(`staff_reg_index/${s.line_user_id}`).set({ owner_uid: s.owner_uid, building_id: s.building_id, registration_id: id });
     await notify({ event: 'staff.registration_pending', ownerUid: s.owner_uid, buildingId: s.building_id, data: { name: a.name, role_label: ROLE_TH[a.role], phone: a.phone } });
+    await raiseAlert({
+        ownerUid: s.owner_uid, buildingId: s.building_id, type: 'staff_link',
+        title: `🧑‍🔧 ${a.name} ขอลงทะเบียนเป็น${ROLE_TH[a.role]}`, body: `เบอร์ ${a.phone} — กดเพื่ออนุมัติ`,
+    });
 }
 
 // ── the manager side ─────────────────────────────────────────────────────────

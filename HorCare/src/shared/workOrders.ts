@@ -66,12 +66,21 @@ export function isPriority(v: unknown): v is Priority {
 export type StaffRole = 'technician' | 'housekeeping';
 export const STAFF_ROLE_LABELS_TH: Record<StaffRole, string> = { technician: 'ช่าง', housekeeping: 'แม่บ้าน' };
 
+/** Offered when adding a technician; any other text can be typed. */
+export const SPECIALTY_SUGGESTIONS = ['ช่างแอร์', 'ช่างไฟ', 'ช่างประปา', 'ช่างทั่วไป', 'ช่างเฟอร์นิเจอร์', 'ช่างสี'];
+
+/** "สมศักดิ์ · ช่างแอร์" — how a staff member reads in a list to choose from. */
+export const staffOptionLabel = (s: Pick<WorkStaff, 'name' | 'specialty' | 'line_user_id'>): string =>
+  `${s.name}${s.specialty ? ` · ${s.specialty}` : ''}${s.line_user_id ? '' : ' (ยังไม่เชื่อม LINE)'}`;
+
 /** Staff directory entry: users/{owner}/buildings/{b}/staff/{id}. */
 export interface WorkStaff {
   id: string;
   name: string;
   phone: string | null;
   role: StaffRole;
+  /** What they do best — "ช่างแอร์", "ช่างไฟ", "ประปา" — so whoever hands out a repair picks the right person. */
+  specialty?: string | null;
   active: boolean;
   /** Set when the person sends their link code to the LINE OA. */
   line_user_id: string | null;

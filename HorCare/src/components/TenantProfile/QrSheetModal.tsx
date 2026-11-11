@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, QrCode, Loader2, Printer, Search, RefreshCw, AlertTriangle, Check, Ban } from 'lucide-react';
+import { X, QrCode, Loader2, Printer, Search, RefreshCw, AlertTriangle, Check, Ban, Download } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 import type { Room } from '../../types';
@@ -9,6 +9,8 @@ import {
     CARDS_PER_PAGE, chunk, groupOf, paginateForPrint, QR_CHUNK, roomQrState, sortForPrint,
     type RoomLineRequest, type RoomQrState,
 } from '../../shared/roomQr';
+import { downloadBlob, renderQrCardJpeg } from '../../utils/qrCardImage';
+import { zipStore } from '../../utils/zip';
 
 interface QrSheetModalProps {
     ownerUid: string;
@@ -43,6 +45,9 @@ const DECIDE_ERRORS: Record<string, string> = {
  * LINE registration for a whole property: who is on LINE, requests waiting for an admin, and printing each room's
  * permanent QR. Printing again gives the same codes, so a lost card is just a reprint; replacing a code is a separate,
  * deliberate action. Any number of rooms: they go to the server in chunks, and a failed chunk is retried alone.
+ *
+ * Each card can also be saved as a JPEG picture — one room straight from the list, or every prepared card at once (a
+ * single .zip) — to send in a chat or hand to a print shop.
  */
 export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, dormName, canDecide, onClose }: QrSheetModalProps) {
     const [requests, setRequests] = useState<PendingRequest[] | null>(null);
@@ -57,6 +62,8 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
     const [failed, setFailed] = useState<Job[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [deciding, setDeciding] = useState<string | null>(null);
+    /** A room id while its picture is being made, 'all' for the whole set (with how far it has got). */
+    const [saving, setSaving] = useState<{ what: string; done?: number; total?: number } | null>(null);
 
     const busy = progress !== null;
 
@@ -162,6 +169,56 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
         }
     };
 
+    const jpegName = (roomNumber: string) => `QR ${unitName} ${roomNumber}.jpg`;
+    const jpegOf = (c: RoomCode, base: string) =>
+        renderQrCardJpeg({ link: `${base}/r/${c.code}`, unitName, roomNumber: c.room_number, dormName, code: c.code });
+
+    /** One prepared card as a picture. */
+    const saveCard = async (c: RoomCode) => {
+        setSaving({ what: c.room_id });
+        try {
+            downloadBlob(await jpegOf(c, baseUrl), jpegName(c.room_number));
+        } catch {
+            toast.error('สร้างรูป QR ไม่สำเร็จ กรุณาลองใหม่');
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    /** Straight from the list: get (or make) that room's permanent code and save its card, without preparing a print run. */
+    const saveRoom = async (roomId: string) => {
+        setSaving({ what: roomId });
+        try {
+            const res = await apiPost<CodesResponse>('room-qr', { action: 'codes', owner_uid: ownerUid, building_id: buildingId, room_ids: [roomId] });
+            const c = res.codes[0];
+            if (!c) throw new Error('no code');
+            downloadBlob(await jpegOf(c, res.base_url), jpegName(c.room_number));
+        } catch (e) {
+            toast.error((e as ApiError).code === 'forbidden' ? 'คุณไม่มีสิทธิ์สร้าง QR' : 'ดาวน์โหลด QR ไม่สำเร็จ กรุณาลองใหม่');
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    /** Every prepared card: one picture, or one .zip holding a picture per room. */
+    const saveAll = async () => {
+        if (!cards || cards.length === 0) return;
+        if (cards.length === 1) { await saveCard(cards[0]); return; }
+        setSaving({ what: 'all', done: 0, total: cards.length });
+        try {
+            const files: { name: string; data: Uint8Array }[] = [];
+            for (const c of cards) {
+                files.push({ name: jpegName(c.room_number), data: new Uint8Array(await (await jpegOf(c, baseUrl)).arrayBuffer()) });
+                setSaving({ what: 'all', done: files.length, total: cards.length });
+            }
+            downloadBlob(new Blob([zipStore(files).buffer as ArrayBuffer], { type: 'application/zip' }), `QR ${dormName || 'HorCare'} (${cards.length} ${unitName}).zip`);
+        } catch {
+            toast.error('สร้างไฟล์ QR ไม่สำเร็จ กรุณาลองใหม่');
+        } finally {
+            setSaving(null);
+        }
+    };
+
     const close = () => { if (!busy) onClose(); };
     const pages = useMemo(() => (cards ? paginateForPrint(cards) : []), [cards]);
     const linkFor = (code: string) => `${baseUrl}/r/${code}`;
@@ -204,7 +261,10 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
                                 <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>ตัวอย่าง {CARDS_PER_PAGE} ใบแรก ทุกใบจะออกตอนพิมพ์</div>
                             )}
                             <div className="qr-sheet-grid">
-                                {pages[0]?.items.map(c => <QrCard key={c.room_id} code={c} link={linkFor(c.code)} unitName={unitName} dormName={dormName ?? ''} />)}
+                                {pages[0]?.items.map(c => (
+                                    <QrCard key={c.room_id} code={c} link={linkFor(c.code)} unitName={unitName} dormName={dormName ?? ''}
+                                        onSave={() => void saveCard(c)} saving={saving?.what === c.room_id} disabled={!!saving} />
+                                ))}
                             </div>
                         </>
                     ) : loadError ? (
@@ -289,6 +349,11 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
                                         <span className="qr-desk-room">{room.room_number}</span>
                                         <span className="qr-desk-group">{group}</span>
                                         <span style={{ color: STATE_COLOR[state], fontWeight: 600 }}>{STATE_LABEL[state]}</span>
+                                        <button type="button" className="btn btn-outline btn-sm qr-desk-save" disabled={!!saving}
+                                            aria-label={`ดาวน์โหลด QR ${unitName} ${room.room_number} เป็นรูป JPEG`}
+                                            onClick={e => { e.preventDefault(); void saveRoom(room.id); }}>
+                                            {saving?.what === room.id ? <Loader2 size={13} className="spin" aria-hidden /> : <Download size={13} aria-hidden />} JPEG
+                                        </button>
                                     </label>
                                 ))}
                             </div>
@@ -312,9 +377,17 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
                             </button>
                         </>
                     ) : !busy && cards.length > 0 && (
-                        <button className="btn btn-primary" onClick={() => window.print()}>
-                            <Printer size={16} /> พิมพ์ {pages.length.toLocaleString('th-TH')} หน้า
-                        </button>
+                        <>
+                            <button className="btn btn-outline" onClick={() => void saveAll()} disabled={!!saving}>
+                                {saving?.what === 'all' ? <Loader2 size={16} className="spin" aria-hidden /> : <Download size={16} aria-hidden />}
+                                {saving?.what === 'all'
+                                    ? ` กำลังสร้างรูป ${saving.done}/${saving.total}`
+                                    : cards.length === 1 ? ' ดาวน์โหลด JPEG' : ` ดาวน์โหลด JPEG ${cards.length.toLocaleString('th-TH')} รูป (.zip)`}
+                            </button>
+                            <button className="btn btn-primary" onClick={() => window.print()} disabled={!!saving}>
+                                <Printer size={16} /> พิมพ์ {pages.length.toLocaleString('th-TH')} หน้า
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -337,7 +410,11 @@ export default function QrSheetModal({ ownerUid, buildingId, rooms, unitName, do
     );
 }
 
-function QrCard({ code, link, unitName, dormName }: { code: RoomCode; link: string; unitName: string; dormName: string }) {
+function QrCard({ code, link, unitName, dormName, onSave, saving, disabled }: {
+    code: RoomCode; link: string; unitName: string; dormName: string;
+    /** On screen only: save this card as a JPEG. The printed copy has no button. */
+    onSave?: () => void; saving?: boolean; disabled?: boolean;
+}) {
     return (
         <div className="qr-sheet-card">
             {dormName && <div className="qr-sheet-dorm">{dormName}</div>}
@@ -346,6 +423,11 @@ function QrCard({ code, link, unitName, dormName }: { code: RoomCode; link: stri
             <QRCodeSVG value={link} size={150} level="M" marginSize={2} />
             <div className="qr-sheet-steps">สแกนด้วยมือถือ แล้วทำตามหน้าจอ<br />รับบิลและแจ้งชำระผ่าน LINE ได้ทันที</div>
             <div className="qr-sheet-code mono">{code.code}</div>
+            {onSave && (
+                <button type="button" className="btn btn-outline btn-sm" disabled={disabled} onClick={onSave}>
+                    {saving ? <Loader2 size={13} className="spin" aria-hidden /> : <Download size={13} aria-hidden />} JPEG
+                </button>
+            )}
         </div>
     );
 }

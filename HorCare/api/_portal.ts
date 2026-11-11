@@ -22,7 +22,7 @@ import { writeAudit } from './_audit.js';
 import { rateLimit } from './_abuse-guard.js';
 import { appBaseUrl } from './_app-url.js';
 import { portalLinkFor, resolvePortalLink, rotatePortalLink, type PortalRoom } from './_portal-link.js';
-import { pushToOwner } from './_notify-push.js';
+import { raiseAlert } from './_alerts.js';
 
 export const config = { maxDuration: 15 };
 
@@ -163,10 +163,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             id, room_id: portal.roomId, room_number: roomNumber, category: body.category, description, urgency: body.urgency,
             status: 'open', photo_url: pic, created_at: nowIso, updated_at: nowIso,
         });
-        await pushToOwner(portal.ownerUid, {
-            title: `แจ้งซ่อมใหม่ ห้อง ${roomNumber}`,
-            body: `${body.urgency === 'urgent' ? '(ด่วน) ' : ''}${description.slice(0, 80)}`,
-            data: { type: 'maintenance', roomId: portal.roomId, roomNumber },
+        // the people who hand out repairs: they choose the technician (air-con, electrical, …) and assign the job
+        await raiseAlert({
+            ownerUid: portal.ownerUid, buildingId: portal.buildingId, type: 'maintenance',
+            title: `🔧 แจ้งซ่อมใหม่ ห้อง ${roomNumber}${body.urgency === 'urgent' ? ' (ด่วน)' : ''}`,
+            body: `${description.slice(0, 120)} — กดเพื่อมอบหมายช่าง`,
         });
         res.status(200).json({ ok: true, id });
         return;
@@ -195,10 +196,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             service_type: body.service_type, preferred_date: date, preferred_time_slot: slot, description,
             status: 'pending', image_url: pic, has_photo: !!pic, created_at: nowIso, updated_at: nowIso,
         });
-        await pushToOwner(portal.ownerUid, {
-            title: `แจ้งทำความสะอาดใหม่ ห้อง ${roomNumber}`,
-            body: `${body.service_type} - ${description.slice(0, 80) || 'ไม่มีบันทึกเพิ่มเติม'}`,
-            data: { type: 'cleaning', roomId: portal.roomId, roomNumber },
+        await raiseAlert({
+            ownerUid: portal.ownerUid, buildingId: portal.buildingId, type: 'cleaning',
+            title: `🧹 งานแม่บ้านใหม่ ห้อง ${roomNumber}`,
+            body: [date, slot, description.slice(0, 100)].filter(Boolean).join(' · ') || 'ไม่มีบันทึกเพิ่มเติม',
+        });
+        // and straight to the housekeepers, on the team LINE OA
+        const { notifyHousekeepersOfCleaning } = await import('./_staff-portal.js');
+        await notifyHousekeepersOfCleaning(portal.ownerUid, portal.buildingId, {
+            roomNumber, serviceType: body.service_type, date, slot, note: description,
         });
         res.status(200).json({ ok: true, id });
         return;

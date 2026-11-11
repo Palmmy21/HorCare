@@ -147,6 +147,8 @@ export const admin = {
     }),
     firestore: {
         FieldValue: { serverTimestamp: () => ({ __serverTimestamp: true }), delete: () => DELETE_FIELD },
+        // plain data (documents are cloned on write): enough for code that only stores an expiry
+        Timestamp: { fromMillis: (ms: number) => ({ seconds: Math.floor(ms / 1000), nanoseconds: (ms % 1000) * 1e6 }) },
     },
 };
 

@@ -12,8 +12,7 @@ import { compressImage } from '../../utils/imageCompress';
 import StaffManagerModal from './StaffManagerModal';
 import {
     PRIORITIES, PRIORITY_LABELS_TH, WORK_STATUS_LABELS_TH, WORK_TYPES, WORK_TYPE_LABELS_TH, isOverdue,
-    type Priority, type WorkOrder, type WorkStaff, type WorkStatus, type WorkType,
-} from '../../shared/workOrders';
+    type Priority, type WorkOrder, type WorkStaff, type WorkStatus, type WorkType, staffOptionLabel } from '../../shared/workOrders';
 
 interface Props { ownerUid: string; buildingId: string; rooms: Room[]; unitName: string; /** Shown as a tab of ระบบจัดการ: no page title */ embedded?: boolean }
 
@@ -159,7 +158,7 @@ function CreateModal({ ownerUid, buildingId, rooms, unitName, staff, onClose }: 
                         <span className="form-label">มอบหมายให้ (ส่งงานทาง LINE ทันที)</span>
                         <select className="form-input" value={staffId} onChange={e => setStaffId(e.target.value)}>
                             <option value="">— ยังไม่มอบหมาย —</option>
-                            {activeStaff.map(s => <option key={s.id} value={s.id}>{s.name}{s.line_user_id ? '' : ' (ยังไม่เชื่อม LINE)'}</option>)}
+                            {activeStaff.map(s => <option key={s.id} value={s.id}>{staffOptionLabel(s)}</option>)}
                         </select>
                     </label>
                     {error && <div role="alert" style={{ color: '#DC2626', fontSize: '0.8125rem' }}>{error}</div>}
@@ -258,7 +257,7 @@ function DetailModal({ order, staff, ownerUid, buildingId, onClose }: { order: W
                                 <span className="form-label">{order.status === 'created' ? 'มอบหมายให้' : 'เปลี่ยนผู้รับผิดชอบ'}</span>
                                 <select className="form-input" value={assignTo} onChange={e => setAssignTo(e.target.value)}>
                                     <option value="">— เลือกพนักงาน —</option>
-                                    {staff.filter(s => s.active).map(s => <option key={s.id} value={s.id}>{s.name}{s.line_user_id ? '' : ' (ยังไม่เชื่อม LINE)'}</option>)}
+                                    {staff.filter(s => s.active).map(s => <option key={s.id} value={s.id}>{staffOptionLabel(s)}</option>)}
                                 </select>
                             </label>
                             <button className="btn btn-primary btn-sm" disabled={!assignTo || busy === 'assign'} onClick={() => void act('assign', { action: 'assign', staff_id: assignTo })}>

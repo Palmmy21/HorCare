@@ -193,7 +193,7 @@ export default function StaffPortalPage() {
                                 <li key={c.key} className={`sp-card sp-job${c.urgent ? ' is-urgent' : ''}`}>
                                     <div className="sp-job-top">
                                         <strong>ห้อง {c.room_number}</strong>
-                                        <span className="sp-chip">{CLEANING_STATUS_TH[c.status] ?? c.status}</span>
+                                        <span className={`sp-chip${c.unassigned ? ' is-warn' : ''}`}>{c.unassigned ? 'งานใหม่ รอคนรับ' : CLEANING_STATUS_TH[c.status] ?? c.status}</span>
                                     </div>
                                     <p className="sp-job-desc">{SERVICE_TH[c.service_type] ?? c.service_type}{c.description ? ` · ${c.description}` : ''}</p>
                                     <p className="sp-job-meta">
@@ -210,7 +210,7 @@ export default function StaffPortalPage() {
                                     <div className="sp-job-actions">
                                         {c.status !== 'in_progress' ? (
                                             <button type="button" className="btn btn-outline" disabled={busy === c.key} onClick={() => void updateCleaning(c, 'in_progress')}>
-                                                <PlayCircle size={16} aria-hidden /> เริ่มทำ
+                                                <PlayCircle size={16} aria-hidden /> {c.unassigned ? 'รับงานนี้' : 'เริ่มทำ'}
                                             </button>
                                         ) : null}
                                         <button type="button" className="btn btn-primary" disabled={busy === c.key} onClick={() => void updateCleaning(c, 'completed')}>

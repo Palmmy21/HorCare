@@ -3,7 +3,7 @@ import { CreditCard, Wrench, Sparkles, X, CheckCircle2, AlertCircle } from 'luci
 import type { MonthlyBill, Fine, MaintenanceRequest, CleaningRequest, MaintenanceStatus, CleaningStatus } from '../types';
 import { usePushNotification } from '../hooks/usePushNotification';
 
-type ToastKind =
+export type ToastKind =
   | 'slip'
   | 'maintenance_new'
   | 'maintenance_status'
@@ -137,6 +137,8 @@ interface Props {
   onGoToPayments: () => void;
   onGoToMaintenance: () => void;
   onGoToCleaning?: () => void;
+  /** Kinds this person switched off (the alert settings): no toast, no sound, no system notification. */
+  muted?: (kind: ToastKind) => boolean;
 }
 
 export default function SlipNotificationToast({
@@ -148,8 +150,12 @@ export default function SlipNotificationToast({
   onGoToPayments,
   onGoToMaintenance,
   onGoToCleaning,
+  muted,
 }: Props) {
   const { notify } = usePushNotification();
+  // read when an event fires, so flipping a switch needs no re-run of the watchers below
+  const mutedRef = useRef(muted);
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // Baseline tracking maps
@@ -223,6 +229,8 @@ export default function SlipNotificationToast({
       }
     });
 
+    if (mutedRef.current?.('maintenance_new')) newItems.length = 0;
+    if (mutedRef.current?.('maintenance_status')) statusChangedItems.length = 0;
     if (newItems.length > 0 || statusChangedItems.length > 0) {
       playNotificationSound();
     }
@@ -295,6 +303,8 @@ export default function SlipNotificationToast({
       }
     });
 
+    if (mutedRef.current?.('cleaning_new')) newItems.length = 0;
+    if (mutedRef.current?.('cleaning_status')) statusChangedItems.length = 0;
     if (newItems.length > 0 || statusChangedItems.length > 0) {
       playNotificationSound();
     }
@@ -410,6 +420,7 @@ export default function SlipNotificationToast({
       });
     });
 
+    if (mutedRef.current?.('slip')) freshSlips.length = 0;
     if (freshSlips.length > 0) {
       playNotificationSound();
     }

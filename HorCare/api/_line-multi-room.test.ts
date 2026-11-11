@@ -8,7 +8,7 @@ import webhook from './line-webhook.js';
 import invitations from './_invitations.js';
 import tenantLink from './_tenant-link.js';
 import { recordFriendship } from './_line-binding.js';
-import { addAuthUser, fakeReq, fakeRes, read, resetFake, seed } from './_fake-firestore.js';
+import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed } from './_fake-firestore.js';
 
 // One LINE account that looks after several rooms: a teacher renting rooms for students, the school paying.
 const OWNER = 'owner-1';
@@ -228,5 +228,71 @@ describe('registering a second room in the chat', () => {
         await post([image()]);
         expect(read(`${B}/bills/b-r101`)?.slip_submitted_at).toBeTruthy();
         expect(read(LINK)?.slip_choice).toBeUndefined();
+    });
+});
+
+describe('registering with the property code and a room number (no invitation, nothing to switch on)', () => {
+    const NEW = 'U' + 'd'.repeat(32);
+    const send = async (t: string, user = NEW) => post([text(t, user)]);
+    const requests = () => listPaths(`${B}/line_requests/`).map(p => read(p)!);
+    beforeEach(() => {
+        seed('dorm_codes/HC-K7MN2P', { uid: OWNER, building_id: BLD, dorm_name: 'Dorm A', due_day: 5 });
+        // room 102 has never been registered; 101 belongs to the teacher
+        seed(LINK, room('r101', '101'));
+        seed(`${B}/rooms/r102`, { room_number: '102', is_active: true });
+        seed(`${B}/rooms/r103`, { room_number: 'A03', is_active: true });
+    });
+
+    it('a room nobody registered is given at once, whatever the old "invitation only" setting says', async () => {
+        seed(`${B}/data/config`, { bill_customization: { dorm_name: 'Dorm A', due_day: 5 }, claim_mode: 'invitation_only' });
+        await send('HC-K7MN2P');
+        expect(replies()[0].text).toContain('กรุณาพิมพ์เลขห้อง');
+        await send('102');
+        expect(replies()[0].text).toContain('ลงทะเบียนสำเร็จ');
+        expect(read(`${B}/rooms/r102`)?.line_user_id).toBe(NEW);
+        expect(read(`line_rooms/${NEW}`)).toMatchObject({ room_id: 'r102', room_number: '102', via: 'room_number' });
+        expect(requests()).toEqual([]);
+    });
+
+    it('finds a room typed in lower case', async () => {
+        await send('HC-K7MN2P');
+        await send('a03');
+        expect(read(`${B}/rooms/r103`)?.line_user_id).toBe(NEW);
+    });
+
+    it('a room that already has someone becomes a request: the tenant in it is not replaced until an admin approves', async () => {
+        await send('HC-K7MN2P');
+        await send('101');
+        expect(replies()[0].text).toContain('ส่งคำขอให้แอดมินแล้ว');
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBe(TEACHER);
+        expect(read(`line_rooms/${NEW}`)).toBeUndefined();
+        expect(requests()).toHaveLength(1);
+        expect(requests()[0]).toMatchObject({ room_number: '101', status: 'pending', line_user_id: NEW });
+        expect(requests()[0].add).toBeUndefined();
+    });
+
+    it('one more room for an account that has one is asked about, then waits for the owner', async () => {
+        await send('HC-K7MN2P', TEACHER);
+        await send('102', TEACHER);
+        expect(replies()[0].text).toContain('คุณลงทะเบียนห้อง 101 ไว้แล้ว');
+        await send('เพิ่มห้อง', TEACHER);
+        expect(replies()[0].text).toContain('ส่งคำขอเพิ่มห้อง 102');
+        expect(read(`${B}/rooms/r102`)?.line_user_id).toBeUndefined();
+        expect(requests()[0]).toMatchObject({ room_number: '102', add: true, other_rooms: '101', status: 'pending' });
+    });
+
+    it('moving to a free room by number releases the old one, as a move always did', async () => {
+        await send('HC-K7MN2P', TEACHER);
+        await send('102', TEACHER);
+        await send('ย้ายห้อง', TEACHER);
+        expect(read(`${B}/rooms/r101`)?.line_user_id).toBeUndefined();
+        expect(read(`${B}/rooms/r102`)?.line_user_id).toBe(TEACHER);
+    });
+
+    it('a number that is not a room is asked for again', async () => {
+        await send('HC-K7MN2P');
+        await send('999');
+        expect(replies()[0].text).toContain('ไม่พบห้อง "999"');
+        expect(read(`line_pending/${NEW}`)?.step).toBe('waiting_room_number');
     });
 });

@@ -36,6 +36,8 @@ export interface PortalCleaningJob {
     preferred_time_slot: string | null;
     status: string;
     urgent: boolean;
+    /** Nobody has taken it yet: starting it makes it this person's. */
+    unassigned?: boolean;
 }
 
 export interface PortalOverview {
