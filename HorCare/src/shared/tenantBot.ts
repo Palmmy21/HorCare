@@ -2,7 +2,7 @@
 // the same conversation. Pure: the webhook decides what to do, this file decides what a message means and how to word it.
 import { normalizeForMatch } from './chatbot.js';
 
-export type TenantCommand = 'bill' | 'slip' | 'portal' | 'repair' | 'announcements' | 'contact' | 'register' | 'cancel' | 'help';
+export type TenantCommand = 'bill' | 'slip' | 'portal' | 'repair' | 'announcements' | 'contact' | 'register' | 'cancel' | 'help' | 'close_shop' | 'my_closures';
 
 /**
  * Whole-message matches only (after normalizing), never "contains": "บิลเดือนที่แล้วผิดค่ะ ช่วยดูหน่อย" is a message for
@@ -14,6 +14,9 @@ const COMMANDS: Record<TenantCommand, string[]> = {
     portal: ['พอร์ทัล', 'พอทัล', 'portal'],
     repair: ['แจ้งซ่อม', 'ซ่อม', 'repair'],
     announcements: ['ประกาศ', 'ประกาศล่าสุด', 'ดูประกาศ'],
+    // market vendors: say the stall is closed on a day (anyone else is told it is for market stalls)
+    close_shop: ['แจ้งหยุด', 'แจ้งหยุดร้าน', 'หยุดร้าน', 'ปิดร้าน', 'แจ้งปิดร้าน'],
+    my_closures: ['วันหยุดที่แจ้ง', 'ดูวันหยุด', 'ยกเลิกแจ้งหยุด'],
     contact: ['ติดต่อแอดมิน'],
     register: ['ลงทะเบียน', 'register'],
     cancel: ['ยกเลิก', 'cancel'],
@@ -68,8 +71,9 @@ const menuLines = (v: BotVocab) =>
 
 export function helpText(registered: boolean, market: boolean): string {
     const v = botVocab(market);
+    const vendor = market ? '\n• "แจ้งหยุด" — แจ้งว่าแผงหยุดวันไหน (ดู/ยกเลิก: "วันหยุดที่แจ้ง")' : '';
     return registered
-        ? `📋 สิ่งที่ทำได้ในแชทนี้\n\n${menuLines(v)}\n\nเรื่องอื่น ๆ พิมพ์มาได้เลยค่ะ ${v.owner}จะตอบกลับในแชทนี้`
+        ? `📋 สิ่งที่ทำได้ในแชทนี้\n\n${menuLines(v)}${vendor}\n\nเรื่องอื่น ๆ พิมพ์มาได้เลยค่ะ ${v.owner}จะตอบกลับในแชทนี้`
         : notRegisteredText(market);
 }
 

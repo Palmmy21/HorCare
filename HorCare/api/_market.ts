@@ -17,6 +17,7 @@ import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { notify } from './_notify.js';
+import { linePush, roomLineToken, runPooled } from './_line.js';
 import { honeypotTripped, rateLimit, verifyCaptcha } from './_abuse-guard.js';
 import { resolvePortalLink } from './_portal-link.js';
 import {
@@ -30,7 +31,7 @@ export const config = { maxDuration: 15 };
 interface Body {
     action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'closure_add' | 'walkin_submit' | 'walkin_add' | 'walkin_decide'
         | 'market_closure_add' | 'market_closure_cancel' | 'market_closure_list';
-    zones?: unknown; waive_rent?: unknown; market_closure_id?: unknown;
+    zones?: unknown; waive_rent?: unknown; market_closure_id?: unknown; notify_line?: unknown;
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -130,7 +131,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const closure: MarketClosure = { id: randomUUID(), ...input, status: 'active', created_at: nowIso, created_by: staff!.displayName };
         await db.doc(`${mcol}/${closure.id}`).set(closure);
         await audit('CREATE', 'market_closure', closure.id, `ตลาดหยุด ${input.from_date} – ${input.to_date} (${MARKET_CLOSURE_REASON_LABELS_TH[input.reason]})`);
-        res.status(200).json({ closure });
+        // tell the vendors of those zones on LINE, once per person, through the OA each of them registered with
+        let sent = 0, failed = 0;
+        if (body.notify_line === true) {
+            const cfg = (await db.doc(`${base}/data/config`).get()).data();
+            const market = cfg?.bill_customization?.dorm_name || 'ตลาด';
+            const d = (s: string) => new Date(`${s}T00:00:00+07:00`).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' });
+            const text = `📢 ประกาศจาก${market}\n\n${input.from_date === input.to_date ? `${d(input.from_date)}` : `${d(input.from_date)} ถึง ${d(input.to_date)}`} ตลาดหยุด${input.zones ? ` (${input.zones.join(', ')})` : ''}\nสาเหตุ: ${MARKET_CLOSURE_REASON_LABELS_TH[input.reason]}${input.note ? `\n${input.note}` : ''}\n\nวันดังกล่าวไม่มีการเก็บค่าแผงรายวันค่ะ`;
+            const rooms = (await db.collection(`${base}/rooms`).get()).docs.map(r => r.data() as { line_user_id?: string; line_channel?: string; zone?: string; is_active?: boolean });
+            const to = new Map<string, { line_channel?: string }>();
+            for (const r of rooms) {
+                if (!r.line_user_id || r.is_active === false) continue;
+                if (input.zones && !input.zones.includes((r.zone ?? '').trim())) continue;
+                if (!to.has(r.line_user_id)) to.set(r.line_user_id, r);
+            }
+            await runPooled([...to.entries()], 5, async ([lineUserId, room]) => {
+                try { await linePush(lineUserId, [{ type: 'text', text }], await roomLineToken(room)); sent++; } catch { failed++; }
+            });
+            await db.doc(`${mcol}/${closure.id}`).update({ line_sent: sent, line_failed: failed });
+        }
+        res.status(200).json({ closure, line_sent: sent, line_failed: failed });
         return;
     }
 

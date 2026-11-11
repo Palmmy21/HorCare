@@ -27,7 +27,7 @@ export default function MarketClosures({ ownerUid, buildingId, canEdit }: { owne
     const [list, setList] = useState<MarketClosure[] | null>(null);
     const [show, setShow] = useState(false);
     const [busy, setBusy] = useState(false);
-    const [form, setForm] = useState<{ from: string; to: string; reason: MarketClosureReason; zones: string[]; note: string; waive: boolean }>({ from: today, to: today, reason: 'power', zones: [], note: '', waive: false });
+    const [form, setForm] = useState<{ from: string; to: string; reason: MarketClosureReason; zones: string[]; note: string; waive: boolean; notify: boolean }>({ from: today, to: today, reason: 'power', zones: [], note: '', waive: false, notify: true });
 
     const call = useCallback(async <T,>(body: Record<string, unknown>) => apiPost<T>('market', { owner_uid: ownerUid, building_id: buildingId, ...body }), [ownerUid, buildingId]);
     const load = useCallback(async () => {
@@ -39,8 +39,8 @@ export default function MarketClosures({ ownerUid, buildingId, canEdit }: { owne
     const save = async () => {
         setBusy(true);
         try {
-            await call({ action: 'market_closure_add', from_date: form.from, to_date: form.to, reason: form.reason, zones: form.zones.length ? form.zones : null, note: form.note || null, waive_rent: form.waive });
-            toast.success('บันทึกตลาดหยุดแล้ว');
+            const r = await call<{ line_sent?: number; line_failed?: number }>({ action: 'market_closure_add', from_date: form.from, to_date: form.to, reason: form.reason, zones: form.zones.length ? form.zones : null, note: form.note || null, waive_rent: form.waive, notify_line: form.notify });
+            toast.success(form.notify ? `บันทึกแล้ว · แจ้งผู้ค้าทาง LINE ${r.line_sent ?? 0} คน${r.line_failed ? ` (ส่งไม่ถึง ${r.line_failed})` : ''}` : 'บันทึกตลาดหยุดแล้ว');
             setShow(false);
             setForm(f => ({ ...f, note: '', zones: [], waive: false }));
             await load();
@@ -88,6 +88,7 @@ export default function MarketClosures({ ownerUid, buildingId, canEdit }: { owne
                     )}
                     <label><span className="form-label">หมายเหตุ</span><input className="form-input" maxLength={300} value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="เช่น หม้อแปลงไฟเสีย ไฟกลับมา 16:00" /></label>
                     <label className="mc-check"><input type="checkbox" checked={form.waive} onChange={e => setForm(f => ({ ...f, waive: e.target.checked }))} /> ยกเว้นค่าเช่าแผงรายเดือนตามจำนวนวันที่หยุด</label>
+                    <label className="mc-check"><input type="checkbox" checked={form.notify} onChange={e => setForm(f => ({ ...f, notify: e.target.checked }))} /> แจ้งผู้ค้าในโซนที่หยุดทาง LINE ทันที</label>
                     <div className="mc-actions">
                         <button type="button" className="btn btn-outline btn-sm" onClick={() => setShow(false)} disabled={busy}>ยกเลิก</button>
                         <button type="button" className="btn btn-primary btn-sm" onClick={() => void save()} disabled={busy || !form.from || !form.to}>{busy ? <Loader2 size={14} className="spin" aria-hidden /> : null} บันทึก</button>

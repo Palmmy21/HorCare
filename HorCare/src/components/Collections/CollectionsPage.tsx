@@ -7,6 +7,7 @@ import type { CollectionStyle } from '../../types';
 import StaysView from './StaysView';
 import RoundView from './RoundView';
 import RatesPlansView from './RatesPlansView';
+import PosLineCard from '../PosCare/PosLineCard';
 
 interface Props { ownerUid: string; buildingId: string; style: CollectionStyle }
 
@@ -37,6 +38,8 @@ export default function CollectionsPage({ ownerUid, buildingId, style }: Props) 
         </div>
         <button className="btn btn-outline btn-sm" onClick={() => void load()} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><RefreshCw size={14} /> โหลดใหม่</button>
       </div>
+
+      <PosLineCard ownerUid={ownerUid} compact />
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button className={tab === 'main' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'} onClick={() => setTab('main')}>{stall ? 'เดินเก็บวันนี้' : 'ห้องและปฏิทินจอง'}</button>

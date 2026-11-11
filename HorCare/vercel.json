@@ -19,6 +19,7 @@
     { "source": "/api/line-webhook", "destination": "/api/line-webhook" },
     { "source": "/api/line-market-webhook", "destination": "/api/line-market-webhook" },
     { "source": "/api/line-staff-webhook", "destination": "/api/line-staff-webhook" },
+    { "source": "/api/line-pos-webhook", "destination": "/api/line-pos-webhook" },
     { "source": "/api/line-team-webhook/:id", "destination": "/api/line-team-webhook?id=:id" },
     { "source": "/api/payment-webhook", "destination": "/api/payment-webhook" },
     { "source": "/api/cron-check-expiry", "destination": "/api/cron-check-expiry" },

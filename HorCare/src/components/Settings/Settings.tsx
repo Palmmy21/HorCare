@@ -24,6 +24,7 @@ import ListingSettingsSection from './ListingSettingsSection';
 import { residentOaId } from '../../utils/lineOa';
 import LineOaCard from './LineOaCard';
 import OwnerLineSection from './OwnerLineSection';
+import PosLineCard from '../PosCare/PosLineCard';
 import { toast } from 'react-hot-toast';
 import horcareLogo from '../../assets/horcare_logo.png';
 import ContractTemplatesSettingsSection from './ContractTemplatesSettingsSection';
@@ -1660,6 +1661,7 @@ export default function Settings(props: SettingsProps) {
             {uid && <LineOaCard ownerUid={uid} buildingId={buildingId} />}
             <ListingSettingsSection config={config} ownerUid={uid} buildingId={buildingId} />
             <OwnerLineSection ownerUid={uid} />
+            {uid && <div className="settings-section"><PosLineCard ownerUid={uid} /></div>}
 
             {/* LINE Integration */}
             <div className="settings-section" style={{ position: 'relative' }}>

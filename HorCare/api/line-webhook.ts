@@ -27,6 +27,7 @@ import { autoPostSafe } from './_ledger-auto.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { raiseAlert } from './_alerts.js';
+import { handleVendorClosurePostback, isVendorClosurePostback, listVendorClosures, startVendorClosure } from './_vendor-closure.js';
 import { GUEST_QUICK, TENANT_QUICK, ackText, botText, botVocab, helpText, notRegisteredText, parseTenantCommand, welcomeText } from '../src/shared/tenantBot.js';
 
 export const config = {
@@ -99,7 +100,7 @@ interface LineEvent {
         /** sticker */
         packageId?: string; stickerId?: string;
     };
-    postback?: { data?: string };
+    postback?: { data?: string; params?: { date?: string } };
 }
 
 async function handleEvent(event: LineEvent) {
@@ -144,7 +145,8 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     if (event.type === 'postback') {
         const modeReq = parseSplitModePostback(event.postback?.data);
         const slipRoom = parseSlipRoomPostback(event.postback?.data);
-        if (slipRoom) await handleSlipRoomChoice(lineUserId, replyToken, slipRoom);
+        if (isVendorClosurePostback(event.postback?.data)) await lineReply(replyToken, await handleVendorClosurePostback(lineUserId, event.postback!.data!, event.postback?.params?.date));
+        else if (slipRoom) await handleSlipRoomChoice(lineUserId, replyToken, slipRoom);
         else if (modeReq) await handleSplitMode(lineUserId, replyToken, modeReq);
         else await handleSplitPostback(lineUserId, replyToken, event.postback?.data);
         return;
@@ -219,6 +221,10 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
         await handlePortalCommand(lineUserId, replyToken);
         return;
     }
+
+    // ── 2c1. แจ้งหยุด — a market vendor says the stall is closed (api/_vendor-closure.ts) ──
+    if (cmd === 'close_shop') { await lineReply(replyToken, await startVendorClosure(lineUserId)); return; }
+    if (cmd === 'my_closures') { await lineReply(replyToken, await listVendorClosures(lineUserId)); return; }
 
     // ── 2c2. ประกาศ — latest notices from the property (registered tenants only) ──
     if (cmd === 'announcements') {

@@ -1,0 +1,165 @@
+/**
+ * setup-oa-rich-menus.mjs — the rich menus of two more LINE OAs:
+ *
+ *   market   "HorCare Markets" (vendors)          token: LINE_MARKET_CHANNEL_ACCESS_TOKEN
+ *            บิล · ส่งสลิป · แจ้งหยุด / ประกาศ · พอร์ทัล · ช่วยเหลือ
+ *   pos      "HorCare Staff" (POS Care, collectors) token: LINE_POS_CHANNEL_ACCESS_TOKEN
+ *            เปิด POS Care / ยอดวันนี้ · ร้านหยุดวันนี้ · ปิดยอด
+ *
+ * Every button sends a word the webhook understands (src/shared/tenantBot.ts, src/shared/posCare.ts), so no link is ever
+ * baked into a menu. One menu per OA, set as its default.
+ *
+ * Usage (Node 18+):
+ *   node scripts/setup-oa-rich-menus.mjs --render                 draw scripts/rich-menu/oa-<name>.png (needs Chrome or Edge)
+ *   node scripts/setup-oa-rich-menus.mjs market --dry-run          ask LINE to validate, change nothing
+ *   node scripts/setup-oa-rich-menus.mjs market                   install and make it the default (deletes this script's older one)
+ *   node scripts/setup-oa-rich-menus.mjs pos
+ */
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const OUT = join(HERE, 'rich-menu');
+const W = 2500, H = 1686, HALF = H / 2;
+
+const ICONS = {
+    bill: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
+    slip: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+    closed: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m14 14-4 4"/><path d="m10 14 4 4"/>',
+    news: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+    portal: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    pos: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/><path d="M6 15h4"/>',
+    today: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+    close: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+};
+
+const third = W / 3;
+const cell = (col, row, label, sub, icon, text, primary = false) => ({ x: Math.round(col * third), y: row * HALF, w: Math.round((col + 1) * third) - Math.round(col * third), h: HALF, label, sub, icon, text, primary });
+
+const MENUS = {
+    market: {
+        name: 'horcare-market-vendor', chatBarText: 'เมนูผู้ค้า', token: 'LINE_MARKET_CHANNEL_ACCESS_TOKEN',
+        tiles: [
+            cell(0, 0, 'บิล', 'ดูยอดที่ต้องจ่าย', 'bill', 'บิล', true),
+            cell(1, 0, 'ส่งสลิป', 'จ่ายแล้ว ส่งรูปสลิป', 'slip', 'ส่งสลิป'),
+            cell(2, 0, 'แจ้งหยุด', 'แผงหยุดวันไหน', 'closed', 'แจ้งหยุด'),
+            cell(0, 1, 'ประกาศ', 'ข่าวจากตลาด', 'news', 'ประกาศ'),
+            cell(1, 1, 'พอร์ทัล', 'ประวัติ แจ้งซ่อม', 'portal', 'พอร์ทัล'),
+            cell(2, 1, 'ช่วยเหลือ', 'ทำอะไรได้บ้าง', 'help', 'เมนู'),
+        ],
+    },
+    pos: {
+        name: 'horcare-pos-care', chatBarText: 'POS Care', token: 'LINE_POS_CHANNEL_ACCESS_TOKEN',
+        tiles: [
+            { x: 0, y: 0, w: W, h: HALF, label: 'เปิด POS Care', sub: 'เดินเก็บแผง · รับค่าห้อง · ขาจร', icon: 'pos', text: 'เปิด POS Care', primary: true },
+            cell(0, 1, 'ยอดวันนี้', 'เก็บได้เท่าไร', 'today', 'ยอดวันนี้'),
+            cell(1, 1, 'ร้านหยุดวันนี้', 'แผงไหนแจ้งหยุด', 'closed', 'ร้านหยุดวันนี้'),
+            cell(2, 1, 'ปิดยอด', 'นับเงินสดสิ้นวัน', 'close', 'ปิดยอด'),
+        ],
+    },
+};
+
+const pngOf = name => join(OUT, `oa-${name}.png`);
+const payload = name => {
+    const m = MENUS[name];
+    return {
+        size: { width: W, height: H }, selected: true, name: m.name, chatBarText: m.chatBarText,
+        areas: m.tiles.map(t => ({ bounds: { x: t.x, y: t.y, width: t.w, height: t.h }, action: { type: 'message', label: t.label.slice(0, 20), text: t.text } })),
+    };
+};
+
+function html(name) {
+    const tile = t => {
+        const row = t.w === W;
+        return `<div class="tile${t.primary ? ' primary' : ''}${row ? ' row' : ''}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px">
+  <svg viewBox="0 0 24 24">${ICONS[t.icon]}</svg>
+  <div><div class="label">${t.label}</div><div class="sub">${t.sub}</div></div>
+</div>`;
+    };
+    return `<!doctype html><html lang="th"><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: ${W}px; height: ${H}px; overflow: hidden; background: #DCE5EF; }
+  body { position: relative; font-family: 'Anuphan', 'Leelawadee UI', 'Noto Sans Thai', sans-serif; }
+  .tile { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+          background: #FFFFFF; color: #102A43; border: 4px solid #DCE5EF; }
+  .tile svg { width: 230px; height: 230px; fill: none; stroke: #0A6CC2; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .label { font-size: 132px; font-weight: 700; line-height: 1.2; margin-top: 52px; letter-spacing: -0.01em; white-space: nowrap; }
+  .sub { font-size: 66px; font-weight: 500; line-height: 1.3; margin-top: 12px; color: #557089; white-space: nowrap; }
+  .tile.primary { background: #0A5DAA; border-color: #0A5DAA; color: #FFFFFF; }
+  .tile.primary svg { stroke: #FFB36B; }
+  .tile.primary .sub { color: #CFE3F7; }
+  .tile.row { flex-direction: row; gap: 120px; text-align: left; padding: 0 90px; }
+  .tile.row svg { width: 400px; height: 400px; stroke-width: 1.5; flex: none; }
+  .tile.row .label { font-size: 220px; margin-top: 0; }
+  .tile.row .sub { font-size: 92px; margin-top: 22px; }
+</style></head><body>
+${MENUS[name].tiles.map(tile).join('\n')}
+</body></html>`;
+}
+
+function render() {
+    const browser = [
+        process.env.CHROME_PATH,
+        'C:/Program Files/Google/Chrome/Application/chrome.exe',
+        'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/usr/bin/google-chrome', '/usr/bin/chromium',
+    ].find(p => p && existsSync(p));
+    if (!browser) throw new Error('Chrome or Edge not found; set CHROME_PATH');
+    const tmp = mkdtempSync(join(tmpdir(), 'horcare-oa-menu-'));
+    try {
+        for (const name of Object.keys(MENUS)) {
+            const page = join(tmp, `${name}.html`);
+            writeFileSync(page, html(name));
+            execFileSync(browser, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1', `--window-size=${W},${H}`, '--virtual-time-budget=8000', `--screenshot=${pngOf(name)}`, pathToFileURL(page).href], { stdio: 'ignore' });
+            console.log(`rendered ${pngOf(name)} (${(statSync(pngOf(name)).size / 1024).toFixed(0)} KB)`);
+        }
+    } finally {
+        rmSync(tmp, { recursive: true, force: true });
+    }
+}
+
+const args = process.argv.slice(2);
+if (args.includes('--render')) { render(); process.exit(0); }
+const name = args.find(a => !a.startsWith('--'));
+if (!name || !MENUS[name]) { console.error(`Which OA? ${Object.keys(MENUS).join(' | ')}`); process.exit(1); }
+const TOKEN = process.env[MENUS[name].token];
+if (!TOKEN) { console.error(`Set ${MENUS[name].token}.`); process.exit(1); }
+
+async function line(method, path, body, host = 'api.line.me') {
+    const isImage = Buffer.isBuffer(body);
+    const res = await fetch(`https://${host}/v2/bot${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${TOKEN}`, ...(body ? { 'Content-Type': isImage ? 'image/png' : 'application/json' } : {}) },
+        body: body ? (isImage ? body : JSON.stringify(body)) : undefined,
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`LINE ${res.status} ${method} ${path}: ${text.slice(0, 300)}`);
+    return text ? JSON.parse(text) : {};
+}
+
+try {
+    if (!existsSync(pngOf(name))) throw new Error(`Missing ${pngOf(name)}; run with --render first.`);
+    const image = readFileSync(pngOf(name));
+    if (image.length > 1024 * 1024) throw new Error('Image is over LINE\'s 1 MB limit.');
+    const info = await line('GET', '/info');
+    console.log(`OA: ${info.displayName} (${info.basicId})`);
+    await line('POST', '/richmenu/validate', payload(name));
+    console.log('menu definition is valid');
+    if (args.includes('--dry-run')) process.exit(0);
+    const before = ((await line('GET', '/richmenu/list')).richmenus ?? []).filter(m => m.name === MENUS[name].name);
+    const { richMenuId } = await line('POST', '/richmenu', payload(name));
+    await line('POST', `/richmenu/${richMenuId}/content`, image, 'api-data.line.me');
+    await line('POST', `/user/all/richmenu/${richMenuId}`);
+    console.log(`default menu is now ${richMenuId}`);
+    for (const m of before) { await line('DELETE', `/richmenu/${m.richMenuId}`); console.log(`deleted previous ${m.richMenuId}`); }
+} catch (e) {
+    console.error(e.message);
+    process.exit(1);
+}

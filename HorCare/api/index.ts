@@ -85,6 +85,7 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'staff-portal': return (await import('./_staff-portal.js')).default(req, res);
         case 'alerts': return (await import('./_alerts.js')).default(req, res);
         case 'revenue-audit': return (await import('./_revenue-audit.js')).default(req, res);
+        case 'pos': return (await import('./_pos.js')).default(req, res);
         case 'nong-care': return nongCareHandler(req, res);
         case 'notify-owner': return notifyOwnerHandler(req, res);
         case 'notify-payment': return notifyPaymentHandler(req, res);
