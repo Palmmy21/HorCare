@@ -18,6 +18,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { admin, db } from './_firebase.js';
 import { linePush, staffLineToken } from './_line.js';
+import { appBaseUrl } from './_app-url.js';
 import { isRole, permissionsForRole, type Permission } from '../src/shared/permissions.js';
 import {
     ALERT_INFO, canReceiveAlert, cleanAlertPrefs, wantsAlert, wantsPush, type AlertPrefs, type AlertType, type InboxItem,
@@ -40,6 +41,11 @@ export interface AlertInput {
     kind?: string;
     /** The account that caused it: nobody needs to be told what they just did. */
     exceptUid?: string | null;
+    /**
+     * Also a LINE message to everyone told who linked LINE on the team OA (owner_line): for what needs a person now,
+     * like a tenant asking for help. Same people as the app alert (role, property, their own switch), nobody else.
+     */
+    line?: boolean;
 }
 
 /** The accounts that may be told about this kind of thing at this property: the owner, then eligible members. */
@@ -98,6 +104,7 @@ export async function raiseAlert(input: AlertInput): Promise<{ recipients: numbe
     try {
         const uids = (await recipientsOf(input.ownerUid, input.buildingId, input.type)).filter(u => u !== input.exceptUid);
         const now = new Date().toISOString();
+        const told: string[] = [];
         await Promise.all(uids.map(async uid => {
             try {
                 const prefs = ((await prefsRef(uid).get()).data() ?? {}) as AlertPrefs;
@@ -109,16 +116,37 @@ export async function raiseAlert(input: AlertInput): Promise<{ recipients: numbe
                 };
                 await db.doc(`users/${uid}/inbox/${item.id}`).set(item);
                 recipients++;
+                told.push(uid);
                 if (wantsPush(prefs)) pushed += await pushToDevices(uid, item).catch(() => 0);
                 if (Math.random() < 0.05) await pruneInbox(uid).catch(() => undefined);
             } catch (err) {
                 console.error(`[alerts] ${input.type} → ${uid} failed:`, (err as Error).message);
             }
         }));
+        if (input.line && told.length) pushed += await pushToLinkedAdmins(input, told);
     } catch (err) {
         console.error('[alerts] failed:', (err as Error).message);
     }
     return { recipients, pushed };
+}
+
+/** The alert as a LINE message to the told accounts that linked LINE on the team OA. Returns how many were sent. */
+async function pushToLinkedAdmins(input: AlertInput, told: string[]): Promise<number> {
+    const token = staffLineToken();
+    if (!token) return 0;
+    const links = (await db.collection('owner_line').where('owner_uid', '==', input.ownerUid).get()).docs
+        .filter(d => told.includes(String(d.data().account_uid)));
+    const url = `${appBaseUrl()}${input.url ?? ALERT_INFO[input.type].url}`;
+    let sent = 0;
+    await Promise.all(links.map(async d => {
+        try {
+            await linePush(d.id, [{ type: 'text', text: `${input.title}\n${input.body}\n\nเปิดตอบ: ${url}`.slice(0, 4900) }], token);
+            sent++;
+        } catch (err) {
+            console.error('[alerts] LINE admin push failed:', (err as Error).message);
+        }
+    }));
+    return sent;
 }
 
 /**

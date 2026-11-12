@@ -33,7 +33,12 @@ export interface LineThread {
   unread_count: number;
   /** When the tenant was last sent the automatic "we got your message" reply. */
   last_ack_at: string | null;
+  /** Last press of "ขอความช่วยเหลือ": the conversation is flagged while it has unread messages. */
+  help_requested_at?: string;
 }
+
+/** Waiting for a person after the tenant asked for help (and nobody has read it since). */
+export const needsHelp = (t: Pick<LineThread, 'help_requested_at' | 'unread_count'>): boolean => !!t.help_requested_at && t.unread_count > 0;
 
 export interface LineMessage {
   id: string;

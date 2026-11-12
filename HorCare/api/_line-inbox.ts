@@ -99,7 +99,7 @@ export async function recordInbound(
             unread_count: (prev?.unread_count ?? 0) + (input.quiet ? 0 : 1),
             last_ack_at: ack ? nowIso : (prev?.last_ack_at ?? null),
         };
-        tx.set(ref, thread);
+        tx.set(ref, thread, { merge: true });   // keeps what else the thread carries (help_requested_at)
         tx.set(db.doc(`${ref.path}/messages/${msg.id}`), msg);
         return ack;
     });

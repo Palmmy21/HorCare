@@ -1,8 +1,10 @@
 /**
- * setup-oa-rich-menus.mjs — the rich menus of two more LINE OAs:
+ * setup-oa-rich-menus.mjs — the rich menus of the resident and staff LINE OAs:
  *
+ *   tenant   the tenant OA (dorms, rooms)          token: LINE_CHANNEL_ACCESS_TOKEN
+ *            บิล · ส่งสลิป · พอร์ทัล / ประกาศ · แจ้งซ่อม · ช่วยเหลือ (= "ขอความช่วยเหลือ": staff are alerted with the room)
  *   market   "HorCare Markets" (vendors)          token: LINE_MARKET_CHANNEL_ACCESS_TOKEN
- *            บิล · ส่งสลิป · แจ้งหยุด / ประกาศ · พอร์ทัล · ช่วยเหลือ
+ *            บิล · ส่งสลิป · แจ้งหยุด / ประกาศ · พอร์ทัล · ช่วยเหลือ (same)
  *   pos      "HorCare Staff" (POS Care, collectors) token: LINE_POS_CHANNEL_ACCESS_TOKEN
  *            เปิด POS Care / ยอดวันนี้ · ร้านหยุดวันนี้ · ปิดยอด
  *
@@ -11,6 +13,7 @@
  *
  * Usage (Node 18+):
  *   node scripts/setup-oa-rich-menus.mjs --render                 draw scripts/rich-menu/oa-<name>.png (needs Chrome or Edge)
+ *   node scripts/setup-oa-rich-menus.mjs tenant
  *   node scripts/setup-oa-rich-menus.mjs market --dry-run          ask LINE to validate, change nothing
  *   node scripts/setup-oa-rich-menus.mjs market                   install and make it the default (deletes this script's older one)
  *   node scripts/setup-oa-rich-menus.mjs pos
@@ -32,6 +35,8 @@ const ICONS = {
     news: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
     portal: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
     help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    sos: '<circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/>',
+    repair: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     pos: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/><path d="M6 15h4"/>',
     today: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
     close: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
@@ -39,8 +44,21 @@ const ICONS = {
 
 const third = W / 3;
 const cell = (col, row, label, sub, icon, text, primary = false) => ({ x: Math.round(col * third), y: row * HALF, w: Math.round((col + 1) * third) - Math.round(col * third), h: HALF, label, sub, icon, text, primary });
+/** The help button: it calls a person at the property at once (the webhook's "support" command), so it stands out. */
+const sosCell = (col, row, sub) => ({ ...cell(col, row, 'ช่วยเหลือ', sub, 'sos', 'ขอความช่วยเหลือ'), sos: true });
 
 const MENUS = {
+    tenant: {
+        name: 'horcare-tenant', chatBarText: 'เมนูผู้เช่า', token: 'LINE_CHANNEL_ACCESS_TOKEN',
+        tiles: [
+            cell(0, 0, 'บิล', 'ดูยอดที่ต้องจ่าย', 'bill', 'บิล', true),
+            cell(1, 0, 'ส่งสลิป', 'จ่ายแล้ว ส่งรูปสลิป', 'slip', 'ส่งสลิป'),
+            cell(2, 0, 'พอร์ทัล', 'ประวัติบิล สัญญา', 'portal', 'พอร์ทัล'),
+            cell(0, 1, 'ประกาศ', 'ข่าวจากหอพัก', 'news', 'ประกาศ'),
+            cell(1, 1, 'แจ้งซ่อม', 'ของเสีย ชำรุด', 'repair', 'แจ้งซ่อม'),
+            sosCell(2, 1, 'เรียกเจ้าหน้าที่ทันที'),
+        ],
+    },
     market: {
         name: 'horcare-market-vendor', chatBarText: 'เมนูผู้ค้า', token: 'LINE_MARKET_CHANNEL_ACCESS_TOKEN',
         tiles: [
@@ -49,7 +67,7 @@ const MENUS = {
             cell(2, 0, 'แจ้งหยุด', 'แผงหยุดวันไหน', 'closed', 'แจ้งหยุด'),
             cell(0, 1, 'ประกาศ', 'ข่าวจากตลาด', 'news', 'ประกาศ'),
             cell(1, 1, 'พอร์ทัล', 'ประวัติ แจ้งซ่อม', 'portal', 'พอร์ทัล'),
-            cell(2, 1, 'ช่วยเหลือ', 'ทำอะไรได้บ้าง', 'help', 'เมนู'),
+            sosCell(2, 1, 'เรียกเจ้าหน้าที่ทันที'),
         ],
     },
     pos: {
@@ -75,7 +93,7 @@ const payload = name => {
 function html(name) {
     const tile = t => {
         const row = t.w === W;
-        return `<div class="tile${t.primary ? ' primary' : ''}${row ? ' row' : ''}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px">
+        return `<div class="tile${t.primary ? ' primary' : ''}${t.sos ? ' sos' : ''}${row ? ' row' : ''}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px">
   <svg viewBox="0 0 24 24">${ICONS[t.icon]}</svg>
   <div><div class="label">${t.label}</div><div class="sub">${t.sub}</div></div>
 </div>`;
@@ -94,6 +112,9 @@ function html(name) {
   .tile.primary { background: #0A5DAA; border-color: #0A5DAA; color: #FFFFFF; }
   .tile.primary svg { stroke: #FFB36B; }
   .tile.primary .sub { color: #CFE3F7; }
+  .tile.sos { background: #C62828; border-color: #C62828; color: #FFFFFF; }
+  .tile.sos svg { stroke: #FFFFFF; }
+  .tile.sos .sub { color: #FFE0E0; }
   .tile.row { flex-direction: row; gap: 120px; text-align: left; padding: 0 90px; }
   .tile.row svg { width: 400px; height: 400px; stroke-width: 1.5; flex: none; }
   .tile.row .label { font-size: 220px; margin-top: 0; }

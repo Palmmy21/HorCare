@@ -3,7 +3,7 @@ import { MessageSquare, Search, Send, Loader2, ArrowLeft, MessageCircle, Play, M
 import toast from 'react-hot-toast';
 import { useThreadMessages } from '../../hooks/useLineThreads';
 import { apiPost, ApiError } from '../../utils/api';
-import { MAX_OUTGOING_CHARS, fileSizeText, mapUrl, stickerUrl, type LineMessage, type LineThread } from '../../shared/messages';
+import { MAX_OUTGOING_CHARS, fileSizeText, mapUrl, needsHelp, stickerUrl, type LineMessage, type LineThread } from '../../shared/messages';
 
 interface Props {
     ownerUid: string;
@@ -160,8 +160,9 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        if (!q) return threads;
-        return threads.filter(t => `${t.room_number} ${t.tenant_name ?? ''} ${t.last_message_text}`.toLowerCase().includes(q));
+        const shown = q ? threads.filter(t => `${t.room_number} ${t.tenant_name ?? ''} ${t.last_message_text}`.toLowerCase().includes(q)) : threads;
+        // someone who pressed "ขอความช่วยเหลือ" waits at the top until the conversation is opened
+        return [...shown.filter(needsHelp), ...shown.filter(t => !needsHelp(t))];
     }, [threads, search]);
 
     // Opening a conversation (or receiving a message while it's open) marks it read.
@@ -233,7 +234,10 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                                     </div>
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                                            <b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.tenant_name || `${unitName} ${t.room_number}`}</b>
+                                            <b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {needsHelp(t) && <span style={{ background: '#DC2626', color: '#fff', borderRadius: 6, fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', marginRight: 6, verticalAlign: 'middle' }}>🆘 ขอความช่วยเหลือ</span>}
+                                                {t.tenant_name || `${unitName} ${t.room_number}`}
+                                            </b>
                                             <span style={{ fontSize: '0.7rem', color: 'var(--color-gray-500)', flexShrink: 0 }}>{when(t.last_message_at)}</span>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>

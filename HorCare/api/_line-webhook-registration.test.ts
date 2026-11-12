@@ -183,6 +183,38 @@ describe('what the bot says', () => {
         expect(replied()).not.toContain('"101');
     });
 
+    it('"ขอความช่วยเหลือ" alerts the property at once, with the room, in the app and on the admin\'s LINE', async () => {
+        await scanCard();
+        seed(`users/${OWNER}/buildings/${BLD}/tenants/r101`, { full_name: 'สมชาย' });
+        seed(`owner_line/U${'d'.repeat(32)}`, { account_uid: OWNER, owner_uid: OWNER });
+        process.env.LINE_STAFF_CHANNEL_ACCESS_TOKEN = 'staff-token';
+        fetchMock.mockClear();
+        await post([text('ขอความช่วยเหลือ')]);
+
+        const alerts = listPaths(`users/${OWNER}/inbox/`).map(p => read(p)).filter(a => a?.type === 'help_request');
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0]?.title).toContain('ห้อง 101');
+        expect(alerts[0]?.title).toContain('สมชาย');
+        const adminPush = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/message/push') && JSON.parse(init.body).to === `U${'d'.repeat(32)}`);
+        expect(adminPush![1].headers.Authorization).toBe('Bearer staff-token');
+        expect(JSON.parse(adminPush![1].body).messages[0].text).toContain('ห้อง 101');
+        const thread = read(`users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`);
+        expect(thread?.help_requested_at).toBeTruthy();
+        expect(thread?.unread_count).toBe(1);
+        expect(reply()![0].text).toContain('แจ้งเจ้าหน้าที่แล้ว');
+
+        // pressing again straight away does not ring everyone again, but is still answered
+        fetchMock.mockClear();
+        await post([text('ขอความช่วยเหลือ')]);
+        expect(listPaths(`users/${OWNER}/inbox/`).map(p => read(p)).filter(a => a?.type === 'help_request')).toHaveLength(1);
+        expect(reply()![0].text).toContain('แจ้งเจ้าหน้าที่แล้ว');
+
+        // the next message keeps the flag; the inbox shows it waiting
+        await post([text('ไฟดับทั้งชั้นค่ะ')]);
+        expect(read(`users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`)?.help_requested_at).toBeTruthy();
+        delete process.env.LINE_STAFF_CHANNEL_ACCESS_TOKEN;
+    });
+
     it('an answer LINE turns down (reply token expired) is pushed instead, and kept in the inbox', async () => {
         await scanCard();
         fetchMock.mockClear();

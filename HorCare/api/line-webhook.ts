@@ -287,6 +287,9 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
             : botText(notRegisteredText(market), GUEST_QUICK)]);
         return;
     }
+    // ── 2c3. ขอความช่วยเหลือ (rich menu) — a person at the property is told right away, with the room ──
+    if (cmd === 'support') { await handleSupport(lineUserId, replyToken); return; }
+
     // ── 2d. Rich Menu — ติดต่อแอดมิน ──────────────────────────────
     if (cmd === 'contact') {
         await lineReply(replyToken, [{
@@ -597,6 +600,44 @@ async function handleRoomNumber(
 /** The one room this OA deals with: the primary room's document as before, or the account's other room of this OA. */
 function thisRoom(primary: FirebaseFirestore.DocumentData, mine: LinkedRoom[]): FirebaseFirestore.DocumentData {
     return mine[0] && !sameRoom(mine[0], primary as LinkedRoom) ? mine[0] : primary;
+}
+
+/** A second press within this long does not ring everyone again (the tenant is still told it was passed on). */
+const HELP_ALERT_EVERY_MS = 2 * 60 * 1000;
+
+/**
+ * "ขอความช่วยเหลือ": the property's people who handle LINE messages are alerted at once — in the app, on their phone
+ * and on LINE if they linked the team OA — with the room and the tenant's name; the conversation is flagged in the
+ * inbox until someone reads it. The tenant is told it was passed on and can type what it is about.
+ */
+async function handleSupport(lineUserId: string, replyToken: string) {
+    const market = isMarket();
+    const link = await getTenantLink(lineUserId);
+    if (!link) { await lineReply(replyToken, [botText(notRegisteredText(market), GUEST_QUICK)]); return; }
+    const v = botVocab(market);
+    const base = `users/${link.uid}/buildings/${link.building_id}`;
+    const thread = db.doc(`${base}/line_threads/${lineUserId}`);
+    const was = (await thread.get()).data();
+    const prev = was?.help_requested_at as string | undefined;
+    if (!prev || Date.now() - Date.parse(prev) > HELP_ALERT_EVERY_MS) {
+        const now = new Date().toISOString();
+        // the press itself was kept quietly (dispatchEvent); here it becomes something waiting for a person
+        await thread.set({
+            help_requested_at: now, unread_count: Number(was?.unread_count ?? 0) + 1,
+            last_message_text: '🆘 ขอความช่วยเหลือ', last_message_at: now, last_direction: 'in',
+        }, { merge: true });
+        const name = (await db.doc(`${base}/tenants/${link.room_id}`).get()).data()?.full_name as string | undefined;
+        const place = (link as { dorm_name?: string }).dorm_name;
+        await raiseAlert({
+            ownerUid: link.uid, buildingId: link.building_id, type: 'help_request', line: true,
+            title: `🆘 ${v.unit} ${link.room_number}${name ? ` · ${name}` : ''} ขอความช่วยเหลือ`,
+            body: `${place ? `${place}: ` : ''}กดปุ่ม "ขอความช่วยเหลือ" ใน LINE — เข้าไปตอบในหน้าข้อความ LINE ได้เลย`,
+        });
+    }
+    await lineReply(replyToken, [botText(
+        `🆘 แจ้งเจ้าหน้าที่แล้วค่ะ (${v.unit} ${link.room_number})\n\nพิมพ์เรื่องที่ต้องการให้ช่วยในแชทนี้ได้เลย หรือส่งรูปประกอบได้ เจ้าหน้าที่จะตอบกลับในแชทนี้โดยเร็วที่สุดค่ะ 🙏`,
+        TENANT_QUICK,
+    )]);
 }
 
 /** ดูบิลล่าสุดของห้องที่ลงทะเบียน */
