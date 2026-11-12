@@ -7,7 +7,7 @@
 import type { Permission } from './permissions.js';
 
 export const ALERT_TYPES = [
-    'staff_link', 'line_request', 'maintenance', 'cleaning', 'job_status', 'help_request', 'chat', 'payment', 'stock', 'monthly_summary',
+    'staff_link', 'line_request', 'maintenance', 'cleaning', 'job_status', 'help_request', 'chat', 'booking', 'payment', 'stock', 'monthly_summary',
 ] as const;
 export type AlertType = (typeof ALERT_TYPES)[number];
 
@@ -45,6 +45,10 @@ export const ALERT_INFO: Record<AlertType, AlertInfo> = {
     help_request: {
         label: 'ผู้เช่าขอความช่วยเหลือ', hint: 'ผู้เช่าหรือผู้ค้ากดปุ่ม "ขอความช่วยเหลือ" ใน LINE — รอคนเข้าไปตอบ',
         permissions: ['message.read'], url: '/?view=messages',
+    },
+    booking: {
+        label: 'การจอง / สัญญาเช่า', hint: 'มีการจองห้องหรือแผง ยกเลิกจอง ทำสัญญาเช่า หรือสัญญาสิ้นสุด',
+        permissions: ['room.read', 'leasing.read'], url: '/?view=rooms',
     },
     chat: {
         label: 'แชทจากผู้เช่า', hint: 'ผู้เช่าส่งข้อความ รูป หรือไฟล์ทาง LINE',

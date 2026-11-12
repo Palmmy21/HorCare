@@ -118,6 +118,55 @@ describe('leads', () => {
     });
 });
 
+describe('booking a stall in one step, and the team is told', () => {
+    const quick = (over: Record<string, unknown> = {}, uid: string | null = OWNER) =>
+        call(uid, { action: 'quick_reserve', room_id: 'r1', name: 'ป้าแดง ขายผัก', phone: '0812345678', reserved_until: d(7), deposit: 500, ...over });
+    const alerts = (uid: string) => listPaths(`users/${uid}/inbox/`).map(p => read(p)).filter(a => a?.type === 'booking');
+
+    it('one call: the lead is made, the stall is held, and owner + staff are alerted (not the one who did it)', async () => {
+        seed(`users/${OWNER}/buildings/${B1}/data/config`, { building_type: 'market' });
+        const r = await quick({}, 'desk');
+        expect(r.statusCode).toBe(200);
+        expect(r.body.reservation).toMatchObject({ room_id: 'r1', room_number: 'A01', status: 'active', reserved_until: d(7), deposit_satang: 50000 });
+        expect(sb.rows('leasing_leads')[0]).toMatchObject({ name: 'ป้าแดง ขายผัก', status: 'reserved', source: 'walk_in' });
+        const told = alerts(OWNER);
+        expect(told).toHaveLength(1);
+        expect(told[0]?.title).toContain('แผง A01 ถูกจองแล้ว');
+        expect(told[0]?.body).toContain('ป้าแดง');
+        expect(alerts('desk')).toHaveLength(0);   // the person who booked it
+    });
+
+    it('a stall already held, or leased, refuses — and leaves no stray lead behind', async () => {
+        await quick();
+        const again = await quick({ phone: '0899999999' });
+        expect(again.body.error).toBe('room_already_reserved');
+        expect(sb.rows('leasing_leads')).toHaveLength(1);
+        await call(OWNER, { action: 'lease_create', room_id: 'r2', ...terms() });
+        expect((await quick({ room_id: 'r2' })).body.error).toBe('room_leased');
+        for (const bad of [{ phone: '' }, { name: 'x' }, { reserved_until: d(-1) }, { reserved_until: d(90) }, { deposit: -1 }]) expect((await quick({ room_id: 'r1', ...bad })).statusCode).toBe(400);
+        expect(sb.rows('leasing_leads')).toHaveLength(1);
+        expect((await quick({}, 'tech')).statusCode).toBe(403);
+    });
+
+    it('a booking past its date no longer blocks the stall', async () => {
+        await quick();
+        sb.rows('leasing_reservations')[0].reserved_until = d(-2);
+        const r = await quick({ phone: '0899999999' });
+        expect(r.statusCode).toBe(200);
+        expect(sb.rows('leasing_reservations').map(x => x.status).sort()).toEqual(['active', 'expired']);
+    });
+
+    it('cancelling and signing are told too', async () => {
+        const res = (await quick()).body.reservation;
+        await call(OWNER, { action: 'reservation_cancel', reservation_id: res.id, reason: 'ไม่มาตามนัด' }, );
+        const lease = await call(OWNER, { action: 'lease_create', room_id: 'r2', ...terms() });
+        expect(lease.statusCode).toBe(200);
+        const titles = alerts('desk').map(a => a?.title);
+        expect(titles.some(t => String(t).includes('ยกเลิกจองห้อง A01'))).toBe(true);
+        expect(titles.some(t => String(t).includes('ห้อง A02 ทำสัญญาเช่าแล้ว'))).toBe(true);
+    });
+});
+
 describe('reservations', () => {
     it('reserves a room: creates the hold and moves the lead to reserved', async () => {
         const id = await leadId();

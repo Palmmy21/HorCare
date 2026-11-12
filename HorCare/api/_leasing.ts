@@ -6,13 +6,18 @@
  * Rooms are validated against Firestore, where they still live.
  *
  * read:   overview
- * manage: lead_create | lead_update | lead_move | reserve | reservation_cancel | convert
+ * manage: lead_create | lead_update | lead_move | reserve | quick_reserve | reservation_cancel | convert
  *         lease_create | lease_renew | lease_activate | lease_end
+ *
+ * quick_reserve: book a room / stall in one step (name, phone, until) — the lead is made for you.
+ * Every booking, cancellation and lease change is told to the property's team (alert "booking": the owner, admins and
+ * staff who may see rooms — in the app, on their phone, and on LINE for those who linked the team OA).
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
+import { raiseAlert } from './_alerts.js';
 import { dbError, supabase, SupabaseNotConfigured } from './_supabase.js';
 import { todayTh } from '../src/shared/market.js';
 import {
@@ -23,9 +28,9 @@ import type { Permission } from '../src/shared/permissions.js';
 
 export const config = { maxDuration: 30 };
 
-type Action = 'overview' | 'lead_create' | 'lead_update' | 'lead_move' | 'reserve' | 'reservation_cancel' | 'convert'
+type Action = 'overview' | 'lead_create' | 'lead_update' | 'lead_move' | 'reserve' | 'quick_reserve' | 'reservation_cancel' | 'convert'
     | 'lease_create' | 'lease_renew' | 'lease_activate' | 'lease_end';
-const ACTIONS: Action[] = ['overview', 'lead_create', 'lead_update', 'lead_move', 'reserve', 'reservation_cancel', 'convert', 'lease_create', 'lease_renew', 'lease_activate', 'lease_end'];
+const ACTIONS: Action[] = ['overview', 'lead_create', 'lead_update', 'lead_move', 'reserve', 'quick_reserve', 'reservation_cancel', 'convert', 'lease_create', 'lease_renew', 'lease_activate', 'lease_end'];
 
 const LIST_LIMIT = 500;
 
@@ -61,9 +66,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             action: act, resourceType: type, resourceId: id, resourceLabel: label, req, ...extra,
         });
 
+    // what the team is told: "แผง A22" at a market, "ห้อง 101" elsewhere; never fails the action behind it
+    const unitWord = await db.doc(`users/${owner}/buildings/${buildingId}/data/config`).get()
+        .then(d => (d.data()?.building_type === 'market' ? 'แผง' : 'ห้อง'), () => 'ห้อง');
+    const tell = (title: string, body: string) => raiseAlert({
+        ownerUid: owner, buildingId, type: 'booking', line: true, title: `📌 ${title}`, body: `${body}\nโดย ${ctx.displayName}`, exceptUid: ctx.uid,
+    }).catch(() => undefined);
+    const th = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+
     try {
         const sb = supabase();
         const scope = { owner_uid: owner, building_id: buildingId };
+        /** A booking past its date no longer holds the room: close it, so the room can be booked again. */
+        const expireLapsed = async (roomId: string) => {
+            await sb.from('leasing_reservations').update({ status: 'expired' })
+                .eq('owner_uid', owner).eq('building_id', buildingId).eq('room_id', roomId).eq('status', 'active').lt('reserved_until', today);
+        };
         const fail = (error: { code?: string; message?: string }): never => { const e = dbError(error); throw new HttpError(e.status, e.code); };
 
         /** The room must exist and be active in this property (Firestore). */
@@ -139,6 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const inForce = await sb.from('leases').select('id').eq('owner_uid', owner).eq('building_id', buildingId).eq('room_id', r.id).eq('status', 'active').limit(1);
             if (inForce.error) fail(inForce.error);
             if ((inForce.data ?? []).length) throw new HttpError(409, 'room_leased');
+            await expireLapsed(r.id);
             const { data, error } = await sb.rpc('leasing_reserve', {
                 p_owner: owner, p_building: buildingId, p_lead: input.lead_id, p_room_id: r.id, p_room_number: r.number,
                 p_deposit: input.deposit_satang, p_until: input.reserved_until, p_by: ctx.uid,
@@ -148,7 +167,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 fail(error);
             }
             await audit('CREATE', 'lead', input.lead_id, `reserved room ${r.number} until ${input.reserved_until}`);
+            await tell(`${unitWord} ${r.number} ถูกจองแล้ว`, `จองถึง ${th(input.reserved_until)}${input.deposit_satang ? ` · มัดจำ ฿${(input.deposit_satang / 100).toLocaleString('th-TH')}` : ''}`);
             res.status(200).json({ reservation: data });
+            return;
+        }
+
+        // one step from the room / stall board: who, a phone, until when — the lead is made here
+        if (action === 'quick_reserve') {
+            const lead = cleanLeadInput({ name: body.name, phone: body.phone, source: 'walk_in', interested_room_id: body.room_id, note: body.note });
+            const until = body.reserved_until;
+            const deposit = Number(body.deposit ?? 0);
+            if (!lead || !lead.phone || typeof until !== 'string' || !Number.isFinite(deposit) || deposit < 0 || deposit > 10_000_000) throw new HttpError(400, 'invalid_input');
+            const r = await room(body.room_id);
+            const inForce = await sb.from('leases').select('id').eq('owner_uid', owner).eq('building_id', buildingId).eq('room_id', r.id).eq('status', 'active').limit(1);
+            if (inForce.error) fail(inForce.error);
+            if ((inForce.data ?? []).length) throw new HttpError(409, 'room_leased');
+            const made = await sb.from('leasing_leads').insert({ ...scope, ...lead, created_by: ctx.uid }).select().single();
+            if (made.error) fail(made.error);
+            const leadId = (made.data as Lead).id;
+            const input = cleanReservationInput({ lead_id: leadId, room_id: r.id, deposit, reserved_until: until });
+            // a lead made for a booking that cannot happen is taken back, so nothing is left half done
+            const undo = () => sb.from('leasing_leads').delete().eq('id', leadId).eq('owner_uid', owner).eq('building_id', buildingId);
+            if (!input) { await undo(); throw new HttpError(400, 'invalid_input'); }
+            await expireLapsed(r.id);
+            const { data, error } = await sb.rpc('leasing_reserve', {
+                p_owner: owner, p_building: buildingId, p_lead: leadId, p_room_id: r.id, p_room_number: r.number,
+                p_deposit: input.deposit_satang, p_until: input.reserved_until, p_by: ctx.uid,
+            });
+            if (error) {
+                await undo();
+                if (error.code === '23505') throw new HttpError(409, 'room_already_reserved');
+                fail(error);
+            }
+            await audit('CREATE', 'lead', leadId, `reserved room ${r.number} until ${input.reserved_until} (quick)`);
+            await tell(`${unitWord} ${r.number} ถูกจองแล้ว`, `${lead.name} · ${lead.phone}\nจองถึง ${th(input.reserved_until)}${input.deposit_satang ? ` · มัดจำ ฿${(input.deposit_satang / 100).toLocaleString('th-TH')}` : ''}`);
+            res.status(200).json({ reservation: data, lead: made.data });
             return;
         }
 
@@ -162,6 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // the lead goes back to the pipeline, ready to be offered another room
             await sb.from('leasing_leads').update({ status: 'viewing' }).eq('id', reservation.lead_id).eq('owner_uid', owner).eq('building_id', buildingId).eq('status', 'reserved');
             await audit('UPDATE', 'lead', reservation.lead_id, `reservation of room ${reservation.room_number} cancelled`);
+            await tell(`ยกเลิกจอง${unitWord} ${reservation.room_number}`, `${unitWord}นี้ว่างแล้ว${reason ? ` · เหตุผล: ${reason}` : ''}`);
             res.status(200).json({ reservation: data });
             return;
         }
@@ -180,6 +234,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 fail(error);
             }
             await audit('CREATE', 'lease', (data as Lease).id, `Room ${reservation.room_number} ${terms.start_date}..${terms.end_date}`);
+            await tell(`${unitWord} ${reservation.room_number} ทำสัญญาเช่าแล้ว`, `${terms.tenant_name} · ${th(terms.start_date)} – ${th(terms.end_date)}`);
             res.status(200).json({ lease: data });
             return;
         }
@@ -197,6 +252,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 fail(error);
             }
             await audit('CREATE', 'lease', (data as Lease).id, `Room ${r.number} ${terms.start_date}..${terms.end_date}`);
+            await tell(`${unitWord} ${r.number} ทำสัญญาเช่าแล้ว`, `${terms.tenant_name} · ${th(terms.start_date)} – ${th(terms.end_date)}${status === 'scheduled' ? ' (รอเริ่มสัญญา)' : ''}`);
             res.status(200).json({ lease: data });
             return;
         }
@@ -248,6 +304,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (error) fail(error);
         if (!data) throw new HttpError(409, 'changed_meanwhile');
         await audit('UPDATE', 'lease', lease.id, `Room ${lease.room_number} ${end.terminated ? 'terminated' : 'ended'} ${end.ended_on}`, { note: end.reason ?? undefined });
+        await tell(`${unitWord} ${lease.room_number} ${end.terminated ? 'ยกเลิกสัญญา' : 'สิ้นสุดสัญญา'}`, `${lease.tenant_name} · ${unitWord}ว่างตั้งแต่ ${th(end.ended_on)}${end.reason ? ` · ${end.reason}` : ''}`);
         res.status(200).json({ lease: data });
     } catch (e) {
         if (e instanceof SupabaseNotConfigured) { res.status(503).json({ error: 'supabase_not_configured', message: 'ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์ (ดู supabase/README.md)' }); return; }

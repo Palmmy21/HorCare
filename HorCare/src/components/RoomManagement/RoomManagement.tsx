@@ -1,5 +1,6 @@
 import { useState, Fragment } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles, Layers } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles, Layers, LayoutGrid } from 'lucide-react';
+import StallBoard from './StallBoard';
 import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
 import ImportSheetModal from './ImportSheetModal';
 import BulkRoomModal from './BulkRoomModal';
@@ -44,6 +45,8 @@ export default function RoomManagement({
     isPaid = false,
 }: RoomManagementProps) {
     const terms = getWorkspaceTerms(config?.building_type);
+    // markets open on the stall board (who is on which stall, book one); everything else on the table
+    const [layout, setLayout] = useState<'board' | 'table'>(terms.isMarket ? 'board' : 'table');
     const [newRoomNumber, setNewRoomNumber] = useState('');
     const [editingRoom, setEditingRoom] = useState<string | null>(null);
     const [importResult, setImportResult] = useState<{ updated: number; created: number; tenants: number; skipped: string[] } | null>(null);
@@ -439,6 +442,21 @@ export default function RoomManagement({
                 )}
             </div>
 
+            {/* Board (status at a glance, book / cancel) or the full table (edit everything) */}
+            {rooms.length > 0 && uid && buildingId && (
+                <div role="tablist" aria-label="มุมมอง" className="seg" style={{ marginBottom: '0.75rem', alignSelf: 'flex-start', display: 'inline-flex' }}>
+                    <button role="tab" aria-selected={layout === 'board'} className={`seg-item ${layout === 'board' ? 'active' : ''}`} onClick={() => setLayout('board')}>
+                        <LayoutGrid size={14} /> ผัง{terms.unitName} · ว่าง / จอง
+                    </button>
+                    <button role="tab" aria-selected={layout === 'table'} className={`seg-item ${layout === 'table' ? 'active' : ''}`} onClick={() => setLayout('table')}>
+                        <ClipboardList size={14} /> ตาราง · แก้ไขข้อมูล
+                    </button>
+                </div>
+            )}
+            {layout === 'board' && rooms.length > 0 && uid && buildingId ? (
+                <StallBoard uid={uid} buildingId={buildingId} rooms={rooms} unitName={terms.unitName}
+                    onEdit={room => { setLayout('table'); setSearchQuery(room.room_number); setFilterType('all'); setFilterLine('all'); startEdit(room); }} />
+            ) : (<>
             {/* Search & Filter bar */}
             <div className="card mb-4" style={{ padding: '0.75rem 1rem' }}>
                 <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1013,6 +1031,7 @@ export default function RoomManagement({
                     </div>
                 )}
             </div>
+            </>)}
 
             {/* Bulk Delete Confirm Modal */}
             {showBulkDeleteConfirm && (
