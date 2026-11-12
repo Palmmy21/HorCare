@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BarChart3, BookOpen, FileBarChart, Landmark, Receipt, ListOrdered, Send, Settings2 } from 'lucide-react';
+import { BarChart3, BookOpen, FileBarChart, Landmark, Receipt, ListOrdered, Send, Settings2, ShieldCheck } from 'lucide-react';
+import RevenueAuditPanel from '../Market/RevenueAuditPanel';
 import type { Building } from '../../types';
 import { useLedgerEntries, useLedgers } from '../../hooks/useLedgerData';
 import PostingTab from './PostingTab';
@@ -11,7 +12,7 @@ import GuidedEntryTab from './GuidedEntryTab';
 import YearEndClose from './YearEndClose';
 import FinanceOverviewTab from '../Accounting/FinanceOverviewTab';
 
-type Tab = 'overview' | 'guided' | 'statements' | 'post' | 'journal' | 'reports' | 'settings';
+type Tab = 'overview' | 'guided' | 'statements' | 'post' | 'journal' | 'reports' | 'audit' | 'settings';
 
 export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; buildings: Building[] }) {
     const { ledgers, loading, error } = useLedgers(ownerUid);
@@ -19,6 +20,10 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
     const [tab, setTab] = useState<Tab>('overview');
     const current = ledgers.find(l => l.id === selected) ?? ledgers[0];
     const { entries, loading: entriesLoading } = useLedgerEntries(ownerUid, current?.id ?? null);
+    const allMarkets = buildings.filter(b => b.building_type === 'market');
+    // the markets this ledger keeps the books of (all markets when it covers none of them, or there is no ledger yet)
+    const ledgerMarkets = current ? allMarkets.filter(b => current.property_ids.includes(b.id)) : allMarkets;
+    const markets = ledgerMarkets.length ? ledgerMarkets : allMarkets;
 
     const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
         { id: 'overview', label: 'ภาพรวม (กราฟ)', icon: BarChart3 },
@@ -27,9 +32,12 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
         { id: 'statements', label: 'งบกำไรขาดทุน / งบดุล', icon: Landmark },
         { id: 'journal', label: 'สมุดรายวัน', icon: ListOrdered },
         { id: 'reports', label: 'รายงาน', icon: FileBarChart },
+        // markets: expected vs collected, where the gap went — next to the books it explains
+        ...(markets.length ? [{ id: 'audit' as Tab, label: 'ตรวจยอดรายได้ (ตลาด)', icon: ShieldCheck }] : []),
         { id: 'settings', label: 'ตั้งค่า', icon: Settings2 },
     ];
-    const activeTab: Tab = current || tab === 'overview' ? tab : 'settings';
+    // overview and the audit work without a ledger set up; the rest need one
+    const activeTab: Tab = current || tab === 'overview' || tab === 'audit' ? tab : 'settings';
     // the charts follow the properties of the selected ledger; with no ledger yet they cover every property
     const chartBuildings = current ? buildings.filter(b => current.property_ids.includes(b.id)) : buildings;
 
@@ -43,7 +51,7 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
             </div>
             <div style={{ display: 'inline-flex', flexWrap: 'wrap', background: 'var(--color-gray-100)', borderRadius: 'var(--radius-md)', padding: 3, gap: 3, alignSelf: 'flex-start' }}>
                 {tabs.map(t => (
-                    <button key={t.id} onClick={() => setTab(t.id)} aria-pressed={activeTab === t.id} disabled={!current && t.id !== 'settings' && t.id !== 'overview'} style={{
+                    <button key={t.id} onClick={() => setTab(t.id)} aria-pressed={activeTab === t.id} disabled={!current && t.id !== 'settings' && t.id !== 'overview' && t.id !== 'audit'} style={{
                         border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                         fontSize: '0.8125rem', fontWeight: 600, background: activeTab === t.id ? 'var(--color-white)' : 'transparent',
                         color: activeTab === t.id ? 'var(--color-gray-800)' : 'var(--color-gray-500)', boxShadow: activeTab === t.id ? 'var(--shadow-sm)' : 'none',
@@ -68,6 +76,7 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
             {current && activeTab === 'post' && <PostingTab ownerUid={ownerUid} ledger={current} />}
             {current && activeTab === 'journal' && (entriesLoading ? <div>กำลังโหลด…</div> : <JournalTab ownerUid={ownerUid} ledger={current} entries={entries} />)}
             {current && activeTab === 'reports' && (entriesLoading ? <div>กำลังโหลด…</div> : <ReportsTab ownerUid={ownerUid} ledger={current} entries={entries} />)}
+            {activeTab === 'audit' && <RevenueAuditPanel key={current?.id ?? 'all'} ownerUid={ownerUid} buildings={markets} marketsOnly />}
         </div>
     );
 }
