@@ -7,17 +7,49 @@ import { writeAudit } from './_audit.js';
 import { notify } from './_notify.js';
 import { AiError, aiErrorHint } from './_ai.js';
 import { isPlusOrAbove } from './_meter-ocr.js';
-import { readParcelLabel } from './_parcel-ocr.js';
+import { aiPickRecipient, readParcelLabel } from './_parcel-ocr.js';
 import { resolvePortalLink } from './_portal-link.js';
 import {
-    canTransition, isParcelStatus,
-    type Parcel, type ParcelStatus, type TenantParcelView,
+    canTransition, hasRoom, isParcelStatus, matchLabelRoom, matchRecipient,
+    type Parcel, type ParcelStatus, type RecipientCandidate, type RoomSuggestion, type TenantParcelView,
 } from '../src/shared/parcels.js';
+
+/** Saved when nobody picked a carrier. */
+const UNKNOWN_CARRIER = 'ไม่ระบุ';
+
+/**
+ * The room a label fits: the room printed on it, else the tenant whose name / phone it carries (src/shared/parcels.ts
+ * matchRecipient), else — when the plan has AI — the text model choosing from the tenant list. A suggestion only.
+ */
+async function suggestRoom(
+    b: string, label: { room_number?: string | null; recipient_name?: string | null; recipient_phone?: string | null }, ai: boolean,
+): Promise<{ match: RoomSuggestion | null; candidates: RecipientCandidate[] }> {
+    const [roomsSnap, tenantsSnap] = await Promise.all([db.collection(`${b}/rooms`).get(), db.collection(`${b}/tenants`).get()]);
+    const rooms = roomsSnap.docs.map(d => ({ id: d.id, ...(d.data() as { room_number?: string; is_active?: boolean }) }))
+        .filter(r => r.is_active !== false && r.room_number).map(r => ({ id: r.id, room_number: String(r.room_number), is_active: true }));
+    const profile = new Map(tenantsSnap.docs.map(d => [d.id, d.data() as { full_name?: string; nickname?: string; phone?: string }]));
+    const tenants: RecipientCandidate[] = rooms.filter(r => profile.has(r.id)).map(r => {
+        const p = profile.get(r.id)!;
+        return { room_id: r.id, room_number: r.room_number, full_name: p.full_name ?? null, nickname: p.nickname ?? null, phone: p.phone ?? null };
+    });
+    const printed = matchLabelRoom(label.room_number, rooms);
+    if (printed) {
+        return { match: { room_id: printed.id, room_number: printed.room_number, tenant_name: profile.get(printed.id)?.full_name ?? null, by: 'label_room', confidence: 1 }, candidates: [] };
+    }
+    const found = matchRecipient(label.recipient_name, label.recipient_phone, tenants);
+    if (found.match || !ai || !label.recipient_name) return found;
+    const picked = await aiPickRecipient(label.recipient_name, tenants);
+    const t = picked ? tenants.find(x => x.room_number === picked.room_number) : undefined;
+    return t ? { match: { room_id: t.room_id, room_number: t.room_number, tenant_name: t.full_name ?? null, by: 'ai', confidence: picked!.confidence }, candidates: found.candidates } : found;
+}
+
+const candidateView = (c: RecipientCandidate) => ({ room_id: c.room_id, room_number: c.room_number, tenant_name: c.full_name ?? null });
 
 export const config = { maxDuration: 20 };
 
 interface Body {
-    action?: 'create' | 'update_status' | 'renotify' | 'tenant_list' | 'read_label';
+    action?: 'create' | 'update_status' | 'renotify' | 'tenant_list' | 'read_label' | 'assign_room';
+    recipient_phone?: string;
     owner_uid?: string;
     building_id?: string;
     room_id?: string;
@@ -50,6 +82,25 @@ function text(value: unknown, max: number): string | null | undefined {
 }
 
 const base = (owner: string, bld: string) => `users/${owner}/buildings/${bld}`;
+
+/** Tell the room's tenant a parcel arrived; a parcel still at "received" becomes "tenant_notified" once delivered. */
+async function notifyParcel(b: string, parcel: Parcel, now: string): Promise<Record<string, string>> {
+    const [, owner, , buildingId] = b.split('/');
+    const result = await notify({
+        event: 'parcel.received', ownerUid: owner, buildingId, roomId: parcel.room_id,
+        data: { carrier: parcel.carrier, storage_location: parcel.storage_location },
+    });
+    const ref = db.doc(`${b}/parcels/${parcel.id}`);
+    if (result.delivered && parcel.status === 'received') {
+        await ref.update({ status: 'tenant_notified', notified_at: now, notify_channels: result.channels });
+        parcel.status = 'tenant_notified';
+        parcel.notified_at = now;
+    } else {
+        await ref.update({ notify_channels: result.channels });
+    }
+    parcel.notify_channels = result.channels;
+    return result.channels;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -92,7 +143,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return;
         }
         try {
-            res.status(200).json({ data: await readParcelLabel(body.image_base64, 'image/jpeg') });
+            const data = await readParcelLabel(body.image_base64, 'image/jpeg');
+            // which room it is for: the room on the label, else the tenant whose name / phone it carries
+            const { match, candidates } = await suggestRoom(base(ctx.ownerUid, buildingId), data, true)
+                .catch(err => { console.warn('[parcels] room suggestion failed:', (err as Error).message); return { match: null, candidates: [] }; });
+            res.status(200).json({ data, match, candidates: candidates.map(candidateView) });
         } catch (err) {
             console.error('[parcels] read_label', (err as Error).message);
             const code = err instanceof AiError ? err.code : 'unexpected';
@@ -106,16 +161,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!ctx) return;
         if (!(await buildingExists(ctx.ownerUid, buildingId))) { res.status(404).json({ error: 'property_not_found' }); return; }
 
-        const carrier = text(body.carrier, 40);
+        // Everything may be missing: a parcel is saved with whatever is known — even no room — and completed later.
+        const carrierIn = text(body.carrier, 40);
         const tracking = text(body.tracking_number, 60);
         const recipient = text(body.recipient_name, 80);
+        const phone = text(body.recipient_phone, 30);
         const storage = text(body.storage_location, 60);
         const note = text(body.note, 300);
-        if (!carrier || tracking === undefined || recipient === undefined || storage === undefined || note === undefined) {
+        if (carrierIn === undefined || tracking === undefined || recipient === undefined || phone === undefined || storage === undefined || note === undefined) {
             res.status(400).json({ error: 'invalid_input' });
             return;
         }
-        if (typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'room_id is required' }); return; }
+        if (body.room_id !== undefined && body.room_id !== null && body.room_id !== '' && typeof body.room_id !== 'string') { res.status(400).json({ error: 'invalid_input' }); return; }
+        const carrier = carrierIn ?? UNKNOWN_CARRIER;
+        const roomId = typeof body.room_id === 'string' ? body.room_id : '';
 
         let image: string | null = null;
         if (body.image_base64 !== undefined && body.image_base64 !== '') {
@@ -126,12 +185,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             image = body.image_base64;
         }
 
-        // The parcel is bound to a room the staff member picked — never matched from the label name.
+        // The parcel is bound to a room a person picked — a name on the label only ever *suggests* one.
         const b = base(ctx.ownerUid, buildingId);
-        const roomSnap = await db.doc(`${b}/rooms/${body.room_id}`).get();
-        if (!roomSnap.exists || roomSnap.data()?.is_active === false) { res.status(404).json({ error: 'room_not_found' }); return; }
-        const room = roomSnap.data()!;
-        const profile = await db.doc(`${b}/tenants/${body.room_id}`).get();
+        let room: { room_number?: string } | null = null;
+        let tenantName: string | null = null;
+        if (roomId) {
+            const roomSnap = await db.doc(`${b}/rooms/${roomId}`).get();
+            if (!roomSnap.exists || roomSnap.data()?.is_active === false) { res.status(404).json({ error: 'room_not_found' }); return; }
+            room = roomSnap.data()!;
+            tenantName = ((await db.doc(`${b}/tenants/${roomId}`).get()).data()?.full_name as string | undefined) ?? null;
+        }
+        // no room yet: work out which one it probably is, for staff to confirm in one tap
+        const owner = roomId ? null : await db.doc(`users/${ctx.ownerUid}`).get();
+        const suggested = roomId || (!recipient && !phone) ? null
+            : (await suggestRoom(b, { recipient_name: recipient, recipient_phone: phone }, isPlusOrAbove(effectiveLicense(owner?.data())))
+                .catch(() => ({ match: null }))).match;
 
         if (tracking) {
             const dup = await db.collection(`${b}/parcels`).where('tracking_number', '==', tracking).get();
@@ -145,9 +213,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const now = new Date().toISOString();
         const parcel: Parcel = {
             id, organization_id: ctx.ownerUid, property_id: buildingId,
-            room_id: body.room_id, room_number: room.room_number,
-            tenant_id: body.room_id, tenant_name: (profile.data()?.full_name as string | undefined) ?? null,
-            recipient_name: recipient, carrier, tracking_number: tracking, storage_location: storage, note,
+            room_id: roomId, room_number: room ? String(room.room_number ?? '') : '',
+            tenant_id: roomId, tenant_name: tenantName,
+            recipient_name: recipient, recipient_phone: phone, suggested_room: suggested,
+            carrier, tracking_number: tracking, storage_location: storage, note,
             has_image: image !== null, status: 'received',
             received_at: now, received_by: ctx.uid, received_by_name: ctx.displayName,
             picked_up_at: null, picked_up_by: null, picked_up_by_name: null,
@@ -156,25 +225,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await db.doc(`${b}/parcels/${id}`).set(parcel);
         if (image) await db.doc(`${b}/parcel_images/${id}`).set({ data_url: `data:image/jpeg;base64,${image}`, created_at: now });
 
-        // Tell the tenant. Status advances to "notified" only if something was actually delivered.
-        const result = await notify({
-            event: 'parcel.received', ownerUid: ctx.ownerUid, buildingId, roomId: body.room_id,
-            data: { carrier, storage_location: storage },
-        });
-        if (result.delivered) {
-            await db.doc(`${b}/parcels/${id}`).update({ status: 'tenant_notified', notified_at: now, notify_channels: result.channels });
-            parcel.status = 'tenant_notified';
-        } else {
-            await db.doc(`${b}/parcels/${id}`).update({ notify_channels: result.channels });
-        }
-        parcel.notify_channels = result.channels;
+        // Tell the tenant (once there is a room). Status advances to "notified" only if something was actually delivered.
+        const result = roomId ? await notifyParcel(b, parcel, now) : null;
 
         await writeAudit({
             ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
-            action: 'CREATE', resourceType: 'parcel', resourceId: id, resourceLabel: `Parcel · Room ${room.room_number}`,
+            action: 'CREATE', resourceType: 'parcel', resourceId: id, resourceLabel: `Parcel · ${roomId ? `Room ${parcel.room_number}` : 'no room yet'}`,
             after: { carrier, tracking_number: tracking, status: parcel.status }, req,
         });
-        res.status(200).json({ parcel, notify: result.channels });
+        res.status(200).json({ parcel, notify: result });
+        return;
+    }
+
+    // a parcel saved without a room (or in the wrong one, before pickup) gets its room; the tenant is told then
+    if (body.action === 'assign_room') {
+        const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'parcel.update' });
+        if (!ctx) return;
+        if (typeof body.parcel_id !== 'string' || !body.parcel_id || typeof body.room_id !== 'string' || !body.room_id) { res.status(400).json({ error: 'invalid_input' }); return; }
+        const b = base(ctx.ownerUid, buildingId);
+        const ref = db.doc(`${b}/parcels/${body.parcel_id}`);
+        const snap = await ref.get();
+        if (!snap.exists) { res.status(404).json({ error: 'not_found' }); return; }
+        const parcel = snap.data() as Parcel;
+        if (parcel.status === 'picked_up') { res.status(409).json({ error: 'already_picked_up' }); return; }
+        const roomSnap = await db.doc(`${b}/rooms/${body.room_id}`).get();
+        if (!roomSnap.exists || roomSnap.data()?.is_active === false) { res.status(404).json({ error: 'room_not_found' }); return; }
+        const tenantName = ((await db.doc(`${b}/tenants/${body.room_id}`).get()).data()?.full_name as string | undefined) ?? null;
+        const updated: Parcel = { ...parcel, room_id: body.room_id, room_number: String(roomSnap.data()!.room_number ?? ''), tenant_id: body.room_id, tenant_name: tenantName, suggested_room: null };
+        await ref.update({ room_id: updated.room_id, room_number: updated.room_number, tenant_id: updated.tenant_id, tenant_name: tenantName, suggested_room: null });
+        const result = await notifyParcel(b, updated, new Date().toISOString());
+        await writeAudit({
+            ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
+            action: 'UPDATE', resourceType: 'parcel', resourceId: parcel.id, resourceLabel: `Parcel · Room ${updated.room_number}`,
+            before: { room: parcel.room_number || null }, after: { room: updated.room_number }, req,
+        });
+        res.status(200).json({ parcel: updated, notify: result });
         return;
     }
 
@@ -190,6 +275,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (body.action === 'renotify') {
             if (parcel.status === 'picked_up') { res.status(409).json({ error: 'already_picked_up' }); return; }
+            if (!hasRoom(parcel)) { res.status(409).json({ error: 'no_room' }); return; }
             const result = await notify({
                 event: 'parcel.received', ownerUid: ctx.ownerUid, buildingId, roomId: parcel.room_id,
                 data: { carrier: parcel.carrier, storage_location: parcel.storage_location },
@@ -201,6 +287,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!isParcelStatus(body.status)) { res.status(400).json({ error: 'invalid_status' }); return; }
         const to: ParcelStatus = body.status;
+        // nobody to notify or remind without a room: only handing it over is possible (the person came for it)
+        if (!hasRoom(parcel) && to !== 'picked_up') { res.status(409).json({ error: 'no_room' }); return; }
         if (!canTransition(parcel.status, to)) {
             res.status(409).json({ error: 'invalid_transition', message: `เปลี่ยนสถานะจาก ${parcel.status} เป็น ${to} ไม่ได้` });
             return;

@@ -10,9 +10,14 @@ import { useParcels } from '../../hooks/useParcels';
 import { apiPost, ApiError } from '../../utils/api';
 import { compressImage } from '../../utils/imageCompress';
 import {
-    CARRIERS, PARCEL_STATUS_LABELS_TH, REMIND_AFTER_DAYS, matchCarrier, matchLabelRoom,
-    type Parcel, type ParcelLabelOcr, type ParcelStatus,
+    CARRIERS, PARCEL_STATUS_LABELS_TH, REMIND_AFTER_DAYS, hasRoom, matchCarrier,
+    type Parcel, type ParcelLabelResult, type ParcelStatus, type RoomSuggestion,
 } from '../../shared/parcels';
+
+/** How a room was found, in the words staff read. */
+const SUGGESTED_BY: Record<RoomSuggestion['by'], string> = {
+    label_room: 'จากเลขห้องบนใบปะหน้า', name: 'จากชื่อผู้รับ', phone: 'จากเบอร์โทรบนใบปะหน้า', ai: 'AI จับคู่ชื่อผู้รับกับรายชื่อผู้เช่า',
+};
 
 interface ParcelsPageProps {
     ownerUid: string;
@@ -21,7 +26,7 @@ interface ParcelsPageProps {
     unitName: string;
 }
 
-type Tab = 'open' | 'history' | 'all';
+type Tab = 'open' | 'noroom' | 'history' | 'all';
 
 const STATUS_COLOR: Record<ParcelStatus, string> = {
     received: '#557089', tenant_notified: '#0A6CC2', waiting_pickup: '#E8740C', picked_up: '#15803D',
@@ -30,6 +35,8 @@ const STATUS_COLOR: Record<ParcelStatus, string> = {
 const ERRORS: Record<string, string> = {
     duplicate_tracking: 'เลขพัสดุนี้ถูกบันทึกไว้แล้วและยังไม่ได้รับ',
     room_not_found: 'ไม่พบห้องนี้',
+    no_room: 'ยังไม่ได้ระบุห้อง — กด "ระบุห้อง" ก่อน',
+    already_picked_up: 'พัสดุนี้ส่งมอบไปแล้ว',
     invalid_input: 'ข้อมูลไม่ถูกต้อง ตรวจสอบช่องที่กรอก',
     invalid_image: 'รูปไม่ถูกต้องหรือใหญ่เกินไป',
     forbidden: 'คุณไม่มีสิทธิ์จัดการพัสดุของสถานที่นี้',
@@ -44,10 +51,13 @@ const daysSince = (iso: string) => Math.floor((Date.now() - Date.parse(iso)) / 8
 function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: ParcelsPageProps & { onClose: () => void }) {
     const [roomId, setRoomId] = useState('');
     const [roomSearch, setRoomSearch] = useState('');
-    const [carrier, setCarrier] = useState<string>(CARRIERS[0]);
+    const [carrier, setCarrier] = useState<string>('');
     const [customCarrier, setCustomCarrier] = useState('');
     const [tracking, setTracking] = useState('');
     const [recipient, setRecipient] = useState('');
+    const [recipientPhone, setRecipientPhone] = useState('');
+    /** People the label may be for, when no one clearly stands out (tap to choose). */
+    const [candidates, setCandidates] = useState<ParcelLabelResult['candidates']>([]);
     const [storage, setStorage] = useState('');
     const [note, setNote] = useState('');
     const [image, setImage] = useState<{ base64: string; preview: string; file: File } | null>(null);
@@ -63,7 +73,8 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
     const shown = active.filter(r => !roomSearch || r.room_number.toLowerCase().includes(roomSearch.toLowerCase()));
     const room = active.find(r => r.id === roomId);
     const finalCarrier = carrier === '__other' ? customCarrier.trim() : carrier;
-    const canSubmit = !busy && !!roomId && finalCarrier.length > 0;
+    // anything may be missing — even the room: it is saved now and completed later
+    const canSubmit = !busy;
 
     const pickPhoto = async (file: File | undefined) => {
         if (!file) return;
@@ -83,24 +94,29 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
         setOcr({ state: 'reading', text: 'กำลังอ่านใบปะหน้า…' });
         try {
             const { base64 } = await compressImage(file, 1600); // sharper than the stored photo: small print and barcodes
-            const { data } = await apiPost<{ data: ParcelLabelOcr }>('parcels', {
+            const { data, match, candidates: maybe } = await apiPost<ParcelLabelResult>('parcels', {
                 action: 'read_label', owner_uid: ownerUid, building_id: buildingId, image_base64: base64,
             });
             const filled: string[] = [];
             if (data.tracking_number && !tracking.trim()) { setTracking(data.tracking_number); filled.push('เลขพัสดุ'); }
             if (data.recipient_name && !recipient.trim()) { setRecipient(data.recipient_name); filled.push('ชื่อผู้รับ'); }
+            if (data.recipient_phone && !recipientPhone.trim()) { setRecipientPhone(data.recipient_phone); filled.push('เบอร์'); }
             if (data.carrier) {
                 const known = matchCarrier(data.carrier);
                 if (known) setCarrier(known);
                 else { setCarrier('__other'); setCustomCarrier(data.carrier.slice(0, 40)); }
                 filled.push('ขนส่ง');
             }
+            // the room: the one printed on the label, else the tenant whose name / phone it carries — staff confirm
             let roomNote = '';
-            if (data.room_number) {
-                const hit = matchLabelRoom(data.room_number, active);
-                if (hit && !roomId) { setRoomId(hit.id); setRoomSearch(''); filled.push(unitName); }
-                if (!hit) roomNote = ` · ใบปะหน้าระบุ${unitName} "${data.room_number}" แต่ไม่พบในระบบ — กรุณาเลือกเอง`;
-                else if (roomId && hit.id !== roomId) roomNote = ` · ใบปะหน้าระบุ${unitName} ${hit.room_number} ไม่ตรงกับที่เลือกไว้`;
+            setCandidates(match ? [] : maybe);
+            if (match) {
+                if (!roomId) { setRoomId(match.room_id); setRoomSearch(''); filled.push(`${unitName} ${match.room_number} (${SUGGESTED_BY[match.by]}${match.tenant_name ? ` · ${match.tenant_name}` : ''})`); }
+                else if (match.room_id !== roomId) roomNote = ` · ระบบคิดว่าเป็น${unitName} ${match.room_number} (${SUGGESTED_BY[match.by]}) ไม่ตรงกับที่เลือกไว้`;
+            } else if (data.room_number) {
+                roomNote = ` · ใบปะหน้าระบุ${unitName} "${data.room_number}" แต่ไม่พบในระบบ — เลือกเอง หรือบันทึกแบบไม่ระบุ${unitName}`;
+            } else if (data.recipient_name) {
+                roomNote = maybe.length ? ` · ไม่แน่ใจว่าเป็นของใคร — เลือกจากรายชื่อด้านบน` : ` · หาผู้เช่าชื่อนี้ไม่พบ — เลือกเอง หรือบันทึกแบบไม่ระบุ${unitName}`;
             }
             const low = data.confidence < 0.5 ? ' (ความมั่นใจต่ำ)' : '';
             setOcr(filled.length || roomNote
@@ -117,15 +133,20 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
         setBusy(true);
         setError(null);
         try {
-            const res = await apiPost<{ notify: Record<string, string> }>('parcels', {
-                action: 'create', owner_uid: ownerUid, building_id: buildingId, room_id: roomId, carrier: finalCarrier,
-                tracking_number: tracking, recipient_name: recipient, storage_location: storage, note,
+            const res = await apiPost<{ notify: Record<string, string> | null; parcel: Parcel }>('parcels', {
+                action: 'create', owner_uid: ownerUid, building_id: buildingId, room_id: roomId || undefined, carrier: finalCarrier || undefined,
+                tracking_number: tracking, recipient_name: recipient, recipient_phone: recipientPhone, storage_location: storage, note,
                 image_base64: image?.base64,
             });
-            const line = res.notify?.line;
-            toast.success(line === 'sent' ? 'บันทึกแล้ว และแจ้งผู้เช่าทาง LINE แล้ว' : 'บันทึกพัสดุแล้ว');
-            if (line === 'skipped') toast(`${unitName}นี้ยังไม่ได้เชื่อม LINE — ผู้เช่าจะเห็นในพอร์ทัลเท่านั้น`, { icon: '⚠️' });
-            if (line === 'failed') toast.error('ส่ง LINE ไม่สำเร็จ — กด "แจ้งอีกครั้ง" ภายหลังได้');
+            if (!roomId) {
+                const s = res.parcel?.suggested_room;
+                toast.success(s ? `บันทึกแล้ว — ระบบคิดว่าเป็น${unitName} ${s.room_number} กดยืนยันในรายการเพื่อแจ้งผู้เช่า` : `บันทึกแล้ว (ยังไม่ระบุ${unitName}) — กด "ระบุ${unitName}" ในรายการเมื่อทราบ`);
+            } else {
+                const line = res.notify?.line;
+                toast.success(line === 'sent' ? 'บันทึกแล้ว และแจ้งผู้เช่าทาง LINE แล้ว' : 'บันทึกพัสดุแล้ว');
+                if (line === 'skipped') toast(`${unitName}นี้ยังไม่ได้เชื่อม LINE — ผู้เช่าจะเห็นในพอร์ทัลเท่านั้น`, { icon: '⚠️' });
+                if (line === 'failed') toast.error('ส่ง LINE ไม่สำเร็จ — กด "แจ้งอีกครั้ง" ภายหลังได้');
+            }
             onClose();
         } catch (e) {
             const err = e as ApiError;
@@ -146,9 +167,26 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                 </div>
                 <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
                     <div style={field}>
-                        <span className="form-label">{unitName}ผู้รับ *</span>
+                        <span className="form-label">{unitName}ผู้รับ <span style={{ fontWeight: 400, color: 'var(--color-gray-500)' }}>(ไม่ทราบก็บันทึกได้ ระบุทีหลังได้)</span></span>
                         <input className="form-input" placeholder={`ค้นหาเลข${unitName}`} value={roomSearch} onChange={e => setRoomSearch(e.target.value)} />
+                        {candidates.length > 0 && !roomId && (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', fontSize: '0.78rem' }}>
+                                <span style={{ color: '#9A3412' }}>อาจเป็น:</span>
+                                {candidates.map(c => (
+                                    <button key={c.room_id} type="button" className="btn btn-outline btn-sm" onClick={() => { setRoomId(c.room_id); setCandidates([]); }}>
+                                        {unitName} {c.room_number}{c.tenant_name ? ` · ${c.tenant_name}` : ''}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <div role="listbox" aria-label={`เลือก${unitName}`} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 120, overflowY: 'auto', padding: 2 }}>
+                            <button type="button" role="option" aria-selected={!roomId} onClick={() => setRoomId('')}
+                                style={{
+                                    padding: '0.3rem 0.65rem', borderRadius: 8, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: !roomId ? 700 : 500,
+                                    border: `1.5px dashed ${!roomId ? '#C2410C' : 'var(--color-gray-300)'}`, background: !roomId ? 'rgba(194,65,12,0.08)' : 'transparent', color: 'var(--color-gray-800)',
+                                }}>
+                                ไม่ระบุ{unitName}
+                            </button>
                             {shown.length === 0 && <span style={{ fontSize: '0.8125rem', color: 'var(--color-gray-500)' }}>ไม่พบ{unitName}</span>}
                             {shown.map(r => {
                                 const on = r.id === roomId;
@@ -172,8 +210,9 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem' }}>
                         <label style={field}>
-                            <span className="form-label">บริษัทขนส่ง *</span>
+                            <span className="form-label">บริษัทขนส่ง</span>
                             <select className="form-input" value={carrier} onChange={e => setCarrier(e.target.value)}>
+                                <option value="">ไม่ระบุ</option>
                                 {CARRIERS.map(c => <option key={c} value={c}>{c}</option>)}
                                 <option value="__other">อื่นๆ (ระบุเอง)</option>
                             </select>
@@ -186,6 +225,10 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                         <label style={field}>
                             <span className="form-label">ชื่อผู้รับบนใบปะหน้า</span>
                             <input className="form-input" maxLength={80} value={recipient} onChange={e => setRecipient(e.target.value)} />
+                        </label>
+                        <label style={field}>
+                            <span className="form-label">เบอร์บนใบปะหน้า</span>
+                            <input className="form-input mono" maxLength={30} inputMode="tel" placeholder="เช่น 08x-xxx-1234" value={recipientPhone} onChange={e => setRecipientPhone(e.target.value)} />
                         </label>
                         <label style={field}>
                             <span className="form-label">ที่เก็บพัสดุ</span>
@@ -212,7 +255,7 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                                 <button type="button" className="btn btn-outline btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => fileRef.current?.click()}>
                                     <Camera size={14} /> ถ่ายรูปใบปะหน้า / เลือกรูป
                                 </button>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>ระบบจะอ่านขนส่ง เลขพัสดุ ชื่อผู้รับ และเลข{unitName}ให้อัตโนมัติ</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>ระบบจะอ่านขนส่ง เลขพัสดุ ชื่อผู้รับ เบอร์ และเลข{unitName}ให้ ถ้าไม่มีเลข{unitName} จะหาผู้เช่าจากชื่อ/เบอร์ให้</span>
                             </>
                         )}
                         {ocr && (
@@ -232,9 +275,33 @@ function AddParcelModal({ ownerUid, buildingId, rooms, unitName, onClose }: Parc
                 <div className="modal-footer">
                     <button className="btn btn-outline" onClick={onClose} disabled={busy}>ยกเลิก</button>
                     <button className="btn btn-primary" onClick={submit} disabled={!canSubmit}>
-                        {busy ? <Loader2 size={16} className="spin" /> : <Plus size={16} />} บันทึกและแจ้งผู้เช่า
+                        {busy ? <Loader2 size={16} className="spin" /> : <Plus size={16} />} {roomId ? 'บันทึกและแจ้งผู้เช่า' : `บันทึก (ระบุ${unitName}ทีหลัง)`}
                     </button>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+/** A parcel saved without a room: confirm the suggested one in one tap, or pick it. The tenant is told then. */
+function AssignRoom({ parcel, rooms, unitName, busy, onAssign }: { parcel: Parcel; rooms: Room[]; unitName: string; busy: boolean; onAssign: (roomId: string) => void }) {
+    const [pick, setPick] = useState('');
+    const s = parcel.suggested_room;
+    const active = rooms.filter(r => r.is_active !== false).sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }));
+    return (
+        <div style={{ marginTop: 6, padding: '0.5rem 0.65rem', borderRadius: 10, background: '#FFF7ED', border: '1px dashed #FDBA74', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {s && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                    <span>ระบบคิดว่าเป็น <b>{unitName} {s.room_number}</b>{s.tenant_name ? ` · ${s.tenant_name}` : ''} <span style={{ color: 'var(--color-gray-500)' }}>({SUGGESTED_BY[s.by]})</span></span>
+                    <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => onAssign(s.room_id)}><CheckCircle2 size={13} /> ใช่ แจ้งผู้เช่าเลย</button>
+                </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <select className="form-input" style={{ width: 'auto', minWidth: 140, padding: '0.3rem 0.5rem', fontSize: '0.8rem' }} value={pick} onChange={e => setPick(e.target.value)} aria-label={`ระบุ${unitName}`}>
+                    <option value="">{s ? `หรือเลือก${unitName}อื่น…` : `ระบุ${unitName}…`}</option>
+                    {active.map(r => <option key={r.id} value={r.id}>{unitName} {r.room_number}</option>)}
+                </select>
+                <button className="btn btn-outline btn-sm" disabled={busy || !pick} onClick={() => onAssign(pick)}>ระบุ{unitName}และแจ้งผู้เช่า</button>
             </div>
         </div>
     );
@@ -251,14 +318,16 @@ export default function ParcelsPage(props: ParcelsPageProps) {
     const [photo, setPhoto] = useState<{ id: string; url?: string; loading: boolean } | null>(null);
 
     const openCount = parcels.filter(p => p.status !== 'picked_up').length;
+    const noRoomCount = parcels.filter(p => p.status !== 'picked_up' && !hasRoom(p)).length;
     const overdueCount = parcels.filter(p => p.status !== 'picked_up' && daysSince(p.received_at) >= REMIND_AFTER_DAYS).length;
 
     const filtered = parcels.filter(p => {
         if (tab === 'open' && p.status === 'picked_up') return false;
+        if (tab === 'noroom' && (p.status === 'picked_up' || hasRoom(p))) return false;
         if (tab === 'history' && p.status !== 'picked_up') return false;
         if (search) {
             const q = search.toLowerCase();
-            const hay = `${p.room_number} ${p.tenant_name ?? ''} ${p.recipient_name ?? ''} ${p.tracking_number ?? ''} ${p.carrier}`.toLowerCase();
+            const hay = `${p.room_number} ${p.tenant_name ?? ''} ${p.recipient_name ?? ''} ${p.recipient_phone ?? ''} ${p.tracking_number ?? ''} ${p.carrier}`.toLowerCase();
             if (!hay.includes(q)) return false;
         }
         return true;
@@ -278,7 +347,7 @@ export default function ParcelsPage(props: ParcelsPageProps) {
     };
 
     const handOver = (p: Parcel) => {
-        const who = window.prompt(`ชื่อผู้มารับพัสดุ ห้อง ${p.room_number} (เว้นว่างได้)`, p.tenant_name ?? '');
+        const who = window.prompt(`ชื่อผู้มารับพัสดุ ${hasRoom(p) ? `${unitName} ${p.room_number}` : '(ยังไม่ระบุ' + unitName + ')'} (เว้นว่างได้)`, p.tenant_name ?? p.recipient_name ?? '');
         if (who === null) return; // cancelled
         void act(p, { action: 'update_status', status: 'picked_up', picked_up_by_name: who.trim() || undefined }, 'บันทึกการส่งมอบแล้ว');
     };
@@ -295,6 +364,7 @@ export default function ParcelsPage(props: ParcelsPageProps) {
 
     const tabs: { id: Tab; label: string; count?: number }[] = [
         { id: 'open', label: 'ยังไม่ได้รับ', count: openCount },
+        ...(noRoomCount > 0 ? [{ id: 'noroom' as Tab, label: `ยังไม่ระบุ${unitName}`, count: noRoomCount }] : []),
         { id: 'history', label: 'ประวัติ' },
         { id: 'all', label: 'ทั้งหมด' },
     ];
@@ -307,6 +377,7 @@ export default function ParcelsPage(props: ParcelsPageProps) {
                     <p className="page-subtitle">
                         รับพัสดุแทน{props.unitName}และแจ้งผู้เช่าอัตโนมัติ
                         {overdueCount > 0 && <span style={{ color: '#C2410C', fontWeight: 700 }}> · ค้างรับเกิน {REMIND_AFTER_DAYS} วัน {overdueCount} ชิ้น</span>}
+                        {noRoomCount > 0 && <span style={{ color: '#C2410C', fontWeight: 700 }}> · ยังไม่ระบุ{unitName} {noRoomCount} ชิ้น</span>}
                     </p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setAdding(true)}><Plus size={16} /> รับพัสดุใหม่</button>
@@ -351,7 +422,7 @@ export default function ParcelsPage(props: ParcelsPageProps) {
                             <div key={p.id} className="card" style={{ padding: '0.875rem 1rem', display: 'flex', gap: '0.875rem', flexWrap: 'wrap', alignItems: 'flex-start', borderColor: overdue ? 'rgba(245, 158, 46,0.5)' : undefined }}>
                                 <div style={{ width: 52, height: 52, borderRadius: 12, background: 'var(--color-gray-100)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                     <span style={{ fontSize: '0.62rem', color: 'var(--color-gray-400)', lineHeight: 1 }}>{unitName}</span>
-                                    <span style={{ fontWeight: 800, color: 'var(--color-gray-800)' }}>{p.room_number}</span>
+                                    <span style={{ fontWeight: 800, color: hasRoom(p) ? 'var(--color-gray-800)' : '#C2410C' }}>{hasRoom(p) ? p.room_number : '?'}</span>
                                 </div>
                                 <div style={{ flex: '1 1 260px', minWidth: 0 }}>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -373,13 +444,18 @@ export default function ParcelsPage(props: ParcelsPageProps) {
                                         {line && p.status !== 'picked_up' && <> · LINE: {line === 'sent' ? 'ส่งแล้ว' : line === 'skipped' ? 'ยังไม่เชื่อม' : 'ส่งไม่สำเร็จ'}</>}
                                     </div>
                                     {p.note && <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>หมายเหตุ: {p.note}</div>}
+                                    {p.recipient_phone && <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>เบอร์บนใบปะหน้า: <span className="mono">{p.recipient_phone}</span></div>}
+                                    {!hasRoom(p) && p.status !== 'picked_up' && (
+                                        <AssignRoom parcel={p} rooms={props.rooms} unitName={unitName} busy={busy}
+                                            onAssign={roomId => void act(p, { action: 'assign_room', room_id: roomId }, `ระบุ${unitName}แล้ว และแจ้งผู้เช่าแล้ว`)} />
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                     {p.has_image && <button className="btn btn-outline btn-sm" onClick={() => void showPhoto(p)}><ImageIcon size={13} /> รูป</button>}
                                     {p.status !== 'picked_up' && (
                                         <>
-                                            <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => void act(p, { action: 'renotify' }, 'ส่งการแจ้งเตือนอีกครั้งแล้ว')}><Bell size={13} /> แจ้งอีกครั้ง</button>
-                                            {p.status !== 'waiting_pickup' && (
+                                            {hasRoom(p) && <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => void act(p, { action: 'renotify' }, 'ส่งการแจ้งเตือนอีกครั้งแล้ว')}><Bell size={13} /> แจ้งอีกครั้ง</button>}
+                                            {hasRoom(p) && p.status !== 'waiting_pickup' && (
                                                 <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => void act(p, { action: 'update_status', status: 'waiting_pickup' }, 'ย้ายไป "รอรับ" แล้ว')}>รอรับ</button>
                                             )}
                                             <button className="btn btn-success btn-sm" disabled={busy} onClick={() => handOver(p)}>

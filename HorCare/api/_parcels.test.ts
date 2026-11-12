@@ -10,7 +10,7 @@ import { parseParcelLabel } from './_parcel-ocr.js';
 import { decideChannels, renderMessage } from './_notify.js';
 import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, seed, seedPortalLink } from './_fake-firestore.js';
 import { permissionsForRole } from '../src/shared/permissions.js';
-import { MAX_REMINDERS, canTransition, isDueForReminder, matchCarrier, matchLabelRoom, type Parcel } from '../src/shared/parcels.js';
+import { MAX_REMINDERS, canTransition, isDueForReminder, matchCarrier, matchLabelRoom, matchRecipient, nameWords, phoneTail, type Parcel } from '../src/shared/parcels.js';
 
 const OWNER = 'owner-1';
 const BLD = 'bld-A';
@@ -103,18 +103,46 @@ describe('create parcel', () => {
         expect((await create(OWNER, { room_id: 'r103' })).statusCode).toBe(404); // inactive
     });
 
+    it('saves with nothing filled in: no carrier, no room — nobody is notified until a room is chosen', async () => {
+        const res = await call(OWNER, { action: 'create' });
+        expect(res.statusCode).toBe(200);
+        const p = (res.body as { parcel: Parcel }).parcel;
+        expect(p).toMatchObject({ room_id: '', room_number: '', carrier: 'ไม่ระบุ', status: 'received', suggested_room: null });
+        expect((res.body as { notify: unknown }).notify).toBeNull();
+        expect(listPaths(`${B}/notifications/`)).toHaveLength(0);
+        // nothing can be sent for it, nor can it wait for pickup — but it can be handed over
+        expect((await call(OWNER, { action: 'renotify', parcel_id: p.id })).body).toMatchObject({ error: 'no_room' });
+        expect((await call(OWNER, { action: 'update_status', parcel_id: p.id, status: 'waiting_pickup' })).body).toMatchObject({ error: 'no_room' });
+    });
+
+    it('no room but a name: the tenant it fits is suggested; choosing the room then tells the tenant', async () => {
+        seed(`${B}/tenants/r102`, { full_name: 'สมศรี ใจดี', phone: '0891231234' });
+        const res = await call(OWNER, { action: 'create', recipient_name: 'นางสาว สมศรี ใจดี', carrier: 'Flash Express' });
+        const p = (res.body as { parcel: Parcel }).parcel;
+        expect(p.room_id).toBe('');
+        expect(p.suggested_room).toMatchObject({ room_id: 'r102', room_number: '102', by: 'name' });
+        const assigned = await call(OWNER, { action: 'assign_room', parcel_id: p.id, room_id: p.suggested_room!.room_id });
+        expect(assigned.statusCode).toBe(200);
+        expect(read(`${B}/parcels/${p.id}`)).toMatchObject({ room_id: 'r102', room_number: '102', tenant_name: 'สมศรี ใจดี', suggested_room: null, status: 'tenant_notified' });
+        expect(listPaths(`${B}/notifications/`)).toHaveLength(1);
+        // a room of another property, or after pickup, is refused
+        expect((await call(OWNER, { action: 'assign_room', parcel_id: p.id, room_id: 'rB1' })).statusCode).toBe(404);
+        await call(OWNER, { action: 'update_status', parcel_id: p.id, status: 'picked_up' });
+        expect((await call(OWNER, { action: 'assign_room', parcel_id: p.id, room_id: 'r101' })).body).toMatchObject({ error: 'already_picked_up' });
+        member('tech', 'technician');
+        expect((await call('tech', { action: 'assign_room', parcel_id: p.id, room_id: 'r101' })).statusCode).toBe(403);
+    });
+
     it('rejects a property that is not the owner\'s', async () => {
         const res = await call(OWNER, { action: 'create', building_id: 'bld-forged', room_id: 'r101', carrier: 'DHL' });
         expect(res.statusCode).toBe(404);
     });
 
     it('validates input (400)', async () => {
-        expect((await create(OWNER, { carrier: '' })).statusCode).toBe(400);
-        expect((await create(OWNER, { carrier: undefined })).statusCode).toBe(400);
         expect((await create(OWNER, { carrier: 'x'.repeat(41) })).statusCode).toBe(400);
         expect((await create(OWNER, { tracking_number: 't'.repeat(61) })).statusCode).toBe(400);
         expect((await create(OWNER, { note: 42 })).statusCode).toBe(400);
-        expect((await create(OWNER, { room_id: undefined })).statusCode).toBe(400);
+        expect((await create(OWNER, { room_id: 7 })).statusCode).toBe(400);
         expect((await create(OWNER, { image_base64: '<script>' })).statusCode).toBe(400);
         expect((await create(OWNER, { image_base64: 'A'.repeat(450_001) })).statusCode).toBe(400);
         expect(listPaths(`${B}/parcels/`)).toHaveLength(0);
@@ -213,9 +241,33 @@ describe('read_label (shipping-label OCR)', () => {
         const res = await label(OWNER);
         expect(res.statusCode).toBe(200);
         expect((res.body as { data: unknown }).data).toEqual({
-            carrier: 'Flash', tracking_number: 'TH0123456789', recipient_name: 'สมชาย', room_number: '101', confidence: 0.9,
+            carrier: 'Flash', tracking_number: 'TH0123456789', recipient_name: 'สมชาย', recipient_phone: null, room_number: '101', confidence: 0.9,
         });
         expect(listPaths(`${B}/parcels/`)).toHaveLength(0);
+    });
+
+    it('no room on the label: the name finds the tenant; if the name is unclear the AI picks from the tenant list', async () => {
+        seed(`users/${OWNER}`, { uid: OWNER, license: 'monthly_medium' });
+        seed(`${B}/tenants/r102`, { full_name: 'สมศรี ใจดี', nickname: 'ศรี', phone: '0891231234' });
+        aiGenerate.mockResolvedValueOnce('{"carrier":"Kerry","recipient_name":"คุณสมศรี ใจดี","room_number":null,"confidence":0.8}');
+        const byName = (await label(OWNER)).body as { match: { room_id: string; by: string } };
+        expect(byName.match).toMatchObject({ room_id: 'r102', by: 'name' });
+        // an English spelling the name rules cannot match: the AI is asked, and only a room in the list is accepted
+        aiGenerate
+            .mockResolvedValueOnce('{"recipient_name":"SOMSRI JAIDEE","room_number":null,"confidence":0.8}')
+            .mockResolvedValueOnce('{"room_number":"102","confidence":0.9}');
+        const byAi = (await label(OWNER)).body as { match: { room_id: string; by: string } };
+        expect(byAi.match).toMatchObject({ room_id: 'r102', by: 'ai' });
+        const askedWith = String(aiGenerate.mock.calls.at(-1)?.[0]?.prompt);
+        expect(askedWith).toContain('102: สมศรี ใจดี');
+        expect(askedWith).not.toContain('0891231234');   // names only, never phones
+        aiGenerate
+            .mockResolvedValueOnce('{"recipient_name":"SOMSRI JAIDEE","confidence":0.8}')
+            .mockResolvedValueOnce('{"room_number":"999","confidence":0.99}');
+        expect(((await label(OWNER)).body as { match: unknown }).match).toBeNull();
+        // the room printed on the label wins
+        aiGenerate.mockResolvedValueOnce('{"recipient_name":"สมศรี ใจดี","room_number":"ห้อง 101","confidence":0.8}');
+        expect(((await label(OWNER)).body as { match: { room_id: string; by: string } }).match).toMatchObject({ room_id: 'r101', by: 'label_room' });
     });
 
     it('is Plus/Pro only, needs parcel.create, and validates the image', async () => {
@@ -237,9 +289,33 @@ describe('read_label (shipping-label OCR)', () => {
     });
 
     it('parser drops junk and non-label replies', () => {
-        expect(parseParcelLabel('not json')).toEqual({ carrier: null, tracking_number: null, recipient_name: null, room_number: null, confidence: 0 });
+        expect(parseParcelLabel('not json')).toEqual({ carrier: null, tracking_number: null, recipient_name: null, recipient_phone: null, room_number: null, confidence: 0 });
+        // the name without a "ผู้รับ:" the model kept; a masked phone kept as printed; a non-phone dropped
+        expect(parseParcelLabel('{"recipient_name":"ผู้รับ: นางสาว สมศรี ใจดี","recipient_phone":"08x-xxx-1234"}')).toMatchObject({ recipient_name: 'นางสาว สมศรี ใจดี', recipient_phone: '08xxxx1234' });
+        expect(parseParcelLabel('{"recipient_phone":"call me"}').recipient_phone).toBeNull();
         expect(parseParcelLabel('{"tracking_number":"12","room_number":null,"carrier":"null","confidence":7}'))
             .toMatchObject({ tracking_number: null, room_number: null, carrier: null, confidence: 1 });
+    });
+
+    it('matches a label name / phone to one tenant — only when one clearly stands out', () => {
+        const tenants = [
+            { room_id: 'a', room_number: '201', full_name: 'สมชาย ใจดี', nickname: 'ชาย', phone: '0811111111' },
+            { room_id: 'b', room_number: '202', full_name: 'สมชาย รักไทย', phone: '0822222222' },
+            { room_id: 'c', room_number: '203', full_name: 'Anna Smith', nickname: 'แอน', phone: '0833334444' },
+        ];
+        expect(matchRecipient('นาย สมชาย ใจดี', null, tenants).match).toMatchObject({ room_id: 'a', by: 'name' });
+        expect(matchRecipient('MS. ANNA SMITH', null, tenants).match).toMatchObject({ room_id: 'c' });
+        // two "สมชาย": not clear — offered as candidates, never chosen
+        const two = matchRecipient('สมชาย', null, tenants);
+        expect(two.match).toBeNull();
+        expect(two.candidates.map(c => c.room_id).sort()).toEqual(['a', 'b']);
+        // ... the phone's last digits settle it, even masked
+        expect(matchRecipient('สมชาย', '08x-xxx-2222', tenants).match).toMatchObject({ room_id: 'b' });
+        expect(matchRecipient(null, '***4444', tenants).match).toMatchObject({ room_id: 'c', by: 'phone' });
+        expect(matchRecipient('ใครก็ไม่รู้', null, tenants).match).toBeNull();
+        expect(nameWords('นางสาว  สมศรี  ใจดี')).toEqual(['สมศรี', 'ใจดี']);
+        expect(phoneTail('08x-xxx-1234')).toBe('1234');
+        expect(phoneTail('xx12')).toBeNull();
     });
 
     it('matches carriers and rooms from what the label says', () => {

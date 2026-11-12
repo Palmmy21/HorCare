@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // users/{uid}/buildings/{bid}/parcels/{id}
             if (parts.length !== 6 || parts[0] !== 'users' || parts[2] !== 'buildings') continue;
             const p = d.data() as Parcel;
-            if (!isDueForReminder(p, now)) { skipped++; continue; }
+            if (!p.room_id || !isDueForReminder(p, now)) { skipped++; continue; }   // no room yet: nobody to remind
 
             const days = Math.floor((now - Date.parse(p.received_at)) / 86400_000);
             const result = await notify({
