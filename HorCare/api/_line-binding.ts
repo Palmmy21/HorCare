@@ -10,7 +10,7 @@
  * the binding is allowed, then `commit` writes.
  */
 import { admin, db } from './_firebase.js';
-import type { LineChannel } from './_line.js';
+import { currentLineChannel, roomLineChannel, type LineChannel } from './_line.js';
 import {
     addRoom, linkWithRooms, registrationChoice, removeRoom, roomsOfLink, sameRoom, type BindMode, type LinkedRoom,
 } from '../src/shared/lineRooms.js';
@@ -117,6 +117,39 @@ export async function linkedRooms(lineUserId: string): Promise<LinkedRoom[]> {
         await (next ? ref.set(next) : ref.delete()).catch(() => undefined);
     }
     return live;
+}
+
+/**
+ * The rooms this LINE account speaks for through the OA the event came in on (primary first). One account may hold a
+ * market stall (vendor OA) and a dorm room (tenant OA): "บิล", the portal, a slip, a message — each OA deals with its
+ * own place only. A room remembers the OA it was linked through (`line_channel`); rooms linked before the vendor OA
+ * existed all say tenant, so then the kind of place decides (vendor OA = markets, tenant OA = everything else).
+ * Every room when none can be told apart, so nobody is ever left with nothing.
+ */
+export async function roomsOnThisOa(lineUserId: string, channel: LineChannel = currentLineChannel()): Promise<LinkedRoom[]> {
+    const rooms = await linkedRooms(lineUserId);
+    if (rooms.length <= 1) return rooms;
+    const facts = await Promise.all(rooms.map(async r => {
+        try {
+            const base = `users/${r.uid}/buildings/${r.building_id}`;
+            const [room, building, cfg] = await Promise.all([roomRefOf(r).get(), db.doc(base).get(), db.doc(`${base}/data/config`).get()]);
+            return { channel: roomLineChannel(room.data()), market: (building.data()?.building_type ?? cfg.data()?.building_type) === 'market' };
+        } catch {
+            return null;
+        }
+    }));
+    const team = channel.startsWith('oa:');
+    const fits = (f: { market: boolean } | null) => !!f && (team || f.market === (channel === 'market'));
+    const pick = (keep: (f: { channel: LineChannel; market: boolean } | null) => boolean) => rooms.filter((_, i) => keep(facts[i]));
+    for (const keep of [
+        (f: { channel: LineChannel; market: boolean } | null) => f?.channel === channel && fits(f),
+        (f: { channel: LineChannel; market: boolean } | null) => f?.channel === channel,
+        ...(team ? [] : [fits]),
+    ]) {
+        const found = pick(keep);
+        if (found.length) return found;
+    }
+    return rooms;
 }
 
 /** What a property's tenants see at registration; read outside the transaction since it is display only. */

@@ -7,7 +7,7 @@ import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } fro
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { claimRoom, isRoomCode, scanRoomCode, type ScanResult } from './_room-qr.js';
 import { propertyOaId } from './_line-oa.js';
-import { linkedRooms, recordFriendship } from './_line-binding.js';
+import { linkedRooms, recordFriendship, roomsOnThisOa } from './_line-binding.js';
 import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
 import { readSlipDetails } from './_slip-ai.js';
 import { describeReply, getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
@@ -594,6 +594,11 @@ async function handleRoomNumber(
     await handleClaimByNumber(lineUserId, replyToken, { ownerUid: uid, buildingId: building_id, roomId: roomsSnap.docs[0].id });
 }
 
+/** The one room this OA deals with: the primary room's document as before, or the account's other room of this OA. */
+function thisRoom(primary: FirebaseFirestore.DocumentData, mine: LinkedRoom[]): FirebaseFirestore.DocumentData {
+    return mine[0] && !sameRoom(mine[0], primary as LinkedRoom) ? mine[0] : primary;
+}
+
 /** ดูบิลล่าสุดของห้องที่ลงทะเบียน */
 async function handleBillCommand(lineUserId: string, replyToken: string) {
     const lineRoomSnap = await db.collection('line_rooms').doc(lineUserId).get();
@@ -602,10 +607,11 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
         return;
     }
 
-    const mine = await linkedRooms(lineUserId);
+    // only the rooms of the OA this was typed to: the market's bills on the vendor OA, the dorm's on the tenant OA
+    const mine = await roomsOnThisOa(lineUserId);
     if (mine.length > 1) { await replyBillsOfRooms(replyToken, mine); return; }
 
-    const { uid, building_id, room_id, room_number, dorm_name, due_day } = lineRoomSnap.data()!;
+    const { uid, building_id, room_id, room_number, dorm_name, due_day } = thisRoom(lineRoomSnap.data()!, mine);
 
     const billDoc = await getLatestSavedBill(uid, building_id, room_id);
 
@@ -688,10 +694,10 @@ async function handlePortalCommand(lineUserId: string, replyToken: string, intro
         return;
     }
 
-    const mine = await linkedRooms(lineUserId);
+    const mine = await roomsOnThisOa(lineUserId);
     if (mine.length > 1) { await replyPortalChoice(replyToken, mine, intro); return; }
 
-    const { uid, building_id, room_id, room_number, dorm_name } = lineRoomSnap.data()!;
+    const { uid, building_id, room_id, room_number, dorm_name } = thisRoom(lineRoomSnap.data()!, mine);
     const appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
     const portalUrl = `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: room_id }))}`;
 
@@ -951,11 +957,11 @@ async function handleSlipImage(
     // One room: exactly as before. Several: find out which room the money is for before anything is written.
     let target: LinkedRoom | undefined = chosen;
     if (!target && roomsOfLink(lineRoomSnap.data()).length > 1) {
-        const mine = await linkedRooms(lineUserId);
+        const mine = await roomsOnThisOa(lineUserId);
         if (mine.length > 1) {
             target = await pickSlipRoom(lineUserId, replyToken, messageId, mine, lineRoomSnap.data()!, preloaded) ?? undefined;
             if (!target) return;   // asked which room, or already answered
-        }
+        } else if (mine[0] && !sameRoom(mine[0], lineRoomSnap.data() as LinkedRoom)) target = mine[0];
     }
     const { uid, building_id, room_id, room_number, dorm_name } = (target ?? lineRoomSnap.data()!) as LinkedRoom;
 

@@ -135,6 +135,7 @@ describe('what the bot says', () => {
         expect(thread(MKT)).not.toContain('น้ำไม่ไหลค่ะ');
 
         process.env.LINE_MARKET_CHANNEL_SECRET = SECRET;
+        process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN = 'market-token';
         const market = (await import('./line-market-webhook.js')).default;
         const raw = Buffer.from(JSON.stringify({ events: [text('พรุ่งนี้หยุดขาย')] }));
         const req = Readable.from([raw]) as never as { method: string; headers: object };
@@ -143,9 +144,43 @@ describe('what the bot says', () => {
         const res = fakeRes();
         await market(req as never, res as never);
         delete process.env.LINE_MARKET_CHANNEL_SECRET;
+        delete process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN;
         expect(res.statusCode).toBe(200);
         expect(thread(MKT)).toContain('พรุ่งนี้หยุดขาย');
         expect(thread(BLD)).not.toContain('พรุ่งนี้หยุดขาย');
+    });
+
+    it('"บิล" on the tenant OA shows the dorm bill only, on the vendor OA the stall bill only', async () => {
+        const MKT = 'bld-M';
+        seed(`users/${OWNER}/buildings/${MKT}`, { id: MKT, building_type: 'market' });
+        seed(`users/${OWNER}/buildings/${MKT}/rooms/A22`, { room_number: 'A22', line_user_id: LINE_USER, line_channel: 'market' });
+        seed(ROOM, { room_number: '101', is_active: true, line_user_id: LINE_USER });
+        const bill = (room: string, n: string) => ({ room_id: room, room_number: n, is_saved: true, month: '2026-11', total_bill: 1000, rent: 1000, payment_status: 'unpaid' });
+        seed(`users/${OWNER}/buildings/${MKT}/bills/b-stall`, bill('A22', 'A22'));
+        seed(`users/${OWNER}/buildings/${BLD}/bills/b-dorm`, bill('r101', '101'));
+        const stall = { uid: OWNER, building_id: MKT, room_id: 'A22', room_number: 'A22', dorm_name: 'ตลาด' };
+        const dorm = { uid: OWNER, building_id: BLD, room_id: 'r101', room_number: '101', dorm_name: 'หอ' };
+        seed(`line_rooms/${LINE_USER}`, { ...stall, rooms: [stall, dorm] });
+        const replied = () => JSON.stringify(fetchMock.mock.calls.filter(([url]) => /message\/(reply|push)$/.test(String(url))).map(c => JSON.parse(c[1].body).messages));
+
+        fetchMock.mockClear();
+        await post([text('บิล')]);
+        expect(replied()).toContain('101');
+        expect(replied()).not.toContain('A22');
+
+        process.env.LINE_MARKET_CHANNEL_SECRET = SECRET;
+        process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN = 'market-token';
+        const market = (await import('./line-market-webhook.js')).default;
+        const raw = Buffer.from(JSON.stringify({ events: [text('บิล')] }));
+        const req = Readable.from([raw]) as never as { method: string; headers: object };
+        req.method = 'POST';
+        req.headers = { 'x-line-signature': createHmac('sha256', SECRET).update(raw).digest('base64') };
+        fetchMock.mockClear();
+        await market(req as never, fakeRes() as never);
+        delete process.env.LINE_MARKET_CHANNEL_SECRET;
+        delete process.env.LINE_MARKET_CHANNEL_ACCESS_TOKEN;
+        expect(replied()).toContain('A22');
+        expect(replied()).not.toContain('"101');
     });
 
     it('an answer LINE turns down (reply token expired) is pushed instead, and kept in the inbox', async () => {

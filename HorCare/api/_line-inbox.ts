@@ -12,8 +12,9 @@ import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { currentLineChannel, linePush, roomLineChannel, roomLineToken } from './_line.js';
-import { roomsOfLink } from '../src/shared/lineRooms.js';
+import { linePush, roomLineToken } from './_line.js';
+import { roomsOnThisOa } from './_line-binding.js';
+import { roomsOfLink, sameRoom } from '../src/shared/lineRooms.js';
 import { loadMediaDataUrl } from './_line-media.js';
 import { raiseAlert } from './_alerts.js';
 import {
@@ -51,26 +52,9 @@ export async function getTenantLink(lineUserId: string): Promise<TenantLink | nu
     const snap = await db.collection('line_rooms').doc(lineUserId).get();
     if (!snap.exists) return null;
     const data = snap.data() as TenantLink & Record<string, unknown>;
-    const rooms = roomsOfLink(data);
-    if (rooms.length <= 1) return data;
-    const here = currentLineChannel();
-    const facts = await Promise.all(rooms.map(async r => {
-        try {
-            const base = `users/${r.uid}/buildings/${r.building_id}`;
-            const [room, building, cfg] = await Promise.all([db.doc(`${base}/rooms/${r.room_id}`).get(), db.doc(base).get(), db.doc(`${base}/data/config`).get()]);
-            return { channel: roomLineChannel(room.data()), market: (building.data()?.building_type ?? cfg.data()?.building_type) === 'market' };
-        } catch {
-            return null;
-        }
-    }));
-    // a room is "of this OA" when it was linked here; rooms linked before the vendor OA existed all say tenant,
-    // so then the kind of place decides: the vendor OA talks for markets, the tenant OA for everything else
-    const fits = (f: { market: boolean } | null) => !!f && (here.startsWith('oa:') || f.market === (here === 'market'));
-    let i = facts.findIndex(f => f?.channel === here && fits(f));
-    if (i < 0) i = facts.findIndex(f => f?.channel === here);
-    if (i < 0 && !here.startsWith('oa:')) i = facts.findIndex(fits);
-    if (i <= 0) return data;
-    const r = rooms[i];
+    if (roomsOfLink(data).length <= 1) return data;
+    const r = (await roomsOnThisOa(lineUserId))[0];
+    if (!r || sameRoom(r, data)) return data;
     return { ...data, uid: r.uid, building_id: r.building_id, room_id: r.room_id, room_number: r.room_number, ...(r.dorm_name ? { dorm_name: r.dorm_name } : {}), ...(r.due_day ? { due_day: r.due_day } : {}) };
 }
 
