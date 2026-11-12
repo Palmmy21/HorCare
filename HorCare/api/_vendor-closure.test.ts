@@ -55,8 +55,9 @@ describe('a vendor says the stall is closed, from the chat', () => {
         const ask = await text('แจ้งหยุด');
         expect(ask!.text).toContain('แผง A1 หยุดวันไหน');
         const actions = ask!.quickReply!.items.map(i => i.action);
-        expect(actions.map(a => a.label)).toEqual(['วันนี้', 'พรุ่งนี้', 'เลือกวันอื่น', 'ยกเลิก']);
+        expect(actions.map(a => a.label)).toEqual(['วันนี้', 'พรุ่งนี้', 'เลือกวันอื่น', 'หยุดหลายวัน', 'ยกเลิก']);
         expect(actions[2].type).toBe('datetimepicker');
+        expect(actions[3].type).toBe('datetimepicker');
 
         const reason = await tap(actions[1].data!);
         expect(reason!.text).toContain('เพราะอะไร');
@@ -76,6 +77,42 @@ describe('a vendor says the stall is closed, from the chat', () => {
         const reason = await tap('shopclose|s1|pick', day);
         await tap(reason!.quickReply!.items[0].action.data!);
         expect(closures()[0].from_date).toBe(day);
+    });
+
+    it('a long closure: first day, last day from the calendar, a reason — one record for the whole span', async () => {
+        const from = addDays(todayTh(), 5);
+        const to = addDays(todayTh(), 18);
+        const ask = await tap('shopclose_range|s1|from', from);
+        expect(ask!.text).toContain('หยุดถึงวันไหน');
+        const picker = ask!.quickReply!.items[0].action as { type: string; data?: string; min?: string; max?: string };
+        expect(picker).toMatchObject({ type: 'datetimepicker', min: from, max: addDays(from, 59) });
+        expect(ask!.quickReply!.items.map(i => i.action.label)).toEqual(['เลือกวันสุดท้าย', '1 สัปดาห์', '2 สัปดาห์', '1 เดือน', 'ยกเลิก']);
+        const reason = await tap(picker.data!, to);
+        expect(reason!.text).toContain('14 วัน');
+        const saved = await tap(reason!.quickReply!.items[2].action.data!);   // หยุดพักผ่อน
+        expect(saved!.text).toContain('14 วัน');
+        expect(closures()).toHaveLength(1);
+        expect(closures()[0]).toMatchObject({ room_id: 's1', from_date: from, to_date: to, reason: 'holiday', status: 'active' });
+        // the market is told the whole span
+        expect(JSON.stringify(listPaths(`${B}/notifications/`).map(p => read(p)))).toContain(to);
+        // listed with its span; a second request overlapping it is refused and points to the existing one
+        expect((await text('วันหยุดที่แจ้ง'))!.text).toContain('14 วัน');
+        const again = await tap(`shopclose_range|s1|${addDays(from, 3)}|${addDays(from, 9)}`);
+        expect((await tap(again!.quickReply!.items[0].action.data!))!.text).toContain('ทับกับช่วงที่เลือก');
+        expect(closures()).toHaveLength(1);
+    });
+
+    it('a preset (1 week) needs no calendar; a last day before the first, or over 60 days, is refused', async () => {
+        const from = addDays(todayTh(), 1);
+        const ask = await tap('shopclose_range|s1|from', from);
+        const week = await tap(ask!.quickReply!.items[1].action.data!);
+        expect(week!.text).toContain('7 วัน');
+        expect((await tap(`shopclose_range|s1|${from}|pick`, addDays(from, -1)))!.text).toContain('ต้องไม่ก่อนวันเริ่ม');
+        expect((await tap(`shopclose_range|s1|${from}|${addDays(from, 60)}`))!.text).toContain('ไม่เกิน 60 วัน');
+        // a crafted save past the limit is refused by the same rule as the portal
+        expect((await tap(`shopclose_save|s1|${from}|sick|${addDays(from, 61)}`))!.text).toContain('แจ้งไม่ได้');
+        expect((await tap(`shopclose_range|s1|${addDays(todayTh(), -2)}|${from}`))!.text).toContain('หยุดวันไหน');   // a past first day: start again
+        expect(closures()).toEqual([]);
     });
 
     it('lists what is coming and cancels it', async () => {
