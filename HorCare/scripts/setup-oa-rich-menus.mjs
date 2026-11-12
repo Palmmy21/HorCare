@@ -18,7 +18,8 @@
  *   node scripts/setup-oa-rich-menus.mjs tenant
  *   node scripts/setup-oa-rich-menus.mjs market --dry-run          ask LINE to validate, change nothing
  *   node scripts/setup-oa-rich-menus.mjs market                   install and make it the default (deletes this script's older one)
- *   node scripts/setup-oa-rich-menus.mjs walkin                   (the walk-in menu: sets its alias, leaves the default alone)
+ *   node scripts/setup-oa-rich-menus.mjs walkin                   (the walk-in menu: sets its alias, leaves the default alone;
+ *                                                                   once installed, running again does nothing — --force replaces it)
  *   node scripts/setup-oa-rich-menus.mjs pos
  */
 import { execFileSync } from 'node:child_process';
@@ -193,6 +194,14 @@ try {
     console.log('menu definition is valid');
     if (args.includes('--dry-run')) process.exit(0);
     const before = ((await line('GET', '/richmenu/list')).richmenus ?? []).filter(m => m.name === MENUS[name].name);
+    // a per-person menu that is already in place: running again would only pile up copies
+    if (MENUS[name].alias && !args.includes('--force')) {
+        const current = await line('GET', `/richmenu/alias/${MENUS[name].alias}`).catch(() => null);
+        if (current?.richMenuId && before.some(m => m.richMenuId === current.richMenuId)) {
+            console.log(`already installed: alias ${MENUS[name].alias} → ${current.richMenuId}. Nothing to do (add --force to replace it with a new copy).`);
+            process.exit(0);
+        }
+    }
     const { richMenuId } = await line('POST', '/richmenu', payload(name));
     await line('POST', `/richmenu/${richMenuId}/content`, image, 'api-data.line.me');
     const alias = MENUS[name].alias;
