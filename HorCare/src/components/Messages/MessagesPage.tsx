@@ -155,7 +155,8 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
     const bottomRef = useRef<HTMLDivElement>(null);
 
     const selected = threads.find(t => t.line_user_id === selectedId) ?? null;
-    const { messages, loading: msgLoading } = useThreadMessages(ownerUid, buildingId, selected?.line_user_id ?? null);
+    const { messages, loading: msgLoading, hasEarlier, loadingEarlier, loadEarlier } = useThreadMessages(ownerUid, buildingId, selected?.line_user_id ?? null);
+    const lastMessageId = messages[messages.length - 1]?.id;
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -170,7 +171,8 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
         void apiPost('line-inbox', { action: 'mark_read', owner_uid: ownerUid, building_id: buildingId, line_user_id: selectedId }).catch(() => undefined);
     }, [selectedId, unread, ownerUid, buildingId]);
 
-    useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length, selectedId]);
+    // jump to the newest message when a conversation opens or a new message arrives — not when earlier ones are loaded
+    useEffect(() => { bottomRef.current?.scrollIntoView({ block: 'end' }); }, [lastMessageId, selectedId]);
 
     const send = async () => {
         const text = draft.trim();
@@ -267,6 +269,11 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
                             </div>
 
                             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--color-gray-50)' }}>
+                                {!msgLoading && (hasEarlier || loadingEarlier) && (
+                                    <button type="button" className="btn btn-secondary" style={{ alignSelf: 'center', fontSize: '0.8rem' }} onClick={loadEarlier} disabled={loadingEarlier}>
+                                        {loadingEarlier ? <Loader2 size={14} className="spin" /> : null} ดูข้อความก่อนหน้า
+                                    </button>
+                                )}
                                 {msgLoading ? <Loader2 size={20} className="spin" style={{ margin: 'auto' }} /> : messages.map(m => {
                                     const mine = m.direction === 'out';
                                     return (

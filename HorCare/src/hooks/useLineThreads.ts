@@ -29,18 +29,37 @@ export function useLineThreads(ownerUid: string | null, buildingId: string | nul
   };
 }
 
-/** Live messages of one conversation, oldest first. */
+/** How many of the latest messages a conversation opens with; "earlier messages" loads this many more each time. */
+export const THREAD_PAGE = 200;
+
+/**
+ * Live messages of one conversation, oldest first on screen — but always the LATEST ones: a long conversation (every
+ * command and every automatic answer is kept) must never stop showing what was just said. Older ones load on request.
+ */
 export function useThreadMessages(ownerUid: string | null, buildingId: string | null, lineUserId: string | null) {
   const key = ownerUid && buildingId && lineUserId ? `${ownerUid}/${buildingId}/${lineUserId}` : '';
-  const [snap, setSnap] = useState<{ key: string; messages: LineMessage[] } | null>(null);
+  const [snap, setSnap] = useState<{ key: string; size: number; messages: LineMessage[] } | null>(null);
+  const [want, setWant] = useState<{ key: string; size: number }>({ key: '', size: THREAD_PAGE });
+  const size = want.key === key ? want.size : THREAD_PAGE;
 
   useEffect(() => {
     if (!key) return;
     const [o, b, l] = key.split('/');
-    const q = query(collection(db, `users/${o}/buildings/${b}/line_threads/${l}/messages`), orderBy('at', 'asc'), limit(300));
-    return onSnapshot(q, s => setSnap({ key, messages: s.docs.map(d => d.data() as LineMessage) }), () => setSnap({ key, messages: [] }));
-  }, [key]);
+    const q = query(collection(db, `users/${o}/buildings/${b}/line_threads/${l}/messages`), orderBy('at', 'desc'), limit(size));
+    return onSnapshot(
+      q,
+      s => setSnap({ key, size, messages: s.docs.map(d => d.data() as LineMessage).reverse() }),
+      () => setSnap({ key, size, messages: [] }),
+    );
+  }, [key, size]);
 
+  // while more are loading, keep showing what is already there
   const cur = snap && snap.key === key ? snap : null;
-  return { messages: cur?.messages ?? [], loading: !!key && cur === null };
+  return {
+    messages: cur?.messages ?? [],
+    loading: !!key && cur === null,
+    hasEarlier: !!cur && cur.size === size && cur.messages.length >= size,
+    loadingEarlier: !!cur && cur.size !== size,
+    loadEarlier: () => setWant({ key, size: size + THREAD_PAGE }),
+  };
 }

@@ -26,6 +26,9 @@ export interface SlipQR {
     looksLikeSlip: boolean;    // loose heuristic — used only for the status note
 }
 
+/** Time the enlarged / sharpened retries may take after the first scan of the whole picture. */
+export const QR_EXTRA_PASSES_MS = 4000;
+
 /** Decode the QR embedded in a slip image. Never throws. */
 export async function decodeSlipQR(image: Buffer): Promise<SlipQR> {
     try {
@@ -41,8 +44,12 @@ export async function decodeSlipQR(image: Buffer): Promise<SlipQR> {
         };
         // The slip QR is small and usually in the lower part (often bottom-right) of a phone screenshot or photo, which
         // LINE has also recompressed: look at the whole picture first, then at the likely corners enlarged, then sharper.
+        // The extra passes are bounded in time: LINE waits for the webhook, and a photo with no QR at all (a room, a
+        // receipt) must not hold the reply up — past the budget the AI reader / "นี่คือสลิป" button takes over.
+        const started = Date.now();
+        const inBudget = () => Date.now() - started < QR_EXTRA_PASSES_MS;
         let payload = scan(img);
-        if (!payload) {
+        if (!payload && inBudget()) {
             const { width: w, height: h } = img.bitmap;
             const regions: [number, number, number, number][] = [
                 [0, Math.floor(h * 0.4), w, Math.ceil(h * 0.6)],                                   // lower 60%
@@ -51,13 +58,14 @@ export async function decodeSlipQR(image: Buffer): Promise<SlipQR> {
                 [0, 0, w, Math.ceil(h * 0.6)],                                                     // upper 60%
             ];
             for (const [x, y, cw, ch] of regions) {
+                if (!inBudget()) break;
                 if (cw < 40 || ch < 40) continue;
                 const part = img.clone().crop({ x, y, w: Math.min(cw, w - x), h: Math.min(ch, h - y) });
                 if (part.bitmap.width < 900) part.resize({ w: part.bitmap.width * 2 });
                 payload = scan(part) ?? scan(part.greyscale().contrast(0.4));
                 if (payload) break;
             }
-            if (!payload) payload = scan(img.clone().greyscale().contrast(0.5));
+            if (!payload && inBudget()) payload = scan(img.clone().greyscale().contrast(0.5));
         }
         return { payload, looksLikeSlip: payload ? isThaiSlipQR(payload) : false };
     } catch {
