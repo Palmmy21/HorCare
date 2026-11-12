@@ -43,7 +43,8 @@ window.addEventListener('unhandledrejection', (e) => {
 // Route: ?sp=<token>         → StaffPortalPage (all of one technician's / housekeeper's jobs; token from the team LINE OA)
 // Route: ?pos=<token>        → PosCarePage (collectors' screen, opened from the HorCare Staff LINE OA; the token signs in once)
 // Route: ?guide=staff        → StaffGuidePage (how to register and work in the team LINE OA; public, no data)
-// Route: ?walkin=1&uid=&bid= → WalkInPage (public form for walk-in market vendors)
+// Route: ?walkin=<link>      → WalkInPage (public form for walk-in market vendors; the market's own scan link)
+//        ?walkin=1&uid=&bid= → WalkInPage too (links printed before the scan link)
 // Route: ?listing=<slug>     → ListingPage (public vacancy page + viewing requests, checked by /api/listing)
 // Route: everything else    → Owner App
 const params = new URLSearchParams(window.location.search);
@@ -53,7 +54,7 @@ const isStaffWork = params.has('w');
 const isStaffPortal = params.has('sp');
 const isStaffGuide = params.get('guide') === 'staff';
 const isPosCare = params.has('pos');
-const isWalkIn = params.has('walkin') && params.has('uid') && params.has('bid');
+const isWalkIn = params.has('walkin') && ((params.get('walkin') ?? '').length >= 16 || (params.has('uid') && params.has('bid')));
 const isListing = params.has('listing');
 
 // eslint-disable-next-line react-refresh/only-export-components

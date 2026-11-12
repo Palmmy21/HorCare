@@ -2,7 +2,7 @@
 // the same conversation. Pure: the webhook decides what to do, this file decides what a message means and how to word it.
 import { normalizeForMatch } from './chatbot.js';
 
-export type TenantCommand = 'bill' | 'slip' | 'portal' | 'repair' | 'announcements' | 'contact' | 'register' | 'cancel' | 'help' | 'support' | 'close_shop' | 'my_closures';
+export type TenantCommand = 'bill' | 'slip' | 'portal' | 'repair' | 'announcements' | 'contact' | 'register' | 'cancel' | 'help' | 'support' | 'close_shop' | 'my_closures' | 'walkin_status' | 'walkin_new';
 
 /**
  * Whole-message matches only (after normalizing), never "contains": "บิลเดือนที่แล้วผิดค่ะ ช่วยดูหน่อย" is a message for
@@ -17,6 +17,9 @@ const COMMANDS: Record<TenantCommand, string[]> = {
     // market vendors: say the stall is closed on a day (anyone else is told it is for market stalls)
     close_shop: ['แจ้งหยุด', 'แจ้งหยุดร้าน', 'หยุดร้าน', 'ปิดร้าน', 'แจ้งปิดร้าน'],
     my_closures: ['วันหยุดที่แจ้ง', 'ดูวันหยุด', 'ยกเลิกแจ้งหยุด'],
+    // walk-in vendors (ขาจร, not registered): the walk-in rich menu and its quick replies
+    walkin_status: ['สถานะขาจร', 'สถานะการจอง', 'ผลการจอง', 'ผลการพิจารณา', 'ดูสถานะ'],
+    walkin_new: ['แจ้งเข้าขาย', 'จองวันขาย', 'แจ้งขาจร', 'จองล็อก'],
     contact: ['ติดต่อแอดมิน'],
     // the rich menu's help button: a person at the property is told right away (not the HorCare team: that is contact)
     support: ['ขอความช่วยเหลือ', 'ต้องการความช่วยเหลือ', 'ความช่วยเหลือ', 'เรียกเจ้าหน้าที่', 'ติดต่อเจ้าหน้าที่', 'ขอคุยกับเจ้าหน้าที่', 'คุยกับเจ้าหน้าที่', 'ติดต่อเจ้าของหอ', 'ติดต่อเจ้าของตลาด', 'ติดต่อนิติ', 'sos'],
@@ -24,6 +27,11 @@ const COMMANDS: Record<TenantCommand, string[]> = {
     cancel: ['ยกเลิก', 'cancel'],
     help: ['ช่วยเหลือ', 'เมนู', 'วิธีใช้', 'คำสั่ง', 'ทำอะไรได้บ้าง', 'help', 'menu'],
 };
+
+/** The main word of each command (what the menus send) — the in-app manual must explain every one (manual.test.ts). */
+export const TENANT_COMMAND_WORDS: Readonly<Record<TenantCommand, string>> = Object.fromEntries(
+    (Object.entries(COMMANDS) as [TenantCommand, string[]][]).map(([cmd, words]) => [cmd, words[0]]),
+) as Record<TenantCommand, string>;
 
 const LOOKUP = new Map<string, TenantCommand>();
 for (const [cmd, words] of Object.entries(COMMANDS) as [TenantCommand, string[]][]) {

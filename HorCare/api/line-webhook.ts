@@ -10,7 +10,9 @@ import { propertyOaId } from './_line-oa.js';
 import { linkedRooms, recordFriendship, roomsOnThisOa } from './_line-binding.js';
 import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
 import { readSlipDetails } from './_slip-ai.js';
-import { describeReply, getTenantLink, recordBotReply, recordInbound } from './_line-inbox.js';
+import { describeReply, getTenantLink, inboxLinkOf, recordBotReply, recordInbound } from './_line-inbox.js';
+import { WALKIN_QUICK, bindWalkInCode, dropWalkInMenuIfRegistered, walkInLinkOf, walkInNewReply, walkInStatusReply } from './_walkin.js';
+import { isWalkInCode } from '../src/shared/market.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { findFaqAnswer } from './_chatbot.js';
 
@@ -177,6 +179,12 @@ async function handleEventInner(event: LineEvent) {
 const isMarket = () => currentLineChannel() === 'market';
 
 async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: string) {
+    // a walk-in who has since registered a stall goes back to the vendor menu (only the vendor / a team's OA give it)
+    if (currentLineChannel() !== 'tenant') {
+        await dropWalkInMenuIfRegistered(lineUserId, async () => !!(await getTenantLink(lineUserId)))
+            .catch(err => console.warn('[walkin] menu reset failed:', (err as Error).message));
+    }
+
     // ── "แบ่งจ่าย" buttons: on an invoice (split mode) or on a slip card ─────────────
     if (event.type === 'postback') {
         const modeReq = parseSplitModePostback(event.postback?.data);
@@ -206,7 +214,8 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     // a form the owner can open (never treated as slips). Someone not registered is told how to register instead.
     const type = event.message?.type;
     if (type === 'audio' || type === 'video' || type === 'file' || type === 'location' || type === 'sticker') {
-        if (!(await getTenantLink(lineUserId))) {
+        // a registered tenant, or a walk-in linked to a market: both talk to the property's inbox
+        if (!(await inboxLinkOf(lineUserId))) {
             if (type !== 'sticker') await lineReply(replyToken, [botText(notRegisteredText(isMarket()), GUEST_QUICK)]);
             return;
         }
@@ -232,11 +241,19 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
 
     // Every message from a registered tenant goes to the inbox, commands included (quietly: the bot answers those
     // itself, so they do not count as unread or ring anyone). The bot's answers are kept too (lineReply below).
-    const quiet = cmd !== null || isInvitationToken(text) || isRoomCode(text) || DORM_CODE_RE.test(text.toUpperCase());
+    const quiet = cmd !== null || isInvitationToken(text) || isRoomCode(text) || isWalkInCode(text) || DORM_CODE_RE.test(text.toUpperCase());
     const inbound = await recordInbound(lineUserId, { kind: 'text', text, quiet }).catch(err => {
         console.error('recordInbound failed:', (err as Error).message);
         return { recorded: false, shouldAck: false };
     });
+
+    // ── 0. Walk-in vendors (ขาจร): the request's own code links this LINE to it and to the market's chat ──
+    if (isWalkInCode(text)) {
+        await lineReply(replyToken, await bindWalkInCode(lineUserId, text, { registered: !!(await getTenantLink(lineUserId)) }));
+        return;
+    }
+    if (cmd === 'walkin_status') { await lineReply(replyToken, await walkInStatusReply(lineUserId)); return; }
+    if (cmd === 'walkin_new') { await lineReply(replyToken, await walkInNewReply(lineUserId)); return; }
 
     // ── 1. บิล / ดูบิล ────────────────────────────────────────────
     if (cmd === 'bill') {
@@ -390,7 +407,12 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
             await lineReply(replyToken, [{ type: 'text', text: answer }]);
             return;
         }
-        if (inbound.shouldAck) await lineReply(replyToken, [botText(ackText(market), TENANT_QUICK)]);
+        if (inbound.shouldAck) {
+            await lineReply(replyToken, [link
+                ? botText(ackText(market), TENANT_QUICK)
+                // a walk-in: no bill to point at, their request instead
+                : botText('ได้รับข้อความแล้วค่ะ 🙏 เจ้าหน้าที่ตลาดจะตอบกลับในแชทนี้โดยเร็วที่สุด\n\nกด "สถานะขาจร" เพื่อดูผลการพิจารณาคำขอเข้าขาย', WALKIN_QUICK)]);
+        }
         return;
     }
     const isRegistered = (await db.collection('line_rooms').doc(lineUserId).get()).exists;
@@ -612,9 +634,10 @@ const HELP_ALERT_EVERY_MS = 2 * 60 * 1000;
  */
 async function handleSupport(lineUserId: string, replyToken: string) {
     const market = isMarket();
-    const link = await getTenantLink(lineUserId);
+    const link = await inboxLinkOf(lineUserId);   // a registered tenant, or a walk-in linked to a market
     if (!link) { await lineReply(replyToken, [botText(notRegisteredText(market), GUEST_QUICK)]); return; }
     const v = botVocab(market);
+    const who = link.walkin ? (link.tenant_name ?? 'ขาจร') : `${v.unit} ${link.room_number}`;
     const base = `users/${link.uid}/buildings/${link.building_id}`;
     const thread = db.doc(`${base}/line_threads/${lineUserId}`);
     const was = (await thread.get()).data();
@@ -622,21 +645,23 @@ async function handleSupport(lineUserId: string, replyToken: string) {
     if (!prev || Date.now() - Date.parse(prev) > HELP_ALERT_EVERY_MS) {
         const now = new Date().toISOString();
         // the press itself was kept quietly (dispatchEvent); here it becomes something waiting for a person
+        const name = link.walkin ? null : (await db.doc(`${base}/tenants/${link.room_id}`).get()).data()?.full_name as string | undefined;
+        // the whole thread description too: a first message could be this very press
         await thread.set({
+            line_user_id: lineUserId, room_id: link.room_id, room_number: link.room_number, tenant_name: link.walkin ? (link.tenant_name ?? null) : (name ?? was?.tenant_name ?? null),
             help_requested_at: now, unread_count: Number(was?.unread_count ?? 0) + 1,
-            last_message_text: '🆘 ขอความช่วยเหลือ', last_message_at: now, last_direction: 'in',
+            last_message_text: '🆘 ขอความช่วยเหลือ', last_message_at: now, last_direction: 'in', last_ack_at: was?.last_ack_at ?? null,
         }, { merge: true });
-        const name = (await db.doc(`${base}/tenants/${link.room_id}`).get()).data()?.full_name as string | undefined;
         const place = (link as { dorm_name?: string }).dorm_name;
         await raiseAlert({
             ownerUid: link.uid, buildingId: link.building_id, type: 'help_request', line: true,
-            title: `🆘 ${v.unit} ${link.room_number}${name ? ` · ${name}` : ''} ขอความช่วยเหลือ`,
+            title: `🆘 ${who}${name ? ` · ${name}` : ''} ขอความช่วยเหลือ`,
             body: `${place ? `${place}: ` : ''}กดปุ่ม "ขอความช่วยเหลือ" ใน LINE — เข้าไปตอบในหน้าข้อความ LINE ได้เลย`,
         });
     }
     await lineReply(replyToken, [botText(
-        `🆘 แจ้งเจ้าหน้าที่แล้วค่ะ (${v.unit} ${link.room_number})\n\nพิมพ์เรื่องที่ต้องการให้ช่วยในแชทนี้ได้เลย หรือส่งรูปประกอบได้ เจ้าหน้าที่จะตอบกลับในแชทนี้โดยเร็วที่สุดค่ะ 🙏`,
-        TENANT_QUICK,
+        `🆘 แจ้งเจ้าหน้าที่แล้วค่ะ (${who})\n\nพิมพ์เรื่องที่ต้องการให้ช่วยในแชทนี้ได้เลย หรือส่งรูปประกอบได้ เจ้าหน้าที่จะตอบกลับในแชทนี้โดยเร็วที่สุดค่ะ 🙏`,
+        link.walkin ? WALKIN_QUICK : TENANT_QUICK,
     )]);
 }
 
@@ -814,7 +839,7 @@ async function storeInboxMedia(
     caption?: string,
     extra?: Pick<LineMessage, 'file_name' | 'duration_ms'>,
 ) {
-    const link = await getTenantLink(lineUserId);
+    const link = await inboxLinkOf(lineUserId);
     if (!link) return NOT_STORED;
     const saved = await saveMedia({
         ownerUid: link.uid, buildingId: link.building_id, lineUserId, messageId,
@@ -838,6 +863,14 @@ async function storeInboxMedia(
 async function handleImage(lineUserId: string, replyToken: string, messageId: string) {
     const link = await getTenantLink(lineUserId);
     if (!link) {
+        // a walk-in's photo (their goods, the lot…) is conversation for the market: no bills, so never a slip here
+        if (await walkInLinkOf(lineUserId)) {
+            const img = await getLineImageContent(messageId);
+            const inbound = img ? await storeInboxMedia(lineUserId, messageId, 'image', img).catch(logStoreFailure) : NOT_STORED;
+            if (!img) await lineReply(replyToken, [{ type: 'text', text: 'ขออภัยค่ะ โหลดรูปไม่สำเร็จ กรุณาส่งใหม่อีกครั้งนะคะ' }]);
+            else if (inbound.shouldAck) await lineReply(replyToken, [botText('ได้รับรูปแล้วค่ะ 📷 เจ้าหน้าที่ตลาดจะตอบกลับในแชทนี้ค่ะ', WALKIN_QUICK)]);
+            return;
+        }
         // Unregistered: keep the old behaviour (asks them to register).
         await handleSlipImage(lineUserId, replyToken, messageId);
         return;

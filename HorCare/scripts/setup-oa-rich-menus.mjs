@@ -5,6 +5,8 @@
  *            บิล · ส่งสลิป · พอร์ทัล / ประกาศ · แจ้งซ่อม · ช่วยเหลือ (= "ขอความช่วยเหลือ": staff are alerted with the room)
  *   market   "HorCare Markets" (vendors)          token: LINE_MARKET_CHANNEL_ACCESS_TOKEN
  *            บิล · ส่งสลิป · แจ้งหยุด / ประกาศ · พอร์ทัล · ช่วยเหลือ (same)
+ *   walkin   HorCare Markets, for walk-ins (ขาจร) — NOT the default: alias horcare-walkin, given per person by the bot
+ *            สถานะการจอง · แจ้งเข้าขาย / ลงทะเบียนแผง · ช่วยเหลือ
  *   pos      "HorCare Staff" (POS Care, collectors) token: LINE_POS_CHANNEL_ACCESS_TOKEN
  *            เปิด POS Care / ยอดวันนี้ · ร้านหยุดวันนี้ · ปิดยอด
  *
@@ -16,6 +18,7 @@
  *   node scripts/setup-oa-rich-menus.mjs tenant
  *   node scripts/setup-oa-rich-menus.mjs market --dry-run          ask LINE to validate, change nothing
  *   node scripts/setup-oa-rich-menus.mjs market                   install and make it the default (deletes this script's older one)
+ *   node scripts/setup-oa-rich-menus.mjs walkin                   (the walk-in menu: sets its alias, leaves the default alone)
  *   node scripts/setup-oa-rich-menus.mjs pos
  */
 import { execFileSync } from 'node:child_process';
@@ -37,6 +40,8 @@ const ICONS = {
     help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     sos: '<circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/>',
     repair: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    calplus: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M12 13v6"/><path d="M9 16h6"/>',
+    status: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
     pos: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/><path d="M6 15h4"/>',
     today: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
     close: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
@@ -46,6 +51,8 @@ const third = W / 3;
 const cell = (col, row, label, sub, icon, text, primary = false) => ({ x: Math.round(col * third), y: row * HALF, w: Math.round((col + 1) * third) - Math.round(col * third), h: HALF, label, sub, icon, text, primary });
 /** The help button: it calls a person at the property at once (the webhook's "support" command), so it stands out. */
 const sosCell = (col, row, sub) => ({ ...cell(col, row, 'ช่วยเหลือ', sub, 'sos', 'ขอความช่วยเหลือ'), sos: true });
+/** A tile of a 2 × 2 menu. */
+const half = (col, row, label, sub, icon, text) => ({ x: col * (W / 2), y: row * HALF, w: W / 2, h: HALF, label, sub, icon, text });
 
 const MENUS = {
     tenant: {
@@ -68,6 +75,17 @@ const MENUS = {
             cell(0, 1, 'ประกาศ', 'ข่าวจากตลาด', 'news', 'ประกาศ'),
             cell(1, 1, 'พอร์ทัล', 'ประวัติ แจ้งซ่อม', 'portal', 'พอร์ทัล'),
             sosCell(2, 1, 'เรียกเจ้าหน้าที่ทันที'),
+        ],
+    },
+    // Not a default: the bot gives it to one person (by its alias) when a walk-in links their request (api/_walkin.ts),
+    // and takes it back once they register a stall. Same OA as `market`.
+    walkin: {
+        name: 'horcare-walkin', alias: 'horcare-walkin', chatBarText: 'เมนูขาจร', token: 'LINE_MARKET_CHANNEL_ACCESS_TOKEN',
+        tiles: [
+            { ...half(0, 0, 'สถานะการจอง', 'ผลอนุมัติ ล็อกที่ได้', 'status', 'สถานะขาจร'), primary: true },
+            half(1, 0, 'แจ้งเข้าขาย', 'จองวันขายครั้งถัดไป', 'calplus', 'แจ้งเข้าขาย'),
+            half(0, 1, 'ลงทะเบียนแผง', 'สำหรับผู้ค้าประจำ', 'portal', 'ลงทะเบียน'),
+            { ...half(1, 1, 'ช่วยเหลือ', 'เรียกเจ้าหน้าที่ตลาด', 'sos', 'ขอความช่วยเหลือ'), sos: true },
         ],
     },
     pos: {
@@ -177,9 +195,20 @@ try {
     const before = ((await line('GET', '/richmenu/list')).richmenus ?? []).filter(m => m.name === MENUS[name].name);
     const { richMenuId } = await line('POST', '/richmenu', payload(name));
     await line('POST', `/richmenu/${richMenuId}/content`, image, 'api-data.line.me');
-    await line('POST', `/user/all/richmenu/${richMenuId}`);
-    console.log(`default menu is now ${richMenuId}`);
-    for (const m of before) { await line('DELETE', `/richmenu/${m.richMenuId}`); console.log(`deleted previous ${m.richMenuId}`); }
+    const alias = MENUS[name].alias;
+    if (alias) {
+        // a per-person menu: point its alias at the new one (the bot looks it up by alias); not the OA's default
+        const exists = await line('GET', `/richmenu/alias/${alias}`).then(() => true, () => false);
+        if (exists) await line('POST', `/richmenu/alias/${alias}`, { richMenuId });
+        else await line('POST', '/richmenu/alias', { richMenuAliasId: alias, richMenuId });
+        console.log(`alias ${alias} → ${richMenuId} (given to each walk-in by the bot; the default menu is unchanged)`);
+        // older copies stay: people already given one keep it (deleting it would drop them to the default menu)
+        if (before.length) console.log(`kept ${before.length} older copy(ies) for people already linked`);
+    } else {
+        await line('POST', `/user/all/richmenu/${richMenuId}`);
+        console.log(`default menu is now ${richMenuId}`);
+        for (const m of before) { await line('DELETE', `/richmenu/${m.richMenuId}`); console.log(`deleted previous ${m.richMenuId}`); }
+    }
 } catch (e) {
     console.error(e.message);
     process.exit(1);

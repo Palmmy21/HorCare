@@ -12,7 +12,8 @@ import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
-import { linePush, roomLineToken } from './_line.js';
+import { linePush, resolveLineToken, roomLineChannel, roomLineToken } from './_line.js';
+import { walkInLinkOf } from './_walkin.js';
 import { roomsOnThisOa } from './_line-binding.js';
 import { roomsOfLink, sameRoom } from '../src/shared/lineRooms.js';
 import { loadMediaDataUrl } from './_line-media.js';
@@ -58,6 +59,21 @@ export async function getTenantLink(lineUserId: string): Promise<TenantLink | nu
     return { ...data, uid: r.uid, building_id: r.building_id, room_id: r.room_id, room_number: r.room_number, ...(r.dorm_name ? { dorm_name: r.dorm_name } : {}), ...(r.due_day ? { due_day: r.due_day } : {}) };
 }
 
+/** A conversation's place in the inbox: a registered tenant's room, or a walk-in vendor (ขาจร) linked to a market. */
+export interface InboxLink extends TenantLink { tenant_name?: string | null; walkin?: boolean }
+
+/** Walk-in threads carry this prefix instead of a room id (they have no room). */
+export const WALKIN_THREAD_PREFIX = 'walkin-';
+
+/** Where this LINE user's messages are filed: their room on this OA, else the market their walk-in request is with. */
+export async function inboxLinkOf(lineUserId: string): Promise<InboxLink | null> {
+    const tenant = await getTenantLink(lineUserId);
+    if (tenant) return tenant;
+    const w = await walkInLinkOf(lineUserId);
+    if (!w) return null;
+    return { uid: w.owner_uid, building_id: w.building_id, room_id: `${WALKIN_THREAD_PREFIX}${w.walkin_id}`, room_number: 'ขาจร', tenant_name: `${w.name} (ขาจร)`, walkin: true };
+}
+
 export async function recordInbound(
     lineUserId: string,
     input: {
@@ -66,15 +82,15 @@ export async function recordInbound(
         quiet?: boolean;
     },
 ): Promise<RecordResult> {
-    const link = await getTenantLink(lineUserId);
+    const link = await inboxLinkOf(lineUserId);
     if (!link) return { recorded: false, shouldAck: false };
     const { uid, building_id, room_id, room_number } = link;
 
     const text = input.text.trim().slice(0, MAX_INCOMING_CHARS);
     if (!text) return { recorded: false, shouldAck: false };
 
-    const profile = await db.doc(`users/${uid}/buildings/${building_id}/tenants/${room_id}`).get();
-    const tenantName = (profile.data()?.full_name as string | undefined) ?? null;
+    const tenantName = link.walkin ? (link.tenant_name ?? null)
+        : ((await db.doc(`users/${uid}/buildings/${building_id}/tenants/${room_id}`).get()).data()?.full_name as string | undefined) ?? null;
 
     const ref = db.doc(threadPath(uid, building_id, lineUserId));
     const now = new Date();
@@ -106,7 +122,7 @@ export async function recordInbound(
     if (alert) {
         await raiseAlert({
             ownerUid: uid, buildingId: building_id, type: 'chat',
-            title: `💬 ห้อง ${room_number}${tenantName ? ` · ${tenantName}` : ''}`, body: text.slice(0, 140),
+            title: link.walkin ? `💬 ${tenantName}` : `💬 ห้อง ${room_number}${tenantName ? ` · ${tenantName}` : ''}`, body: text.slice(0, 140),
         });
     }
     return { recorded: true, shouldAck };
@@ -117,7 +133,7 @@ export async function recordInbound(
  * Unlike a staff reply it leaves the unread count alone: a person may still want to follow up.
  */
 export async function recordBotReply(lineUserId: string, text: string): Promise<void> {
-    const link = await getTenantLink(lineUserId);
+    const link = await inboxLinkOf(lineUserId);
     if (!link) return;
     const ref = db.doc(threadPath(link.uid, link.building_id, lineUserId));
     const now = new Date().toISOString();
@@ -126,7 +142,7 @@ export async function recordBotReply(lineUserId: string, text: string): Promise<
     const snap = await ref.get();
     // while the tenant's message waits for a person, the list keeps showing it (not the bot's "received" note)
     if (snap.exists) { if (!((snap.data() as LineThread).unread_count > 0)) await ref.update({ last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out' }); }
-    else await ref.set({ line_user_id: lineUserId, room_id: link.room_id, room_number: link.room_number, tenant_name: null, last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out', unread_count: 0, last_ack_at: null } satisfies LineThread);
+    else await ref.set({ line_user_id: lineUserId, room_id: link.room_id, room_number: link.room_number, tenant_name: link.tenant_name ?? null, last_message_text: msg.text.slice(0, 200), last_message_at: now, last_direction: 'out', unread_count: 0, last_ack_at: null } satisfies LineThread);
 }
 
 /** How a reply the bot sent reads in the inbox: its text, or what a card / picture was about. */
@@ -213,14 +229,18 @@ async function handleAuthorized(
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     if (!text || text.length > MAX_OUTGOING_CHARS) { res.status(400).json({ error: 'invalid_input' }); return; }
 
-    // The tenant may have moved out / been re-registered since the thread started.
-    const room = await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/rooms/${thread.room_id}`).get();
-    if (!room.exists || room.data()?.line_user_id !== body.line_user_id) {
-        res.status(409).json({ error: 'tenant_unlinked', message: 'ผู้เช่าคนนี้ไม่ได้เชื่อม LINE กับห้องนี้แล้ว จึงส่งข้อความไม่ได้' });
+    // The tenant may have moved out / been re-registered since the thread started; a walk-in's request must still be
+    // linked to this LINE account. Either way the reply goes out through the OA they linked through.
+    const walkInId = thread.room_id.startsWith(WALKIN_THREAD_PREFIX) ? thread.room_id.slice(WALKIN_THREAD_PREFIX.length) : null;
+    const linked = walkInId
+        ? (await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/walk_ins/${walkInId}`).get()).data()
+        : (await db.doc(`users/${ctx.ownerUid}/buildings/${buildingId}/rooms/${thread.room_id}`).get()).data();
+    if (!linked || linked.line_user_id !== body.line_user_id) {
+        res.status(409).json({ error: 'tenant_unlinked', message: walkInId ? 'ขาจรคนนี้ไม่ได้เชื่อม LINE กับคำขอนี้แล้ว จึงส่งข้อความไม่ได้' : 'ผู้เช่าคนนี้ไม่ได้เชื่อม LINE กับห้องนี้แล้ว จึงส่งข้อความไม่ได้' });
         return;
     }
     // the OA this tenant / vendor linked through must be set up on the server
-    const token = await roomLineToken(room.data());
+    const token = walkInId ? await resolveLineToken(roomLineChannel(linked)) : await roomLineToken(linked);
     if (!token) {
         res.status(503).json({ error: 'line_not_configured', message: 'ยังไม่ได้ตั้งค่า LINE บนเซิร์ฟเวอร์' });
         return;

@@ -132,7 +132,7 @@ export function renderMessage(
         case 'visitor.arriving':
             return {
                 title: 'ขาจรแจ้งเข้าขาย',
-                body: `🧺 ${dormName}\nขาจร ${data.name ?? ''} แจ้งเข้าขายวันที่ ${data.date ?? ''} (${data.goods ?? ''})`,
+                body: `🧺 ${dormName}\nขาจร ${data.name ?? ''} แจ้งเข้าขายวันที่ ${data.date ?? ''} (${data.goods ?? ''})${data.lot ? `\nล็อกที่ต้องการ: ${data.lot}` : ''}`,
             };
         case 'payment.needs_review':
             return {

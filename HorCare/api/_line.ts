@@ -163,6 +163,38 @@ export async function linePush(to: string, messages: object[], token: string | u
     }
 }
 
+/**
+ * Give one person their own rich menu, found by its alias (created by scripts/setup-oa-rich-menus.mjs), on the OA this
+ * request runs in. Best effort: false when the alias is not set up or LINE says no — the person keeps the default menu.
+ */
+export async function linkRichMenuAlias(lineUserId: string, alias: string, token: string | undefined = residentLineToken()): Promise<boolean> {
+    if (!token) return false;
+    try {
+        const headers = { Authorization: `Bearer ${token}` };
+        const a = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${encodeURIComponent(alias)}`, { headers, signal: AbortSignal.timeout(5000) });
+        if (!a.ok) { console.warn(`[line] rich menu alias ${alias} not found (${a.status})`); return false; }
+        const { richMenuId } = await a.json() as { richMenuId?: string };
+        if (!richMenuId) return false;
+        const r = await fetch(`https://api.line.me/v2/bot/user/${encodeURIComponent(lineUserId)}/richmenu/${encodeURIComponent(richMenuId)}`, { method: 'POST', headers, signal: AbortSignal.timeout(5000) });
+        if (!r.ok) console.warn(`[line] rich menu link failed ${r.status}`);
+        return r.ok;
+    } catch (err) {
+        console.warn('[line] rich menu link failed:', (err as Error).message);
+        return false;
+    }
+}
+
+/** Back to the OA's default menu (a walk-in who became a regular vendor). Best effort. */
+export async function unlinkRichMenu(lineUserId: string, token: string | undefined = residentLineToken()): Promise<boolean> {
+    if (!token) return false;
+    try {
+        const r = await fetch(`https://api.line.me/v2/bot/user/${encodeURIComponent(lineUserId)}/richmenu`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
+        return r.ok;
+    } catch {
+        return false;
+    }
+}
+
 /** รันงาน async เป็นชุดละ `limit` ตัว — กัน fan-out ระเบิดตอนหอใหญ่ */
 export async function runPooled<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
     for (let i = 0; i < items.length; i += limit) {

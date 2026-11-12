@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Store, Footprints, Check, X, Loader2, Copy, Plus, BellOff, ShieldCheck, CloudRain } from 'lucide-react';
 import RevenueAudit from './RevenueAudit';
 import MarketClosures from './MarketClosures';
@@ -8,7 +9,7 @@ import { apiPost, ApiError } from '../../utils/api';
 import { useShopClosures, useWalkIns } from '../../hooks/useMarketData';
 import { useBuildingRooms } from '../../hooks/useAccountingData';
 import {
-    CLOSURE_REASONS, CLOSURE_REASON_LABELS_TH, MAX_CLOSURE_DAYS, WALKIN_STATUS_LABELS_TH, addDays, closuresOn, todayTh, upcomingClosures,
+    CLOSURE_REASONS, CLOSURE_REASON_LABELS_TH, MAX_CLOSURE_DAYS, WALKIN_MAX_DAYS_AHEAD, WALKIN_STATUS_LABELS_TH, addDays, closuresOn, lotLabel, lotRequests, todayTh, upcomingClosures,
     type ClosureReason, type WalkIn,
 } from '../../shared/market';
 
@@ -20,6 +21,7 @@ const ERRORS: Record<string, string> = {
     unauthenticated: 'กรุณาเข้าสู่ระบบใหม่',
     already_requested: 'เบอร์นี้มีรายการวันนั้นอยู่แล้ว',
     day_full: 'วันนั้นเต็มแล้ว',
+    invalid_lot: 'ล็อกนี้ไม่มีในตลาดแล้ว กรุณาเลือกใหม่',
     overlaps_existing: 'แผงนี้แจ้งหยุดช่วงวันนั้นไว้แล้ว',
     limit_reached: 'แผงนี้แจ้งหยุดล่วงหน้าครบ 10 รายการแล้ว',
 };
@@ -115,44 +117,110 @@ function ClosuresTab({ ownerUid, buildingId }: Props) {
     );
 }
 
+/** The market's walk-in scan link and its QR: made for this market (no ids in it), replaceable if it leaks. */
+function WalkInLinkCard({ ownerUid, buildingId }: Props) {
+    const [url, setUrl] = useState<string | null>(null);
+    const [failed, setFailed] = useState(false);
+    const [confirmRotate, setConfirmRotate] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const load = async (rotate = false) => {
+        setBusy(true);
+        try {
+            const r = await apiPost<{ url: string }>('market', { action: 'walkin_link', owner_uid: ownerUid, building_id: buildingId, rotate });
+            setUrl(r.url); setFailed(false);
+            if (rotate) toast.success('สร้างลิงก์ใหม่แล้ว ลิงก์ / QR เดิมใช้ไม่ได้แล้ว');
+        } catch (e) {
+            setFailed(true);
+            const err = e as ApiError;
+            toast.error(ERRORS[err.code] ?? err.message ?? 'โหลดลิงก์ไม่สำเร็จ');
+        }
+        setBusy(false); setConfirmRotate(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => { void load(); }, [ownerUid, buildingId]);
+    const copy = () => url && navigator.clipboard?.writeText(url).then(() => toast.success('คัดลอกลิงก์แล้ว'), () => toast.error('คัดลอกไม่สำเร็จ'));
+    const downloadQr = () => {
+        const svg = document.getElementById('walkin-qr');
+        if (!svg) return;
+        const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'walk-in-qr.svg'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    return (
+        <div style={card}>
+            <strong>QR / ลิงก์ให้ขาจรแจ้งเข้าขาย</strong>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>
+                พิมพ์ QR ติดหน้าตลาด หรือส่งลิงก์ทาง LINE ขาจรแจ้งวันและล็อกที่ต้องการได้ล่วงหน้าไม่เกิน {WALKIN_MAX_DAYS_AHEAD} วัน แล้วเชื่อม LINE ของตลาดเพื่อรับผลอนุมัติและคุยกับเจ้าหน้าที่
+            </span>
+            {failed && !url ? <button className="btn btn-outline btn-sm" onClick={() => void load()}>ลองโหลดลิงก์อีกครั้ง</button> : !url ? <Loader2 size={16} className="spin" /> : (
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ background: '#fff', padding: 6, borderRadius: 8, border: '1px solid var(--color-gray-200)' }}>
+                        <QRCodeSVG id="walkin-qr" value={url} size={120} level="M" includeMargin />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 220px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            <input readOnly value={url} style={{ ...input, flex: 1, fontSize: '0.75rem' }} onFocus={e => e.currentTarget.select()} aria-label="ลิงก์แจ้งขาจร" />
+                            <button className="btn btn-outline btn-sm" onClick={() => void copy()} aria-label="คัดลอกลิงก์"><Copy size={14} /></button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="btn btn-outline btn-sm" onClick={downloadQr}>ดาวน์โหลด QR</button>
+                            {!confirmRotate ? <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => setConfirmRotate(true)}>สร้างลิงก์ใหม่</button> : (
+                                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: '0.8rem' }}>
+                                    QR ที่พิมพ์ไว้จะใช้ไม่ได้ ยืนยัน?
+                                    <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void load(true)}>ยืนยัน</button>
+                                    <button className="btn btn-outline btn-sm" disabled={busy} onClick={() => setConfirmRotate(false)}>ยกเลิก</button>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function WalkInsTab({ ownerUid, buildingId }: Props) {
     const { walkIns, loading, error } = useWalkIns(ownerUid, buildingId);
+    const { rooms } = useBuildingRooms(ownerUid, buildingId);
     const today = todayTh();
     const [date, setDate] = useState(today);
     const [show, setShow] = useState(false);
-    const [form, setForm] = useState({ name: '', phone: '', goods: '' });
+    const [form, setForm] = useState({ name: '', phone: '', goods: '', lot: '' });
     const [busy, setBusy] = useState<string | null>(null);
+    /** The lot staff chose for each pending request before approving ('' = none yet). */
+    const [lotFor, setLotFor] = useState<Record<string, string>>({});
 
-    const link = `${window.location.origin}/?walkin=1&uid=${encodeURIComponent(ownerUid)}&bid=${encodeURIComponent(buildingId)}`;
     const dates = useMemo(() => [...new Set(walkIns.filter(w => w.date >= today).map(w => w.date))], [walkIns, today]);
     const day = walkIns.filter(w => w.date === date);
+    const asked = useMemo(() => lotRequests(walkIns, date), [walkIns, date]);
     const pending = walkIns.filter(w => w.date >= today && w.status === 'pending').length;
 
     const decide = async (w: WalkIn, status: 'approved' | 'rejected') => {
         setBusy(w.id);
-        await call(ownerUid, buildingId, { action: 'walkin_decide', walkin_id: w.id, status });
+        const lot = lotFor[w.id] ?? w.preferred_lot?.room_id ?? '';
+        try {
+            const r = await apiPost<{ line_notified?: boolean }>('market', { owner_uid: ownerUid, building_id: buildingId, action: 'walkin_decide', walkin_id: w.id, status, ...(status === 'approved' ? { lot_room_id: lot } : {}) });
+            toast.success(r.line_notified ? 'บันทึกแล้ว และแจ้งผลทาง LINE แล้ว' : 'บันทึกแล้ว (ขาจรยังไม่ได้เชื่อม LINE — โทรแจ้งผลตามเบอร์)');
+        } catch (e) {
+            const err = e as ApiError;
+            toast.error(ERRORS[err.code] ?? err.message ?? 'ดำเนินการไม่สำเร็จ');
+        }
         setBusy(null);
     };
     const add = async () => {
         setBusy('add');
-        const ok = await call(ownerUid, buildingId, { action: 'walkin_add', date, ...form });
+        const ok = await call(ownerUid, buildingId, { action: 'walkin_add', date, name: form.name, phone: form.phone, goods: form.goods, preferred_room_id: form.lot || null });
         setBusy(null);
-        if (ok) { toast.success('เพิ่มแล้ว'); setForm({ name: '', phone: '', goods: '' }); setShow(false); }
+        if (ok) { toast.success('เพิ่มแล้ว'); setForm({ name: '', phone: '', goods: '', lot: '' }); setShow(false); }
     };
-    const copy = () => navigator.clipboard?.writeText(link).then(() => toast.success('คัดลอกลิงก์แล้ว'), () => toast.error('คัดลอกไม่สำเร็จ'));
+    const lotOptions = rooms.map(r => <option key={r.id} value={r.id}>ล็อก {r.room_number}{r.zone ? ` (${r.zone})` : ''}{asked.get(r.id) ? ` · ขอแล้ว ${asked.get(r.id)}` : ''}</option>);
 
     if (loading) return <Loader2 className="spin" />;
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {error && <ReadError code={error} />}
-            <div style={card}>
-                <strong>ลิงก์ให้ขาจรแจ้งล่วงหน้า</strong>
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>ส่งลิงก์นี้ให้ขาจรทาง LINE หรือพิมพ์เป็น QR ที่หน้าตลาด แจ้งได้ล่วงหน้าไม่เกิน 14 วัน</span>
-                <div style={{ display: 'flex', gap: 6 }}>
-                    <input readOnly value={link} style={{ ...input, flex: 1, fontSize: '0.75rem' }} onFocus={e => e.currentTarget.select()} aria-label="ลิงก์แจ้งขาจร" />
-                    <button className="btn btn-outline btn-sm" onClick={() => void copy()} aria-label="คัดลอกลิงก์"><Copy size={14} /></button>
-                </div>
-            </div>
+            <WalkInLinkCard ownerUid={ownerUid} buildingId={buildingId} />
 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input type="date" value={date} min={today} max={addDays(today, 14)} onChange={e => e.target.value && setDate(e.target.value)} style={input} aria-label="วันที่" />
@@ -167,6 +235,10 @@ function WalkInsTab({ ownerUid, buildingId }: Props) {
                     <input style={{ ...input, flex: '1 1 140px' }} placeholder="ชื่อ" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} maxLength={60} />
                     <input style={{ ...input, flex: '1 1 130px' }} placeholder="เบอร์โทร" inputMode="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
                     <input style={{ ...input, flex: '1 1 160px' }} placeholder="สินค้าที่ขาย" value={form.goods} onChange={e => setForm({ ...form, goods: e.target.value })} maxLength={100} />
+                    <select style={{ ...input, flex: '1 1 140px' }} value={form.lot} onChange={e => setForm({ ...form, lot: e.target.value })} aria-label="ล็อก">
+                        <option value="">ยังไม่กำหนดล็อก</option>
+                        {lotOptions}
+                    </select>
                     <button className="btn btn-primary btn-sm" disabled={busy === 'add'} onClick={() => void add()}>{busy === 'add' ? <Loader2 size={14} className="spin" /> : 'บันทึก (อนุมัติทันที)'}</button>
                 </div>
             )}
@@ -179,6 +251,24 @@ function WalkInsTab({ ownerUid, buildingId }: Props) {
                         <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{WALKIN_STATUS_LABELS_TH[w.status]}</span>
                     </div>
                     <div style={{ fontSize: '0.85rem', overflowWrap: 'anywhere' }}>{w.goods} · <a href={`tel:${w.phone}`}>{w.phone}</a></div>
+                    <div style={{ fontSize: '0.8rem', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span>{w.status === 'approved' ? <>ได้: <b>{lotLabel(w.lot)}</b></> : <>ขอ: {lotLabel(w.preferred_lot)}</>}</span>
+                        {(() => {
+                            const id = (w.status === 'approved' ? w.lot : w.preferred_lot)?.room_id;
+                            const n = id ? asked.get(id) ?? 0 : 0;
+                            return n > 1 && w.status !== 'rejected' ? <span style={{ background: '#FEF3C7', color: '#92400E', borderRadius: 6, padding: '0 6px', fontWeight: 700 }}>ล็อกซ้ำ {n} ราย</span> : null;
+                        })()}
+                        <span style={{ color: w.line_user_id ? '#15803D' : 'var(--color-gray-500)' }}>{w.line_user_id ? `LINE เชื่อมแล้ว${w.line_notified_at ? ' · แจ้งผลแล้ว' : ''}` : 'ยังไม่เชื่อม LINE'}</span>
+                    </div>
+                    {w.status === 'pending' && (
+                        <label style={{ fontSize: '0.8rem', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                            ล็อกที่ให้
+                            <select style={{ ...input, flex: '1 1 160px' }} value={lotFor[w.id] ?? w.preferred_lot?.room_id ?? ''} onChange={e => setLotFor({ ...lotFor, [w.id]: e.target.value })}>
+                                <option value="">แจ้งล็อกตอนมาถึง</option>
+                                {lotOptions}
+                            </select>
+                        </label>
+                    )}
                     {w.status === 'pending' && (
                         <div style={{ display: 'flex', gap: 6 }}>
                             <button className="btn btn-primary btn-sm" disabled={busy === w.id} onClick={() => void decide(w, 'approved')} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Check size={14} /> อนุมัติ</button>

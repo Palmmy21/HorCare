@@ -4,9 +4,10 @@
  * Public (no login — they come from the stall's portal link / the market's walk-in link, like the
  * parcels and announcements portal reads), so each one proves the property is a market and the stall
  * exists, validates strictly, and is capped:
- *   closure_submit | closure_cancel | closure_list | walkin_submit
+ *   closure_submit | closure_cancel | closure_list | walkin_info | walkin_submit
+ *   (walk-ins come with the market's scan link `link` — api/_walkin.ts — or, for links printed before, owner_uid)
  * Staff (signed in, property-checked):
- *   closure_ack / closure_add – shop.update     walkin_decide / walkin_add – visitor.create
+ *   closure_ack / closure_add – shop.update     walkin_decide / walkin_add / walkin_link – visitor.create
  *   market_closure_add / market_closure_cancel – shop.update   market_closure_list – shop.read
  *     (the whole market, or some zones, shut for a day: power cut, flood … — the revenue audit excuses those days)
  * Reading the lists is straight from Firestore under rules needing shop.read / visitor.read.
@@ -21,15 +22,18 @@ import { linePush, roomLineToken, runPooled } from './_line.js';
 import { honeypotTripped, rateLimit, verifyCaptcha } from './_abuse-guard.js';
 import { resolvePortalLink } from './_portal-link.js';
 import {
+    lotOf, marketName, newWalkInCode, notifyWalkInDecision, resolveWalkInLink, saveWalkInCode, walkInLineUrl, walkInLinkToken, walkInLots, walkInPageUrl,
+} from './_walkin.js';
+import {
     CLOSURE_REASON_LABELS_TH, MAX_ACTIVE_CLOSURES_PER_ROOM, WALKIN_MAX_PER_DAY,
-    MARKET_CLOSURE_REASON_LABELS_TH, cleanClosureInput, cleanMarketClosureInput, cleanWalkInInput, todayTh, upcomingClosures,
+    MARKET_CLOSURE_REASON_LABELS_TH, WALKIN_MAX_DAYS_AHEAD, addDays, cleanClosureInput, cleanMarketClosureInput, cleanWalkInInput, isValidDate, lotRequests, todayTh, upcomingClosures,
     type MarketClosure, type ShopClosure, type WalkIn,
 } from '../src/shared/market.js';
 
 export const config = { maxDuration: 15 };
 
 interface Body {
-    action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'closure_add' | 'walkin_submit' | 'walkin_add' | 'walkin_decide'
+    action?: 'closure_submit' | 'closure_cancel' | 'closure_list' | 'closure_ack' | 'closure_add' | 'walkin_info' | 'walkin_submit' | 'walkin_add' | 'walkin_decide' | 'walkin_link'
         | 'market_closure_add' | 'market_closure_cancel' | 'market_closure_list';
     zones?: unknown; waive_rent?: unknown; market_closure_id?: unknown; notify_line?: unknown;
     owner_uid?: string;
@@ -39,7 +43,11 @@ interface Body {
     walkin_id?: string;
     status?: string;
     from_date?: unknown; to_date?: unknown; reason?: unknown; note?: unknown;
-    date?: unknown; name?: unknown; phone?: unknown; goods?: unknown;
+    date?: unknown; name?: unknown; phone?: unknown; goods?: unknown; preferred_room_id?: unknown;
+    /** walkin_info / walkin_submit: the market's scan link token (/?walkin=…). */
+    link?: unknown;
+    /** walkin_decide: the lot the market gives ('' = none yet); walkin_link: make a new link (the old one stops). */
+    lot_room_id?: unknown; rotate?: unknown;
     /** Hidden field: a person never fills it in. */
     website?: unknown;
     /** Cloudflare Turnstile token (only checked when TURNSTILE_SECRET is set). */
@@ -48,21 +56,30 @@ interface Body {
     portal?: unknown;
 }
 
-const PUBLIC = new Set(['closure_submit', 'closure_cancel', 'closure_list', 'walkin_submit']);
+const PUBLIC = new Set(['closure_submit', 'closure_cancel', 'closure_list', 'walkin_info', 'walkin_submit']);
 /** Calls per visitor per hour, by public action: writes are tight, reads are loose. */
-const PUBLIC_LIMITS: Record<string, number> = { closure_submit: 10, walkin_submit: 5, closure_cancel: 30, closure_list: 120 };
+const PUBLIC_LIMITS: Record<string, number> = { closure_submit: 10, walkin_submit: 5, closure_cancel: 30, closure_list: 120, walkin_info: 120 };
 const WRITES = new Set(['closure_submit', 'walkin_submit']);
 
 const STAFF_PERM = {
-    closure_ack: 'shop.update', closure_add: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create',
+    closure_ack: 'shop.update', closure_add: 'shop.update', walkin_add: 'visitor.create', walkin_decide: 'visitor.create', walkin_link: 'visitor.create',
     market_closure_add: 'shop.update', market_closure_cancel: 'shop.update', market_closure_list: 'shop.read',
 } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
     const body = (req.body ?? {}) as Body;
-    const buildingId = body.building_id;
     const action = body.action;
+    // a walk-in arriving by the market's scan link: the link says which market (it carries no ids of its own)
+    if ((action === 'walkin_info' || action === 'walkin_submit') && body.link !== undefined) {
+        const limited = await rateLimit(req, `market:${action}:link`, PUBLIC_LIMITS[action] * 2, 3600);
+        if (!limited.ok) { res.setHeader?.('Retry-After', String(limited.retryAfterSec)); res.status(429).json({ error: 'too_many_requests', retry_after_sec: limited.retryAfterSec }); return; }
+        const market = await resolveWalkInLink(body.link);
+        if (!market) { res.status(404).json({ error: 'not_found' }); return; }
+        body.owner_uid = market.owner_uid;
+        body.building_id = market.building_id;
+    }
+    const buildingId = body.building_id;
     if (!buildingId || typeof buildingId !== 'string') { res.status(400).json({ error: 'building_id is required' }); return; }
     if (!action || (!PUBLIC.has(action) && !(action in STAFF_PERM))) { res.status(400).json({ error: 'unknown_action' }); return; }
 
@@ -211,15 +228,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ── walk-in vendors ─────────────────────────────────────────────────────
     const col = `${base}/walk_ins`;
+
+    // the form: the market's name and its lots, and how many already asked for each lot that day (no one's details)
+    if (action === 'walkin_info') {
+        const today = todayTh(now);
+        const date = isValidDate(body.date) && body.date >= today && body.date <= addDays(today, WALKIN_MAX_DAYS_AHEAD) ? body.date : today;
+        const [name, lots, sameDay] = await Promise.all([
+            marketName(owner, buildingId), walkInLots(owner, buildingId),
+            db.collection(col).where('date', '==', date).get().then(s => s.docs.map(d => d.data() as WalkIn)),
+        ]);
+        res.status(200).json({ market_name: name, date, lots, requested: Object.fromEntries(lotRequests(sameDay, date)) });
+        return;
+    }
+
+    // staff: the market's scan link (made on first use); rotate = a new one, the old link stops working
+    if (action === 'walkin_link') {
+        const token = await walkInLinkToken(owner, buildingId, { rotate: body.rotate === true });
+        if (body.rotate === true) await audit('UPDATE', 'walkin', 'walkin_link', 'ลิงก์ขาจร', { note: 'rotated' });
+        res.status(200).json({ url: walkInPageUrl(token) });
+        return;
+    }
+
     if (action === 'walkin_decide') {
         if (typeof body.walkin_id !== 'string' || !body.walkin_id || (body.status !== 'approved' && body.status !== 'rejected')) { res.status(400).json({ error: 'invalid_input' }); return; }
         const ref = db.doc(`${col}/${body.walkin_id}`);
         const snap = await ref.get();
         if (!snap.exists) { res.status(404).json({ error: 'not_found' }); return; }
         const w = snap.data() as WalkIn;
-        await ref.update({ status: body.status, decided_at: nowIso, decided_by: staff!.displayName });
-        await audit('UPDATE', 'walkin', w.id, `${w.name} ${w.date}`, { before: { status: w.status }, after: { status: body.status } });
-        res.status(200).json({ ok: true });
+        // the lot given: the one chosen by staff, else the one asked for; none = told at the market
+        let lot = w.lot ?? w.preferred_lot ?? null;
+        if (body.lot_room_id !== undefined) {
+            if (body.lot_room_id === '' || body.lot_room_id === null) lot = null;
+            else if (typeof body.lot_room_id !== 'string' || !(lot = await lotOf(owner, buildingId, body.lot_room_id))) { res.status(400).json({ error: 'invalid_lot' }); return; }
+        }
+        const decided: WalkIn = { ...w, status: body.status, decided_at: nowIso, decided_by: staff!.displayName, lot: body.status === 'approved' ? lot : null };
+        await ref.update({ status: decided.status, decided_at: nowIso, decided_by: decided.decided_by, lot: decided.lot });
+        await audit('UPDATE', 'walkin', w.id, `${w.name} ${w.date}`, { before: { status: w.status }, after: { status: body.status, lot: decided.lot?.room_number ?? null } });
+        const notified = await notifyWalkInDecision(owner, buildingId, decided);
+        if (notified) await ref.update({ line_notified_at: new Date().toISOString() });
+        res.status(200).json({ ok: true, line_notified: notified });
         return;
     }
 
@@ -231,13 +278,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // one live request per phone per day (a rejected one may be retried)
     if (sameDay.some(w => w.phone === input.phone && w.status !== 'rejected')) { res.status(409).json({ error: 'already_requested' }); return; }
     const isStaff = action === 'walkin_add';
+    // the lot asked for must be one of this market's stalls; it is a wish, never a booking
+    const { preferred_room_id: preferredId, ...fields } = input;
+    const preferred = preferredId ? await lotOf(owner, buildingId, preferredId) : null;
+    if (preferredId && !preferred) { res.status(400).json({ error: 'invalid_lot' }); return; }
+    const code = isStaff ? undefined : newWalkInCode();
     const walkIn: WalkIn = {
-        id: randomUUID(), ...input, status: isStaff ? 'approved' : 'pending', source: isStaff ? 'staff' : 'public', created_at: nowIso,
-        ...(isStaff ? { decided_at: nowIso, decided_by: staff!.displayName } : {}),
+        id: randomUUID(), ...fields, status: isStaff ? 'approved' : 'pending', source: isStaff ? 'staff' : 'public', created_at: nowIso,
+        preferred_lot: preferred, ...(isStaff ? { lot: preferred, decided_at: nowIso, decided_by: staff!.displayName } : {}),
+        ...(code ? { line_code: code } : {}),
     };
     await db.doc(`${col}/${walkIn.id}`).set(walkIn);
+    if (code) await saveWalkInCode(code, owner, buildingId, walkIn);
     if (isStaff) await audit('CREATE', 'walkin', walkIn.id, `${walkIn.name} ${walkIn.date}`);
-    else await notify({ event: 'visitor.arriving', ownerUid: owner, buildingId, data: { name: input.name, date: input.date, goods: input.goods } });
-    // the public caller only learns that it was received, never other vendors' details
-    res.status(200).json(isStaff ? { walk_in: walkIn } : { ok: true, status: walkIn.status });
+    else await notify({ event: 'visitor.arriving', ownerUid: owner, buildingId, data: { name: input.name, date: input.date, goods: input.goods, lot: preferred?.room_number ?? null } });
+    if (isStaff) { res.status(200).json({ walk_in: walkIn }); return; }
+    // the public caller learns that it was received and how to follow it on LINE — never other vendors' details
+    const line = await walkInLineUrl(owner, buildingId, code!);
+    res.status(200).json({ ok: true, status: walkIn.status, line_code: code, line_url: line?.url ?? null, oa_id: line?.oa_id ?? null, market_name: await marketName(owner, buildingId) });
 }

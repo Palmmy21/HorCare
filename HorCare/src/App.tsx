@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
-  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car
+  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car, BookOpenText
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -51,6 +51,7 @@ import toast from 'react-hot-toast';
 // are downloaded only when the user first navigates to them
 const Summary         = lazy(() => import('./components/Summary/Summary'));
 const DocumentArchive = lazy(() => import('./components/DocumentArchive/DocumentArchive'));
+const ManualPage      = lazy(() => import('./components/Manual/ManualPage'));
 const PaymentsPage    = lazy(() => import('./components/Payments/PaymentsPage'));
 const TenantsPage     = lazy(() => import('./components/TenantProfile/TenantsPage'));
 const MaidPortalView  = lazy(() => import('./components/Cleaning/MaidPortalView'));
@@ -102,7 +103,7 @@ function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
 /** Screens that follow the chosen building (ตึก) of the property. */
 const WING_VIEWS: string[] = ['dashboard', 'floorplan', 'parking', 'rooms', 'tenants', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels'];
 
-const VIEW_MODES = ['dashboard', 'floorplan', 'rooms', 'parking', 'collections', 'tenants', 'maintenance', 'cleaning', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels', 'workorders', 'messages', 'announcements', 'market', 'accounting', 'ledger', 'leasing', 'security', 'settings', 'admin', 'pricing'] as const;
+const VIEW_MODES = ['dashboard', 'floorplan', 'rooms', 'parking', 'collections', 'tenants', 'maintenance', 'cleaning', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels', 'workorders', 'messages', 'announcements', 'market', 'accounting', 'ledger', 'leasing', 'security', 'settings', 'manual', 'admin', 'pricing'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
 const isViewMode = (v: unknown): v is ViewMode => typeof v === 'string' && (VIEW_MODES as readonly string[]).includes(v);
 const OPS_TABS: OpsTab[] = ['maintenance', 'workorders', 'cleaning', 'team', 'vendors', 'stock', 'assets', 'expenses', 'fines', 'common_fees'];
@@ -566,6 +567,7 @@ function App() {
     { id: 'security'    as ViewMode, icon: ShieldCheck,     label: 'ความปลอดภัย' },
 
     { id: 'settings'    as ViewMode, icon: SettingsIcon,    label: 'ตั้งค่า' },
+    { id: 'manual'      as ViewMode, icon: BookOpenText,    label: 'คู่มือการใช้งาน' },
     { id: 'pricing'     as ViewMode, icon: Zap,             label: 'แพ็กเกจ' },
   ];
 
@@ -1971,6 +1973,15 @@ function App() {
             uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
           />
+        )}
+
+        {currentView === 'manual' && (
+          <Suspense fallback={<div style={{ padding: '2rem' }}>กำลังโหลด…</div>}>
+            <ManualPage
+              canOpen={v => isViewMode(v) && !hiddenViews.includes(v) && (!isStaff || canOpenView(v, staffPermissions))}
+              onOpen={v => { if (isViewMode(v)) setCurrentView(v); }}
+            />
+          </Suspense>
         )}
 
         {currentView === 'admin' && isAdmin && (

@@ -125,11 +125,57 @@ describe('closure_add (staff)', () => {
 describe('walk-in vendors', () => {
     it('a vendor announces a day, lands as pending, and the public gets no vendor data back', async () => {
         const res = await walkin();
-        expect(res.body).toEqual({ ok: true, status: 'pending' });
+        // only this request's own way into LINE comes back — nothing about any other vendor
+        expect(Object.keys(res.body).sort()).toEqual(['line_code', 'line_url', 'market_name', 'oa_id', 'ok', 'status']);
+        expect(res.body).toMatchObject({ ok: true, status: 'pending', market_name: 'ตลาดทดสอบ' });
+        expect(res.body.line_code).toMatch(/^HCW-[A-Z0-9]{8}$/);
         const [w] = listPaths(`${B}/walk_ins/`).map(p => read(p)!);
         expect(w).toMatchObject({ name: 'สมชาย', phone: '0812345678', status: 'pending', source: 'public', date: d(1) });
         expect(notes()[0]).toMatchObject({ event: 'visitor.arriving' });
         expect(JSON.stringify(notes()[0])).not.toContain('0812345678');
+    });
+
+    it('the market\'s own scan link: no ids in it, it opens the form, and a new one retires the old', async () => {
+        const made = await call('mkt', { action: 'walkin_link' });
+        expect(made.statusCode).toBe(200);
+        const url = new URL(made.body.url);
+        const token = url.searchParams.get('walkin')!;
+        expect(made.body.url).not.toContain(OWNER);
+        expect(made.body.url).not.toContain(BLD);
+        // the same link until replaced
+        expect((await call('mkt', { action: 'walkin_link' })).body.url).toBe(made.body.url);
+        // a walk-in with only the link: the form loads and the request lands in this market
+        const info = await call(null, { owner_uid: undefined, building_id: undefined, action: 'walkin_info', link: token });
+        expect(info.body).toMatchObject({ market_name: 'ตลาดทดสอบ' });
+        expect(info.body.lots.map((l: { room_number: string }) => l.room_number)).toEqual(['A01', 'A02']);
+        expect(JSON.stringify(info.body)).not.toContain(OWNER);
+        expect((await call(null, { owner_uid: undefined, building_id: undefined, action: 'walkin_submit', link: token, date: d(1), name: 'สมศรี', phone: '0812345679', goods: 'ขนม' })).statusCode).toBe(200);
+        expect(listPaths(`${B}/walk_ins/`)).toHaveLength(1);
+        // staff only
+        expect((await call('fin', { action: 'walkin_link' })).statusCode).toBe(403);
+        // rotate: the old link is dead
+        const fresh = await call('mkt', { action: 'walkin_link', rotate: true });
+        expect(fresh.body.url).not.toBe(made.body.url);
+        expect((await call(null, { owner_uid: undefined, building_id: undefined, action: 'walkin_info', link: token })).statusCode).toBe(404);
+        expect((await call(null, { owner_uid: undefined, building_id: undefined, action: 'walkin_info', link: 'x'.repeat(24) })).statusCode).toBe(404);
+    });
+
+    it('a lot is a wish: counted per day, checked against the market, and the market gives the lot when approving', async () => {
+        const a = await walkin({ preferred_room_id: 's1' });
+        expect(a.statusCode).toBe(200);
+        await walkin({ phone: '0812345670', preferred_room_id: 's1' });
+        expect((await walkin({ phone: '0812345671', preferred_room_id: 'ghost' })).body.error).toBe('invalid_lot');
+        // a dorm's room is not a lot of this market
+        expect((await walkin({ phone: '0812345672', preferred_room_id: '../dorm' })).statusCode).toBe(400);
+        const info = await call(null, { action: 'walkin_info', date: d(1) });
+        expect(info.body.requested).toEqual({ s1: 2 });
+        const [first] = listPaths(`${B}/walk_ins/`).map(p => read(p)!).filter(w => w.phone === '0812345678');
+        expect(first.preferred_lot).toEqual({ room_id: 's1', room_number: 'A01', zone: null });
+        // the clash is settled by giving the other lot
+        const r = await call('mkt', { action: 'walkin_decide', walkin_id: first.id, status: 'approved', lot_room_id: 's2' });
+        expect(r.statusCode).toBe(200);
+        expect(read(`${B}/walk_ins/${first.id}`)).toMatchObject({ status: 'approved', lot: { room_id: 's2', room_number: 'A02' } });
+        expect((await call('mkt', { action: 'walkin_decide', walkin_id: first.id, status: 'approved', lot_room_id: 'ghost' })).body.error).toBe('invalid_lot');
     });
 
     it('validates input and the date window; only markets accept walk-ins', async () => {

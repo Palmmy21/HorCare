@@ -28,6 +28,8 @@ export const VIEW_PERMISSIONS: Record<string, Permission[] | null | 'owner'> = {
   // team management, the activity log and LINE-binding alerts span the whole organisation
   security: ['member.manage'],
   settings: ['property.update'],
+  // the manual: everyone signed in (it only explains; each screen it opens is checked as usual)
+  manual: null,
   pricing: 'owner',
   admin: 'owner',
 };

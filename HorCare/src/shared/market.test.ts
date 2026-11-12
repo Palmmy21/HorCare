@@ -52,7 +52,12 @@ describe('closure queries', () => {
 describe('cleanWalkInInput', () => {
   const ok = { date: '2026-10-11', name: ' สมชาย ', phone: '081-234-5678', goods: ' ผลไม้ ' };
   it('normalises phone and text', () => {
-    expect(cleanWalkInInput(ok, NOW)).toEqual({ date: '2026-10-11', name: 'สมชาย', phone: '0812345678', goods: 'ผลไม้' });
+    expect(cleanWalkInInput(ok, NOW)).toEqual({ date: '2026-10-11', name: 'สมชาย', phone: '0812345678', goods: 'ผลไม้', preferred_room_id: null });
+  });
+  it('a lot is optional; when given it must look like a stall id', () => {
+    expect(cleanWalkInInput({ ...ok, preferred_room_id: 'A-22_x' }, NOW)?.preferred_room_id).toBe('A-22_x');
+    expect(cleanWalkInInput({ ...ok, preferred_room_id: '' }, NOW)?.preferred_room_id).toBeNull();
+    for (const bad of ['../x', 'a/b', 5, 'x'.repeat(129)]) expect(cleanWalkInInput({ ...ok, preferred_room_id: bad }, NOW)).toBeNull();
   });
   it('limits the date window and rejects bad contact data', () => {
     for (const bad of [

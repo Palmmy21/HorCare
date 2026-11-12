@@ -133,6 +133,9 @@ export function cleanMarketClosureInput(raw: Record<string, unknown>, now: Date 
 export type WalkInStatus = 'pending' | 'approved' | 'rejected';
 export const WALKIN_STATUS_LABELS_TH: Record<WalkInStatus, string> = { pending: 'รอพิจารณา', approved: 'อนุมัติ', rejected: 'ไม่อนุมัติ' };
 
+/** A stall (ล็อก) as a walk-in sees it: its number and zone, nothing about who rents it. */
+export interface WalkInLot { room_id: string; room_number: string; zone?: string | null }
+
 export interface WalkIn {
   id: string;
   date: string;
@@ -144,13 +147,26 @@ export interface WalkIn {
   created_at: string;
   decided_at?: string;
   decided_by?: string;
+  /** The lot the vendor asked for — a wish, not a booking (WALKIN_LOT_NOTE). */
+  preferred_lot?: WalkInLot | null;
+  /** The lot the market gave when approving (may differ from the wish). */
+  lot?: WalkInLot | null;
+  /** The one-off code that links this request to the vendor's LINE (HCW-XXXXXXXX). */
+  line_code?: string;
+  line_user_id?: string;
+  /** The OA the vendor linked through (LineChannel), so the decision goes out through the same chat. */
+  line_channel?: string;
+  /** The decision was sent to the vendor on LINE. */
+  line_notified_at?: string;
 }
 
-export interface WalkInInput { date: string; name: string; phone: string; goods: string }
+export interface WalkInInput { date: string; name: string; phone: string; goods: string; preferred_room_id: string | null }
 
 export const digitsOnly = (s: string) => s.replace(/\D/g, '');
 
-export function cleanWalkInInput(raw: { date?: unknown; name?: unknown; phone?: unknown; goods?: unknown }, now: Date = new Date()): WalkInInput | null {
+const ROOM_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+export function cleanWalkInInput(raw: { date?: unknown; name?: unknown; phone?: unknown; goods?: unknown; preferred_room_id?: unknown }, now: Date = new Date()): WalkInInput | null {
   if (!isValidDate(raw.date)) return null;
   const today = todayTh(now);
   if (raw.date < today || raw.date > addDays(today, WALKIN_MAX_DAYS_AHEAD)) return null;
@@ -160,5 +176,36 @@ export function cleanWalkInInput(raw: { date?: unknown; name?: unknown; phone?: 
   const phone = digitsOnly(raw.phone);
   if (name.length < 2 || name.length > 60 || goods.length < 2 || goods.length > 100) return null;
   if (!/^0\d{8,9}$/.test(phone)) return null;
-  return { date: raw.date, name, phone, goods };
+  let preferred: string | null = null;
+  if (raw.preferred_room_id !== undefined && raw.preferred_room_id !== null && raw.preferred_room_id !== '') {
+    if (typeof raw.preferred_room_id !== 'string' || !ROOM_ID_RE.test(raw.preferred_room_id)) return null;
+    preferred = raw.preferred_room_id;
+  }
+  return { date: raw.date, name, phone, goods, preferred_room_id: preferred };
 }
+
+/**
+ * Said wherever a walk-in picks a lot — the form, the LINE confirmation, the decision: the lot is a wish. Others may
+ * ask for the same lot the same day, and a regular stall may be in use, so the market assigns the lot in the end.
+ */
+export const WALKIN_LOT_NOTE =
+  'ล็อกที่เลือกเป็นเพียงล็อกที่ต้องการ ยังไม่ใช่การจองยืนยัน อาจไม่ได้ล็อกตามที่เลือก เพราะอาจมีผู้แจ้งล็อกเดียวกันในวันเดียวกัน ' +
+  'หรือล็อกนั้นมีผู้ค้าประจำใช้อยู่ ตลาดจะเป็นผู้จัดล็อกให้และแจ้งผลอีกครั้งค่ะ';
+
+/** The one-off code a walk-in sends to the market's LINE to link the request: HCW- and 8 letters / digits. */
+export const WALKIN_CODE_RE = /^HCW-[A-Z0-9]{8}$/;
+export const isWalkInCode = (text: string): boolean => WALKIN_CODE_RE.test(text.trim().toUpperCase());
+
+/** How many live requests (not rejected) want each lot on a day — two or more is a clash the market must settle. */
+export function lotRequests(list: Pick<WalkIn, 'date' | 'status' | 'preferred_lot' | 'lot'>[], date: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const w of list) {
+    if (w.date !== date || w.status === 'rejected') continue;
+    const id = (w.lot ?? w.preferred_lot)?.room_id;
+    if (id) out.set(id, (out.get(id) ?? 0) + 1);
+  }
+  return out;
+}
+
+export const lotLabel = (l: WalkInLot | null | undefined): string =>
+  !l ? 'ให้ตลาดจัดให้' : `ล็อก ${l.room_number}${l.zone ? ` (${l.zone})` : ''}`;
