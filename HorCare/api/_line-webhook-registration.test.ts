@@ -120,6 +120,51 @@ describe('what the bot says', () => {
     };
     const STRANGER = 'U' + 'c'.repeat(32);
 
+    it('one LINE account with a market stall and a dorm room: each OA files the message with its own place', async () => {
+        const MKT = 'bld-M';
+        seed(`users/${OWNER}/buildings/${MKT}`, { id: MKT, building_type: 'market' });
+        seed(`users/${OWNER}/buildings/${MKT}/rooms/A22`, { room_number: 'A22', line_user_id: LINE_USER, line_channel: 'market' });
+        seed(ROOM, { room_number: '101', is_active: true, line_user_id: LINE_USER });
+        const stall = { uid: OWNER, building_id: MKT, room_id: 'A22', room_number: 'A22' };
+        const dorm = { uid: OWNER, building_id: BLD, room_id: 'r101', room_number: '101' };
+        seed(`line_rooms/${LINE_USER}`, { ...stall, rooms: [stall, dorm] });   // the stall is the primary
+        const thread = (b: string) => listPaths(`users/${OWNER}/buildings/${b}/line_threads/${LINE_USER}/messages/`).map(p => read(p)?.text);
+
+        await post([text('น้ำไม่ไหลค่ะ')]);   // to the tenant OA
+        expect(thread(BLD)).toContain('น้ำไม่ไหลค่ะ');
+        expect(thread(MKT)).not.toContain('น้ำไม่ไหลค่ะ');
+
+        process.env.LINE_MARKET_CHANNEL_SECRET = SECRET;
+        const market = (await import('./line-market-webhook.js')).default;
+        const raw = Buffer.from(JSON.stringify({ events: [text('พรุ่งนี้หยุดขาย')] }));
+        const req = Readable.from([raw]) as never as { method: string; headers: object };
+        req.method = 'POST';
+        req.headers = { 'x-line-signature': createHmac('sha256', SECRET).update(raw).digest('base64') };
+        const res = fakeRes();
+        await market(req as never, res as never);
+        delete process.env.LINE_MARKET_CHANNEL_SECRET;
+        expect(res.statusCode).toBe(200);
+        expect(thread(MKT)).toContain('พรุ่งนี้หยุดขาย');
+        expect(thread(BLD)).not.toContain('พรุ่งนี้หยุดขาย');
+    });
+
+    it('an answer LINE turns down (reply token expired) is pushed instead, and kept in the inbox', async () => {
+        await scanCard();
+        fetchMock.mockClear();
+        fetchMock.mockImplementation(async (url: string) => String(url).endsWith('/v2/bot/message/reply')
+            ? { ok: false, status: 400, text: async () => '{"message":"Invalid reply token"}', headers: new Headers() }
+            : { ok: true, status: 200, text: async () => '', headers: new Headers() });
+        const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        await post([text('บิล')]);
+        const push = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/v2/bot/message/push'));
+        expect(push).toBeTruthy();
+        expect(JSON.parse(push![1].body).to).toBe(LINE_USER);
+        expect(errors.mock.calls.some(c => String(c[0]).includes('Invalid reply token'))).toBe(true);
+        errors.mockRestore();
+        const thread = listPaths(`users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}/messages/`).map(p => read(p));
+        expect(thread.some(m => m?.direction === 'out')).toBe(true);
+    });
+
     it('greets a new friend with how to register', async () => {
         await post([{ type: 'follow', replyToken: 'rt', source: { userId: STRANGER } }]);
         expect(reply()![0].text).toContain('ยังไม่ได้ลงทะเบียน');

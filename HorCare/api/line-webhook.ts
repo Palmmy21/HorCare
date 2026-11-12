@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { isPaidPlan } from '../src/shared/plans.js';
-import { verifyLineSignature, lineReply as sendLineReply, buildBillFlex, getLineImageContent, getLineContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
+import { verifyLineSignature, lineReply as sendLineReply, linePush,buildBillFlex, getLineImageContent, getLineContent, parseSplitModePostback, currentLineChannel, currentTeamSecret, channelAllowsOwner, isLineFriend } from './_line.js';
 import { decodeSlipQR, slipFingerprint, compressSlipToDataUrl, type SlipQR } from './_slip.js';
 import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { claimRoom, isRoomCode, scanRoomCode, type ScanResult } from './_room-qr.js';
@@ -106,20 +106,37 @@ interface LineEvent {
 }
 
 /** Who this event is from, so every reply sent while handling it is also kept in that tenant's inbox thread. */
-const conversation = new AsyncLocalStorage<{ lineUserId: string }>();
+const conversation = new AsyncLocalStorage<{ lineUserId: string; replied: boolean }>();
 
-/** Reply in LINE, and keep what the bot said in the inbox (the owner sees the whole conversation, automatic answers included). */
+/**
+ * Reply in LINE, and keep what the bot said in the inbox (the owner sees the whole conversation, automatic answers included).
+ * A reply token works once and only for a short while: a second answer to the same event, or one LINE turns down
+ * (token expired after a slow slip check, LINE busy), is pushed to the person instead — the answer always arrives.
+ */
 async function lineReply(replyToken: string, messages: object[]): Promise<void> {
-    await sendLineReply(replyToken, messages);
     const who = conversation.getStore();
-    const said = who ? describeReply(messages) : '';
+    let sent = !who?.replied && await sendLineReply(replyToken, messages);
+    if (who) who.replied = true;
+    if (!sent && who) {
+        sent = await linePush(who.lineUserId, messages).then(() => true, err => {
+            console.error('[line] push instead of reply failed:', (err as Error).message);
+            return false;
+        });
+    }
+    const said = who && sent ? describeReply(messages) : '';
     if (who && said) await recordBotReply(who.lineUserId, said).catch(err => console.warn('[line-inbox] bot reply not kept:', (err as Error).message));
 }
 
 async function handleEvent(event: LineEvent) {
     const userId = event.source?.userId;
-    if (!userId) return handleEventInner(event);
-    return conversation.run({ lineUserId: userId }, () => handleEventInner(event));
+    const started = Date.now();
+    try {
+        if (!userId) return await handleEventInner(event);
+        return await conversation.run({ lineUserId: userId, replied: false }, () => handleEventInner(event));
+    } finally {
+        // one line per event, so "it did not answer" can be traced to what came in and how long it took
+        console.log(`[line] ${event.type}${event.message?.type ? `/${event.message.type}` : ''} ${userId?.slice(-6) ?? '-'} ${Date.now() - started}ms`);
+    }
 }
 
 async function handleEventInner(event: LineEvent) {

@@ -60,13 +60,26 @@ export const roomLineChannel = (room: { line_channel?: unknown } | null | undefi
 export const roomLineToken = (room: { line_channel?: unknown } | null | undefined): Promise<string | undefined> => resolveLineToken(roomLineChannel(room));
 
 /** 	oken defaults to the tenant OA's access token. */
-export async function lineReply(replyToken: string, messages: object[], token: string | undefined = residentLineToken()): Promise<void> {
-    if (!token) return;
-    await fetch('https://api.line.me/v2/bot/message/reply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ replyToken, messages }),
-    });
+/**
+ * Answer a webhook event. False when LINE did not take it (reply token expired or already used, a malformed message,
+ * LINE down) — logged with LINE's reason, so a reply that never arrived is never silent; callers may push instead.
+ */
+export async function lineReply(replyToken: string, messages: object[], token: string | undefined = residentLineToken()): Promise<boolean> {
+    if (!token) { console.error('[line] reply not sent: no channel access token'); return false; }
+    try {
+        const res = await fetch('https://api.line.me/v2/bot/message/reply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ replyToken, messages }),
+        });
+        if (res.ok) return true;
+        const detail = await res.text().catch(() => '');
+        console.error(`[line] reply rejected ${res.status}: ${detail.slice(0, 300)}`);
+        return false;
+    } catch (err) {
+        console.error('[line] reply failed:', (err as Error).message);
+        return false;
+    }
 }
 
 /**
