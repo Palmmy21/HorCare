@@ -129,7 +129,7 @@ export function useLocalStorage() {
             rent_type: 'monthly'
         };
         const updatedRooms = [...rooms, newRoom].sort((a, b) =>
-            a.room_number.localeCompare(b.room_number)
+            a.room_number.localeCompare(b.room_number, 'th', { numeric: true })
         );
         localStorage.setItem(STORAGE_KEYS.ROOMS, JSON.stringify(updatedRooms));
         setRoomsState(updatedRooms);

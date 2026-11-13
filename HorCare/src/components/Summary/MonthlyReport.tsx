@@ -34,7 +34,7 @@ const MonthlyReport = forwardRef<HTMLDivElement, MonthlyReportProps>(
     ({ bills, currentMonth, config, billCustomization }, ref) => {
         const monthBills = bills
             .filter(b => b.month === currentMonth)
-            .sort((a, b) => a.room_number.localeCompare(b.room_number));
+            .sort((a, b) => a.room_number.localeCompare(b.room_number, 'th', { numeric: true }));
 
         const totalElecUnits = monthBills.reduce((s, b) => s + b.elec_units, 0);
         const totalWaterUnits = monthBills.reduce((s, b) => s + b.water_units, 0);

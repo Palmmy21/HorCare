@@ -160,7 +160,10 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
         const roomsRef = collection(db, userPath, 'rooms');
         const roomsQuery = query(roomsRef, orderBy('room_number'));
         const unsubRooms = onSnapshot(roomsQuery, (snap) => {
-            const roomList: Room[] = snap.docs.map(d => ({ ...d.data(), id: d.id } as Room));
+            // Firestore orders room_number as text (1, 10, 11, 2 …); every screen wants it the way people count (1, 2, … 10).
+            const roomList: Room[] = snap.docs
+                .map(d => ({ ...d.data(), id: d.id } as Room))
+                .sort((a, b) => String(a.room_number ?? '').localeCompare(String(b.room_number ?? ''), 'th', { numeric: true }));
             setRoomsState(roomList);
             loadedRef.current.rooms = true;
             settle();
