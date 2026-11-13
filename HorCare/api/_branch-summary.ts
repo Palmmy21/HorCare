@@ -6,16 +6,22 @@
  *   { action: 'touch',   owner_uid, building_id }   → records that the caller just opened that branch (FR-03 / FR-07)
  *
  * Access is decided here, not by the page: the owner sees every branch, a member only the property_ids they were
- * granted, and revenue is sent only to callers with finance.read. The counted figures are cached per branch for
- * up to 5 minutes on the warm instance; the caller's own "last opened" times are always read fresh.
+ * granted, and revenue is sent only to callers with finance.read. The caller's own "last opened" times are always read
+ * fresh.
+ *
+ * Reads are kept low, because the picker is opened often (Firestore bills every document read):
+ *   - the counted figures are kept per branch for 5 minutes, in memory and in `branch_summaries` (one read per branch,
+ *     shared by every server instance);
+ *   - bills are counted and summed with aggregation queries (about 1 read per 1,000 bills) instead of reading every
+ *     bill of the last 12 months; if an aggregation is refused, the bills are read as before.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_firebase.js';
+import { db, admin } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { supabase, SupabaseNotConfigured } from './_supabase.js';
 import { contractOccupancy, effectiveOccupancy, type LeaseFacts, type ProfileFacts, type ReservationFacts, type StatusOverride } from '../src/shared/roomOccupancy.js';
 import {
-    branchKind, isOverdueBill, monthRevenue, roomsBookedTonight, OPEN_REPAIR_STATUSES,
+    branchKind, isOverdueBill, monthRevenue, monthsBack, overdueMonths, roomsBookedTonight, OPEN_REPAIR_STATUSES,
     type BillFacts, type BookingFacts, type BranchSummary, type BranchSummaryResponse,
 } from '../src/shared/branchSummary.js';
 import { todayTh } from '../src/shared/market.js';
@@ -31,11 +37,41 @@ type Counted = Omit<BranchSummary, 'lastAccessedAt'> & { revenueCollected: numbe
 const cache = new Map<string, { at: number; value: Counted }>();
 
 const accessDocId = (owner: string, buildingId: string) => `${owner}__${buildingId}`;
+/** server-only: no client rule opens this collection */
+const summaryDoc = (owner: string, buildingId: string) => db.doc(`branch_summaries/${owner}__${buildingId}`);
 
-function monthsBack(today: string, n: number): string {
-    const [y, m] = today.split('-').map(Number);
-    const d = new Date(Date.UTC(y, m - 1 - n, 1));
-    return d.toISOString().slice(0, 7);
+interface BillFigures { overdue: number; collected: number; expected: number }
+
+/**
+ * Overdue count and this month's revenue from aggregation queries: equality filters only (month in …, is_saved,
+ * payment_status), so the single-field indexes serve them and no composite index is needed. A bill with no
+ * payment_status counts as unpaid, so "unpaid" is everything saved minus what is paid or pending.
+ */
+async function billFiguresByAggregate(base: string, today: string, dueDay: number, grace: number): Promise<BillFigures> {
+    const bills = db.collection(`${base}/bills`);
+    const months = overdueMonths(today, dueDay, grace, OVERDUE_LOOKBACK_MONTHS);
+    const month = today.slice(0, 7);
+    const saved = bills.where('is_saved', '==', true);
+    const sum = { total: admin.firestore.AggregateField.sum('total_bill') };
+    const [inOverdueMonths, settled, expected, collected] = await Promise.all([
+        months.length ? saved.where('month', 'in', months).count().get() : null,
+        months.length ? saved.where('month', 'in', months).where('payment_status', 'in', ['paid', 'pending']).count().get() : null,
+        saved.where('month', '==', month).aggregate(sum).get(),
+        saved.where('month', '==', month).where('payment_status', '==', 'paid').aggregate(sum).get(),
+    ]);
+    return {
+        overdue: Math.max(0, (inOverdueMonths?.data().count ?? 0) - (settled?.data().count ?? 0)),
+        expected: Number(expected.data().total) || 0,
+        collected: Number(collected.data().total) || 0,
+    };
+}
+
+/** The old way: read every bill of the lookback window. Used when an aggregation is refused. */
+async function billFiguresByReading(base: string, today: string, dueDay: number, grace: number): Promise<BillFigures> {
+    const snap = await db.collection(`${base}/bills`).where('month', '>=', monthsBack(today, OVERDUE_LOOKBACK_MONTHS)).get();
+    const bills = snap.docs.map(d => d.data() as BillFacts);
+    const revenue = monthRevenue(bills, today.slice(0, 7));
+    return { overdue: bills.filter(b => isOverdueBill(b, dueDay, grace, today)).length, ...revenue };
 }
 
 interface OrgFacts { leases: LeaseFacts[]; reservations: ReservationFacts[]; bookings: (BookingFacts & { building_id: string })[] }
@@ -69,21 +105,25 @@ async function countBranch(
     facts: { leases: LeaseFacts[]; reservations: ReservationFacts[] }, bookings: BookingFacts[],
 ): Promise<Counted> {
     const base = `users/${owner}/buildings/${buildingId}`;
-    const [roomsSnap, tenantsSnap, billsSnap, repairsSnap, cfgSnap] = await Promise.all([
+    const resort = branchKind(buildingType) === 'resort';
+    const [roomsSnap, tenantsSnap, repairsCount, cfgSnap] = await Promise.all([
         db.collection(`${base}/rooms`).get(),
-        db.collection(`${base}/tenants`).get(),
-        db.collection(`${base}/bills`).where('month', '>=', monthsBack(today, OVERDUE_LOOKBACK_MONTHS)).get(),
-        db.collection(`${base}/maintenance`).where('status', 'in', [...OPEN_REPAIR_STATUSES]).get(),
+        // a resort counts tonight's bookings, not tenant profiles
+        resort ? null : db.collection(`${base}/tenants`).get(),
+        (async () => {
+            const open = db.collection(`${base}/maintenance`).where('status', 'in', [...OPEN_REPAIR_STATUSES]);
+            try { return (await open.count().get()).data().count; } catch { return (await open.get()).size; }
+        })(),
         db.doc(`${base}/data/config`).get(),
     ]);
 
     const rooms = roomsSnap.docs.filter(d => d.data().is_active !== false);
     let occupied = 0;
-    if (branchKind(buildingType) === 'resort') {
+    if (resort) {
         const ids = new Set(rooms.map(d => d.id));
         occupied = roomsBookedTonight(bookings.filter(b => ids.has(b.room_id)), today);
     } else {
-        const profiles = new Map(tenantsSnap.docs.map(d => [d.id, d.data() as ProfileFacts]));
+        const profiles = new Map((tenantsSnap?.docs ?? []).map(d => [d.id, d.data() as ProfileFacts]));
         for (const doc of rooms) {
             const r = doc.data() as { room_status?: 'occupied' | 'vacant' | 'reserved'; status_override?: StatusOverride | null };
             const auto = contractOccupancy({
@@ -99,17 +139,22 @@ async function countBranch(
     const cfg = (cfgSnap.data() ?? {}) as { bill_customization?: { due_day?: number }; due_day?: number; late_fee?: { grace_days?: number } };
     const dueDay = Number(cfg.bill_customization?.due_day ?? cfg.due_day) || 5;
     const grace = Number(cfg.late_fee?.grace_days) || 0;
-    const bills = billsSnap.docs.map(d => d.data() as BillFacts);
-    const revenue = monthRevenue(bills, today.slice(0, 7));
+    let figures: BillFigures;
+    try {
+        figures = await billFiguresByAggregate(base, today, dueDay, grace);
+    } catch (err) {
+        console.warn(`branches: aggregate for ${buildingId} refused, reading bills:`, errorInfo(err).message);
+        figures = await billFiguresByReading(base, today, dueDay, grace);
+    }
 
     return {
         id: buildingId,
         unitsTotal: rooms.length,
         unitsOccupied: occupied,
-        overdueInvoices: bills.filter(b => isOverdueBill(b, dueDay, grace, today)).length,
-        openRepairs: repairsSnap.size,
-        revenueCollected: revenue.collected,
-        revenueExpected: revenue.expected,
+        overdueInvoices: figures.overdue,
+        openRepairs: repairsCount,
+        revenueCollected: figures.collected,
+        revenueExpected: figures.expected,
     };
 }
 
@@ -146,10 +191,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const lastAccess = new Map(accessSnaps.map((s, i) => [ids[i], (s.exists ? (s.data()?.at as string | undefined) : undefined) ?? null]));
 
     const now = Date.now();
-    const stale = ids.filter(id => {
+    let stale = ids.filter(id => {
         const hit = cache.get(`${owner}/${id}`);
         return !hit || now - hit.at > CACHE_MS;
     });
+    // another instance may have counted them a moment ago: one read per branch instead of counting again
+    if (stale.length) {
+        try {
+            const kept = await db.getAll(...stale.map(id => summaryDoc(owner, id)));
+            kept.forEach((snap, i) => {
+                const k = snap.exists ? (snap.data() as { at?: number; value?: Counted }) : undefined;
+                if (k?.value && typeof k.at === 'number' && now - k.at <= CACHE_MS) cache.set(`${owner}/${stale[i]}`, { at: k.at, value: k.value });
+            });
+            stale = stale.filter(id => !cache.has(`${owner}/${id}`) || now - cache.get(`${owner}/${id}`)!.at > CACHE_MS);
+        } catch (err) {
+            console.warn('branches: kept summaries unavailable:', errorInfo(err).message);
+        }
+    }
     const resortIds = stale.filter(id => branchKind(types.get(id)) === 'resort');
     const facts = stale.length ? await orgFacts(owner, stale, resortIds, today) : null;
 
@@ -159,7 +217,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const f = facts?.byBuilding.get(id) ?? { leases: [], reservations: [] };
             const bookings = (facts?.bookings ?? []).filter(b => b.building_id === id);
             const value = await countBranch(owner, id, types.get(id), today, f, bookings);
-            cache.set(`${owner}/${id}`, { at: Date.now(), value });
+            const at = Date.now();
+            cache.set(`${owner}/${id}`, { at, value });
+            await summaryDoc(owner, id).set({ at, value, owner_uid: owner, building_id: id }).catch(() => { /* best effort */ });
         } catch (err) {
             console.error(`branches: counting ${id} failed:`, errorInfo(err).message);
             cache.delete(`${owner}/${id}`);

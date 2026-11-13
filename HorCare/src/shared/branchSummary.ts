@@ -60,6 +60,26 @@ export function isOverdueBill(b: BillFacts, dueDay: number, graceDays: number, t
   return chargeableLateDays(dueDateOf(b.month, dueDay), today, Math.max(0, graceDays || 0)) > 0;
 }
 
+/** 'YYYY-MM' n months before today's month. */
+export function monthsBack(today: string, n: number): string {
+  const [y, m] = today.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 - n, 1)).toISOString().slice(0, 7);
+}
+
+/**
+ * The months whose bills are already overdue today (past the due day plus grace), newest first, going back
+ * `lookback` months — the same rule as isOverdueBill, so the server can count overdue bills by month instead of
+ * reading every bill.
+ */
+export function overdueMonths(today: string, dueDay: number, graceDays: number, lookback: number): string[] {
+  const out: string[] = [];
+  for (let n = 0; n <= lookback; n++) {
+    const month = monthsBack(today, n);
+    if (chargeableLateDays(dueDateOf(month, dueDay), today, Math.max(0, graceDays || 0)) > 0) out.push(month);
+  }
+  return out;
+}
+
 /** Collected vs expected for one month, the same sum the dashboard's money panel makes. */
 export function monthRevenue(bills: BillFacts[], month: string): { collected: number; expected: number } {
   let collected = 0, expected = 0;

@@ -52,21 +52,47 @@ function docRef(path: string) {
     };
 }
 
-function collectionRef(path: string, filters: [string, unknown][] = []) {
+type Filter = [string, string, unknown];
+
+/** Like Firestore, a document without the field never matches a filter on it. */
+function matches(d: Data, [f, op, v]: Filter): boolean {
+    if (!(f in d)) return false;
+    const x = d[f] as string | number;
+    switch (op) {
+        case '==': return x === v;
+        case 'in': return (v as unknown[]).includes(x);
+        case '>=': return x >= (v as string | number);
+        case '<=': return x <= (v as string | number);
+        default: throw new Error(`fake firestore does not support ${op}`);
+    }
+}
+
+function collectionRef(path: string, filters: Filter[] = []) {
     const run = () => [...store.keys()]
         .filter(p => p.startsWith(path + '/') && !p.slice(path.length + 1).includes('/'))
         .map(p => snap(p))
-        .filter(s => filters.every(([f, v]) => (s.data() as Data)[f] === v));
+        .filter(s => filters.every(f => matches(s.data() as Data, f)));
     return {
         // like Firestore, doc() with no id makes a new random one
         doc: (id?: string) => docRef(`${path}/${id ?? `auto${Math.random().toString(36).slice(2, 12)}`}`),
-        where: (field: string, op: string, value: unknown) => {
-            if (op !== '==') throw new Error('fake firestore only supports ==');
-            return collectionRef(path, [...filters, [field, value]]);
-        },
+        where: (field: string, op: string, value: unknown) => collectionRef(path, [...filters, [field, op, value]]),
         get: async () => { const docs = run(); return { docs, empty: docs.length === 0, size: docs.length }; },
+        /** aggregation queries: count(), and sum() via admin.firestore.AggregateField.sum */
+        count: () => ({ get: async () => { const n = run().length; aggregateCalls.push('count'); return { data: () => ({ count: n }) }; } }),
+        aggregate: (spec: Record<string, { sum: string }>) => ({
+            get: async () => {
+                const docs = run();
+                aggregateCalls.push('aggregate');
+                const out: Record<string, number> = {};
+                for (const [k, { sum }] of Object.entries(spec)) out[k] = docs.reduce((t, d) => t + (Number((d.data() as Data)[sum]) || 0), 0);
+                return { data: () => out };
+            },
+        }),
     };
 }
+
+/** Aggregation queries run since the last reset (tests check a route counts instead of reading). */
+export const aggregateCalls: string[] = [];
 
 /** Every document in a collection with this id, at any depth (only == filters, like the rest of the fake). */
 function collectionGroupRef(id: string, filters: [string, unknown][] = []) {
@@ -147,6 +173,7 @@ export const admin = {
     }),
     firestore: {
         FieldValue: { serverTimestamp: () => ({ __serverTimestamp: true }), delete: () => DELETE_FIELD },
+        AggregateField: { sum: (field: string) => ({ sum: field }) },
         // plain data (documents are cloned on write): enough for code that only stores an expiry
         Timestamp: { fromMillis: (ms: number) => ({ seconds: Math.floor(ms / 1000), nanoseconds: (ms % 1000) * 1e6 }) },
     },
@@ -155,7 +182,7 @@ export const admin = {
 export const firebaseMock = { db, admin };
 
 // ── test helpers ─────────────────────────────────────────────────────────────
-export function resetFake() { store.clear(); authUsers.clear(); revoked.length = 0; failWritePrefix = null; }
+export function resetFake() { store.clear(); authUsers.clear(); revoked.length = 0; failWritePrefix = null; aggregateCalls.length = 0; }
 /** Make every set() under this path prefix throw (null to stop). */
 export function failWritesTo(prefix: string | null) { failWritePrefix = prefix; }
 export function seed(path: string, data: object) { store.set(path, structuredClone(data) as Data); }

@@ -119,3 +119,18 @@ describe('wording', () => {
     expect(headline('resort', 18, 24)).toEqual({ label: 'คืนนี้', value: '18/24 ห้อง', showPct: false });
   });
 });
+
+describe('overdueMonths', () => {
+  it('lists the months already past due + grace, the same as isOverdueBill', async () => {
+    const { overdueMonths, isOverdueBill } = await import('./branchSummary');
+    const today = '2026-11-13';
+    const months = overdueMonths(today, 5, 3, 12);
+    expect(months[0]).toBe('2026-11');           // due 5th + 3 days grace < 13th
+    expect(months).toHaveLength(13);
+    expect(months[12]).toBe('2025-11');
+    expect(overdueMonths(today, 20, 0, 12)[0]).toBe('2026-10'); // this month not due yet
+    for (const m of ['2026-11', '2026-10', '2025-11']) {
+      expect(isOverdueBill({ month: m, is_saved: true }, 5, 3, today)).toBe(months.includes(m));
+    }
+  });
+});
