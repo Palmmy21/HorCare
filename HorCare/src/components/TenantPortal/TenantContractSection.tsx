@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText, ShieldCheck, PenTool, CheckCircle2, Clock, Eye, Download,
   X, ArrowRight, Check, Sparkles,
 } from 'lucide-react';
-import { QRCodeCanvas } from 'qrcode.react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { toast } from 'react-hot-toast';
 
 import { portalCall } from './portalApi';
 import type { TenantProfile, Room, DormConfig, BillLanguage } from '../../types';
 import SignaturePad from '../ESignature/SignaturePad';
-import horcareLogo from '../../assets/horcare_logo.png';
+import { PaperSheet } from '../Documents/PaperSheet';
+import { DocumentViewer } from '../Documents/DocumentViewer';
+import { ContractDocument } from '../Documents/ContractDocument';
+import type { DocIssuer } from '../Documents/docFormat';
 import { errorInfo } from '../../shared/errorInfo';
 
 interface TenantContractSectionProps {
@@ -36,9 +36,7 @@ export default function TenantContractSection({
   const [lesseeSignature, setLesseeSignature] = useState<string>('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
 
-  const printAreaRef = useRef<HTMLDivElement | null>(null);
 
   // Auto open sign modal if URL contains action=sign
   useEffect(() => {
@@ -52,10 +50,10 @@ export default function TenantContractSection({
     return null;
   }
 
+  const bc = config?.bill_customization;
+  const issuer: DocIssuer = { name: bc?.dorm_name, address: bc?.dorm_address, phone: bc?.dorm_phone, logo: bc?.dorm_logo };
   const isSigned = !!contract.lessee_signature;
   const isPending = !isSigned;
-  const isMarket = contract.contract_type === 'market_stall';
-  const unitLabel = isMarket ? 'แผงค้า' : 'ห้องพัก';
 
   const formatThaiDate = (isoStr?: string) => {
     if (!isoStr) return '—';
@@ -97,49 +95,6 @@ export default function TenantContractSection({
     }
   };
 
-  const handleDownloadPDF = async () => {
-    if (!printAreaRef.current) return;
-    setIsExporting(true);
-    const toastId = toast.loading('กำลังประมวลผล PDF สัญญา...');
-
-    try {
-      const element = printAreaRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#FFFFFF',
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pdfHeight;
-      }
-
-      pdf.save(`${contract.contract_number}_${contract.lessee_name || 'contract'}.pdf`);
-      toast.success('ดาวน์โหลดสัญญา PDF สำเร็จแล้ว 📄', { id: toastId });
-    } catch (err) {
-      console.error(err);
-      toast.error('ไม่สามารถส่งออก PDF ได้ กรุณาลองใหม่', { id: toastId });
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   return (
     <div style={{ marginBottom: '1.25rem' }}>
@@ -387,7 +342,6 @@ export default function TenantContractSection({
               type="button"
               onClick={() => {
                 setShowPreviewModal(true);
-                setTimeout(handleDownloadPDF, 400);
               }}
               style={{
                 background: '#F4F7FB',
@@ -558,123 +512,12 @@ export default function TenantContractSection({
               {modalStep === 'review' ? (
                 /* REVIEW TERMS STEP */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  {/* Parties Box */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                      gap: '0.75rem',
-                      background: '#F4F7FB',
-                      padding: '1rem',
-                      borderRadius: '16px',
-                      border: '1px solid #DCE5EF',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#08589F', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
-                        ฝ่ายผู้ให้เช่า
-                      </div>
-                      <div style={{ fontWeight: 800, fontSize: '0.925rem', color: '#102A43' }}>
-                        {contract.lessor_name}
-                      </div>
-                      {contract.lessor_phone && (
-                        <div style={{ fontSize: '0.8rem', color: '#557089', marginTop: '0.1rem' }}>
-                          โทร: {contract.lessor_phone}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
-                        ฝ่ายผู้เช่า (ท่าน)
-                      </div>
-                      <div style={{ fontWeight: 800, fontSize: '0.925rem', color: '#102A43' }}>
-                        {contract.lessee_name}
-                      </div>
-                      {contract.lessee_phone && (
-                        <div style={{ fontSize: '0.8rem', color: '#557089', marginTop: '0.1rem' }}>
-                          โทร: {contract.lessee_phone}
-                        </div>
-                      )}
-                    </div>
+                  {/* the document exactly as it will be signed */}
+                  <div style={{ background: '#E5E7EB', borderRadius: '14px', padding: '0.5rem' }}>
+                    <PaperSheet>
+                      <ContractDocument c={contract} issuer={issuer} />
+                    </PaperSheet>
                   </div>
-
-                  {/* Rent and Unit terms */}
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                      gap: '0.75rem',
-                    }}
-                  >
-                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>{unitLabel}</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#102A43' }}>{contract.unit_number}</div>
-                    </div>
-                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>ค่าเช่า</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0A6CC2' }}>
-                        ฿{contract.rent_amount.toLocaleString()}
-                      </div>
-                    </div>
-                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>เงินประกัน/มัดจำ</div>
-                      <div style={{ fontWeight: 800, fontSize: '1rem', color: '#102A43' }}>
-                        ฿{contract.deposit_amount.toLocaleString()}
-                      </div>
-                    </div>
-                    <div style={{ background: '#EBF1F7', padding: '0.75rem', borderRadius: '12px' }}>
-                      <div style={{ fontSize: '0.725rem', color: '#557089', fontWeight: 600 }}>วันเริ่มสัญญา</div>
-                      <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#102A43' }}>
-                        {formatThaiDate(contract.start_date)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Utilities */}
-                  {(contract.electricity_rate_desc || contract.water_rate_desc || contract.waste_fee_desc) && (
-                    <div style={{ background: '#F4F7FB', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid #DCE5EF', fontSize: '0.825rem' }}>
-                      <div style={{ fontWeight: 800, color: '#29435E', marginBottom: '0.35rem' }}>
-                        อัตราค่าสาธารณูปโภคและบริการ:
-                      </div>
-                      {contract.electricity_rate_desc && <div>• ค่าไฟฟ้า: {contract.electricity_rate_desc}</div>}
-                      {contract.water_rate_desc && <div>• ค่าน้ำประปา: {contract.water_rate_desc}</div>}
-                      {contract.waste_fee_desc && <div>• ค่าบริการส่วนกลาง/ขยะ: {contract.waste_fee_desc}</div>}
-                    </div>
-                  )}
-
-                  {/* Clauses */}
-                  <div>
-                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.925rem', fontWeight: 800, color: '#102A43' }}>
-                      ข้อกำหนดและเงื่อนไขสัญญา:
-                    </h4>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem',
-                        background: '#FFFFFF',
-                        border: '1px solid #DCE5EF',
-                        borderRadius: '14px',
-                        padding: '1rem',
-                        fontSize: '0.825rem',
-                        color: '#29435E',
-                        lineHeight: 1.55,
-                      }}
-                    >
-                      {contract.clauses.map((clause, idx) => (
-                        <div key={idx} style={{ paddingBottom: '0.35rem', borderBottom: idx < contract.clauses.length - 1 ? '1px dashed #DCE5EF' : 'none' }}>
-                          {clause}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Additional terms */}
-                  {contract.custom_terms && (
-                    <div style={{ background: '#FDEBD3', padding: '0.75rem 1rem', borderRadius: '12px', border: '1px solid #F7B86C', fontSize: '0.825rem', color: '#9A3412' }}>
-                      <strong>ข้อตกลงพิเศษเพิ่มเติม:</strong> {contract.custom_terms}
-                    </div>
-                  )}
 
                   {/* Lessor signature status */}
                   {contract.lessor_signature && (
@@ -830,280 +673,15 @@ export default function TenantContractSection({
         </div>
       )}
 
-      {/* ── FULL CONTRACT A4 PREVIEW / PRINT MODAL ── */}
+      {/* ── FULL CONTRACT (A4) ── */}
       {showPreviewModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(16, 42, 67, 0.8)',
-            backdropFilter: 'blur(8px)',
-            padding: '1rem',
-            overflow: 'hidden',
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowPreviewModal(false);
-          }}
+        <DocumentViewer
+          title={`${contract.title} · ${contract.contract_number}`}
+          filename={`${contract.contract_number}_${contract.lessee_name || 'contract'}`}
+          onClose={() => setShowPreviewModal(false)}
         >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: '860px',
-              backgroundColor: '#EBF1F7',
-              borderRadius: '20px',
-              display: 'flex',
-              flexDirection: 'column',
-              maxHeight: '94vh',
-              overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '1rem 1.5rem',
-                backgroundColor: '#FFFFFF',
-                borderBottom: '1px solid #DCE5EF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldCheck size={20} color="#15803D" />
-                <span style={{ fontWeight: 800, fontSize: '1rem', color: '#102A43' }}>
-                  เอกสารสัญญาเช่าฉบับสมบูรณ์ (A4 Preview)
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={handleDownloadPDF}
-                  disabled={isExporting}
-                  style={{
-                    background: 'linear-gradient(135deg, #0A6CC2 0%, #08589F 100%)',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '0.5rem 1rem',
-                    fontWeight: 700,
-                    fontSize: '0.825rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                  }}
-                >
-                  <Download size={14} /> ดาวน์โหลด PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPreviewModal(false)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #C3D0DE',
-                    borderRadius: '50%',
-                    width: 32,
-                    height: 32,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#557089',
-                  }}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* A4 Printable Paper */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-              <div
-                ref={printAreaRef}
-                style={{
-                  width: '100%',
-                  maxWidth: '740px',
-                  backgroundColor: '#FFFFFF',
-                  padding: '2.5rem',
-                  borderRadius: '4px',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                  color: '#1A3350',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '0.875rem',
-                  lineHeight: 1.6,
-                }}
-              >
-                {/* Header with Logo */}
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '2px solid #102A43', paddingBottom: '1rem' }}>
-                  <img
-                    src={config?.bill_customization?.dorm_logo || horcareLogo}
-                    alt="Logo"
-                    style={{ height: '48px', objectFit: 'contain', marginBottom: '0.5rem' }}
-                  />
-                  <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#102A43' }}>
-                    {contract.title}
-                  </h2>
-                  <div style={{ fontSize: '0.825rem', color: '#557089', marginTop: '0.2rem' }}>
-                    เลขที่สัญญา: <strong style={{ fontFamily: 'var(--font-mono)' }}>{contract.contract_number}</strong>
-                  </div>
-                </div>
-
-                {/* Parties */}
-                <div style={{ marginBottom: '1.25rem', textAlign: 'justify' }}>
-                  สัญญาฉบับนี้ทำขึ้นเมื่อวันที่ <strong>{formatThaiDate(contract.start_date)}</strong> ระหว่าง{' '}
-                  <strong>{contract.lessor_name}</strong> (ซึ่งต่อไปนี้เรียกว่า "ผู้ให้เช่า") ฝ่ายหนึ่ง กับ{' '}
-                  <strong>{contract.lessee_name}</strong>
-                  {contract.lessee_id_card ? ` (บัตรประชาชนเลขที่: ${contract.lessee_id_card})` : ''}
-                  {contract.lessee_business_type ? ` ประกอบกิจการ: ${contract.lessee_business_type}` : ''}{' '}
-                  (ซึ่งต่อไปนี้เรียกว่า "ผู้เช่า") อีกฝ่ายหนึ่ง โดยทั้งสองฝ่ายได้ตกลงทำสัญญาเช่า {unitLabel}{' '}
-                  <strong>{contract.unit_number}</strong> {contract.zone_or_floor ? `(${contract.zone_or_floor})` : ''} โดยมีข้อความดังต่อไปนี้:
-                </div>
-
-                {/* Rates Table */}
-                <div
-                  style={{
-                    backgroundColor: '#F4F7FB',
-                    borderRadius: '8px',
-                    padding: '0.875rem',
-                    border: '1px solid #DCE5EF',
-                    marginBottom: '1.25rem',
-                  }}
-                >
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-                    <div>
-                      • อัตราค่าเช่า: <strong>฿{contract.rent_amount.toLocaleString()} บาท/รอบ</strong>
-                    </div>
-                    <div>
-                      • เงินประกันความเสียหาย: <strong>฿{contract.deposit_amount.toLocaleString()} บาท</strong>
-                    </div>
-                    <div>
-                      • วันเริ่มต้นสัญญา: <strong>{formatThaiDate(contract.start_date)}</strong>
-                    </div>
-                    <div>
-                      • วันสิ้นสุดสัญญา: <strong>{contract.end_date ? formatThaiDate(contract.end_date) : 'ไม่มีกำหนด'}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Clauses */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <div style={{ fontWeight: 800, marginBottom: '0.5rem' }}>ข้อตกลงและเงื่อนไข:</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.825rem' }}>
-                    {contract.clauses.map((clause, idx) => (
-                      <div key={idx} style={{ textAlign: 'justify' }}>{clause}</div>
-                    ))}
-                  </div>
-                  {contract.custom_terms && (
-                    <div style={{ marginTop: '0.65rem', fontStyle: 'italic', color: '#3E5872' }}>
-                      * ข้อตกลงเพิ่มเติม: {contract.custom_terms}
-                    </div>
-                  )}
-                </div>
-
-                {/* Signatures */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, 1fr)',
-                    gap: '2rem',
-                    marginTop: '2rem',
-                    paddingTop: '1.5rem',
-                    borderTop: '1px solid #DCE5EF',
-                  }}
-                >
-                  {/* Lessor Sign */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.825rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                      ลงชื่อ.......................................................ผู้ให้เช่า
-                    </div>
-                    {contract.lessor_signature ? (
-                      <img
-                        src={contract.lessor_signature}
-                        alt="Lessor Signature"
-                        style={{ height: '54px', objectFit: 'contain', margin: '0 auto' }}
-                      />
-                    ) : (
-                      <div style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8FA3B8', fontSize: '0.75rem' }}>
-                        (ลงนามดิจิทัล)
-                      </div>
-                    )}
-                    <div style={{ fontSize: '0.8rem', color: '#3E5872', marginTop: '0.25rem' }}>
-                      ({contract.lessor_name})
-                    </div>
-                    {contract.lessor_signed_at && (
-                      <div style={{ fontSize: '0.72rem', color: '#8FA3B8' }}>
-                        วันที่ {formatThaiDate(contract.lessor_signed_at)}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Lessee Sign */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.825rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                      ลงชื่อ.......................................................ผู้เช่า
-                    </div>
-                    {contract.lessee_signature ? (
-                      <img
-                        src={contract.lessee_signature}
-                        alt="Lessee Signature"
-                        style={{ height: '54px', objectFit: 'contain', margin: '0 auto' }}
-                      />
-                    ) : (
-                      <div style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8FA3B8', fontSize: '0.75rem' }}>
-                        (รอดำเนินการลงนาม)
-                      </div>
-                    )}
-                    <div style={{ fontSize: '0.8rem', color: '#3E5872', marginTop: '0.25rem' }}>
-                      ({contract.lessee_name})
-                    </div>
-                    {contract.lessee_signed_at && (
-                      <div style={{ fontSize: '0.72rem', color: '#8FA3B8' }}>
-                        วันที่ {formatThaiDate(contract.lessee_signed_at)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Audit verification seal footer */}
-                <div
-                  style={{
-                    marginTop: '2.5rem',
-                    paddingTop: '0.75rem',
-                    borderTop: '1px dashed #C3D0DE',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.72rem',
-                    color: '#557089',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <ShieldCheck size={14} color="#15803D" />
-                    <span>
-                      เอกสารนี้ลงนามอิเล็กทรอนิกส์ผ่านระบบ HorCare • Audit Code:{' '}
-                      <strong style={{ fontFamily: 'var(--font-mono)', color: '#102A43' }}>
-                        {contract.verification_code || 'VERIFIED'}
-                      </strong>
-                    </span>
-                  </div>
-                  <div>
-                    <QRCodeCanvas
-                      // the contract number and audit code only: a printed contract must not carry the tenant's portal link
-                      value={`HorCare ${contract.contract_number} ${contract.verification_code || ''}`.trim()}
-                      size={36}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <ContractDocument c={contract} issuer={issuer} />
+        </DocumentViewer>
       )}
     </div>
   );

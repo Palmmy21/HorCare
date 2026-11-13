@@ -27,6 +27,10 @@ import TenantBankSection from './TenantBankSection';
 import TenantClosureSection from './TenantClosureSection';
 import TenantAnnouncementSection from './TenantAnnouncementSection';
 import { errorInfo } from '../../shared/errorInfo';
+import { DocumentViewer } from '../Documents/DocumentViewer';
+import { InvoiceDocument } from '../Documents/InvoiceDocument';
+import type { DocIssuer } from '../Documents/docFormat';
+import { invoiceNumber } from '../../shared/invoice';
 
 // ── Image compression (canvas) ────────────────────────────────────────────────
 async function compressImageToBase64(file: File, maxPx = 900, quality = 0.72): Promise<string> {
@@ -386,14 +390,19 @@ function SlipUploader({
 }
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
-function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
+/** What the invoice document needs besides the bill: who issues it and who it is for. */
+interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; dueDay?: number }
+
+function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
   bill: MonthlyBill;
   defaultOpen: boolean; payTo: TenantAccount | null;
   onChanged: () => void;
   lang: BillLanguage;
+  invoice: InvoiceContext;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
   const [open, setOpen] = useState(defaultOpen);
+  const [showInvoice, setShowInvoice] = useState(false);
   const isUnpaid = !bill.payment_status || bill.payment_status === 'unpaid';
   const isPaid = bill.payment_status === 'paid';
 
@@ -432,9 +441,32 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang }: {
         </div>
       </button>
 
+      {showInvoice && (
+        <DocumentViewer
+          title={`ใบแจ้งหนี้ ${formatPortalMonth(bill.month, 'th')}`}
+          filename={invoiceNumber(bill)}
+          onClose={() => setShowInvoice(false)}
+        >
+          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} dueDay={invoice.dueDay} payTo={payTo} />
+        </DocumentViewer>
+      )}
+
       {/* Expanded detail */}
       {open && (
         <div style={{ padding: '0 1.125rem 1.125rem', borderTop: '1px solid var(--color-gray-100)' }}>
+          {/* the bill as a real document, to keep, print or forward */}
+          <button
+            type="button"
+            onClick={() => setShowInvoice(true)}
+            style={{
+              width: '100%', marginTop: '0.75rem', padding: '0.7rem 1rem', borderRadius: '12px',
+              border: '1.5px solid #0F4C81', background: '#F2F7FC', color: '#0F4C81',
+              fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+            }}
+          >
+            <FileText size={16} /> {lang === 'th' ? 'ดูใบแจ้งหนี้ / ดาวน์โหลด PDF' : 'View invoice / PDF'}
+          </button>
           {/* Cost breakdown */}
           <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.75rem' }}>
             <tbody>
@@ -868,6 +900,14 @@ export default function TenantPortalPage() {
 
   const [pinInput, setPinInput] = useState('');
 
+  const bc = config?.bill_customization;
+  const invoiceCtx: InvoiceContext = {
+    issuer: { name: bc?.dorm_name || buildingName, address: bc?.dorm_address, phone: bc?.dorm_phone, logo: bc?.dorm_logo },
+    tenantName: profile?.full_name,
+    unitWord: config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',
+    dueDay: bc?.due_day,
+  };
+
   const currentMonth = getCurrentMonth();
   const currentBill = bills.find(b => b.month === currentMonth);
   const prevBills = bills.filter(b => b.month !== currentMonth);
@@ -1150,7 +1190,7 @@ export default function TenantPortalPage() {
           <section>
             <SectionLabel icon={<Receipt size={14} />} label={`${t.monthly_bill} ${formatPortalMonth(currentMonth, lang)}`} />
             {currentBill ? (
-              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} onChanged={refresh} lang={lang} />
+              <BillCard bill={currentBill} defaultOpen={true} payTo={payTo} onChanged={refresh} lang={lang} invoice={invoiceCtx} />
             ) : (
               <div style={{
                 background: 'var(--color-white)', borderRadius: '16px', padding: '1.5rem',
@@ -1194,7 +1234,7 @@ export default function TenantPortalPage() {
                   <FineCard key={f.id} fine={f} payTo={payTo} onChanged={refresh} lang={lang} />
                 ))}
                 {prevBills.map(b => (
-                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} onChanged={refresh} lang={lang} />
+                  <BillCard key={b.id} bill={b} defaultOpen={false} payTo={payTo} onChanged={refresh} lang={lang} invoice={invoiceCtx} />
                 ))}
               </div>
             </section>
