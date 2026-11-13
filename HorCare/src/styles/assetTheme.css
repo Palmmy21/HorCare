@@ -1,0 +1,22 @@
+/* Sidebar + mobile header colour per kind of property (src/shared/assetTheme.ts is the source; its test checks this file). */
+/* html[data-asset] is set by App.tsx from the open branch; no attribute = the default HorCare blue in index.css. */
+html[data-asset="dormitory"] { --sidebar-bg: #0A5DAA; --sidebar-active-icon: #FFB36B; }
+html[data-asset="apartment"] { --sidebar-bg: #4338CA; --sidebar-active-icon: #FFB36B; }
+html[data-asset="condo"] { --sidebar-bg: #6D28D9; --sidebar-active-icon: #FCD34D; }
+html[data-asset="house"] { --sidebar-bg: #15803D; --sidebar-active-icon: #FDE68A; }
+html[data-asset="market"] { --sidebar-bg: #C2410C; --sidebar-active-icon: #FEF08A; }
+html[data-asset="commercial"] { --sidebar-bg: #0F766E; --sidebar-active-icon: #FFB36B; }
+html[data-asset="office"] { --sidebar-bg: #334155; --sidebar-active-icon: #7DD3FC; }
+html[data-asset="hotel"] { --sidebar-bg: #9F1239; --sidebar-active-icon: #FDE68A; }
+html[data-asset="resort"] { --sidebar-bg: #0E7490; --sidebar-active-icon: #FDE68A; }
+html[data-asset="other"] { --sidebar-bg: #475569; --sidebar-active-icon: #FFB36B; }
+html.dark[data-asset="dormitory"] { --sidebar-bg: #0D2E52; }
+html.dark[data-asset="apartment"] { --sidebar-bg: #221E5C; }
+html.dark[data-asset="condo"] { --sidebar-bg: #331566; }
+html.dark[data-asset="house"] { --sidebar-bg: #0E3B20; }
+html.dark[data-asset="market"] { --sidebar-bg: #55210B; }
+html.dark[data-asset="commercial"] { --sidebar-bg: #0B3B37; }
+html.dark[data-asset="office"] { --sidebar-bg: #1E293B; }
+html.dark[data-asset="hotel"] { --sidebar-bg: #4C0A1E; }
+html.dark[data-asset="resort"] { --sidebar-bg: #0A3846; }
+html.dark[data-asset="other"] { --sidebar-bg: #1F2937; }

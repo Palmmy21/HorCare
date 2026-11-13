@@ -81,8 +81,10 @@ import type { BranchTarget } from './components/BranchSelector/BranchSelector';
 import { recordBranchAccess } from './hooks/useBranchSummary';
 import WorkspaceSwitcher from './components/Workspace/WorkspaceSwitcher';
 import { activeBuildingStorageKey } from './shared/workspace';
+import { ASSET_COLORS, assetKindOf } from './shared/assetTheme';
 
 import './index.css';
+import './styles/assetTheme.css';
 import horcareLogo from './assets/horcare_logo.png';
 import { LOGO_SRC } from './utils/brand';
 
@@ -495,6 +497,19 @@ function App() {
     updateCommonFee,
     deleteCommonFee,
   } = useFirestore(effectiveUid, effectiveBuildingId, currentMonth);
+
+  // The sidebar takes the colour of the kind of property that is open (shared/assetTheme.ts): a dormitory, a market and
+  // a hotel look different at a glance. Signed out or no branch open: the default HorCare blue.
+  const openBuildingType = buildings.find(b => b.id === effectiveBuildingId)?.building_type ?? config?.building_type;
+  const assetKind = (user || maidSession) && effectiveBuildingId ? assetKindOf(openBuildingType) : null;
+  useEffect(() => {
+    const root = document.documentElement;
+    if (assetKind) root.dataset.asset = assetKind; else delete root.dataset.asset;
+    // the phone's browser bar follows too
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const colors = ASSET_COLORS[assetKind ?? 'dormitory'];
+    meta?.setAttribute('content', root.classList.contains('dark') ? colors.dark : colors.light);
+  }, [assetKind]);
 
 
   // Auto-clean orphaned bills (e.g. from deleted rooms)
