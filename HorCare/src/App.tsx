@@ -79,6 +79,8 @@ const ProfileModal = lazy(() => import('./components/Profile/ProfileModal'));
 import type { ProfileSection } from './components/Profile/ProfileModal';
 import type { BranchTarget } from './components/BranchSelector/BranchSelector';
 import { recordBranchAccess } from './hooks/useBranchSummary';
+import WorkspaceSwitcher from './components/Workspace/WorkspaceSwitcher';
+import { activeBuildingStorageKey } from './shared/workspace';
 
 import './index.css';
 import horcareLogo from './assets/horcare_logo.png';
@@ -228,8 +230,10 @@ function App() {
   } = useAuth();
 
   // An administrator created by an owner works inside that owner's organisation, limited to the buildings and
-  // permissions the owner chose. Everything below that touches data uses `orgUid`, never the person's own uid.
-  const { membership, loading: membershipLoading } = useMembership(user);
+  // permissions the owner chose. Someone with an account of their own who is on other owners' teams chooses where to
+  // work (shared/workspace.ts): their own account, or a team, which then works exactly like an owner-created
+  // administrator. Everything below that touches data uses `orgUid`, never the person's own uid.
+  const { membership, teams, hasOwn, choose: chooseWorkspace, loading: membershipLoading } = useMembership(user);
   const isStaff = membership !== null;
   const orgUid = membership?.owner_uid ?? user?.uid ?? '';
   // null = the owner, who may do everything
@@ -283,7 +287,7 @@ function App() {
   }, [maidSession]);
 
   // Active building — persisted per user in localStorage
-  const buildingStorageKey = user ? `horcare_active_building_${user.uid}` : null;
+  const buildingStorageKey = user ? activeBuildingStorageKey(user.uid, membership) : null;
   const [activeBuildingId, setActiveBuildingId] = useState<string | null>(() => maidSession?.building_id ?? null);
 
   const effectiveUid = maidSession ? maidSession.owner_uid : (user && !membershipLoading ? orgUid : null);
@@ -405,6 +409,18 @@ function App() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  // Into another workspace: back to its branch page, nothing of the previous one carried over.
+  const switchWorkspace = (ownerUid: string | null) => {
+    if ((membership?.owner_uid ?? null) === ownerUid) return;
+    chooseWorkspace(ownerUid);
+    setActiveBuildingId(null);
+    setBuildingMenuOpen(false);
+    setMobileMenuOpen(false);
+    setHasSelectedBranch(false);
+    setCurrentView('dashboard');
+  };
+  const canSwitchWorkspace = teams.length + (hasOwn ? 1 : 0) > 1;
 
   const handleSwitchBuilding = (id: string) => {
     setActiveBuildingId(id);
@@ -939,7 +955,7 @@ function App() {
       />
     </Suspense>
   ) : null;
-  if (!maidSession && user && (noBranches || (hasPaidSubscription && !hasSelectedBranch))) {
+  if (!maidSession && user && (noBranches || ((hasPaidSubscription || canSwitchWorkspace) && !hasSelectedBranch))) {
     const enterBranch = (id: string, target?: BranchTarget) => {
       handleSwitchBuilding(id);
       if (target === 'overdue') { setPaymentsFilter('unpaid'); setCurrentView('payments'); }
@@ -964,6 +980,7 @@ function App() {
           onOpenProfile={() => setProfileOpen('profile')}
           onChangePassword={() => setProfileOpen('password')}
           onLogout={() => { void logout(); }}
+          workspaceSwitcher={<WorkspaceSwitcher teams={teams} hasOwn={hasOwn} activeOwnerUid={membership?.owner_uid ?? null} onChoose={switchWorkspace} />}
         />
         <AddBuildingModal
           isOpen={isAddBuildingModalOpen}
@@ -1536,6 +1553,9 @@ function App() {
               <span>{profile?.name || profile?.display_name || user?.email}</span>
             </button>
           ))}
+          {!sidebarCollapsed && !maidSession && (
+            <WorkspaceSwitcher variant="select" teams={teams} hasOwn={hasOwn} activeOwnerUid={membership?.owner_uid ?? null} onChoose={switchWorkspace} />
+          )}
 
           {/* Install PWA Button (only when in web browser) */}
           {!isStandalone && (

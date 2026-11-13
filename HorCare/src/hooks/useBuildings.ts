@@ -11,6 +11,8 @@ export function useBuildings(userId: string | null, allowMigration: boolean = tr
     const [buildings, setBuildings] = useState<Building[]>([]);
     const [loading, setLoading] = useState(true);
     const [migrating] = useState(false);
+    // whose buildings `buildings` holds: after switching accounts the previous list is never shown, not even for a moment
+    const [loadedFor, setLoadedFor] = useState<string | null>(null);
     const migratedRef = useRef(false);
 
     useEffect(() => {
@@ -22,6 +24,7 @@ export function useBuildings(userId: string | null, allowMigration: boolean = tr
         const unsub = onSnapshot(q, async (snap) => {
             const list = snap.docs.map(d => ({ ...d.data(), id: d.id } as Building));
             setBuildings(list);
+            setLoadedFor(userId);
 
             // If any building is missing a logo, check if its config has bill_customization.dorm_logo
             const missingLogo = list.some(b => !b.logo);
@@ -108,7 +111,8 @@ export function useBuildings(userId: string | null, allowMigration: boolean = tr
         await deleteDoc(doc(db, `users/${userId}/buildings`, buildingId));
     }, [userId]);
 
-    return { buildings, loading, migrating, addBuilding, renameBuilding, deleteBuilding };
+    const current = loadedFor === userId;
+    return { buildings: current ? buildings : [], loading: userId ? loading || !current : false, migrating, addBuilding, renameBuilding, deleteBuilding };
 }
 
 /**

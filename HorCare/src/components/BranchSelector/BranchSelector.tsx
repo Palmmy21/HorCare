@@ -34,6 +34,8 @@ interface BranchSelectorProps {
   onOpenProfile: () => void;
   onChangePassword: () => void;
   onLogout: () => void;
+  /** Own account / teams chooser, shown under the greeting when the person may work in more than one. */
+  workspaceSwitcher?: React.ReactNode;
 }
 
 const SKELETON_KEY = 'horcare_branch_count';
@@ -72,6 +74,7 @@ export default function BranchSelector(props: BranchSelectorProps) {
           <h1>{greeting(thHour)}, {firstName}</h1>
           <p>{thaiLongDate(todayTh(now))}</p>
         </div>
+        {props.workspaceSwitcher}
 
         {/* FR-05 */}
         {(loading || buildings.length > 0) && (
@@ -102,7 +105,7 @@ export default function BranchSelector(props: BranchSelectorProps) {
 
         {buildings.length > 0 && (
           <div className="bs-section-head">
-            <h2>สาขาของคุณ <span className="tnum">({buildings.length})</span></h2>
+            <h2>{isStaff ? 'สาขาที่ดูแล' : 'สาขาของคุณ'} <span className="tnum">({buildings.length})</span></h2>
             {summary.error && (
               <button type="button" className="bs-retry" onClick={summary.retry}><RefreshCw size={14} /> โหลดตัวเลขไม่สำเร็จ · ลองใหม่</button>
             )}

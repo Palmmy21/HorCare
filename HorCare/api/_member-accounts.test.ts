@@ -223,3 +223,44 @@ describe('an administrator with a phone number', () => {
         expect(last).toBe(429);
     });
 });
+
+describe('an owner with an account of their own, added to another owner\'s team', () => {
+    beforeEach(() => {
+        addAuthUser('owner-2', 'owner2@x.com', 'เจ้าของอีกหอ');
+        seed('users/owner-2', { uid: 'owner-2', display_name: 'เจ้าของอีกหอ', license: 'active', access_until: 0 });
+        seed('users/owner-2/buildings/own-1', { id: 'own-1' });
+    });
+    const call2 = async (body: Record<string, unknown>, ownerUid: string) => {
+        const res = fakeRes();
+        await staffRegistration(fakeReq({ owner_uid: ownerUid, ...body }, 'owner-2'), res as never);
+        return res as { statusCode: number };
+    };
+
+    it('is listed as a team (not an owner-created account), with only the building granted', async () => {
+        expect((await call(OWNER, { action: 'add', email: 'owner2@x.com', role: 'property_manager', property_ids: [A] })).statusCode).toBe(200);
+        const r = await call('owner-2', { action: 'my_memberships' });
+        expect(r.body.memberships).toHaveLength(1);
+        expect(r.body.memberships[0]).toMatchObject({ owner_uid: OWNER, owner_name: 'เจ้าของหอ', managed: false, property_ids: [A], license: 'active' });
+    });
+
+    it('works in the granted building of the team, not the others, and keeps full rights over their own', async () => {
+        await call(OWNER, { action: 'add', email: 'owner2@x.com', role: 'property_manager', property_ids: [A] });
+        expect((await call2({ action: 'list', building_id: A }, OWNER)).statusCode).toBe(200);
+        expect((await call2({ action: 'list', building_id: B }, OWNER)).statusCode).toBe(403);
+        expect((await call2({ action: 'list', building_id: 'own-1' }, 'owner-2')).statusCode).toBe(200);
+        // the team's owner has no say over this person's own account
+        expect((await call(OWNER, { action: 'reset_password', member_uid: 'owner-2', password: 'Hijack12345' })).statusCode).toBe(409);
+        expect((await call(OWNER, { action: 'list' }, members)).body.members.map((m: { uid: string }) => m.uid)).toEqual(['owner-2']);
+        expect(read('users/owner-2')).toMatchObject({ display_name: 'เจ้าของอีกหอ' });
+        expect(read('users/owner-2')!.staff_account_of).toBeUndefined();
+    });
+
+    it('removed from the team: the team is gone, their own account stays usable', async () => {
+        await call(OWNER, { action: 'add', email: 'owner2@x.com', role: 'property_manager', property_ids: [A] });
+        await call(OWNER, { action: 'remove', member_uid: 'owner-2' });
+        expect((await call('owner-2', { action: 'my_memberships' })).body.memberships).toEqual([]);
+        expect(revoked).not.toContain('owner-2');
+        expect((await call2({ action: 'list', building_id: A }, OWNER)).statusCode).toBe(403);
+        expect((await call2({ action: 'list', building_id: 'own-1' }, 'owner-2')).statusCode).toBe(200);
+    });
+});
