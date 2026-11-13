@@ -10,6 +10,7 @@ import ListingPage from './components/Listing/ListingPage.tsx'
 import StaffPortalPage from './components/StaffPortal/StaffPortalPage.tsx'
 import StaffGuidePage from './components/StaffPortal/StaffGuidePage.tsx'
 import PosCarePage from './components/PosCare/PosCarePage.tsx'
+import UnitOwnerSummary from './components/Leasing/UnitOwnerSummary.tsx'
 
 // ── Firestore internal assertion error → auto silent reload ──────────────────
 // Firebase SDK can enter a broken state when too many listeners are created /
@@ -46,6 +47,7 @@ window.addEventListener('unhandledrejection', (e) => {
 // Route: ?walkin=<link>      → WalkInPage (public form for walk-in market vendors; the market's own scan link)
 //        ?walkin=1&uid=&bid= → WalkInPage too (links printed before the scan link)
 // Route: ?listing=<slug>     → ListingPage (public vacancy page + viewing requests, checked by /api/listing)
+// Route: ?unit=<token>       → UnitOwnerSummary (a unit owner's rooms and monthly payouts; read-only, /api/rental-parties)
 // Route: everything else    → Owner App
 const params = new URLSearchParams(window.location.search);
 const isTenantGateway = window.location.pathname === '/portal';
@@ -56,6 +58,7 @@ const isStaffGuide = params.get('guide') === 'staff';
 const isPosCare = params.has('pos');
 const isWalkIn = params.has('walkin') && ((params.get('walkin') ?? '').length >= 16 || (params.has('uid') && params.has('bid')));
 const isListing = params.has('listing');
+const isUnitOwner = params.has('unit');
 
 // eslint-disable-next-line react-refresh/only-export-components
 function Root() {
@@ -66,6 +69,7 @@ function Root() {
   if (isPosCare) return <PosCarePage />;
   if (isWalkIn) return <WalkInPage />;
   if (isListing) return <ListingPage />;
+  if (isUnitOwner) return <UnitOwnerSummary />;
   if (isTenantPortal) return <TenantPortalPage />;
   return <App />;
 }

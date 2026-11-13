@@ -80,6 +80,7 @@ async function dispatch(route: string | undefined, req: VercelRequest, res: Verc
         case 'room-qr': return (await import('./_room-qr.js')).default(req, res);
         case 'branches': return (await import('./_branch-summary.js')).default(req, res);
         case 'liff-join': return (await import('./_liff-join.js')).default(req, res);
+        case 'rental-parties': return (await import('./_rental-parties.js')).default(req, res);
         case 'trial': return (await import('./_trial.js')).default(req, res);
         case 'listing': return (await import('./_listing.js')).default(req, res);
         case 'owner-line': return (await import('./_owner-line.js')).default(req, res);

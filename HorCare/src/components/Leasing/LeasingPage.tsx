@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Loader2, Plus, RefreshCw, Repeat } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { useBuildingRooms } from '../../hooks/useAccountingData';
@@ -9,10 +9,13 @@ import {
     LEAD_SOURCES, LEAD_SOURCE_LABELS_TH, LEAD_STATUSES, LEAD_STATUS_LABELS_TH, LEASE_STATUS_LABELS_TH, RESERVATION_STATUS_LABELS_TH,
     canMoveLead, depositsHeld, isReservationLapsed, leaseAlert, renewalDefaults, type Lead, type LeadStatus, type Lease, type Reservation,
 } from '../../shared/leasing';
+import { currentSublease, type Sublease, type UnitOwner } from '../../shared/rentalParties';
+import UnitOwnersTab from './UnitOwnersTab';
 
 interface Props { ownerUid: string; buildingId: string }
 interface Overview { leads: Lead[]; reservations: Reservation[]; leases: Lease[] }
-type Tab = 'leads' | 'reservations' | 'leases';
+type Tab = 'leads' | 'reservations' | 'leases' | 'owners';
+interface Parties { subleases: Sublease[]; owners: UnitOwner[] }
 
 const ERRORS: Record<string, string> = {
     supabase_not_configured: 'ยังไม่ได้ตั้งค่า Supabase บนเซิร์ฟเวอร์ (ดู supabase/README.md)',
@@ -29,6 +32,10 @@ const ERRORS: Record<string, string> = {
     changed_meanwhile: 'มีคนแก้รายการนี้ไปก่อน — โหลดใหม่แล้วลองอีกครั้ง',
     forbidden: 'คุณไม่มีสิทธิ์ทำรายการนี้',
     unauthenticated: 'กรุณาเข้าสู่ระบบใหม่',
+    outside_lease: 'ช่วงเช่าช่วงต้องอยู่ภายในสัญญาของผู้เช่าหลัก',
+    overlaps_sublease: 'ช่วงนี้มีผู้เช่าช่วงอยู่แล้ว — สิ้นสุดรายการเดิมก่อน',
+    lease_not_active: 'บันทึกเช่าช่วงได้เฉพาะสัญญาที่กำลังเช่าหรือรอเริ่ม',
+    lease_not_found: 'ไม่พบสัญญานี้ — โหลดใหม่แล้วลองอีกครั้ง',
 };
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -52,6 +59,34 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
         } catch (e) { const err = e as ApiError; setError(ERRORS[err.code] ?? err.message ?? 'โหลดข้อมูลไม่สำเร็จ'); }
     }, [ownerUid, buildingId]);
     useEffect(() => { void load(); }, [load]);
+
+    const [parties, setParties] = useState<Parties>({ subleases: [], owners: [] });
+    const loadParties = useCallback(async () => {
+        try { setParties(await apiPost<Parties>('rental-parties', { owner_uid: ownerUid, building_id: buildingId, action: 'list' })); } catch { /* no access or not set up: nothing extra to show */ }
+    }, [ownerUid, buildingId]);
+    useEffect(() => { void loadParties(); }, [loadParties]);
+
+    // เช่าช่วง: the lease holder lets the room to someone else; we keep billing the lease holder
+    const [subFor, setSubFor] = useState<Lease | null>(null);
+    const [sb, setSb] = useState({ tenant_name: '', tenant_phone: '', start_date: today, end_date: today, rent: '', note: '' });
+    const openSublease = (l: Lease) => { setSb({ tenant_name: '', tenant_phone: '', start_date: l.start_date > today ? l.start_date : today, end_date: l.end_date, rent: '', note: '' }); setSubFor(l); };
+    const saveSublease = async () => {
+        if (!subFor) return;
+        setBusy('sub');
+        try {
+            await apiPost('rental-parties', { owner_uid: ownerUid, building_id: buildingId, action: 'sublease_create', lease_id: subFor.id, ...sb, rent: sb.rent === '' ? undefined : Number(sb.rent), tenant_phone: sb.tenant_phone || undefined });
+            toast.success('บันทึกผู้เช่าช่วงแล้ว'); setSubFor(null); await loadParties();
+        } catch (e) { const err = e as ApiError; toast.error(ERRORS[err.code] ?? err.message ?? 'บันทึกไม่สำเร็จ'); }
+        finally { setBusy(null); }
+    };
+    const endSublease = async (s: Sublease) => {
+        if (!window.confirm(`สิ้นสุดการเช่าช่วงของ ${s.tenant_name} (ห้อง ${s.room_number}) วันนี้?`)) return;
+        setBusy('se:' + s.id);
+        try { await apiPost('rental-parties', { owner_uid: ownerUid, building_id: buildingId, action: 'sublease_end', sublease_id: s.id }); toast.success('บันทึกแล้ว'); await loadParties(); }
+        catch (e) { const err = e as ApiError; toast.error(ERRORS[err.code] ?? err.message ?? 'ไม่สำเร็จ'); }
+        finally { setBusy(null); }
+    };
+    const unitOwnerOf = useMemo(() => new Map(parties.owners.flatMap(o => o.room_ids.map(r => [r, o] as const))), [parties.owners]);
 
     const act = async (key: string, body: Record<string, unknown>, ok: string): Promise<boolean> => {
         setBusy(key);
@@ -124,16 +159,16 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
     };
 
     const roomOptions = rooms.map(r => <option key={r.id} value={r.id}>{r.room_number}</option>);
-    const tabs: [Tab, string][] = [['leads', `ผู้สนใจ (${data?.leads.filter(l => l.status !== 'won' && l.status !== 'lost').length ?? 0})`], ['reservations', `การจอง (${data?.reservations.filter(r => r.status === 'active').length ?? 0})`], ['leases', `สัญญาเช่า (${data?.leases.filter(l => l.status === 'active').length ?? 0})`]];
+    const tabs: [Tab, string][] = [['leads', `ผู้สนใจ (${data?.leads.filter(l => l.status !== 'won' && l.status !== 'lost').length ?? 0})`], ['reservations', `การจอง (${data?.reservations.filter(r => r.status === 'active').length ?? 0})`], ['leases', `สัญญาเช่า (${data?.leases.filter(l => l.status === 'active').length ?? 0})`], ['owners', `เจ้าของห้อง (${parties.owners.length})`]];
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1 }}>
                     <h1 style={{ margin: 0, fontSize: '1.4rem' }}>ปล่อยเช่า</h1>
-                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-gray-500)' }}>จากผู้สนใจ → จองห้อง → สัญญาเช่า → ต่อสัญญา / สิ้นสุดสัญญา</p>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--color-gray-500)' }}>จากผู้สนใจ → จองห้อง → สัญญาเช่า → ต่อสัญญา / สิ้นสุดสัญญา · เช่าช่วง · ห้องที่มีคนซื้อแล้วฝากปล่อยเช่า</p>
                 </div>
-                <button className="btn btn-outline btn-sm" onClick={() => void load()} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><RefreshCw size={14} /> โหลดใหม่</button>
+                <button className="btn btn-outline btn-sm" onClick={() => { void load(); void loadParties(); }} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><RefreshCw size={14} /> โหลดใหม่</button>
             </div>
 
             {error && <div style={{ ...card, borderColor: '#DC2626', color: '#B91C1C' }}>{error}</div>}
@@ -239,9 +274,31 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
                                         </div>
                                         <div style={{ fontSize: '0.82rem', color: 'var(--color-gray-500)' }}>{day(l.start_date)} – {day(l.end_date)} · ค่าเช่า {baht(l.rent_satang)} · มัดจำ {baht(l.deposit_satang)}{l.renewal_of ? ' · ต่อสัญญา' : ''}{l.end_reason ? ` · ${l.end_reason}` : ''}</div>
                                         {alert && <div style={{ fontSize: '0.8rem', color: '#9A3412', display: 'flex', gap: 4, alignItems: 'center' }}><CalendarClock size={13} /> {alert === 'expired' ? 'เลยวันสิ้นสุดสัญญาแล้ว' : 'ใกล้สิ้นสุดสัญญา'}</div>}
+                                        {unitOwnerOf.get(l.room_id) && <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>เจ้าของห้อง: {unitOwnerOf.get(l.room_id)!.name} (ฝากปล่อยเช่า)</div>}
+                                        {(() => {
+                                            const subs = parties.subleases.filter(s => s.lease_id === l.id);
+                                            if (!subs.length) return null;
+                                            const now = currentSublease(subs, today);
+                                            return (
+                                                <div style={{ borderLeft: '3px solid var(--color-primary, #0A6CC2)', paddingLeft: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                    {subs.map(s => (
+                                                        <div key={s.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.82rem', opacity: s.status === 'active' ? 1 : 0.6 }}>
+                                                            <Repeat size={13} aria-hidden />
+                                                            <span style={{ flex: 1, minWidth: 0 }}>
+                                                                เช่าช่วง: <strong>{s.tenant_name}</strong>{s.tenant_phone ? <> · <a href={`tel:${s.tenant_phone}`}>{s.tenant_phone}</a></> : null} · {day(s.start_date)} – {day(s.end_date)}
+                                                                {s.rent_satang ? ` · ${l.tenant_name} เก็บ ${baht(s.rent_satang)}/เดือน` : ''}{s === now ? ' · อยู่ตอนนี้' : s.status === 'ended' ? ' · สิ้นสุดแล้ว' : ''}
+                                                            </span>
+                                                            {s.status === 'active' && <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={() => void endSublease(s)}>สิ้นสุด</button>}
+                                                        </div>
+                                                    ))}
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>บิลยังออกให้ {l.tenant_name} (ผู้เช่าหลัก) ตามสัญญา</span>
+                                                </div>
+                                            );
+                                        })()}
                                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                             {l.status === 'active' && <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => renew(l)}>ต่อสัญญา</button>}
                                             {l.status === 'active' && <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => endLease(l)}>สิ้นสุดสัญญา</button>}
+                                            {(l.status === 'active' || l.status === 'scheduled') && <button className="btn btn-outline btn-sm" disabled={!!busy} onClick={() => openSublease(l)} style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><Repeat size={13} /> บันทึกเช่าช่วง</button>}
                                             {l.status === 'scheduled' && l.start_date <= today && <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => void act('a:' + l.id, { action: 'lease_activate', lease_id: l.id }, 'เริ่มสัญญาแล้ว')}>เริ่มสัญญา</button>}
                                         </div>
                                     </div>
@@ -250,6 +307,36 @@ export default function LeasingPage({ ownerUid, buildingId }: Props) {
                         </>
                     )}
                 </>
+            )}
+
+            {data && tab === 'owners' && (
+                <UnitOwnersTab ownerUid={ownerUid} buildingId={buildingId} owners={parties.owners} rooms={rooms.map(r => ({ id: r.id, room_number: r.room_number }))} onChanged={loadParties} />
+            )}
+
+            {subFor && (
+                <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setSubFor(null); }}>
+                    <div className="modal" style={{ maxWidth: 480 }} role="dialog" aria-modal="true" aria-label="บันทึกเช่าช่วง">
+                        <div className="modal-header"><span className="modal-title">เช่าช่วง · ห้อง {subFor.room_number}</span></div>
+                        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                                {subFor.tenant_name} (ผู้เช่าหลัก) ปล่อยห้องนี้ให้คนอื่นเช่าต่อ ที่พักยังเก็บค่าเช่าจาก {subFor.tenant_name} ตามสัญญา
+                                ช่วงเช่าช่วงต้องอยู่ภายใน {day(subFor.start_date)} – {day(subFor.end_date)}
+                            </p>
+                            <input style={input} placeholder="ชื่อผู้เช่าช่วง" value={sb.tenant_name} onChange={e => setSb({ ...sb, tenant_name: e.target.value })} maxLength={100} />
+                            <input style={input} placeholder="เบอร์โทร" inputMode="tel" value={sb.tenant_phone} onChange={e => setSb({ ...sb, tenant_phone: e.target.value })} />
+                            <div style={row}>
+                                <label style={{ fontSize: '0.78rem' }}>เริ่ม<input style={{ ...input, width: '100%' }} type="date" min={subFor.start_date} max={subFor.end_date} value={sb.start_date} onChange={e => setSb({ ...sb, start_date: e.target.value })} /></label>
+                                <label style={{ fontSize: '0.78rem' }}>สิ้นสุด<input style={{ ...input, width: '100%' }} type="date" min={subFor.start_date} max={subFor.end_date} value={sb.end_date} onChange={e => setSb({ ...sb, end_date: e.target.value })} /></label>
+                            </div>
+                            <input style={input} type="number" min="0" placeholder={`ค่าเช่าที่ ${subFor.tenant_name} เก็บต่อ (ไม่บังคับ)`} value={sb.rent} onChange={e => setSb({ ...sb, rent: e.target.value })} />
+                            <input style={input} placeholder="หมายเหตุ" value={sb.note} onChange={e => setSb({ ...sb, note: e.target.value })} maxLength={500} />
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-primary btn-sm" disabled={busy === 'sub' || sb.tenant_name.trim().length < 2 || sb.end_date <= sb.start_date} onClick={() => void saveSublease()}>{busy === 'sub' ? <Loader2 size={14} className="spin" /> : 'บันทึก'}</button>
+                                <button className="btn btn-outline btn-sm" onClick={() => setSubFor(null)}>ปิด</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {reserveFor && (
