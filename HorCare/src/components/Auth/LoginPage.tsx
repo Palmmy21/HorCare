@@ -9,6 +9,8 @@ import type { HousekeeperSession, InitialBuildingConfig } from '../../types';
 import RegisterWizard from './RegisterWizard';
 import { LOGO_SRC } from '../../utils/brand';
 import { errorInfo } from '../../shared/errorInfo';
+import { parseLoginId } from '../../shared/loginId';
+import { staffPhoneLogin } from '../../utils/staffLogin';
 const PricingPage = lazy(() => import('../Pricing/PricingPage'));
 
 interface LoginPageProps {
@@ -85,8 +87,24 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
         e.preventDefault();
         setIsLoading(true);
         setMaidError(null);
+        clearError();
+        const id = parseLoginId(maidPhone);
+        if (!id) {
+            setMaidError('กรอกเบอร์โทรศัพท์ หรืออีเมลให้ถูกต้อง');
+            setIsLoading(false);
+            return;
+        }
         try {
-            const session = await authenticateHousekeeper(maidPhone, maidPasscode);
+            // an email is an administrator account the owner created: the ordinary sign-in (errors shown by the parent)
+            if (id.kind === 'email') {
+                try { await onLogin(id.email, maidPasscode); } catch { /* error handled by parent */ }
+                return;
+            }
+            // a phone: an administrator's phone first, then a housekeeper's
+            const staff = await staffPhoneLogin(id.phone, maidPasscode);
+            if (staff === 'ok') return;
+            if (staff === 'too_many') { setMaidError('ลองหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่'); return; }
+            const session = await authenticateHousekeeper(id.phone, maidPasscode);
             if (session) {
                 if (onMaidLogin) {
                     onMaidLogin(session);
@@ -300,19 +318,22 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                 ) : mode === 'maid' ? (
                     <form onSubmit={handleMaidSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         <div style={{ background: 'rgba(10, 108, 194, 0.08)', border: '1px solid rgba(10, 108, 194, 0.25)', borderRadius: 10, padding: '0.75rem 0.875rem', fontSize: '0.825rem', color: 'var(--color-primary, #0a6cc2)', lineHeight: 1.4 }}>
-                            สำหรับแอดมินหรือ staff ประจำหอพัก เข้าสู่ระบบด้วยเบอร์โทรศัพท์และรหัสผ่านที่เจ้าของหอพักกำหนดให้
+                            สำหรับแอดมินหรือ staff ประจำหอพัก เข้าสู่ระบบด้วยเบอร์โทรศัพท์ หรืออีเมล และรหัสผ่านที่เจ้าของหอพักกำหนดให้
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>เบอร์โทรศัพท์</label>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>เบอร์โทรศัพท์ หรืออีเมล</label>
                             <div style={{ position: 'relative' }}>
                                 <input
-                                    type="tel"
-                                    placeholder="เช่น 0812345678"
+                                    type="text"
+                                    inputMode="email"
+                                    placeholder="เช่น 0812345678 หรือ admin@example.com"
                                     value={maidPhone}
                                     onChange={e => setMaidPhone(e.target.value)}
                                     required
-                                    autoComplete="tel"
+                                    autoComplete="username"
+                                    autoCapitalize="none"
+                                    spellCheck={false}
                                     style={{
                                         width: '100%', padding: '0.75rem 1rem', borderRadius: '10px',
                                         border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
@@ -323,7 +344,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>รหัสผ่าน (Passcode)</label>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text, #1a3350)' }}>รหัสผ่าน</label>
                             <div style={{ position: 'relative' }}>
                                 <input
                                     type={showPassword ? "text" : "password"}
@@ -331,6 +352,7 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                                     value={maidPasscode}
                                     onChange={e => setMaidPasscode(e.target.value)}
                                     required
+                                    autoComplete="current-password"
                                     style={{
                                         width: '100%', padding: '0.75rem 2.5rem 0.75rem 1rem', borderRadius: '10px',
                                         border: '1px solid var(--color-gray-200, #dce5ef)', background: 'var(--color-white, #fff)',
@@ -351,9 +373,9 @@ export default function LoginPage({ onLogin, onRegister, onResetPassword, onMaid
                             </div>
                         </div>
 
-                        {maidError && (
+                        {(maidError || error) && (
                             <div className="login-error">
-                                <AlertTriangle size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> {maidError}
+                                <AlertTriangle size={16} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} /> {maidError || error}
                             </div>
                         )}
 

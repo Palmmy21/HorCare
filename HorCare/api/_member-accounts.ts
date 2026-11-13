@@ -12,12 +12,16 @@
 import { admin, db } from './_firebase.js';
 import { effectiveLicense } from '../src/shared/trial.js';
 import { ASSIGNABLE_ROLES, isRole, permissionsForRole, type MemberDoc, type Role } from '../src/shared/permissions.js';
+import { cleanPhone } from '../src/shared/leasing.js';
 
 export class AccountError extends Error {
     constructor(public status: number, public code: string, public detail?: string) { super(code); }
 }
 
 export type ManagedMember = MemberDoc & { managed?: boolean };
+
+/** `staff_login/{phone}`: lets an administrator sign in with the phone number the owner gave them. Server-only. */
+interface StaffLogin { uid: string; owner_uid: string; email: string }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -92,7 +96,7 @@ export async function myMemberships(uid: string): Promise<Membership[]> {
     return out;
 }
 
-export interface CreateAccountInput { email: unknown; password: unknown; display_name: unknown; role: unknown; property_ids: unknown }
+export interface CreateAccountInput { email: unknown; password: unknown; display_name: unknown; role: unknown; property_ids: unknown; phone?: unknown }
 
 /** Create the sign-in account and its member record. Throws AccountError for anything the owner can fix. */
 export async function createManagedAccount(owner: string, createdBy: string, input: CreateAccountInput): Promise<ManagedMember> {
@@ -104,7 +108,10 @@ export async function createManagedAccount(owner: string, createdBy: string, inp
     if (name.length < 2 || name.length > 80) throw new AccountError(400, 'invalid_name');
     if (!isRole(input.role) || !ASSIGNABLE_ROLES.includes(input.role as Role)) throw new AccountError(400, 'invalid_role');
     const role = input.role as Role;
+    const phone = cleanPhone(input.phone);
+    if (phone === undefined) throw new AccountError(400, 'invalid_phone');
     const propertyIds = await cleanProperties(owner, input.property_ids);
+    if (phone && (await db.doc(`staff_login/${phone}`).get()).exists) throw new AccountError(409, 'phone_exists');
 
     let existing: admin.auth.UserRecord | null = null;
     try { existing = await admin.auth().getUserByEmail(email); } catch { /* no such account: good */ }
@@ -115,10 +122,13 @@ export async function createManagedAccount(owner: string, createdBy: string, inp
     const now = new Date().toISOString();
     const member: ManagedMember = {
         uid: created.uid, email, display_name: name, role, permissions: permissionsForRole(role), property_ids: propertyIds,
-        status: 'active', created_at: now, created_by: createdBy, managed: true,
+        status: 'active', created_at: now, created_by: createdBy, managed: true, ...(phone ? { phone } : {}),
     };
-    await db.doc(`users/${created.uid}`).set({ uid: created.uid, email, display_name: name, license: 'free', access_until: 0, created_at: now, staff_account_of: owner });
+    await db.doc(`users/${created.uid}`).set({
+        uid: created.uid, email, display_name: name, ...(phone ? { phone } : {}), license: 'free', access_until: 0, created_at: now, staff_account_of: owner,
+    });
     await db.doc(`users/${owner}/members/${created.uid}`).set(member);
+    if (phone) await db.doc(`staff_login/${phone}`).set({ uid: created.uid, owner_uid: owner, email } satisfies StaffLogin);
     await indexMember(created.uid, owner);
     return member;
 }
@@ -132,4 +142,45 @@ export async function resetManagedPassword(owner: string, memberUid: string, pas
     if (m.managed !== true) throw new AccountError(409, 'not_a_managed_account');
     await admin.auth().updateUser(memberUid, { password: password as string });
     await admin.auth().revokeRefreshTokens(memberUid); // anyone signed in with the old password is signed out
+}
+
+/** Forget the phone sign-in of an account that is being removed. */
+export async function dropPhoneLogin(member: ManagedMember): Promise<void> {
+    if (!member.phone) return;
+    const ref = db.doc(`staff_login/${member.phone}`);
+    const snap = await ref.get();
+    if (snap.exists && (snap.data() as StaffLogin).uid === member.uid) await ref.delete();
+}
+
+/**
+ * Is this the account's password? Asked of Firebase Auth itself (the same check the sign-in page makes), so no
+ * password is ever stored or compared here.
+ */
+export async function passwordMatches(email: string, password: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+    const key = process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!key) throw new Error('FIREBASE_WEB_API_KEY is not set');
+    const r = await fetchImpl(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(key)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, returnSecureToken: false }),
+    });
+    return r.ok;
+}
+
+/**
+ * An administrator signs in with their phone number and password. Returns a custom token for their account, or null
+ * for every kind of failure alike (unknown phone, wrong password, removed or switched off), so the answer never tells
+ * anyone who is registered.
+ */
+export async function phoneSignIn(phoneRaw: unknown, password: unknown, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+    const phone = cleanPhone(phoneRaw);
+    if (!phone || typeof password !== 'string' || !password || password.length > 64) return null;
+    const login = (await db.doc(`staff_login/${phone}`).get()).data() as StaffLogin | undefined;
+    if (!login) return null;
+    const m = (await db.doc(`users/${login.owner_uid}/members/${login.uid}`).get()).data() as ManagedMember | undefined;
+    if (!m || m.status !== 'active' || m.managed !== true) return null;
+    let user: admin.auth.UserRecord;
+    try { user = await admin.auth().getUser(login.uid); } catch { return null; }
+    if (user.disabled || !user.email) return null;
+    if (!(await passwordMatches(user.email, password, fetchImpl))) return null;
+    return admin.auth().createCustomToken(login.uid);
 }

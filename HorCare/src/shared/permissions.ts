@@ -139,4 +139,6 @@ export interface MemberDoc {
   created_by: string;
   /** True when the owner created the sign-in account for this person (email + password) — see api/_member-accounts.ts. */
   managed?: boolean;
+  /** Phone number a managed account may also sign in with (set by the owner at creation). */
+  phone?: string;
 }

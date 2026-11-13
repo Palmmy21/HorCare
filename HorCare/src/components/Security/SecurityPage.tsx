@@ -323,7 +323,7 @@ function MembersTab({ ownerUid, buildings }: SecurityPageProps) {
                             <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap', fontSize: '0.8125rem' }}>
                                 <div style={{ flex: '1 1 180px', minWidth: 0 }}>
                                     <div style={{ fontWeight: 700 }}>{m.display_name}</div>
-                                    <div style={{ color: 'var(--color-gray-500)' }}>{m.email}</div>
+                                    <div style={{ color: 'var(--color-gray-500)' }}>{m.email}{m.phone ? ` · ${m.phone}` : ''}</div>
                                 </div>
                                 <select
                                     className="form-input" style={{ width: 170 }} value={m.role} disabled={busy}

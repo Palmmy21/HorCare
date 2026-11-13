@@ -190,3 +190,5 @@ export function fakeRes() {
     };
     return res;
 }
+/** The password a fake auth user was created or reset with (for faking Firebase Auth's password check). */
+export function authPassword(email: string) { return [...authUsers.values()].find(x => x.email === email)?.password; }

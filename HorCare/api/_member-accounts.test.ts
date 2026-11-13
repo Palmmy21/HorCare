@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).firebaseMock);
 
 import members from './_members.js';
 import staffRegistration from './_staff-registration.js';
-import { addAuthUser, fakeReq, fakeRes, listPaths, read, resetFake, revoked, seed } from './_fake-firestore.js';
+import { addAuthUser, authPassword, fakeReq, fakeRes, listPaths, read, resetFake, revoked, seed } from './_fake-firestore.js';
 import { passwordProblem, validEmail } from './_member-accounts.js';
 
 const OWNER = 'owner-1';
@@ -164,5 +164,62 @@ describe('password reset and removal', () => {
         expect(read(`member_index/${uid}`)).toEqual({ orgs: [] });
         expect(revoked).toContain(uid);
         expect((await call(uid, { action: 'list', building_id: A }, staffRegistration)).statusCode).toBe(403);
+    });
+});
+
+describe('an administrator with a phone number', () => {
+    /** Firebase Auth's password check, faked: the stored password of the fake auth user decides. */
+    const passwordApi = () => vi.fn(async (_url: string, init: { body: string }) => {
+        const { email, password } = JSON.parse(init.body) as { email: string; password: string };
+        const ok = authPassword(email) === password;
+        return { ok, status: ok ? 200 : 400, json: async () => ({}) } as Response;
+    });
+    beforeEach(() => { process.env.VITE_FIREBASE_API_KEY = 'test-key'; vi.stubGlobal('fetch', passwordApi()); });
+    afterEach(() => { vi.unstubAllGlobals(); });
+
+    it('the owner may give a phone at creation; it is kept on the account and indexed for sign-in', async () => {
+        const r = await create({ phone: '081-234-5678' });
+        expect(r.statusCode).toBe(200);
+        expect(r.body.member.phone).toBe('0812345678');
+        const uid = asNew();
+        expect(read(`users/${uid}`)).toMatchObject({ phone: '0812345678', staff_account_of: OWNER });
+        expect(read('staff_login/0812345678')).toEqual({ uid, owner_uid: OWNER, email: 'admin.a@example.com' });
+    });
+
+    it('a bad phone, or one another administrator already signs in with, is refused', async () => {
+        expect((await create({ phone: '12345' })).body.error).toBe('invalid_phone');
+        expect((await create({ phone: '0812345678' })).statusCode).toBe(200);
+        const dup = await create({ email: 'other@example.com', phone: '0812345678' });
+        expect([dup.statusCode, dup.body.error]).toEqual([409, 'phone_exists']);
+        // the phone is optional
+        expect((await create({ email: 'nophone@example.com' })).statusCode).toBe(200);
+    });
+
+    it('signs in with phone + password and gets a token for their own account', async () => {
+        const uid = (await create({ phone: '0812345678' })).body.member.uid as string;
+        const r = await call(null, { action: 'login', phone: '081 234 5678', password: 'Secret123' });
+        expect(r.statusCode).toBe(200);
+        expect(JSON.parse(r.body.token)).toMatchObject({ uid });
+    });
+
+    it('the same refusal for a wrong password, an unknown phone, a removed or a disabled account', async () => {
+        const uid = (await create({ phone: '0812345678' })).body.member.uid as string;
+        expect((await call(null, { action: 'login', phone: '0812345678', password: 'Wrong1234' })).body.error).toBe('invalid_credentials');
+        expect((await call(null, { action: 'login', phone: '0899999999', password: 'Secret123' })).body.error).toBe('invalid_credentials');
+        expect((await call(null, { action: 'login', phone: 'nope', password: 'Secret123' })).statusCode).toBe(400);
+        await call(OWNER, { action: 'update', member_uid: uid, status: 'disabled' });
+        expect((await call(null, { action: 'login', phone: '0812345678', password: 'Secret123' })).statusCode).toBe(401);
+        await call(OWNER, { action: 'update', member_uid: uid, status: 'active' });
+        expect((await call(null, { action: 'login', phone: '0812345678', password: 'Secret123' })).statusCode).toBe(200);
+        await call(OWNER, { action: 'remove', member_uid: uid });
+        expect(read('staff_login/0812345678')).toBeUndefined();
+        expect((await call(null, { action: 'login', phone: '0812345678', password: 'Secret123' })).statusCode).toBe(401);
+    });
+
+    it('guessing is rate-limited per phone', async () => {
+        await create({ phone: '0812345678' });
+        let last = 0;
+        for (let i = 0; i < 9; i++) last = (await call(null, { action: 'login', phone: '0812345678', password: `Guess${i}000` })).statusCode;
+        expect(last).toBe(429);
     });
 });

@@ -3,7 +3,8 @@ import { admin, db } from './_firebase.js';
 import { authorize } from './_rbac.js';
 import { writeAudit } from './_audit.js';
 import { cleanPhone } from '../src/shared/leasing.js';
-import { AccountError, createManagedAccount, indexMember, myMemberships, resetManagedPassword, unindexMember, type ManagedMember } from './_member-accounts.js';
+import { rateLimit, rateLimitBy } from './_abuse-guard.js';
+import { AccountError, createManagedAccount, dropPhoneLogin, indexMember, phoneSignIn, myMemberships, resetManagedPassword, unindexMember, type ManagedMember } from './_member-accounts.js';
 import {
     ASSIGNABLE_ROLES, isRole, permissionsForRole, type MemberDoc, type Role,
 } from '../src/shared/permissions.js';
@@ -11,7 +12,7 @@ import {
 export const config = { maxDuration: 15 };
 
 interface Body {
-    action?: 'list' | 'add' | 'update' | 'remove' | 'create_account' | 'reset_password' | 'my_memberships';
+    action?: 'list' | 'add' | 'update' | 'remove' | 'create_account' | 'reset_password' | 'my_memberships' | 'login';
     display_name?: string;
     password?: string;
     owner_uid?: string;
@@ -50,6 +51,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = (req.body ?? {}) as Body;
     const action = body.action;
 
+    // Public: an administrator signs in with the phone number the owner set up for them (email sign-in needs no API).
+    if (action === 'login') {
+        const phone = cleanPhone(body.phone);
+        if (!phone || typeof body.password !== 'string') { res.status(400).json({ error: 'invalid_input' }); return; }
+        const perPhone = await rateLimitBy(`phone:${phone}`, 'staff_login', 8, 900);
+        const perVisitor = await rateLimit(req, 'staff_login', 30, 900);
+        if (!perPhone.ok || !perVisitor.ok) {
+            res.status(429).json({ error: 'too_many_attempts', retry_after_sec: Math.max(perPhone.retryAfterSec, perVisitor.retryAfterSec) });
+            return;
+        }
+        try {
+            const token = await phoneSignIn(phone, body.password);
+            if (!token) { res.status(401).json({ error: 'invalid_credentials' }); return; }
+            res.status(200).json({ token });
+        } catch (e) {
+            console.error('staff phone login failed', e);
+            res.status(500).json({ error: 'internal_error' });
+        }
+        return;
+    }
+
     // Any signed-in person may ask which organisations they work for (that is how the app knows to open in staff mode).
     if (action === 'my_memberships') {
         const header = req.headers.authorization;
@@ -81,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'create_account' || action === 'reset_password') {
         try {
             if (action === 'create_account') {
-                const member = await createManagedAccount(ownerUid, ctx.uid, { email: body.email, password: body.password, display_name: body.display_name, role: body.role, property_ids: body.property_ids });
+                const member = await createManagedAccount(ownerUid, ctx.uid, { email: body.email, password: body.password, display_name: body.display_name, role: body.role, property_ids: body.property_ids, phone: body.phone });
                 await writeAudit({
                     ownerUid, userId: ctx.uid, userName: ctx.displayName, role: ctx.role, action: 'PERMISSION_CHANGE', resourceType: 'member', resourceId: member.uid,
                     resourceLabel: member.email, after: { role: member.role, property_ids: member.property_ids }, note: 'create administrator account', req,
@@ -206,6 +228,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'remove') {
         await ref.delete();
         await unindexMember(memberUid, ownerUid);
+        await dropPhoneLogin({ ...(before as ManagedMember), uid: memberUid });
         // an account made for this organisation has no other use: lock the sign-in too (reversible by the owner re-adding it)
         if ((before as ManagedMember).managed === true) {
             await admin.auth().updateUser(memberUid, { disabled: true });

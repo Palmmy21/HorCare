@@ -10,6 +10,7 @@ const ERRORS: Record<string, string> = {
   invalid_email: 'อีเมลไม่ถูกต้อง', invalid_name: 'กรุณากรอกชื่อ-นามสกุล (2–80 ตัวอักษร)', invalid_role: 'บทบาทไม่ถูกต้อง',
   password_too_short: 'รหัสผ่านสั้นเกินไป (อย่างน้อย 8 ตัว)', password_too_long: 'รหัสผ่านยาวเกินไป (ไม่เกิน 64 ตัว)', password_too_simple: 'รหัสผ่านต้องมีทั้งตัวอักษรและตัวเลข',
   user_exists: 'อีเมลนี้มีบัญชี HorCare อยู่แล้ว — ใช้ "เพิ่มสมาชิกทีม" ด้านล่างแทน', unknown_property: 'ไม่พบอาคารที่เลือก', invalid_property_ids: 'กรุณาเลือกอาคารอย่างน้อย 1 แห่ง',
+  invalid_phone: 'เบอร์โทรไม่ถูกต้อง (เช่น 0812345678)', phone_exists: 'เบอร์นี้ใช้เข้าสู่ระบบกับบัญชีผู้ดูแลอื่นอยู่แล้ว',
   forbidden: 'เฉพาะเจ้าของเท่านั้นที่สร้างบัญชีได้', unauthenticated: 'กรุณาเข้าสู่ระบบใหม่',
 };
 
@@ -19,24 +20,27 @@ const field: React.CSSProperties = { display: 'flex', flexDirection: 'column', g
 export default function AdminAccountForm({ ownerUid, buildings, onCreated }: { ownerUid: string; buildings: Building[]; onCreated: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState(generatePassword);
   const [show, setShow] = useState(true);
   const [role, setRole] = useState<Role>('property_manager');
   const [scope, setScope] = useState<string[]>([]);
   const [all, setAll] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ email: string; password: string; name: string; scope: string } | null>(null);
+  const [done, setDone] = useState<{ email: string; phone: string; password: string; name: string; scope: string } | null>(null);
 
   const toggle = (id: string) => setScope(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   const scopeNames = all ? 'ทุกอาคาร' : buildings.filter(b => scope.includes(b.id)).map(b => b.name).join(', ');
-  const ready = name.trim().length >= 2 && /^\S+@\S+\.\S{2,}$/.test(email.trim()) && password.length >= 8 && (all || scope.length > 0);
+  const phoneDigits = phone.replace(/\D/g, '');
+  const phoneOk = phone.trim() === '' || /^0\d{8,9}$/.test(phoneDigits);
+  const ready = name.trim().length >= 2 && /^\S+@\S+\.\S{2,}$/.test(email.trim()) && phoneOk && password.length >= 8 && (all || scope.length > 0);
 
   const create = async () => {
     setBusy(true);
     try {
-      await apiPost('members', { owner_uid: ownerUid, action: 'create_account', display_name: name.trim(), email: email.trim(), password, role, property_ids: all ? ['*'] : scope });
-      setDone({ email: email.trim().toLowerCase(), password, name: name.trim(), scope: scopeNames });
-      setName(''); setEmail(''); setPassword(generatePassword()); setScope([]); setAll(false);
+      await apiPost('members', { owner_uid: ownerUid, action: 'create_account', display_name: name.trim(), email: email.trim(), ...(phoneDigits ? { phone: phoneDigits } : {}), password, role, property_ids: all ? ['*'] : scope });
+      setDone({ email: email.trim().toLowerCase(), phone: phoneDigits, password, name: name.trim(), scope: scopeNames });
+      setName(''); setEmail(''); setPhone(''); setPassword(generatePassword()); setScope([]); setAll(false);
       onCreated();
     } catch (e) {
       const err = e as ApiError;
@@ -44,18 +48,23 @@ export default function AdminAccountForm({ ownerUid, buildings, onCreated }: { o
     } finally { setBusy(false); }
   };
 
-  const message = done ? `เข้าสู่ระบบ HorCare\nเว็บ: ${window.location.origin}\nอีเมล: ${done.email}\nรหัสผ่านชั่วคราว: ${done.password}\nดูแล: ${done.scope}\n(กรุณาเปลี่ยนรหัสผ่านหลังเข้าใช้ครั้งแรก)` : '';
+  const message = done ? `เข้าสู่ระบบ HorCare\nเว็บ: ${window.location.origin}\nแท็บ: แอดมิน หรือ staff\nอีเมล: ${done.email}\n${done.phone ? `หรือเบอร์โทร: ${done.phone}\n` : ''}รหัสผ่านชั่วคราว: ${done.password}\nดูแล: ${done.scope}\n(กรุณาเปลี่ยนรหัสผ่านหลังเข้าใช้ครั้งแรก)` : '';
   const copy = async () => { try { await navigator.clipboard.writeText(message); toast.success('คัดลอกแล้ว'); } catch { toast.error('คัดลอกไม่สำเร็จ'); } };
 
   return (
     <div className="card" style={{ padding: '1rem' }}>
-      <div style={{ fontWeight: 700, marginBottom: '0.25rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}><KeyRound size={16} /> สร้างบัญชีผู้ดูแลอาคาร (อีเมล + รหัสผ่าน)</div>
+      <div style={{ fontWeight: 700, marginBottom: '0.25rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}><KeyRound size={16} /> สร้างบัญชีผู้ดูแลอาคาร (อีเมล/เบอร์โทร + รหัสผ่าน)</div>
       <p style={{ margin: '0 0 0.75rem', fontSize: '0.8125rem', color: 'var(--color-gray-500)' }}>
-        ผู้ดูแลเข้าสู่ระบบด้วยอีเมลและรหัสผ่านที่คุณตั้งให้ และเห็น/แก้ไขได้เฉพาะอาคารที่คุณเลือก — ผู้ดูแลตึก A จะไม่เห็นข้อมูลตึก B
+        ผู้ดูแลเข้าสู่ระบบ (แท็บ “แอดมิน หรือ staff”) ด้วยอีเมลหรือเบอร์โทร และรหัสผ่านที่คุณตั้งให้ — ชื่อ อีเมล และเบอร์ที่ตั้งไว้ ผู้ดูแลแก้เองไม่ได้ และเห็น/แก้ไขได้เฉพาะอาคารที่คุณเลือก — ผู้ดูแลตึก A จะไม่เห็นข้อมูลตึก B
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.625rem' }}>
         <label style={field}><span className="form-label">ชื่อ-นามสกุล</span><input className="form-input" value={name} maxLength={80} onChange={e => setName(e.target.value)} /></label>
         <label style={field}><span className="form-label">อีเมล (ใช้เข้าสู่ระบบ)</span><input className="form-input" type="email" autoComplete="off" value={email} onChange={e => setEmail(e.target.value)} placeholder="admin.a@example.com" /></label>
+        <label style={field}>
+          <span className="form-label">เบอร์โทร (ไม่บังคับ — ใช้เข้าสู่ระบบแทนอีเมลได้)</span>
+          <input className="form-input" type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={e => setPhone(e.target.value)} placeholder="0812345678" maxLength={15} />
+          {!phoneOk && <small style={{ color: '#DC2626' }}>เบอร์โทรไม่ถูกต้อง</small>}
+        </label>
         <label style={field}>
           <span className="form-label">รหัสผ่านชั่วคราว</span>
           <div style={{ display: 'flex', gap: 4 }}>

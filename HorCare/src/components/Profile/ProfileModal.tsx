@@ -45,6 +45,8 @@ const ABILITIES: { perm: Permission; label: string }[] = [
 
 export default function ProfileModal({ user, profile, membership, buildings, initialSection = 'profile', onOpenPricing, onClose }: ProfileModalProps) {
   const isOwner = !membership;
+  // an administrator account the owner created keeps the name and phone the owner set up (also enforced by firestore.rules)
+  const locked = membership?.managed === true;
   const startName = profile?.name || profile?.display_name || user.displayName || '';
   const [name, setName] = useState(startName);
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -66,7 +68,7 @@ export default function ProfileModal({ user, profile, membership, buildings, ini
   }, [onClose, saving]);
 
   const saveProfile = async () => {
-    if (!dirty || !name.trim() || !phoneOk) return;
+    if (locked || !dirty || !name.trim() || !phoneOk) return;
     setSaving(true);
     try {
       const clean = name.trim().slice(0, 80);
@@ -119,15 +121,16 @@ export default function ProfileModal({ user, profile, membership, buildings, ini
             <div className="pf-grid">
               <label className="pf-field">
                 <span>ชื่อที่แสดง</span>
-                <input className="form-input" value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="ชื่อ-นามสกุล" />
-                {!name.trim() && <small className="pf-err">กรอกชื่อ</small>}
+                <input className="form-input" value={name} onChange={e => setName(e.target.value)} maxLength={80} placeholder="ชื่อ-นามสกุล" readOnly={locked} disabled={locked} />
+                {!locked && !name.trim() && <small className="pf-err">กรอกชื่อ</small>}
               </label>
               <label className="pf-field">
                 <span>เบอร์โทร</span>
-                <input className="form-input" value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" placeholder="08x-xxx-xxxx" />
-                {!phoneOk && <small className="pf-err">เบอร์โทรไม่ถูกต้อง</small>}
+                <input className="form-input" value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" placeholder={locked ? '—' : '08x-xxx-xxxx'} readOnly={locked} disabled={locked} />
+                {!locked && !phoneOk && <small className="pf-err">เบอร์โทรไม่ถูกต้อง</small>}
               </label>
             </div>
+            {locked && <p className="pf-note">ชื่อ อีเมล และเบอร์โทรตั้งโดย {membership.owner_name || 'เจ้าของบัญชี'} — ติดต่อเจ้าของหากต้องการแก้ไข</p>}
             <dl className="pf-facts">
               <div><dt><Mail size={14} aria-hidden /> อีเมล</dt><dd>{user.email} {user.emailVerified
                 ? <span className="pf-ok"><BadgeCheck size={13} aria-hidden /> ยืนยันแล้ว</span>
@@ -141,11 +144,11 @@ export default function ProfileModal({ user, profile, membership, buildings, ini
                 </dd>
               </div>
             </dl>
-            <div className="pf-actions">
+            {!locked && <div className="pf-actions">
               <button type="button" className="btn btn-primary" onClick={() => void saveProfile()} disabled={!dirty || !name.trim() || !phoneOk || saving}>
                 {saving ? <Loader2 size={16} className="spin" /> : <Check size={16} />} บันทึกโปรไฟล์
               </button>
-            </div>
+            </div>}
           </section>
 
           {/* ── บทบาทและสิทธิ์ ── */}

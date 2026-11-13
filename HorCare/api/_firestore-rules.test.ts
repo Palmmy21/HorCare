@@ -46,3 +46,17 @@ describe('firestore.rules: staff are scoped to their buildings', () => {
     expect(body).toContain('licenseActive(ownerId)');
   });
 });
+
+describe('firestore.rules: an administrator cannot change what the owner set up', () => {
+  it('a profile update refuses name, phone and email changes on an owner-created account', () => {
+    const fn = rules.slice(rules.indexOf('function isWritingStaffSetupFields'), rules.indexOf('function isWritingStaffSetupFields') + 400);
+    expect(fn).toContain("staff_account_of");
+    for (const f of ['name', 'display_name', 'phone', 'email', 'staff_account_of']) expect(fn).toContain(`'${f}'`);
+    const users = statements.find(s => s.ops === 'update' && s.cond.includes('isWritingProtectedFields()'));
+    expect(users?.cond).toContain('!isWritingStaffSetupFields()');
+  });
+
+  it('the phone sign-in index is server-only', () => {
+    expect(rules).toMatch(/match \/staff_login\/\{phone\} \{\s*allow read, write: if false;/);
+  });
+});
