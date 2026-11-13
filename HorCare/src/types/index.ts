@@ -180,6 +180,10 @@ export interface Room {
   status_override?: StatusOverride | null;
   // Bulk-creation / amenity data
   building_name?: string;      // ตึก / อาคาร (free text, e.g. 'A')
+  /** หมวดหมู่ (ห้องพัก / คอนโด / บ้านเช่า / ที่ดิน …); unset = the branch's kind (src/shared/unitCategory.ts). */
+  unit_category?: import('../shared/unitCategory.js').UnitCategory | null;
+  /** Has its own electricity / water meters; unset = by category (land has none). Meterless units bill rent-only. */
+  has_meters?: boolean | null;
   floor?: string;              // ชั้น
   deposit_amount?: number;     // เงินมัดจำมาตรฐานของห้อง
   amenities?: string[];        // amenity ids (see src/utils/amenities.ts) or custom names

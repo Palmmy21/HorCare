@@ -1,8 +1,9 @@
 // Importing rooms (and their tenants) from any spreadsheet: which column is which field, and turning rows into
 // clean records. Pure, shared by the import screen and /api/import-map (which asks the AI for the mapping).
+import { parseUnitCategory, type UnitCategory } from './unitCategory.js';
 
 export const IMPORT_FIELDS = [
-    'room_number', 'floor', 'building_name', 'rent_amount', 'deposit_amount', 'area_sqm',
+    'room_number', 'unit_category', 'floor', 'building_name', 'rent_amount', 'deposit_amount', 'area_sqm',
     'current_meter_elec', 'current_meter_water', 'tenant_name', 'phone', 'move_in_date', 'contract_end_date',
 ] as const;
 export type ImportField = (typeof IMPORT_FIELDS)[number];
@@ -10,7 +11,7 @@ export type ImportField = (typeof IMPORT_FIELDS)[number];
 export type ColumnMapping = (ImportField | null)[];
 
 export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
-    room_number: 'เลขห้อง', floor: 'ชั้น', building_name: 'ตึก/อาคาร', rent_amount: 'ค่าเช่า', deposit_amount: 'เงินมัดจำ',
+    room_number: 'เลขห้อง', unit_category: 'หมวดหมู่ (บ้านเช่า/คอนโด/ที่ดิน…)', floor: 'ชั้น', building_name: 'ตึก/อาคาร', rent_amount: 'ค่าเช่า', deposit_amount: 'เงินมัดจำ',
     area_sqm: 'พื้นที่ (ตร.ม.)', current_meter_elec: 'มิเตอร์ไฟล่าสุด', current_meter_water: 'มิเตอร์น้ำล่าสุด',
     tenant_name: 'ชื่อผู้เช่า', phone: 'เบอร์โทรผู้เช่า', move_in_date: 'วันเข้าอยู่', contract_end_date: 'วันสิ้นสุดสัญญา',
 };
@@ -26,6 +27,7 @@ const KEYWORDS: [ImportField, RegExp][] = [
     ['area_sqm', /พื้นที่|ตร\.?ม|ขนาด|area|sq/i],
     ['phone', /โทร|มือถือ|เบอร์|phone|mobile|tel/i],
     ['tenant_name', /ผู้เช่า|คนเช่า|ผู้พัก|คนพัก|ผู้อยู่|ชื่อ|ลูกค้า|tenant|name|customer|resident/i],
+    ['unit_category', /หมวด|ประเภท|ชนิด|category|propertys*type|^type$/i],
     ['building_name', /ตึก|อาคาร|building|block/i],
     ['floor', /ชั้น|floor|level/i],
     ['room_number', /ห้อง|เลขที่|room|unit|no\.?$|แผง|stall/i],
@@ -122,6 +124,7 @@ export interface ImportRecord {
     room_number: string;
     floor?: string;
     building_name?: string;
+    unit_category?: UnitCategory;
     rent_amount?: number;
     deposit_amount?: number;
     area_sqm?: number;
@@ -156,6 +159,9 @@ export function toImportRecords(rows: string[][], mapping: ColumnMapping): { rec
         }
         if (get('floor')) rec.floor = get('floor').replace(/\.0+$/, '').slice(0, 20);
         if (get('building_name')) rec.building_name = get('building_name').slice(0, 40);
+        const category = parseUnitCategory(get('unit_category'));
+        if (category === undefined) bad.push('หมวดหมู่');
+        else if (category) rec.unit_category = category;
 
         const name = get('tenant_name').replace(/\s+/g, ' ').slice(0, 100);
         const phone = parsePhone(get('phone'));

@@ -3590,6 +3590,11 @@ textarea,
 .imp-drop span { font-size: 0.8125rem; max-width: 40ch; }
 .imp-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .imp-privacy { margin-top: var(--space-3); }
+.imp-template { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md, 10px); background: var(--color-gray-50, #F4F7FB); }
+.imp-template > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 240px; }
+.imp-template strong { font-size: 0.875rem; }
+.imp-template span { font-size: 0.78rem; color: var(--color-text-muted); line-height: 1.5; }
+.imp-template .btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .imp-source { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin-bottom: var(--space-3); font-size: 0.875rem; font-weight: 600; color: var(--color-primary); }
 .imp-file { margin-left: auto; font-weight: 400; color: var(--color-gray-500); }
 .imp-table-wrap { overflow-x: auto; border: 1px solid var(--color-gray-200); border-radius: var(--radius-lg); }
@@ -6605,6 +6610,8 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
 .re-modal .form-input.is-invalid { border-color: var(--color-danger); }
 .re-error { font-size: 0.8125rem; color: var(--color-danger); }
 .re-hint { margin: 0; font-size: 0.75rem; color: var(--color-text-muted); line-height: 1.5; }
+.re-check-row { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 0.9rem; cursor: pointer; }
+.re-check-row input { width: 20px; height: 20px; accent-color: var(--color-primary, #0F4C81); }
 .re-ic-elec { color: var(--color-warning-light); }
 .re-ic-water { color: var(--color-primary); }
 
@@ -6717,3 +6724,23 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
 
 /* team OA: LIFF registration */
 .oa-liff { margin-top: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--color-gray-100); }
+
+/* ===== Unit categories (one branch, several kinds of property) ===== */
+.unit-cat-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 0.625rem; padding-top: 0.625rem; border-top: 1px solid var(--color-border, #DCE5EF); }
+.unit-cat-filter button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0.25rem 0.75rem; border-radius: 999px; border: 1px solid var(--color-border, #DCE5EF); background: var(--color-white, #fff); color: var(--color-text, #29435E); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.unit-cat-filter button span { font-size: 0.72rem; font-weight: 700; color: var(--color-text-muted, #557089); background: var(--color-gray-100, #EBF1F7); border-radius: 999px; padding: 0 6px; }
+.unit-cat-filter button.is-on { background: var(--color-primary, #0F4C81); border-color: var(--color-primary, #0F4C81); color: #fff; }
+.unit-cat-filter button.is-on span { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.unit-cat-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--color-gray-100, #EBF1F7); color: var(--color-text-muted, #557089); white-space: nowrap; }
+.cat-breakdown { margin-bottom: var(--space-5); }
+.cat-breakdown-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+.cat-breakdown-head .card-title { display: inline-flex; align-items: center; gap: 0.5rem; }
+.cat-breakdown-total { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cat-breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.625rem; }
+.cat-tile { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 0.75rem 0.875rem; border-radius: 12px; border: 1px solid var(--color-border, #DCE5EF); background: var(--color-white, #fff); color: var(--color-text, #29435E); cursor: pointer; min-width: 0; }
+.cat-tile:hover { border-color: var(--color-primary, #0F4C81); }
+.cat-tile-name { font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted, #557089); }
+.cat-tile-amount { font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cat-tile-meta { font-size: 0.72rem; color: var(--color-text-muted, #557089); }
+.cat-tile-bar { display: block; height: 4px; border-radius: 2px; background: var(--color-gray-100, #EBF1F7); overflow: hidden; margin-top: 4px; }
+.cat-tile-bar > span { display: block; height: 100%; background: #15803D; }

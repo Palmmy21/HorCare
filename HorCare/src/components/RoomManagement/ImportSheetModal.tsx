@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
-import { FileSpreadsheet, Loader2, Sparkles, Upload, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, Loader2, Sparkles, Upload, X, AlertTriangle, CheckCircle2, Download } from 'lucide-react';
 import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { apiPost } from '../../utils/api';
 import { readSheet } from '../../utils/sheetReader';
 import { logActivity } from '../../utils/auditLog';
+import { downloadXlsx } from '../../utils/xlsxWriter';
+import { importTemplateSheets } from '../../shared/importTemplate';
+import { UNIT_CATEGORY_LABELS } from '../../shared/unitCategory';
 import {
     guessMapping, IMPORT_FIELD_LABELS, IMPORT_FIELDS, maskCell, toImportRecords, type ColumnMapping, type ImportField, type ImportRecord,
 } from '../../shared/importMapping';
@@ -28,7 +31,7 @@ const READ_ERRORS: Record<string, string> = {
     bad_file: 'อ่านไฟล์ไม่ได้ ไฟล์อาจเสียหรือมีรหัสผ่าน',
 };
 
-const ROOM_FIELDS = ['floor', 'building_name', 'rent_amount', 'deposit_amount', 'area_sqm', 'current_meter_elec', 'current_meter_water'] as const;
+const ROOM_FIELDS = ['unit_category', 'floor', 'building_name', 'rent_amount', 'deposit_amount', 'area_sqm', 'current_meter_elec', 'current_meter_water'] as const;
 
 /** Import rooms (and their tenants) from any Excel / CSV: the AI matches the columns, the owner checks, then saves. */
 export default function ImportSheetModal({ uid, buildingId, rooms, remainingSlots, unitName, onBulkCreate, onUpdateRoom, onClose, onDone }: Props) {
@@ -123,6 +126,11 @@ export default function ImportSheetModal({ uid, buildingId, rooms, remainingSlot
     const headers = rows?.[0] ?? [];
     const samples = rows?.slice(1, 4) ?? [];
     const withTenant = result?.records.filter(r => r.tenant).length ?? 0;
+    const byCategory = (() => {
+        const counts = new Map<string, number>();
+        for (const r of result?.records ?? []) if (r.unit_category) counts.set(UNIT_CATEGORY_LABELS[r.unit_category], (counts.get(UNIT_CATEGORY_LABELS[r.unit_category]) ?? 0) + 1);
+        return [...counts].map(([k, n]) => `${k} ${n}`).join(' · ');
+    })();
 
     return (
         <div className="modal-overlay" onClick={stage === 'saving' ? undefined : onClose}>
@@ -141,6 +149,15 @@ export default function ImportSheetModal({ uid, buildingId, rooms, remainingSlot
                             <input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                 onChange={e => { const f = e.target.files?.[0]; if (f) void pick(f); e.target.value = ''; }} />
                         </label>
+                        <div className="imp-template">
+                            <div>
+                                <strong>ยังไม่มีไฟล์? ใช้ไฟล์ตัวอย่างของเรา</strong>
+                                <span>มีหัวคอลัมน์ครบ ตัวอย่างการกรอก และคำอธิบาย ใส่ห้องพัก คอนโด บ้านเช่า ที่ดิน รวมในไฟล์เดียวได้</span>
+                            </div>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => downloadXlsx('HorCare-แบบฟอร์มนำเข้าข้อมูล.xlsx', importTemplateSheets())}>
+                                <Download size={15} aria-hidden /> ดาวน์โหลดไฟล์ตัวอย่าง
+                            </button>
+                        </div>
                         <p className="form-hint imp-privacy">ไฟล์ถูกอ่านในเครื่องของคุณ AI เห็นแค่ชื่อคอลัมน์และรูปแบบข้อมูล (ปิดบังแล้ว) ไม่เห็นชื่อหรือเบอร์โทรจริง</p>
                         {error && <p className="imp-error" role="alert">{error}</p>}
                     </div>
@@ -179,6 +196,7 @@ export default function ImportSheetModal({ uid, buildingId, rooms, remainingSlot
 
                             <ul className="imp-summary">
                                 <li><CheckCircle2 size={15} aria-hidden /> พร้อมนำเข้า {result.records.length} {unitName} (ใหม่ {newCount}, อัปเดต {result.records.length - newCount}){withTenant ? ` · พร้อมข้อมูลผู้เช่า ${withTenant} ราย` : ''}</li>
+                                {byCategory && <li><CheckCircle2 size={15} aria-hidden /> แยกหมวดหมู่: {byCategory}</li>}
                                 {overLimit > 0 && <li className="imp-warn"><AlertTriangle size={15} aria-hidden /> เกินจำนวนที่แพ็กเกจรองรับ {overLimit} {unitName} จะข้ามไป</li>}
                                 {result.problems.slice(0, 6).map(p => <li key={p.line} className="imp-warn"><AlertTriangle size={15} aria-hidden /> แถว {p.line}: {p.message}</li>)}
                                 {result.problems.length > 6 && <li className="imp-warn">…และอีก {result.problems.length - 6} แถวที่มีปัญหา (จะข้ามไป)</li>}

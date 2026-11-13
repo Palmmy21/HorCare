@@ -9,6 +9,9 @@ import { formatCurrency } from '../../utils/calculations';
 import { LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
 import { defaultRentType, getWorkspaceTerms, rentTypeLabel, rentTypeOptions } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
+import { downloadXlsx } from '../../utils/xlsxWriter';
+import { importTemplateSheets } from '../../shared/importTemplate';
+import { UNIT_CATEGORY_LABELS, categoriesInUse, categoryOf, unitHasMeters, type UnitCategory } from '../../shared/unitCategory';
 
 interface RoomManagementProps {
     rooms: Room[];
@@ -61,8 +64,14 @@ export default function RoomManagement({
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState<'all' | 'dormitory' | 'commercial'>('all');
     const [filterLine, setFilterLine] = useState<'all' | 'linked' | 'unlinked'>('all');
+    const [filterCat, setFilterCat] = useState<'all' | UnitCategory>('all');
+    // a branch holding several kinds of property (houses, condos, land…) gets a filter and a badge per unit
+    const cats = categoriesInUse(rooms, config?.building_type);
+    const mixed = cats.length > 1;
+    const catCount = (c: UnitCategory) => rooms.filter(r => categoryOf(r, config?.building_type) === c).length;
 
     const filteredRooms = rooms.filter(r => {
+        if (filterCat !== 'all' && categoryOf(r, config?.building_type) !== filterCat) return false;
         const matchSearch = searchQuery === '' || r.room_number.toLowerCase().includes(searchQuery.toLowerCase());
         const matchType = filterType === 'all' || (r.room_type || 'dormitory') === filterType;
         const matchLine = filterLine === 'all'
@@ -70,7 +79,7 @@ export default function RoomManagement({
             : filterLine === 'linked' ? !!r.line_user_id : !r.line_user_id;
         return matchSearch && matchType && matchLine;
     });
-    const isFiltering = searchQuery !== '' || filterType !== 'all' || filterLine !== 'all';
+    const isFiltering = searchQuery !== '' || filterType !== 'all' || filterLine !== 'all' || filterCat !== 'all';
 
     const hasAnyCommercial = rooms.some(r => (r.room_type || 'dormitory') === 'commercial');
 
@@ -131,28 +140,19 @@ export default function RoomManagement({
         setShowBulkDeleteConfirm(false);
     };
 
-    // ── CSV export template ────────────────────────────────────────────────────
+    // ── Excel template: the import's own columns; the branch's units already filled in, to edit and import back ──
     const exportTemplate = () => {
-        const header = ['ห้อง', 'ค่าเช่า', 'จำนวนผู้เช่า', 'ประเภทห้อง', 'ประเภทค่าเช่า', 'มิเตอร์ไฟเริ่มต้น', 'มิเตอร์น้ำเริ่มต้น'];
-        const dataRows = rooms.map(r => [
-            r.room_number,
-            r.rent_amount,
-            r.tenant_count ?? 1,
-            r.room_type === 'commercial' ? 'commercial' : 'dormitory',
-            r.rent_type === 'semester' ? 'semester' : 'monthly',
-            r.current_meter_elec ?? 0,
-            r.current_meter_water ?? 0,
-        ]);
-        // Append a blank example row if no rooms exist yet
-        if (dataRows.length === 0) dataRows.push(['101', config.room_rent, 1, 'dormitory', 'monthly', 0, 0]);
-        const csv = [header, ...dataRows]
-            .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-            .join('\n');
-        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'rooms_template.csv';
-        a.click();
+        const units = [...rooms]
+            .sort((x, y) => x.room_number.localeCompare(y.room_number, 'th', { numeric: true }))
+            .map(r => ({
+                room_number: r.room_number,
+                category: UNIT_CATEGORY_LABELS[categoryOf(r, config?.building_type)],
+                building_name: r.building_name, floor: r.floor, rent_amount: r.rent_amount, deposit_amount: r.deposit_amount,
+                area_sqm: r.area_sqm,
+                current_meter_elec: unitHasMeters(r, config?.building_type) ? r.current_meter_elec : null,
+                current_meter_water: unitHasMeters(r, config?.building_type) ? r.current_meter_water : null,
+            }));
+        downloadXlsx(units.length ? 'HorCare-ข้อมูลยูนิต.xlsx' : 'HorCare-แบบฟอร์มนำเข้าข้อมูล.xlsx', importTemplateSheets(units));
     };
 
     return (
@@ -221,7 +221,7 @@ export default function RoomManagement({
                     <button
                         className="btn btn-outline btn-sm"
                         onClick={exportTemplate}
-                        title="ดาวน์โหลด Template CSV"
+                        title={rooms.length ? `ดาวน์โหลดไฟล์ Excel ที่มี${terms.unitName}ทั้งหมด แก้แล้วนำเข้ากลับได้` : 'ดาวน์โหลดแบบฟอร์ม Excel สำหรับนำเข้าข้อมูล'}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}
                     >
                         <Download size={15} /> Template
@@ -408,7 +408,7 @@ export default function RoomManagement({
                     </div>
                     {/* Clear */}
                     {isFiltering && (
-                        <button onClick={() => { setSearchQuery(''); setFilterType('all'); setFilterLine('all'); }}
+                        <button onClick={() => { setSearchQuery(''); setFilterType('all'); setFilterLine('all'); setFilterCat('all'); }}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.625rem',
                                 borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600,
@@ -423,6 +423,18 @@ export default function RoomManagement({
                         {filteredRooms.length}/{rooms.length} {terms.unitName}
                     </span>
                 </div>
+                {mixed && (
+                    <div className="unit-cat-filter" role="group" aria-label="หมวดหมู่">
+                        <button type="button" className={filterCat === 'all' ? 'is-on' : ''} onClick={() => setFilterCat('all')}>
+                            ทุกหมวดหมู่ <span>{rooms.length}</span>
+                        </button>
+                        {cats.map(c => (
+                            <button key={c} type="button" className={filterCat === c ? 'is-on' : ''} onClick={() => setFilterCat(c)}>
+                                {UNIT_CATEGORY_LABELS[c]} <span>{catCount(c)}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {offCycle.length > 0 && (
@@ -539,6 +551,7 @@ export default function RoomManagement({
                                         <td>
                                             <div className="flex items-center gap-2">
                                                 <span className="mono font-bold">{room.room_number}</span>
+                                                {mixed && <span className="unit-cat-badge">{UNIT_CATEGORY_LABELS[categoryOf(room, config?.building_type)]}</span>}
                                                 {room.language ? (
                                                     <span
                                                         title={`ภาษารับบิล: ${LANGUAGE_MAP[room.language]?.nativeName} (${LANGUAGE_MAP[room.language]?.name})`}
@@ -592,8 +605,8 @@ export default function RoomManagement({
                                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{room.rent_type === 'semester' || room.rent_type === 'yearly' ? <CalendarDays size={12} /> : <CalendarCheck size={12} />} {rentTypeLabel(room.rent_type, config?.building_type)}</span>
                                             </span>
                                         </td>
-                                        {terms.usesMeters && <td className="text-right mono">{room.current_meter_elec.toLocaleString()}</td>}
-                                        {terms.usesMeters && <td className="text-right mono">{room.current_meter_water.toLocaleString()}</td>}
+                                        {terms.usesMeters && <td className="text-right mono">{unitHasMeters(room, config?.building_type) ? room.current_meter_elec.toLocaleString() : <span className="text-muted" title="ไม่มีมิเตอร์">—</span>}</td>}
+                                        {terms.usesMeters && <td className="text-right mono">{unitHasMeters(room, config?.building_type) ? room.current_meter_water.toLocaleString() : <span className="text-muted" title="ไม่มีมิเตอร์">—</span>}</td>}
                                         {hasAnyCommercial && (
                                             <td className="text-center" style={{ fontSize: '0.75rem' }}>
                                                 {(room.room_type || 'dormitory') === 'commercial' ? (

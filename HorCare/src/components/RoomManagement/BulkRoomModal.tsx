@@ -7,6 +7,7 @@ import {
 } from '../../utils/bulkRooms';
 import { BUILTIN_AMENITIES } from '../../utils/amenities';
 import { defaultRentType, getWorkspaceTerms, rentTypeOptions, rentUnitLabel } from '../../utils/workspaceTerminology';
+import { UNIT_CATEGORIES, UNIT_CATEGORY_LABELS, defaultCategoryFor, type UnitCategory } from '../../shared/unitCategory';
 
 interface BulkRoomModalProps {
     existingRooms: Room[];
@@ -35,6 +36,7 @@ export default function BulkRoomModal({
     const [padWidth, setPadWidth] = useState('0');
     const [buildingName, setBuildingName] = useState('');
     const [floor, setFloor] = useState('');
+    const [category, setCategory] = useState<UnitCategory>(defaultCategoryFor(config.building_type));
     const [roomType, setRoomType] = useState<'dormitory' | 'commercial'>(
         config.building_type === 'commercial' ? 'commercial' : 'dormitory',
     );
@@ -92,6 +94,7 @@ export default function BulkRoomModal({
                 room_status: status,
                 ...(buildingName.trim() ? { building_name: buildingName.trim() } : {}),
                 ...(floor.trim() ? { floor: floor.trim() } : {}),
+                ...(category !== defaultCategoryFor(config.building_type) ? { unit_category: category } : {}),
                 ...(deposit !== '' ? { deposit_amount: Number(deposit) || 0 } : {}),
                 ...(terms.usesMeters && elecRate !== '' ? { custom_electricity_rate: Number(elecRate) || 0 } : {}),
                 ...(terms.usesMeters && waterRate !== '' ? { custom_water_config: { type: 'normal' as const, unit_rate: Number(waterRate) || 0 } } : {}),
@@ -183,6 +186,12 @@ export default function BulkRoomModal({
                     <section>
                         <div className="form-label" style={{ marginBottom: '0.5rem', fontWeight: 700 }}>ตำแหน่งและประเภท</div>
                         <div style={grid}>
+                            <label style={field}>
+                                <span className="form-label">หมวดหมู่</span>
+                                <select className="form-input" value={category} onChange={e => setCategory(e.target.value as UnitCategory)}>
+                                    {UNIT_CATEGORIES.map(c => <option key={c} value={c}>{UNIT_CATEGORY_LABELS[c]}</option>)}
+                                </select>
+                            </label>
                             <label style={field}>
                                 <span className="form-label">ตึก / อาคาร</span>
                                 <input className="form-input" value={buildingName} onChange={e => setBuildingName(e.target.value)} />

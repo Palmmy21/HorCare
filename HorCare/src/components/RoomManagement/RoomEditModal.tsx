@@ -7,6 +7,7 @@ import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
 import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
 import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
 import { getWorkspaceTerms, rentTypeOptions } from '../../utils/workspaceTerminology';
+import { UNIT_CATEGORIES, UNIT_CATEGORY_LABELS, categoryOf, defaultCategoryFor, unitHasMeters, type UnitCategory } from '../../shared/unitCategory';
 
 interface RoomEditModalProps {
     room: Room;
@@ -38,6 +39,9 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
     const [feeOverrides, setFeeOverrides] = useState<FeeOverrides>(room.common_fee_overrides || {});
     const [language, setLanguage] = useState<BillLanguage | ''>(room.language || '');
     const [amenities, setAmenities] = useState<string[]>(room.amenities || []);
+    const [category, setCategory] = useState<UnitCategory>(categoryOf(room, config?.building_type));
+    // undefined = by category (land has no meters); a tick is the owner's own choice
+    const [hasMeters, setHasMeters] = useState<boolean>(unitHasMeters(room, config?.building_type));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [confirmUnlink, setConfirmUnlink] = useState(false);
@@ -73,6 +77,9 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
             common_fee_overrides: feeOverrides,
             language: language ? (language as BillLanguage) : undefined,
             amenities,
+            // the branch's own kind is stored as null (= follow the branch) so changing the branch type later still carries these units
+            unit_category: category === defaultCategoryFor(config?.building_type) ? null : category,
+            has_meters: hasMeters === unitHasMeters({ unit_category: category }, config?.building_type) ? null : hasMeters,
         };
         setSaving(true);
         setError('');
@@ -164,6 +171,32 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
                                 </div>
                             </div>
                         )}
+
+                        <div className="re-grid">
+                            <label className="re-field">
+                                <span className="re-label">หมวดหมู่</span>
+                                <select
+                                    className="form-input"
+                                    value={category}
+                                    onChange={e => {
+                                        const next = e.target.value as UnitCategory;
+                                        setCategory(next);
+                                        setHasMeters(unitHasMeters({ unit_category: next }, config?.building_type));
+                                    }}
+                                >
+                                    {UNIT_CATEGORIES.map(c => <option key={c} value={c}>{UNIT_CATEGORY_LABELS[c]}</option>)}
+                                </select>
+                                <span className="re-hint">ใช้แยกดูและสรุปยอดตามประเภททรัพย์ในสาขาเดียวกัน</span>
+                            </label>
+                            <label className="re-field re-check">
+                                <span className="re-label">มิเตอร์</span>
+                                <span className="re-check-row">
+                                    <input type="checkbox" checked={hasMeters} onChange={e => setHasMeters(e.target.checked)} />
+                                    <span>มีมิเตอร์ไฟ/น้ำของตัวเอง</span>
+                                </span>
+                                <span className="re-hint">{hasMeters ? 'จดมิเตอร์และคิดค่าน้ำไฟตามปกติ' : 'ไม่ต้องจดมิเตอร์ ออกบิลเฉพาะค่าเช่า+ค่าบริการ'}</span>
+                            </label>
+                        </div>
 
                         {terms.isMarket && (
                             <div className="re-grid re-grid-3">

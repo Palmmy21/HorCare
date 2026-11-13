@@ -28,6 +28,8 @@ import { isAdminUser } from './shared/admin';
 import { setAuditContext, logActivity, logActivityAsync } from './utils/auditLog';
 import { billsInWing, hasWings, monthStatsOf, roomsInWing, validWing, wingsOf } from './shared/wings';
 import WingBar from './components/Building/WingBar';
+import CategoryBreakdown from './components/Building/CategoryBreakdown';
+import { UNIT_CATEGORY_LABELS, categoriesInUse, categoryOf, unitHasMeters, type UnitCategory } from './shared/unitCategory';
 // Core pages — always needed, load eagerly
 import Dashboard from './components/Dashboard/Dashboard';
 import QuickStart from './components/Dashboard/QuickStart';
@@ -171,6 +173,10 @@ function App() {
   // ตึกย่อยที่เลือกดู ต่อหอ (property id → building_name); empty = every building
   const [wingChoice, setWingChoice] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem('horcare_wing_v1') || '{}'); } catch { return {}; }
+  });
+  // หมวดหมู่ที่เลือกดู ต่อหอ (property id → unit category); empty = every kind
+  const [catChoice, setCatChoice] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('horcare_unitcat_v1') || '{}'); } catch { return {}; }
   });
   // a room tapped on the Dashboard's room map: the Tenants page opens its profile on arrival
   const [tenantRoomToOpen, setTenantRoomToOpen] = useState<string | null>(null);
@@ -573,10 +579,29 @@ function App() {
   // One building of the property at a time (ตึก A / ตึก B), when its rooms name more than one
   const wings = hasWings(rooms) ? wingsOf(rooms) : [];
   const activeWing = validWing(activeBuildingId ? wingChoice[activeBuildingId] : null, rooms);
-  const scopedRooms = useMemo(() => roomsInWing(rooms, activeWing), [rooms, activeWing]);
-  const scopedBills = useMemo(() => (activeWing ? billsInWing(bills, scopedRooms) : bills), [activeWing, bills, scopedRooms]);
-  const scopedStats = activeWing ? monthStatsOf(scopedRooms, scopedBills, currentMonth) : stats;
-  const scopedMonthBills = activeWing ? scopedBills.filter(b => b.month === currentMonth) : monthBills;
+  // …and one kind of property at a time (บ้านเช่า / คอนโด / ที่ดิน), when the branch holds more than one
+  const unitCats = categoriesInUse(rooms, config?.building_type);
+  const savedCat = activeBuildingId ? catChoice[activeBuildingId] : undefined;
+  const activeCat = unitCats.length > 1 && unitCats.includes(savedCat as UnitCategory) ? (savedCat as UnitCategory) : null;
+  const scoped = !!(activeWing || activeCat);
+  const scopedRooms = useMemo(() => {
+    const inWing = roomsInWing(rooms, activeWing);
+    return activeCat ? inWing.filter(r => categoryOf(r, config?.building_type) === activeCat) : inWing;
+  }, [rooms, activeWing, activeCat, config?.building_type]);
+  const scopedBills = useMemo(() => (scoped ? billsInWing(bills, scopedRooms) : bills), [scoped, bills, scopedRooms]);
+  const scopedStats = scoped ? monthStatsOf(scopedRooms, scopedBills, currentMonth) : stats;
+  const scopedMonthBills = scoped ? scopedBills.filter(b => b.month === currentMonth) : monthBills;
+  // units without meters (land…) are billed rent-only, so the meter rounds never list them
+  const meterRooms = useMemo(() => scopedRooms.filter(r => unitHasMeters(r, config?.building_type)), [scopedRooms, config?.building_type]);
+  const chooseCat = (cat: string | null) => {
+    if (!activeBuildingId) return;
+    setCatChoice(prev => {
+      const next = { ...prev };
+      if (cat) next[activeBuildingId] = cat; else delete next[activeBuildingId];
+      try { localStorage.setItem('horcare_unitcat_v1', JSON.stringify(next)); } catch { /* storage blocked: choice lasts this session */ }
+      return next;
+    });
+  };
   const chooseWing = (wing: string | null) => {
     if (!activeBuildingId) return;
     setWingChoice(prev => {
@@ -1708,6 +1733,16 @@ function App() {
         {wings.length > 0 && !maidSession && WING_VIEWS.includes(currentView) && (
           <WingBar wings={wings} active={activeWing} onChange={chooseWing} />
         )}
+        {unitCats.length > 1 && !maidSession && WING_VIEWS.includes(currentView) && (
+          <WingBar
+            wings={unitCats} active={activeCat} onChange={chooseCat}
+            label="หมวดหมู่" allLabel="ทุกหมวดหมู่" ariaLabel="เลือกหมวดหมู่" icon="category"
+            format={c => UNIT_CATEGORY_LABELS[c as UnitCategory] ?? c}
+          />
+        )}
+        {currentView === 'dashboard' && unitCats.length > 1 && !activeCat && !maidSession && (
+          <CategoryBreakdown rooms={roomsInWing(rooms, activeWing)} bills={bills} month={currentMonth} buildingType={config?.building_type} onPick={chooseCat} />
+        )}
         {/* Browser Notification Permission Banner */}
         {user && notifPermission === 'default' && !dismissedNotifBanner && (
           <div style={{
@@ -1922,7 +1957,7 @@ function App() {
 
         {currentView === 'recording' && (
           <MeterRecording
-            rooms={scopedRooms}
+            rooms={meterRooms}
             config={config}
             commonFees={commonFees}
             currentMonth={currentMonth}
