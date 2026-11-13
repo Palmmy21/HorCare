@@ -51,10 +51,10 @@ export function firstOpenView(order: string[], permissions: readonly Permission[
   return order.find(v => canOpenView(v, permissions)) ?? 'dashboard';
 }
 
-/** Tabs of ระบบจัดการ. แจ้งซ่อม / ใบงาน / งานแม่บ้าน used to be screens of their own. */
-export type OpsTab = 'maintenance' | 'workorders' | 'cleaning' | 'team' | 'vendors' | 'stock' | 'assets' | 'expenses' | 'fines' | 'common_fees';
+/** Tabs of ระบบจัดการ. แจ้งซ่อม / งานแม่บ้าน used to be screens of their own (ใบงาน was removed; links to it open แจ้งซ่อม). */
+export type OpsTab = 'maintenance' | 'cleaning' | 'team' | 'vendors' | 'stock' | 'assets' | 'expenses' | 'fines' | 'common_fees';
 
-const SERVICE_TAB_VIEW: Partial<Record<OpsTab, string>> = { maintenance: 'maintenance', workorders: 'workorders', cleaning: 'cleaning', team: 'workorders' };
+const SERVICE_TAB_VIEW: Partial<Record<OpsTab, string>> = { maintenance: 'maintenance', cleaning: 'cleaning', team: 'workorders' };
 
 /**
  * The service tabs follow the permissions of the screens they replaced, so staff keep exactly the access they had;

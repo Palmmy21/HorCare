@@ -257,7 +257,14 @@ service cloud.firestore {
         match /maintenance/{reqId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId);
           allow update, delete: if (isOwner(userId) && isNotBanned()) || memberHasPermOn(userId, buildingId, 'work_order.update');
-          allow create: if false;
+          // Tenants report through /api/portal; the owner and staff who take repair calls may add one themselves:
+          // a new, open request with the reporting fields only (assignment and completion come later as updates).
+          allow create: if (ownerWrites(userId) || memberCan(userId, buildingId, 'work_order.create') || memberCan(userId, buildingId, 'work_order.update'))
+                        && request.resource.data.keys().hasOnly(['id', 'room_id', 'room_number', 'category', 'description', 'urgency', 'status', 'created_by', 'created_at', 'updated_at'])
+                        && request.resource.data.status == 'open'
+                        && request.resource.data.id == reqId
+                        && request.resource.data.urgency in ['normal', 'urgent']
+                        && request.resource.data.description is string && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 1000;
         }
 
         // ── Cleaning requests (งานทำความสะอาด/แม่บ้าน) ────────────────────
@@ -265,7 +272,8 @@ service cloud.firestore {
         // complete jobs that are open or assigned to them.
         match /cleaning/{reqId} {
           allow read: if (isOwner(userId) && isNotBanned()) || memberOn(userId, buildingId) || isHousekeeper(userId, buildingId);
-          allow create: if ownerWrites(userId) || memberCan(userId, buildingId, 'work_order.update') || memberCan(userId, buildingId, 'property.update');
+          // the front desk (work_order.create) takes housekeeping requests too
+          allow create: if ownerWrites(userId) || memberCan(userId, buildingId, 'work_order.create') || memberCan(userId, buildingId, 'work_order.update') || memberCan(userId, buildingId, 'property.update');
           allow update: if ownerWrites(userId) || memberCan(userId, buildingId, 'work_order.update') || memberCan(userId, buildingId, 'property.update')
                         || (housekeeperWrites(userId, buildingId)
                             && changesOnly(['status', 'accepted_at', 'assigned_maid_id', 'assigned_maid_name', 'assigned_maid_phone',

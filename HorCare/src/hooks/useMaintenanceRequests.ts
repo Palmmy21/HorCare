@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { collection, doc, onSnapshot, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { MaintenanceRequest, MaintenancePartUsed, StockItem, Asset, AssetCondition, Vendor } from '../types';
 import { raiseTeamAlert } from '../utils/alerts';
@@ -78,12 +78,25 @@ export function useMaintenanceRequests(
     });
   };
 
+  /** A repair the front desk / owner adds themselves (a phone call, a walk-in, something seen on a round). */
+  const addRequest = async (data: Pick<MaintenanceRequest, 'room_id' | 'room_number' | 'category' | 'description' | 'urgency'>) => {
+    if (!buildingPath || !uid || !buildingId) return;
+    const ref = doc(collection(db, buildingPath, 'maintenance'));
+    const now = new Date().toISOString();
+    await setDoc(ref, { ...data, id: ref.id, status: 'open', created_by: 'admin', created_at: now, updated_at: now });
+    raiseTeamAlert({
+      ownerUid: uid, buildingId, type: 'maintenance', roomNumber: data.room_number,
+      title: `🔧 แจ้งซ่อมใหม่ ห้อง ${data.room_number}${data.urgency === 'urgent' ? ' (ด่วน)' : ''}`, body: data.description.slice(0, 120),
+    });
+    return ref.id;
+  };
+
   const deleteRequest = async (reqId: string) => {
     if (!buildingPath) return;
     await deleteDoc(doc(db, buildingPath, 'maintenance', reqId));
   };
 
-  return { requests, loading, updateStatus, completeRequest, deleteRequest };
+  return { requests, loading, addRequest, updateStatus, completeRequest, deleteRequest };
 }
 
 // ── Stock hook (for use in MaintenancePage completion panel) ──────────────────

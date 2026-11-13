@@ -9,7 +9,8 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useMaintenanceRequests, useStockItems, useAssets, useVendors } from '../../hooks/useMaintenanceRequests';
-import type { MaintenanceRequest, MaintenanceCategory, MaintenanceStatus, AssetCondition, MaintenancePartUsed } from '../../types';
+import type { MaintenanceRequest, MaintenanceCategory, MaintenanceStatus, AssetCondition, MaintenancePartUsed, Room } from '../../types';
+import AddMaintenanceModal from './AddMaintenanceModal';
 
 // ── Lazy photo loader ─────────────────────────────────────────────────────────
 function MaintenancePhoto({ uid, buildingId, reqId }: { uid: string; buildingId: string; reqId: string }) {
@@ -115,11 +116,16 @@ interface AssignState {
 }
 const EMPTY_ASSIGN: AssignState = { vendorId: '', vendorName: '', vendorPhone: '', scheduledDate: '' };
 
-interface Props { uid: string; buildingId: string; /** Shown as a tab of ระบบจัดการ: no page title */ embedded?: boolean }
+interface Props {
+  uid: string; buildingId: string; /** Shown as a tab of ระบบจัดการ: no page title */ embedded?: boolean;
+  /** Rooms of the building, for adding a repair from the office. */
+  rooms?: Room[]; unitName?: string;
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function MaintenancePage({ uid, buildingId, embedded = false }: Props) {
-  const { requests, loading, updateStatus, completeRequest, deleteRequest } = useMaintenanceRequests(uid, buildingId);
+export default function MaintenancePage({ uid, buildingId, embedded = false, rooms = [], unitName = 'ห้อง' }: Props) {
+  const { requests, loading, addRequest, updateStatus, completeRequest, deleteRequest } = useMaintenanceRequests(uid, buildingId);
+  const [adding, setAdding] = useState(false);
   const { items: stockItems, decrementMany } = useStockItems(uid, buildingId);
   const { assets, updateCondition } = useAssets(uid, buildingId);
   const { vendors } = useVendors(uid, buildingId);
@@ -246,6 +252,13 @@ export default function MaintenancePage({ uid, buildingId, embedded = false }: P
         </div>
       )}
 
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+        <button type="button" className="btn btn-primary" onClick={() => setAdding(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem' }}>
+          <Plus size={16} /> เพิ่มงานแจ้งซ่อม
+        </button>
+      </div>
+      {adding && <AddMaintenanceModal rooms={rooms} unitName={unitName} onAdd={addRequest} onClose={() => setAdding(false)} />}
+
       {/* Filter tabs */}
       <div className="card mb-6" style={{ padding: '0.625rem' }}>
         <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
@@ -293,7 +306,7 @@ export default function MaintenancePage({ uid, buildingId, embedded = false }: P
         <div className="empty-state">
           <Wrench size={48} />
           <h3>{filter === 'all' ? 'ยังไม่มีคำขอแจ้งซ่อม' : 'ไม่มีรายการในหมวดนี้'}</h3>
-          <p>เมื่อผู้เช่าแจ้งซ่อมผ่านลิงก์ portal รายการจะแสดงที่นี่</p>
+          <p>เมื่อผู้เช่าแจ้งซ่อมผ่านลิงก์ portal หรือ LINE หรือแอดมินกด "เพิ่มงานแจ้งซ่อม" รายการจะแสดงที่นี่</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

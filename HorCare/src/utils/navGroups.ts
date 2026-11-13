@@ -18,8 +18,8 @@ export function navGroupDefs(isMarket: boolean): NavGroupDef[] {
     // the monthly money flow in the order it is done: read meters → issue & send bills → take payment
     { id: 'billing', label: 'เรียกเก็บและรับเงิน', items: ['recording', 'summary', 'collections', 'payments'] },
     { id: 'accounting', label: 'บัญชี', items: ['accounting', 'ledger', 'archives'] },
-    { id: 'service', label: 'ซ่อมบำรุงและบริการ', // แจ้งซ่อม / ใบงาน / งานแม่บ้าน are tabs of ระบบจัดการ; listed so the housekeeper portal's cleaning screen still has a home
-      items: ['operations', 'maintenance', 'cleaning', 'workorders'] },
+    { id: 'service', label: 'ซ่อมบำรุงและบริการ', // แจ้งซ่อม / งานแม่บ้าน are tabs of ระบบจัดการ; listed so the housekeeper portal's cleaning screen still has a home
+      items: ['operations', 'maintenance', 'cleaning'] },
     { id: 'residents', label: isMarket ? 'ผู้ค้าและการสื่อสาร' : 'ลูกบ้านและการสื่อสาร', items: ['parcels', 'market', 'messages', 'announcements'] },
     // Plan & billing sits on its own (a one-item group renders as a plain top-level link, not a category)
     { id: 'plan', label: 'แพ็กเกจ', items: ['pricing'] },

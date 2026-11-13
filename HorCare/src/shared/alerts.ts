@@ -41,7 +41,7 @@ export const ALERT_INFO: Record<AlertType, AlertInfo> = {
     },
     job_status: {
         label: 'สถานะงานช่าง / แม่บ้าน', hint: 'รับงาน เริ่มงาน หรือทำเสร็จรอตรวจ',
-        permissions: ['work_order.read', 'work_order.create'], url: '/?view=operations&tab=workorders',
+        permissions: ['work_order.read', 'work_order.create'], url: '/?view=operations&tab=maintenance',
     },
     help_request: {
         label: 'ผู้เช่าขอความช่วยเหลือ', hint: 'ผู้เช่าหรือผู้ค้ากดปุ่ม "ขอความช่วยเหลือ" ใน LINE — รอคนเข้าไปตอบ',

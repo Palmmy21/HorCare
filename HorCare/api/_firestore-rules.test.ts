@@ -60,3 +60,21 @@ describe('firestore.rules: an administrator cannot change what the owner set up'
     expect(rules).toMatch(/match \/staff_login\/\{phone\} \{\s*allow read, write: if false;/);
   });
 });
+
+describe('firestore.rules: the office adds repairs and housekeeping jobs', () => {
+  const block = (name: string) => {
+    const i = rules.indexOf(`match /${name}/{reqId}`);
+    return rules.slice(i, rules.indexOf('match /', i + 10)).replace(/\s+/g, ' ');
+  };
+  it('a repair may be added by the owner or staff who take repair calls, as a new open request with reporting fields only', () => {
+    const m = block('maintenance');
+    expect(m).not.toContain('allow create: if false');
+    expect(m).toMatch(/allow create: if \(ownerWrites\(userId\) \|\| memberCan\(userId, buildingId, 'work_order.create'\)/);
+    expect(m).toContain("request.resource.data.status == 'open'");
+    expect(m).toContain('keys().hasOnly(');
+    for (const f of ['vendor_id', 'parts_used', 'photo_url']) expect(m).not.toContain(`'${f}'`);
+  });
+  it('the front desk may add a housekeeping job', () => {
+    expect(block('cleaning')).toMatch(/allow create: if ownerWrites\(userId\) \|\| memberCan\(userId, buildingId, 'work_order.create'\)/);
+  });
+});

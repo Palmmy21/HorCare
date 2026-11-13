@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import type { Room, Fine, CommonFee } from '../../types';
-import { HardHat, Package, Layers, Receipt, AlertTriangle, Building2, Wrench, ClipboardCheck, Sparkles, Users, MessageCircle } from 'lucide-react';
+import { HardHat, Package, Layers, Receipt, AlertTriangle, Building2, Wrench, Sparkles, Users, MessageCircle } from 'lucide-react';
 import StaffTeamTab from './StaffTeamTab';
 import { canOpenOpsTab, type OpsTab } from '../../shared/viewAccess';
 import type { Permission } from '../../shared/permissions';
@@ -11,9 +11,8 @@ import ExpensesTab from './ExpensesTab';
 import FinesTab from './FinesTab';
 import CommonFeesTab from './CommonFeesTab';
 
-// The service work lives here too (it used to be three separate menu entries)
+// The service work lives here too (it used to be separate menu entries)
 const MaintenancePage = lazy(() => import('../Maintenance/MaintenancePage'));
-const WorkOrdersPage = lazy(() => import('../WorkOrders/WorkOrdersPage'));
 const CleaningPage = lazy(() => import('../Cleaning/CleaningPage'));
 
 export type { OpsTab };
@@ -44,7 +43,7 @@ interface Props {
 interface TabDef { id: OpsTab; label: string; Icon: React.ComponentType<{ size?: number }>; badge?: number }
 
 
-/** ระบบจัดการ: service work (repairs, work orders, housekeeping) and the property's back office, as tabs. */
+/** ระบบจัดการ: service work (repairs, housekeeping) and the property's back office, as tabs. */
 export default function OperationsPage(props: Props) {
   const { uid, buildingId, rooms, tab, onTabChange, permissions, counts, fines } = props;
   const unpaidFines = fines.filter(f => f.status === 'unpaid').length;
@@ -55,7 +54,6 @@ export default function OperationsPage(props: Props) {
       label: 'งานบริการ',
       tabs: [
         { id: 'maintenance', label: 'แจ้งซ่อม', Icon: Wrench, badge: counts.maintenance },
-        { id: 'workorders', label: 'ใบงาน', Icon: ClipboardCheck },
         { id: 'cleaning', label: props.isMarket ? 'ดูแลตลาด/ขยะ' : 'งานแม่บ้าน', Icon: Sparkles, badge: counts.cleaning },
         { id: 'team', label: 'ทีมช่าง/แม่บ้าน', Icon: Users },
       ],
@@ -82,7 +80,7 @@ export default function OperationsPage(props: Props) {
     <div>
       <div className="page-header">
         <h1 className="page-title">ระบบจัดการ</h1>
-        <p className="page-subtitle">งานซ่อม ใบงานช่าง งานแม่บ้าน และข้อมูลอาคาร ในที่เดียว</p>
+        <p className="page-subtitle">งานซ่อม งานแม่บ้าน และข้อมูลอาคาร ในที่เดียว</p>
       </div>
 
       <nav className="ops-tabs" aria-label="หมวดในระบบจัดการ">
@@ -110,9 +108,8 @@ export default function OperationsPage(props: Props) {
       </nav>
 
       <Suspense fallback={<div className="ops-loading"><div className="loading-spinner" /></div>}>
-        {active === 'maintenance' && <MaintenancePage uid={uid} buildingId={buildingId} embedded />}
-        {active === 'workorders' && <WorkOrdersPage ownerUid={uid} buildingId={buildingId} rooms={rooms} unitName={props.unitName} embedded />}
-        {active === 'cleaning' && <CleaningPage uid={uid} buildingId={buildingId} embedded />}
+        {active === 'maintenance' && <MaintenancePage uid={uid} buildingId={buildingId} rooms={rooms} unitName={props.unitName} embedded />}
+        {active === 'cleaning' && <CleaningPage uid={uid} buildingId={buildingId} rooms={rooms} unitName={props.unitName} embedded />}
       </Suspense>
       {active === 'team' && (
         <>

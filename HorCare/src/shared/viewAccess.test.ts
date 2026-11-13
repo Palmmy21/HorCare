@@ -55,11 +55,12 @@ describe('tabs of ระบบจัดการ', () => {
     const desk = of('front_desk');
     expect(canOpenOpsTab('maintenance', desk)).toBe(true);
     for (const t of ['vendors', 'stock', 'assets', 'expenses', 'fines', 'common_fees'] as const) expect(canOpenOpsTab(t, desk), t).toBe(false);
-    expect(canOpenOpsTab('workorders', of('technician'))).toBe(true);
+    expect(canOpenOpsTab('maintenance', of('technician'))).toBe(true);
+    expect(canOpenOpsTab('team', of('technician'))).toBe(true);
     expect(canOpenOpsTab('stock', of('technician'))).toBe(false);
   });
   it('a building manager and the owner see every tab', () => {
-    for (const t of ['maintenance', 'workorders', 'cleaning', 'vendors', 'stock', 'common_fees'] as const) {
+    for (const t of ['maintenance', 'cleaning', 'team', 'vendors', 'stock', 'common_fees'] as const) {
       expect(canOpenOpsTab(t, of('property_manager')), t).toBe(true);
       expect(canOpenOpsTab(t, null), t).toBe(true);
     }

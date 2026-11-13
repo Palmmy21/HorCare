@@ -10,7 +10,7 @@ import { db } from '../../firebase/config';
 import { useCleaningRequests } from '../../hooks/useCleaningRequests';
 import { useHousekeepers } from '../../hooks/useHousekeepers';
 import { ApiError } from '../../utils/api';
-import type { CleaningRequest, CleaningServiceType, Housekeeper } from '../../types';
+import type { CleaningRequest, CleaningServiceType, Housekeeper, Room } from '../../types';
 
 const MAID_SAVE_ERRORS: Record<string, string> = {
   phone_in_use: 'เบอร์นี้ถูกใช้เป็นบัญชีแม่บ้านอยู่แล้ว (อาจเป็นของหออื่น)',
@@ -133,9 +133,13 @@ interface Props {
   buildingId: string;
   /** Shown as a tab of ระบบจัดการ: no page title */
   embedded?: boolean;
+  /** Rooms of the building, to pick from when adding a job (typed by hand when there are none). */
+  rooms?: Room[];
+  unitName?: string;
 }
 
-export default function CleaningPage({ uid, buildingId, embedded = false }: Props) {
+export default function CleaningPage({ uid, buildingId, embedded = false, rooms = [], unitName = 'ห้อง' }: Props) {
+  const sortedRooms = [...rooms].sort((a, b) => a.room_number.localeCompare(b.room_number, 'th', { numeric: true }));
   const {
     requests,
     loading: requestsLoading,
@@ -216,7 +220,9 @@ export default function CleaningPage({ uid, buildingId, embedded = false }: Prop
     setSavingId('create_req');
     try {
       const assignedMaid = housekeepers.find(m => m.id === reqMaidId);
+      const pickedRoom = rooms.find(r => r.room_number === reqRoom.trim());
       await addRequest({
+        ...(pickedRoom ? { room_id: pickedRoom.id } : {}),
         room_number: reqRoom.trim(),
         service_type: reqServiceType,
         preferred_date: reqDate || undefined,
@@ -347,7 +353,7 @@ export default function CleaningPage({ uid, buildingId, embedded = false }: Prop
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem' }}
             >
               <Plus size={16} />
-              + สร้างงานทำความสะอาด
+              สร้างงานทำความสะอาด
             </button>
           ) : (
             <button
@@ -865,7 +871,18 @@ export default function CleaningPage({ uid, buildingId, embedded = false }: Prop
 
             <form onSubmit={handleCreateRequest} style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '0.35rem' }}>เลขที่ห้อง *</label>
+                <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '0.35rem' }}>{unitName} *</label>
+                {sortedRooms.length > 0 ? (
+                  <select
+                    required
+                    value={reqRoom}
+                    onChange={e => setReqRoom(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8, border: '1px solid var(--color-gray-300)', fontSize: '0.9rem' }}
+                  >
+                    <option value="">— เลือก{unitName} —</option>
+                    {sortedRooms.map(r => <option key={r.id} value={r.room_number}>{r.room_number}</option>)}
+                  </select>
+                ) : (
                 <input
                   type="text"
                   required
@@ -874,6 +891,7 @@ export default function CleaningPage({ uid, buildingId, embedded = false }: Prop
                   onChange={e => setReqRoom(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8, border: '1px solid var(--color-gray-300)', fontSize: '0.9rem' }}
                 />
+                )}
               </div>
 
               <div>

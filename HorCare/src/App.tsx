@@ -114,7 +114,9 @@ const WING_VIEWS: string[] = ['dashboard', 'floorplan', 'parking', 'rooms', 'ten
 const VIEW_MODES = ['dashboard', 'floorplan', 'rooms', 'parking', 'collections', 'tenants', 'maintenance', 'cleaning', 'operations', 'recording', 'summary', 'archives', 'payments', 'parcels', 'workorders', 'messages', 'announcements', 'market', 'accounting', 'ledger', 'leasing', 'security', 'settings', 'manual', 'admin', 'pricing'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
 const isViewMode = (v: unknown): v is ViewMode => typeof v === 'string' && (VIEW_MODES as readonly string[]).includes(v);
-const OPS_TABS: OpsTab[] = ['maintenance', 'workorders', 'cleaning', 'team', 'vendors', 'stock', 'assets', 'expenses', 'fines', 'common_fees'];
+const OPS_TABS: OpsTab[] = ['maintenance', 'cleaning', 'team', 'vendors', 'stock', 'assets', 'expenses', 'fines', 'common_fees'];
+/** ใบงาน was removed from ระบบจัดการ: links to it (old alerts, LINE messages, bookmarks) open แจ้งซ่อม instead. */
+const opsTabOf = (tab: string | null): OpsTab | null => (tab === 'workorders' ? 'maintenance' : tab && (OPS_TABS as string[]).includes(tab) ? tab as OpsTab : null);
 
 /**
  * A link straight to one screen — /?view=recording, /?view=operations&tab=team — as the team LINE OA sends to admins and
@@ -123,8 +125,8 @@ const OPS_TABS: OpsTab[] = ['maintenance', 'workorders', 'cleaning', 'team', 've
 const DEEP_LINK = (() => {
   const p = new URLSearchParams(window.location.search);
   const view = p.get('view');
-  const tab = p.get('tab') as OpsTab | null;
-  return { view: isViewMode(view) ? view : null, tab: tab && OPS_TABS.includes(tab) ? tab : null };
+  if (view === 'workorders') return { view: 'operations' as ViewMode, tab: 'maintenance' as OpsTab };
+  return { view: isViewMode(view) ? view : null, tab: opsTabOf(p.get('tab')) };
 })();
 
 function App() {
@@ -635,9 +637,10 @@ function App() {
   const inbox = useInbox(user && !maidSession ? user.uid : null);
 
   const handleNavClick = (view: ViewMode) => {
-    // แจ้งซ่อม / ใบงาน / งานแม่บ้าน are tabs of ระบบจัดการ (a housekeeper session keeps its own cleaning screen)
+    // แจ้งซ่อม / งานแม่บ้าน are tabs of ระบบจัดการ (a housekeeper session keeps its own cleaning screen); the removed
+    // ใบงาน opens แจ้งซ่อม
     if (!maidSession && (view === 'maintenance' || view === 'cleaning' || view === 'workorders')) {
-      setOpsTab(view);
+      setOpsTab(view === 'workorders' ? 'maintenance' : view);
       view = 'operations';
     }
     if (!maidSession && START_ONLY_VIEWS.includes(view) && !hasPaidSubscription) {
@@ -653,9 +656,9 @@ function App() {
   const openAlert = (url: string) => {
     const p = new URLSearchParams(url.split('?')[1] ?? '');
     const view = p.get('view');
-    const tab = p.get('tab') as OpsTab | null;
+    const tab = opsTabOf(p.get('tab'));
     if (!isViewMode(view)) return;
-    if (view === 'operations' && tab && OPS_TABS.includes(tab)) setOpsTab(tab);
+    if (view === 'operations' && tab) setOpsTab(tab);
     handleNavClick(view);
   };
   // The older pop-ups (slips, repairs, housekeeping — drawn from the data on screen) follow the same switches…

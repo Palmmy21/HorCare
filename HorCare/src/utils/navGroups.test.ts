@@ -4,7 +4,7 @@ import { groupNav, groupOfView, isGroupOpen, navGroupDefs, parseSavedState } fro
 const ids = (xs: { id: string }[]) => xs.map(x => x.id);
 const item = (id: string) => ({ id, label: id });
 const ALL = ['dashboard', 'rooms', 'recording', 'tenants', 'maintenance', 'cleaning', 'operations', 'payments',
-  'summary', 'archives', 'parcels', 'workorders', 'messages', 'security', 'settings', 'pricing'].map(item);
+  'summary', 'archives', 'parcels', 'messages', 'security', 'settings', 'pricing'].map(item);
 
 describe('groupNav', () => {
   it('puts every view in a category, in definition order', () => {
@@ -14,7 +14,7 @@ describe('groupNav', () => {
     expect(ids(groups.find(g => g.id === 'billing')!.items)).toEqual(['recording', 'summary', 'payments']);
     expect(ids(groups.find(g => g.id === 'accounting')!.items)).toEqual(['archives']);
     expect(ids(groups.find(g => g.id === 'property')!.items)).toEqual(['rooms']);
-    expect(ids(groups.find(g => g.id === 'service')!.items)).toEqual(['operations', 'maintenance', 'cleaning', 'workorders']);
+    expect(ids(groups.find(g => g.id === 'service')!.items)).toEqual(['operations', 'maintenance', 'cleaning']);
     expect(groups.flatMap(g => ids(g.items)).sort()).toEqual(ids(ALL).sort()); // nothing lost, nothing duplicated
   });
 
