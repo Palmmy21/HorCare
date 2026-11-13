@@ -6703,3 +6703,14 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
   .re-grid, .re-grid-3, .re-choice-row { grid-template-columns: 1fr; }
   .re-fee-amount { width: 7.5rem; }
 }
+
+/* sidebar: the signed-in name opens โปรไฟล์ของฉัน */
+.sidebar-user-name { color: #FFFFFF; font-weight: 700; font-size: 0.8125rem; margin-bottom: var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-user-btn {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 36px; padding: 6px 8px; margin-left: -8px;
+  border: none; border-radius: var(--radius-md); background: transparent; font-family: inherit; text-align: left; cursor: pointer;
+}
+.sidebar-user-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-user-btn svg { flex-shrink: 0; opacity: 0.8; }
+.sidebar-user-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.sidebar-user-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }

@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
-  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car, BookOpenText
+  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car, BookOpenText,
+  UserRound,
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -74,6 +75,8 @@ const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
 const FeatureLockedModal = lazy(() => import('./components/FeatureLockedModal'));
 const BranchSelector = lazy(() => import('./components/BranchSelector/BranchSelector'));
+const ProfileModal = lazy(() => import('./components/Profile/ProfileModal'));
+import type { ProfileSection } from './components/Profile/ProfileModal';
 import type { BranchTarget } from './components/BranchSelector/BranchSelector';
 import { recordBranchAccess } from './hooks/useBranchSummary';
 
@@ -210,7 +213,8 @@ function App() {
   const [hasSelectedBranch, setHasSelectedBranch] = useState(false);
   // Set by the branch page's badges / account menu; dropped once the user leaves that screen.
   const [paymentsFilter, setPaymentsFilter] = useState<'unpaid' | null>(null);
-  const [settingsTab, setSettingsTab] = useState<'account' | null>(null);
+  /** โปรไฟล์ของฉัน: open on this section, or closed. */
+  const [profileOpen, setProfileOpen] = useState<ProfileSection | null>(null);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -594,7 +598,6 @@ function App() {
     : navItems.filter(i => !hiddenViews.includes(i.id) && (!isStaff || canOpenView(i.id, staffPermissions)));
 
   if (paymentsFilter && currentView !== 'payments') setPaymentsFilter(null);
-  if (settingsTab && currentView !== 'settings') setSettingsTab(null);
   // A staff account is kept on screens it may open (corrected while rendering, like the housekeeper session above).
   if (isStaff && !canOpenView(currentView, staffPermissions)) {
     setCurrentView(firstOpenView(visibleNavItems.map(i => i.id), staffPermissions) as ViewMode);
@@ -923,17 +926,24 @@ function App() {
   // หน้าเลือกสาขา — before any branch's own data loads, so it shows skeleton cards instead of a spinner.
   // Shown even with one branch (the totals strip), and to anyone with no branch at all (the empty state).
   const noBranches = !buildingsLoading && buildings.length === 0;
+  const profileSheet = user && profileOpen && !maidSession ? (
+    <Suspense fallback={null}>
+      <ProfileModal
+        user={user}
+        profile={profile}
+        membership={membership}
+        buildings={buildings}
+        initialSection={profileOpen}
+        onOpenPricing={!isStaff && activeBuildingId ? () => { setProfileOpen(null); setHasSelectedBranch(true); setCurrentView('pricing'); } : undefined}
+        onClose={() => setProfileOpen(null)}
+      />
+    </Suspense>
+  ) : null;
   if (!maidSession && user && (noBranches || (hasPaidSubscription && !hasSelectedBranch))) {
     const enterBranch = (id: string, target?: BranchTarget) => {
       handleSwitchBuilding(id);
       if (target === 'overdue') { setPaymentsFilter('unpaid'); setCurrentView('payments'); }
       else if (target === 'repairs') { setOpsTab('maintenance'); setCurrentView('operations'); }
-      setHasSelectedBranch(true);
-    };
-    const openAccount = () => {
-      if (!activeBuildingId) return;
-      setSettingsTab('account');
-      setCurrentView('settings');
       setHasSelectedBranch(true);
     };
     return (
@@ -951,8 +961,8 @@ function App() {
           userEmail={user.email ?? undefined}
           avatarUrl={user.photoURL}
           roleLabel={membership ? (ROLE_LABELS_TH[membership.role as keyof typeof ROLE_LABELS_TH] ?? 'ทีมงาน') : 'เจ้าของ'}
-          onOpenProfile={openAccount}
-          onChangePassword={openAccount}
+          onOpenProfile={() => setProfileOpen('profile')}
+          onChangePassword={() => setProfileOpen('password')}
           onLogout={() => { void logout(); }}
         />
         <AddBuildingModal
@@ -960,6 +970,7 @@ function App() {
           onClose={() => setIsAddBuildingModalOpen(false)}
           onAdd={handleAddBuildingSubmit}
         />
+        {profileSheet}
       </Suspense>
     );
   }
@@ -1007,6 +1018,7 @@ function App() {
 
   return (
     <div className="app-container">
+      {profileSheet}
       <SlipNotificationToast
         bills={bills}
         fines={fines}
@@ -1515,19 +1527,15 @@ function App() {
           flexDirection: 'column',
           alignItems: sidebarCollapsed ? 'center' : 'stretch',
         }}>
-          {!sidebarCollapsed && (
-            <div style={{
-              color: '#FFFFFF',
-              fontWeight: 700,
-              fontSize: '0.8125rem',
-              marginBottom: 'var(--space-2)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {maidSession ? `แม่บ้าน: ${maidSession.maid_name}` : (profile?.display_name || user?.email)}
-            </div>
-          )}
+          {!sidebarCollapsed && (maidSession ? (
+            <div className="sidebar-user-name">แม่บ้าน: {maidSession.maid_name}</div>
+          ) : (
+            <button type="button" className="sidebar-user-name sidebar-user-btn" onClick={() => { setMobileMenuOpen(false); setProfileOpen('profile'); }}
+              title="โปรไฟล์ · บทบาท · แพ็กเกจ">
+              <UserRound size={15} aria-hidden />
+              <span>{profile?.name || profile?.display_name || user?.email}</span>
+            </button>
+          ))}
 
           {/* Install PWA Button (only when in web browser) */}
           {!isStandalone && (
@@ -1990,8 +1998,6 @@ function App() {
 
         {currentView === 'settings' && (
           <Settings
-            key={settingsTab ?? 'general'}
-            initialTab={settingsTab ?? undefined}
             config={config}
             onSaveConfig={saveConfig}
             themeId={themeId}
