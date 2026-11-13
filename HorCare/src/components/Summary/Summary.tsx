@@ -12,6 +12,11 @@ import type { MonthlyBill, DormConfig, Room, BillLanguage } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
 import InvoiceBill from './InvoiceBill';
+import { DocumentViewer } from '../Documents/DocumentViewer';
+import { InvoiceDocument } from '../Documents/InvoiceDocument';
+import { invoiceNumber } from '../../shared/invoice';
+import { useTenantProfile } from '../../hooks/useTenantProfiles';
+import { categoryOf, UNIT_CATEGORY_LABELS } from '../../shared/unitCategory';
 import PrintBillSlip from './PrintBillSlip';
 import BillEditModal from './BillEditModal';
 import RentBillModal from './RentBillModal';
@@ -86,6 +91,10 @@ export default function Summary({
     });
     const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
     const [previewLang, setPreviewLang] = useState<BillLanguage | null>(null);
+    // the old card-style bill, kept for tenants who read their bill in another language
+    const [legacyView, setLegacyView] = useState(false);
+    const { profile: selectedTenant } = useTenantProfile(uid ?? null, buildingId ?? null, selectedBill?.room_id ?? null);
+    const closeBill = () => { setSelectedBill(null); setPreviewLang(null); setLegacyView(false); };
     const [showAllInvoices, setShowAllInvoices] = useState(false);
     const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
     const [isDownloadingAll, setIsDownloadingAll] = useState(false);
@@ -271,7 +280,12 @@ export default function Summary({
         if (!el) throw new Error('Capture element not mounted');
 
         let dataUrl: string;
-        try {
+        if (!legacyView) {
+            // the A4 invoice: html2canvas draws with the page's loaded fonts (Sarabun); toPng's skipFonts would not
+            await document.fonts?.ready;
+            const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+            dataUrl = canvas.toDataURL('image/png');
+        } else try {
             dataUrl = await toPng(el, {
                 pixelRatio: 2,
                 backgroundColor: '#ffffff',
@@ -910,8 +924,47 @@ export default function Summary({
             })()}
 
             {/* Invoice Modal */}
-            {selectedBill && (
-                <div className="modal-overlay" onClick={() => setSelectedBill(null)}>
+            {/* ใบแจ้งหนี้ — the same A4 document the tenant sees in the portal */}
+            {selectedBill && !legacyView && (() => {
+                const room = rooms.find(r => r.id === selectedBill.room_id);
+                const roomLang = room?.language || billCustomization?.default_language || 'th';
+                const otherLang = roomLang !== 'th' || !!billCustomization?.bilingual_mode;
+                const unitWord = room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName;
+                return (
+                    <DocumentViewer
+                        title={`ใบแจ้งหนี้ ${unitName} ${selectedBill.room_number} · ${formatMonthThai(selectedBill.month)}`}
+                        filename={invoiceNumber(selectedBill)}
+                        onClose={closeBill}
+                        actions={<>
+                            {onEditBillExtras && (
+                                <button type="button" className="doc-viewer-btn" onClick={() => { setEditingBillId(selectedBill.id); closeBill(); }} title="แก้ไขบิล">
+                                    <Pencil size={16} /> <span className="doc-viewer-label">แก้ไขบิล</span>
+                                </button>
+                            )}
+                            <button type="button" className="doc-viewer-btn" onClick={() => handleDownloadBill(selectedBill)} disabled={!!downloadingBillId || isDownloadingAll} title="ดาวน์โหลดเป็นรูป สำหรับส่งทาง LINE">
+                                <Download size={16} /> <span className="doc-viewer-label">{downloadingBillId === selectedBill.id ? 'กำลังสร้าง…' : 'รูปสำหรับ LINE'}</span>
+                            </button>
+                            {otherLang && (
+                                <button type="button" className="doc-viewer-btn" onClick={() => setLegacyView(true)} title="ดูบิลในภาษาของผู้เช่า">
+                                    <span className="doc-viewer-label">ภาษาผู้เช่า</span><span aria-hidden>🌐</span>
+                                </button>
+                            )}
+                        </>}
+                    >
+                        <InvoiceDocument
+                            bill={selectedBill}
+                            issuer={{ name: billCustomization?.dorm_name, address: billCustomization?.dorm_address, phone: billCustomization?.dorm_phone, logo: billCustomization?.dorm_logo }}
+                            tenantName={selectedTenant?.full_name}
+                            unitWord={unitWord}
+                            dueDay={billCustomization?.due_day}
+                            payTo={payTo}
+                        />
+                    </DocumentViewer>
+                );
+            })()}
+
+            {selectedBill && legacyView && (
+                <div className="modal-overlay" onClick={closeBill}>
                     <div className="modal invoice-modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -952,7 +1005,7 @@ export default function Summary({
                                 })()}
                                 <button
                                     className="btn btn-outline btn-sm btn-icon"
-                                    onClick={() => { setSelectedBill(null); setPreviewLang(null); }}
+                                    onClick={closeBill}
                                 >
                                     <XCircle size={20} />
                                 </button>
@@ -977,11 +1030,11 @@ export default function Summary({
                             })()}
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => { setSelectedBill(null); setPreviewLang(null); }}>
-                                ปิด
+                            <button className="btn btn-secondary" onClick={() => setLegacyView(false)}>
+                                กลับไปใบแจ้งหนี้ A4
                             </button>
                             {onEditBillExtras && (
-                                <button className="btn btn-outline" onClick={() => { setEditingBillId(selectedBill.id); setSelectedBill(null); }}>
+                                <button className="btn btn-outline" onClick={() => { setEditingBillId(selectedBill.id); closeBill(); }}>
                                     <Pencil size={16} /> แก้ไขบิล
                                 </button>
                             )}
@@ -1066,11 +1119,26 @@ export default function Summary({
 
 
             {/* Hidden capture area for bill image downloads */}
-            <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: '680px', pointerEvents: 'none', zIndex: -1 }}>
+            <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: legacyView ? '680px' : '794px', pointerEvents: 'none', zIndex: -1 }}>
                 {captureTarget && (() => {
                     const room = rooms.find(r => r.id === captureTarget.room_id);
                     const rates = room ? getEffectiveRates(room, config) : null;
                     const captureLang = previewLang || room?.language || billCustomization?.default_language || 'th';
+                    // the picture sent on LINE is the A4 invoice, unless the owner is looking at the tenant-language bill
+                    if (!legacyView) {
+                        return (
+                            <div ref={captureRef} className="doc-sheet" style={{ minHeight: 0, boxShadow: 'none' }}>
+                                <InvoiceDocument
+                                    bill={captureTarget}
+                                    issuer={{ name: billCustomization?.dorm_name, address: billCustomization?.dorm_address, phone: billCustomization?.dorm_phone, logo: billCustomization?.dorm_logo }}
+                                    tenantName={captureTarget.id === selectedBill?.id ? selectedTenant?.full_name : undefined}
+                                    unitWord={room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName}
+                                    dueDay={billCustomization?.due_day}
+                                    payTo={payTo}
+                                />
+                            </div>
+                        );
+                    }
                     return (
                         <InvoiceBill
                             ref={captureRef}

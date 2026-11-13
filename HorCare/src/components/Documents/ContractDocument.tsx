@@ -1,4 +1,5 @@
 import { QRCodeCanvas } from 'qrcode.react';
+import './documents.css';
 import horcareLogo from '../../assets/horcare_logo.png';
 import { bahtAmount, thaiLongDate, type DocIssuer } from './docFormat';
 
