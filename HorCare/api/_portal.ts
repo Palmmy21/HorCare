@@ -13,6 +13,7 @@
  * Staff actions (Firebase sign-in, permission on the property):
  *   link    (tenant.read)   – the room's current portal link, to share with the tenant
  *   rotate  (tenant.update) – issue a new link; every older link for the room stops working (new tenant, leaked link)
+ *   contract_send (tenant.update) – push the unsigned contract to the room's tenant on LINE, with a button to sign
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
@@ -23,6 +24,8 @@ import { rateLimit } from './_abuse-guard.js';
 import { appBaseUrl } from './_app-url.js';
 import { portalLinkFor, resolvePortalLink, rotatePortalLink, type PortalRoom } from './_portal-link.js';
 import { raiseAlert } from './_alerts.js';
+import { linePush, roomLineToken } from './_line.js';
+import { buildContractFlex } from './_contract-line.js';
 
 export const config = { maxDuration: 15 };
 
@@ -80,6 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = body.action;
 
     if (action === 'link' || action === 'rotate') return staffAction(req, res, body, action);
+    if (action === 'contract_send') return contractSend(req, res, body);
     if (action === 'liff') return liffAction(req, res, body);
 
     const TENANT = ['view', 'profile_update', 'maintenance_create', 'cleaning_create', 'contract_sign'];
@@ -259,6 +263,57 @@ async function staffAction(req: VercelRequest, res: VercelResponse, body: Body, 
         });
     }
     res.status(200).json({ portal, url: `${appBaseUrl()}/?p=${encodeURIComponent(portal)}` });
+}
+
+/**
+ * Send the room's unsigned contract to its tenant through the property's LINE OA: a card with the terms and a button
+ * that opens the signing page. A draft becomes "waiting for the tenant". 409 line_not_linked when the room has no
+ * LINE account — the app then offers the link to share by hand.
+ */
+async function contractSend(req: VercelRequest, res: VercelResponse, body: Body) {
+    const buildingId = body.building_id;
+    const roomId = body.room_id;
+    if (typeof buildingId !== 'string' || !buildingId || typeof roomId !== 'string' || !roomId) { res.status(400).json({ error: 'invalid_input' }); return; }
+    const ctx = await authorize(req, res, { ownerUid: body.owner_uid, buildingId, permission: 'tenant.update' });
+    if (!ctx) return;
+    if (!(await buildingExists(ctx.ownerUid, buildingId))) { res.status(404).json({ error: 'property_not_found' }); return; }
+    const b = `users/${ctx.ownerUid}/buildings/${buildingId}`;
+    const [roomSnap, tenantSnap, cfgSnap] = await Promise.all([
+        db.doc(`${b}/rooms/${roomId}`).get(), db.doc(`${b}/tenants/${roomId}`).get(), db.doc(`${b}/data/config`).get(),
+    ]);
+    if (!roomSnap.exists) { res.status(404).json({ error: 'room_not_found' }); return; }
+    type Contract = { status?: string; lessee_signature?: string; contract_number?: string; lessee_name?: string } & Record<string, unknown>;
+    const contract = (tenantSnap.data() as { signed_contract?: Contract } | undefined)?.signed_contract;
+    if (!contract) { res.status(404).json({ error: 'no_contract' }); return; }
+    if (contract.lessee_signature || contract.status === 'signed' || contract.status === 'terminated' || contract.status === 'expired') {
+        res.status(409).json({ error: 'not_signable' }); return;
+    }
+    const room = roomSnap.data() as { line_user_id?: string; line_channel?: string; room_number?: string };
+    if (!room.line_user_id) { res.status(409).json({ error: 'line_not_linked' }); return; }
+    const token = await roomLineToken(room);
+    if (!token) { res.status(503).json({ error: 'line_not_configured' }); return; }
+
+    const dormName = (cfgSnap.data() as { bill_customization?: { dorm_name?: string } } | undefined)?.bill_customization?.dorm_name || 'หอพัก';
+    const signUrl = `${appBaseUrl()}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: ctx.ownerUid, buildingId, roomId }))}&action=sign`;
+    await linePush(room.line_user_id, [buildContractFlex(contract, dormName, signUrl)], token);
+
+    const nowIso = new Date().toISOString();
+    await db.doc(`${b}/tenants/${roomId}`).update({
+        signed_contract: { ...contract, status: 'pending_lessee', sent_via_line_at: nowIso },
+        updated_at: nowIso,
+    });
+    const eventId = randomUUID();
+    await db.doc(`${b}/tenants/${roomId}/events/${eventId}`).set({
+        id: eventId, room_id: roomId, type: 'note', date: nowIso.slice(0, 10),
+        note: `ส่งสัญญา (เลขที่: ${contract.contract_number ?? '-'}) ให้ผู้เช่าลงนามทาง LINE`,
+        created_by: ctx.uid, created_at: nowIso,
+    });
+    await writeAudit({
+        ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,
+        action: 'UPDATE', resourceType: 'contract', resourceId: roomId,
+        resourceLabel: `Room ${String(room.room_number ?? roomId)}`, note: 'contract sent to tenant via LINE', req,
+    });
+    res.status(200).json({ ok: true, sent_at: nowIso });
 }
 
 /** The LINE Login channel the LIFF app belongs to (a LIFF id is "<channelId>-<suffix>"). */

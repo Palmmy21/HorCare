@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
   X, Copy, Check, Share2, Send, QrCode,
-  ShieldCheck, Clock, FileText, Smartphone,
+  ShieldCheck, Clock, FileText, Smartphone, MessageCircle, Loader2,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'react-hot-toast';
 import type { SignedContractData, Room } from '../../types';
 import { fetchPortalUrl } from '../../utils/portalLinks';
+import { apiPost, ApiError } from '../../utils/api';
 
 interface ShareContractModalProps {
   isOpen: boolean;
@@ -33,6 +34,10 @@ export default function ShareContractModal({
   const [copiedMsg, setCopiedMsg] = useState(false);
   // The room's portal link carries a secret only the server knows, so it is fetched when the modal opens.
   const [signUrl, setSignUrl] = useState('');
+  const [sendingOa, setSendingOa] = useState(false);
+  const [sentOaAt, setSentOaAt] = useState<string | null>(null);
+  // the room's LINE account, as last seen here; the server checks again before sending
+  const [lineLinked, setLineLinked] = useState(!!room.line_user_id);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,6 +86,30 @@ export default function ShareContractModal({
       }
     } catch {
       toast.error('ไม่สามารถคัดลอกข้อความได้');
+    }
+  };
+
+  // Through the property's LINE OA: the tenant gets a card with the terms and a "sign" button, from the property itself.
+  const handleSendViaOa = async () => {
+    setSendingOa(true);
+    try {
+      const r = await apiPost<{ sent_at: string }>('portal', { action: 'contract_send', owner_uid: uid, building_id: buildingId, room_id: room.id });
+      setSentOaAt(r.sent_at);
+      toast.success('ส่งสัญญาเข้า LINE ของผู้เช่าแล้ว');
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : '';
+      if (code === 'line_not_linked') {
+        setLineLinked(false);
+        toast.error('ห้องนี้ยังไม่ได้เชื่อม LINE กับหอ ใช้ลิงก์หรือ QR ด้านล่างแทน');
+      } else if (code === 'not_signable') {
+        toast.error('สัญญานี้ลงนามแล้ว ส่งให้เซ็นซ้ำไม่ได้');
+      } else if (code === 'line_not_configured') {
+        toast.error('ยังไม่ได้ตั้งค่า LINE OA ของหอ');
+      } else {
+        toast.error('ส่งทาง LINE ไม่สำเร็จ: ' + ((err as Error).message || 'กรุณาลองใหม่'));
+      }
+    } finally {
+      setSendingOa(false);
     }
   };
 
@@ -273,8 +302,39 @@ export default function ShareContractModal({
             </div>
           </div>
 
+          {/* Action 0: straight to the tenant's LINE, from the property's OA */}
+          {!contract.lessee_signature && (
+            lineLinked ? (
+              <div style={{ padding: '1rem', borderRadius: '16px', background: '#EAF9F0', border: '1px solid #A7DDBB', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  onClick={handleSendViaOa}
+                  disabled={sendingOa}
+                  style={{
+                    width: '100%', background: '#06C755', color: '#FFFFFF', border: 'none', borderRadius: '12px',
+                    padding: '0.9rem 1rem', fontWeight: 800, fontSize: '0.95rem', cursor: sendingOa ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    boxShadow: '0 4px 12px rgba(6, 199, 85, 0.25)', opacity: sendingOa ? 0.8 : 1,
+                  }}
+                >
+                  {sendingOa ? <Loader2 size={18} className="spin" /> : <MessageCircle size={18} />}
+                  {sentOaAt ? 'ส่งซ้ำทาง LINE ของหอ' : 'ส่งให้ผู้เช่าทาง LINE ของหอ'}
+                </button>
+                <div style={{ fontSize: '0.78rem', color: '#256B43', lineHeight: 1.5 }}>
+                  {sentOaAt
+                    ? <>✓ ส่งแล้วเมื่อ {new Date(sentOaAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น. ผู้เช่าจะได้รับการ์ดสัญญาพร้อมปุ่ม "อ่านและลงนามสัญญา" ในแชต LINE ของหอ</>
+                    : <>ผู้เช่าห้องนี้เชื่อม LINE กับหอแล้ว ระบบจะส่งการ์ดสัญญาพร้อมปุ่มลงนามเข้าแชต LINE ของหอให้ทันที ไม่ต้องคัดลอกลิงก์เอง</>}
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '0.85rem 1rem', borderRadius: '14px', background: '#FEF6EC', border: '1px solid #F7B86C', fontSize: '0.8rem', color: '#9A3412', lineHeight: 1.55 }}>
+                ห้องนี้ยังไม่ได้เชื่อม LINE กับหอ จึงส่งเข้า LINE ของหอโดยตรงไม่ได้ ใช้ปุ่มด้านล่างส่งลิงก์จาก LINE ของคุณเอง หรือให้ผู้เช่าสแกน QR
+              </div>
+            )
+          )}
+
           {/* Action 1: One-Click Quick Share Buttons */}
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={handleOpenLineShare}
@@ -297,7 +357,7 @@ export default function ShareContractModal({
               }}
             >
               <Share2 size={18} />
-              ส่งเข้า LINE ทันที
+              {lineLinked && !contract.lessee_signature ? 'ส่งจาก LINE ส่วนตัว' : 'ส่งเข้า LINE'}
             </button>
 
             {typeof navigator.share === 'function' && (

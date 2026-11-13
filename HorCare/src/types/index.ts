@@ -431,6 +431,7 @@ export interface SignedContractData {
 
   created_at: string;                  // ISO timestamp
   verification_code: string;           // e.g. "HC-SIGN-9F2B81" hash for integrity
+  sent_via_line_at?: string;           // last sent to the tenant through the LINE OA (api/_portal.ts contract_send)
   status: 'draft' | 'pending_lessee' | 'signed' | 'expired' | 'terminated';
 }
 
