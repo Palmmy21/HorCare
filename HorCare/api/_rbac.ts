@@ -13,6 +13,8 @@ export interface AuthContext {
     role: Role;
     permissions: Permission[];
     isOwner: boolean;
+    /** Buildings this caller may open: ['*'] for the owner and members granted every property. */
+    propertyIds: string[];
 }
 
 /**
@@ -69,7 +71,7 @@ export async function authorize(
     if (decoded.uid === ownerUid) {
         const permissions = permissionsForRole('owner');
         if (!permissions.includes(opts.permission)) { res.status(403).json({ error: 'forbidden' }); return null; }
-        return { ...base, role: 'owner', permissions, isOwner: true };
+        return { ...base, role: 'owner', permissions, isOwner: true, propertyIds: ['*'] };
     }
 
     const memberSnap = await db.doc(`users/${ownerUid}/members/${decoded.uid}`).get();
@@ -93,7 +95,7 @@ export async function authorize(
         res.status(403).json({ error: 'forbidden' });
         return null;
     }
-    return { ...base, role: member.role, permissions, isOwner: false };
+    return { ...base, role: member.role, permissions, isOwner: false, propertyIds: Array.isArray(member.property_ids) ? member.property_ids : [] };
 }
 
 /** True if `buildingId` really belongs to `ownerUid`. Guards against forged ids. */

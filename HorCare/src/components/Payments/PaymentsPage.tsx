@@ -30,6 +30,8 @@ interface PaymentsPageProps {
     onUpdatePayment: (billId: string, fields: Partial<MonthlyBill>) => Promise<void>;
     uid?: string;
     buildingId?: string;
+    /** Open with this status filter (the branch page's ค้างชำระ badge opens on unpaid). */
+    initialFilter?: PaymentStatus;
 }
 
 const THAI_MONTHS = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -81,7 +83,7 @@ type PayableItem = {
   originalFine?: Fine;
 };
 
-export default function PaymentsPage({ bills, rooms, config, currentMonth, onMonthChange, onUpdatePayment, uid, buildingId }: PaymentsPageProps) {
+export default function PaymentsPage({ bills, rooms, config, currentMonth, onMonthChange, onUpdatePayment, uid, buildingId, initialFilter }: PaymentsPageProps) {
     const [fines, setFines] = useState<Fine[]>([]);
     
     useEffect(() => {
@@ -93,7 +95,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
         return unsub;
     }, [uid, buildingId]);
 
-    const [filter, setFilter] = useState<FilterKey>('all');
+    const [filter, setFilter] = useState<FilterKey>(initialFilter ?? 'all');
     const [methodFilter, setMethodFilter] = useState<'all' | PaymentMethod>('all');
     // Items waiting for the user to choose how they were paid (one = single, many = bulk).
     const [payModal, setPayModal] = useState<PayableItem[] | null>(null);

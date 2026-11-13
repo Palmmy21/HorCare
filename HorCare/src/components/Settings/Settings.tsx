@@ -61,6 +61,8 @@ interface SettingsProps {
     uid?: string;
     /** The property being edited (public vacancy page, viewing requests). */
     buildingId?: string;
+    /** Open on this tab (the branch page's account menu opens on 'account'). */
+    initialTab?: 'general' | 'billing' | 'contract' | 'integrations' | 'account';
 }
 
 const BUILDING_TYPES = [
@@ -168,7 +170,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; desc: string; icon: typeo
 
 export default function Settings(props: SettingsProps) {
     const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid, buildingId } = props;
-    const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+    const [activeTab, setActiveTab] = useState<SettingsTab>(props.initialTab ?? 'general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
         electricity_rate: config.electricity_rate,

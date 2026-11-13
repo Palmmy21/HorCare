@@ -12,6 +12,7 @@ import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
 import { useMembership } from './hooks/useMembership';
 import { canOpenView, firstOpenView } from './shared/viewAccess';
+import { ROLE_LABELS_TH } from './shared/permissions';
 import { useLineThreads } from './hooks/useLineThreads';
 import { useSecurityAlerts } from './hooks/useSecurityAlerts';
 import { groupNav, groupOfView, isGroupOpen, navGroupDefs, parseSavedState, type NavGroupState, type TransientClose } from './utils/navGroups';
@@ -73,6 +74,8 @@ const PricingPage     = lazy(() => import('./components/Pricing/PricingPage'));
 const AdminDashboard  = lazy(() => import('./components/Admin/AdminDashboard'));
 const FeatureLockedModal = lazy(() => import('./components/FeatureLockedModal'));
 const BranchSelector = lazy(() => import('./components/BranchSelector/BranchSelector'));
+import type { BranchTarget } from './components/BranchSelector/BranchSelector';
+import { recordBranchAccess } from './hooks/useBranchSummary';
 
 import './index.css';
 import horcareLogo from './assets/horcare_logo.png';
@@ -205,6 +208,9 @@ function App() {
   const [showFeatureLockedModal, setShowFeatureLockedModal] = useState<string | null>(null);
   const [deleteBuildingConfirm, setDeleteBuildingConfirm] = useState<string | null>(null);
   const [hasSelectedBranch, setHasSelectedBranch] = useState(false);
+  // Set by the branch page's badges / account menu; dropped once the user leaves that screen.
+  const [paymentsFilter, setPaymentsFilter] = useState<'unpaid' | null>(null);
+  const [settingsTab, setSettingsTab] = useState<'account' | null>(null);
 
   // Theme
   const { themeId, setTheme, mode, setMode } = useTheme();
@@ -398,6 +404,7 @@ function App() {
 
   const handleSwitchBuilding = (id: string) => {
     setActiveBuildingId(id);
+    recordBranchAccess(user?.uid, orgUid, id);
     if (buildingStorageKey) localStorage.setItem(buildingStorageKey, id);
     setBuildingMenuOpen(false);
   };
@@ -586,6 +593,8 @@ function App() {
       ]
     : navItems.filter(i => !hiddenViews.includes(i.id) && (!isStaff || canOpenView(i.id, staffPermissions)));
 
+  if (paymentsFilter && currentView !== 'payments') setPaymentsFilter(null);
+  if (settingsTab && currentView !== 'settings') setSettingsTab(null);
   // A staff account is kept on screens it may open (corrected while rendering, like the housekeeper session above).
   if (isStaff && !canOpenView(currentView, staffPermissions)) {
     setCurrentView(firstOpenView(visibleNavItems.map(i => i.id), staffPermissions) as ViewMode);
@@ -906,6 +915,55 @@ function App() {
   // (Email verification is now optional — users can access immediately after signup)
   // A banner in Settings will prompt them to verify when convenient
 
+  // Plan tier checks
+  const hasPaidSubscription = planProfile ? isPaidLicense(planProfile.license) : false;
+  const maxBuildings = planProfile ? getMaxBuildings(planProfile.license) : 1;
+  const canAddBuilding = maxBuildings > 1 && !isStaff; // only the owner creates buildings
+
+  // หน้าเลือกสาขา — before any branch's own data loads, so it shows skeleton cards instead of a spinner.
+  // Shown even with one branch (the totals strip), and to anyone with no branch at all (the empty state).
+  const noBranches = !buildingsLoading && buildings.length === 0;
+  if (!maidSession && user && (noBranches || (hasPaidSubscription && !hasSelectedBranch))) {
+    const enterBranch = (id: string, target?: BranchTarget) => {
+      handleSwitchBuilding(id);
+      if (target === 'overdue') { setPaymentsFilter('unpaid'); setCurrentView('payments'); }
+      else if (target === 'repairs') { setOpsTab('maintenance'); setCurrentView('operations'); }
+      setHasSelectedBranch(true);
+    };
+    const openAccount = () => {
+      if (!activeBuildingId) return;
+      setSettingsTab('account');
+      setCurrentView('settings');
+      setHasSelectedBranch(true);
+    };
+    return (
+      <Suspense fallback={<PageLoader fullScreen />}>
+        <BranchSelector
+          buildings={buildings}
+          loading={buildingsLoading}
+          userUid={user.uid}
+          orgUid={orgUid}
+          onSelect={enterBranch}
+          canAddBuilding={canAddBuilding || (noBranches && !isStaff)}
+          onAddBuilding={() => setIsAddBuildingModalOpen(true)}
+          isStaff={isStaff}
+          userName={profile?.name || user.displayName || user.email?.split('@')[0] || 'User'}
+          userEmail={user.email ?? undefined}
+          avatarUrl={user.photoURL}
+          roleLabel={membership ? (ROLE_LABELS_TH[membership.role as keyof typeof ROLE_LABELS_TH] ?? 'ทีมงาน') : 'เจ้าของ'}
+          onOpenProfile={openAccount}
+          onChangePassword={openAccount}
+          onLogout={() => { void logout(); }}
+        />
+        <AddBuildingModal
+          isOpen={isAddBuildingModalOpen}
+          onClose={() => setIsAddBuildingModalOpen(false)}
+          onAdd={handleAddBuildingSubmit}
+        />
+      </Suspense>
+    );
+  }
+
   // Still loading data (buildings must resolve first so we have a valid buildingId)
   if (!maidSession && (buildingsLoading || dataLoading || !activeBuildingId)) {
     return (
@@ -939,41 +997,13 @@ function App() {
     );
   }
 
-  // Plan tier checks
-  const hasPaidSubscription = planProfile ? isPaidLicense(planProfile.license) : false;
   // A screen opened by a link gets the same plan check the menu applies (corrected while rendering, like the guards above).
   if (!maidSession && planProfile && !hasPaidSubscription && currentView === DEEP_LINK.view && START_ONLY_VIEWS.includes(currentView)) {
     setCurrentView('dashboard');
   }
-  const maxBuildings = planProfile ? getMaxBuildings(planProfile.license) : 1;
-  const canAddBuilding = maxBuildings > 1 && !isStaff; // only the owner creates buildings
   const lineEnabled = planProfile?.license ? canSendLine(planProfile.license) : true;
   const maxRooms = planProfile ? getMaxRooms(planProfile.license) : 5;
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
-
-  if (!maidSession && hasPaidSubscription && !hasSelectedBranch && buildings.length > 0) {
-    return (
-      <Suspense fallback={<PageLoader fullScreen />}>
-        <BranchSelector 
-          buildings={buildings}
-          onSelect={(id) => {
-            handleSwitchBuilding(id);
-            setHasSelectedBranch(true);
-          }}
-          canAddBuilding={canAddBuilding}
-          onAddBuilding={() => {
-            setIsAddBuildingModalOpen(true);
-          }}
-          userName={profile?.name || user?.email?.split('@')[0] || 'User'}
-        />
-        <AddBuildingModal
-          isOpen={isAddBuildingModalOpen}
-          onClose={() => setIsAddBuildingModalOpen(false)}
-          onAdd={handleAddBuildingSubmit}
-        />
-      </Suspense>
-    );
-  }
 
   return (
     <div className="app-container">
@@ -1899,6 +1929,8 @@ function App() {
             onUpdatePayment={updateBillPayment}
             uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
+            initialFilter={paymentsFilter ?? undefined}
+            key={paymentsFilter ?? 'all'}
           />
         )}
 
@@ -1958,6 +1990,8 @@ function App() {
 
         {currentView === 'settings' && (
           <Settings
+            key={settingsTab ?? 'general'}
+            initialTab={settingsTab ?? undefined}
             config={config}
             onSaveConfig={saveConfig}
             themeId={themeId}
