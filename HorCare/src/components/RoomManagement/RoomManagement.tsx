@@ -1,12 +1,12 @@
-import { useState, Fragment } from 'react';
-import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Link2Off, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Globe, Sparkles, Layers, LayoutGrid } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Trash2, Edit2, Check, X, Home, Zap, Droplets, Building2, Store, ClipboardList, CalendarDays, CalendarCheck, MessageCircle, Lock, CheckSquare, Square, UserCheck, Search, Filter, Download, Upload, Sparkles, Layers, LayoutGrid } from 'lucide-react';
 import StallBoard from './StallBoard';
-import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
+import type { Room, DormConfig, CommonFee } from '../../types';
 import ImportSheetModal from './ImportSheetModal';
 import BulkRoomModal from './BulkRoomModal';
-import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
+import RoomEditModal from './RoomEditModal';
 import { formatCurrency } from '../../utils/calculations';
-import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
+import { LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
 import { defaultRentType, getWorkspaceTerms, rentTypeLabel, rentTypeOptions } from '../../utils/workspaceTerminology';
 import TenantProfilePage from '../TenantProfile/TenantProfilePage';
 
@@ -51,24 +51,11 @@ export default function RoomManagement({
     const [editingRoom, setEditingRoom] = useState<string | null>(null);
     const [importResult, setImportResult] = useState<{ updated: number; created: number; tenants: number; skipped: string[] } | null>(null);
     const [showImport, setShowImport] = useState(false);
-    const [editValue, setEditValue] = useState('');
-    const [editRentAmount, setEditRentAmount] = useState('');
-    const [editRentType, setEditRentType] = useState<Room['rent_type']>('monthly');
-    const [editRoomType, setEditRoomType] = useState<'dormitory' | 'commercial'>('dormitory');
-    const [editTenantCount, setEditTenantCount] = useState<string>('1');
-    const [editZone, setEditZone] = useState('');
-    const [editStallSize, setEditStallSize] = useState('');
-    const [editBusinessType, setEditBusinessType] = useState('');
-    const [editCustomElecRate, setEditCustomElecRate] = useState('');
-    const [editCustomWaterRate, setEditCustomWaterRate] = useState('');
-    const [editCommonFeeOverrides, setEditCommonFeeOverrides] = useState<Record<string, { amount?: number; is_active?: boolean }>>({});
-    const [editLanguage, setEditLanguage] = useState<BillLanguage | ''>('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
     const [selectedRooms, setSelectedRooms] = useState<Set<string>>(new Set());
     const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const [tenantRoomId, setTenantRoomId] = useState<string | null>(null);
     const [showBulk, setShowBulk] = useState(false);
-    const [editAmenities, setEditAmenities] = useState<string[]>([]);
 
     // ── Search & Filter state ───────────────────────────────────────────────────
     const [searchQuery, setSearchQuery] = useState('');
@@ -109,84 +96,7 @@ export default function RoomManagement({
         }
     };
 
-    const startEdit = (room: Room) => {
-        setEditingRoom(room.id);
-        setEditValue(room.room_number);
-        setEditRentAmount(room.rent_amount.toString());
-        setEditRentType(room.rent_type || 'monthly');
-        setEditRoomType(room.room_type || 'dormitory');
-        setEditTenantCount((room.tenant_count || 1).toString());
-        setEditZone(room.zone || '');
-        setEditStallSize(room.stall_size || '');
-        setEditBusinessType(room.business_type || '');
-        setEditCustomElecRate(room.custom_electricity_rate?.toString() || '');
-        setEditCustomWaterRate(
-            room.custom_water_config
-                ? (room.custom_water_config.type === 'normal'
-                    ? (room.custom_water_config.unit_rate || 0).toString()
-                    : '')
-                : ''
-        );
-        setEditCommonFeeOverrides(room.common_fee_overrides || {});
-        setEditLanguage(room.language || '');
-        setEditAmenities(room.amenities || []);
-    };
-
-    const saveEdit = async (roomId: string) => {
-        if (!editValue.trim()) return;
-        const updates: Partial<Room> = {
-            room_number: editValue.trim(),
-            rent_amount: Number(editRentAmount) || 0,
-            rent_type: editRentType,
-            room_type: editRoomType,
-            tenant_count: Number(editTenantCount) || 1,
-            zone: editZone.trim() || undefined,
-            stall_size: editStallSize.trim() || undefined,
-            business_type: editBusinessType.trim() || undefined,
-        };
-        
-        if (editCustomElecRate.trim() && !isNaN(Number(editCustomElecRate))) {
-            updates.custom_electricity_rate = Number(editCustomElecRate);
-        } else {
-            updates.custom_electricity_rate = null;
-        }
-
-        if (editCustomWaterRate.trim() && !isNaN(Number(editCustomWaterRate))) {
-            updates.custom_water_config = {
-                type: 'normal',
-                unit_rate: Number(editCustomWaterRate)
-            };
-        } else {
-            updates.custom_water_config = null;
-        }
-
-        updates.common_fee_overrides = editCommonFeeOverrides;
-        updates.language = editLanguage ? (editLanguage as BillLanguage) : undefined;
-        updates.amenities = editAmenities;
-
-        try {
-            await onUpdateRoom(roomId, updates);
-            setEditingRoom(null);
-        } catch (error) {
-            console.error('Error updating room:', error);
-            alert('โอนข้อมูลไม่สำเร็จ กรุณาลองใหม่');
-        }
-    };
-
-    const cancelEdit = () => {
-        setEditingRoom(null);
-        setEditValue('');
-        setEditRentAmount('');
-        setEditRentType('monthly');
-        setEditRoomType('dormitory');
-        setEditTenantCount('1');
-        setEditZone('');
-        setEditStallSize('');
-        setEditBusinessType('');
-        setEditCustomElecRate('');
-        setEditCustomWaterRate('');
-        setEditLanguage('');
-    };
+    const startEdit = (room: Room) => setEditingRoom(room.id);
 
     const confirmDelete = (roomId: string) => {
         onDeleteRoom(roomId);
@@ -455,7 +365,7 @@ export default function RoomManagement({
             )}
             {layout === 'board' && rooms.length > 0 && uid && buildingId ? (
                 <StallBoard uid={uid} buildingId={buildingId} rooms={rooms} unitName={terms.unitName}
-                    onEdit={room => { setLayout('table'); setSearchQuery(room.room_number); setFilterType('all'); setFilterLine('all'); startEdit(room); }} />
+                    onEdit={room => startEdit(room)} />
             ) : (<>
             {/* Search & Filter bar */}
             <div className="card mb-4" style={{ padding: '0.75rem 1rem' }}>
@@ -609,90 +519,43 @@ export default function RoomManagement({
                             </thead>
                             <tbody>
                                 {filteredRooms.map((room, index) => (
-                                    <Fragment key={room.id}>
-                                    <tr style={selectedRooms.has(room.id) ? { background: 'rgba(61, 143, 214,0.06)' } : undefined}>
-                                        <td style={{ textAlign: 'center' }}>
+                                    <tr
+                                        key={room.id}
+                                        className="room-row-clickable"
+                                        onClick={() => startEdit(room)}
+                                        title={`กดเพื่อแก้ไข${terms.unitName} ${room.room_number}`}
+                                        style={selectedRooms.has(room.id) ? { background: 'rgba(61, 143, 214,0.06)' } : undefined}
+                                    >
+                                        <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
                                             <button
-                                                onClick={() => editingRoom !== room.id && toggleSelect(room.id)}
-                                                disabled={editingRoom === room.id}
-                                                style={{ background: 'none', border: 'none', cursor: editingRoom === room.id ? 'default' : 'pointer', color: selectedRooms.has(room.id) ? '#3D8FD6' : 'var(--color-gray-300)', display: 'flex', alignItems: 'center', margin: '0 auto', opacity: editingRoom === room.id ? 0.3 : 1 }}
+                                                onClick={() => toggleSelect(room.id)}
+                                                aria-label={selectedRooms.has(room.id) ? 'ยกเลิกเลือก' : 'เลือก'}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: selectedRooms.has(room.id) ? '#3D8FD6' : 'var(--color-gray-300)', display: 'flex', alignItems: 'center', margin: '0 auto' }}
                                             >
                                                 {selectedRooms.has(room.id) ? <CheckSquare size={16} /> : <Square size={16} />}
                                             </button>
                                         </td>
                                         <td className="text-muted">{index + 1}</td>
                                         <td>
-                                            {editingRoom === room.id ? (
-                                                <div className="edit-room-form">
-                                                    <input
-                                                        type="text"
-                                                        className="form-input mono edit-room-input"
-                                                        value={editValue}
-                                                        onChange={e => setEditValue(e.target.value)}
-                                                        autoFocus
-                                                        placeholder={terms.unitNumberLabel}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="mono font-bold">{room.room_number}</span>
-                                                    {room.language ? (
-                                                        <span
-                                                            title={`ภาษารับบิล: ${LANGUAGE_MAP[room.language]?.nativeName} (${LANGUAGE_MAP[room.language]?.name})`}
-                                                            style={{ fontSize: '1rem', cursor: 'help' }}
-                                                        >
-                                                            {LANGUAGE_MAP[room.language]?.flag}
-                                                        </span>
-                                                    ) : null}
-                                                    {room.line_user_id && (
-                                                        <span title="เชื่อมต่อ LINE แล้ว" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                                            <MessageCircle size={14} color="#06C755" />
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <span className="mono font-bold">{room.room_number}</span>
+                                                {room.language ? (
+                                                    <span
+                                                        title={`ภาษารับบิล: ${LANGUAGE_MAP[room.language]?.nativeName} (${LANGUAGE_MAP[room.language]?.name})`}
+                                                        style={{ fontSize: '1rem', cursor: 'help' }}
+                                                    >
+                                                        {LANGUAGE_MAP[room.language]?.flag}
+                                                    </span>
+                                                ) : null}
+                                                {room.line_user_id && (
+                                                    <span title="เชื่อมต่อ LINE แล้ว" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                                        <MessageCircle size={14} color="#06C755" />
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="text-center">
-                                            {editingRoom === room.id ? (
-                                                terms.isMarket ? (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: '140px' }}>
-                                                        <input
-                                                            type="text"
-                                                            className="form-input"
-                                                            style={{ fontSize: '0.78rem', padding: '0.25rem 0.5rem' }}
-                                                            placeholder="โซน เช่น โซน A"
-                                                            value={editZone}
-                                                            onChange={e => setEditZone(e.target.value)}
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            className="form-input"
-                                                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
-                                                            placeholder="ขนาด เช่น 2x2 ม."
-                                                            value={editStallSize}
-                                                            onChange={e => setEditStallSize(e.target.value)}
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            className="form-input"
-                                                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
-                                                            placeholder="ชื่อร้าน/สินค้า"
-                                                            value={editBusinessType}
-                                                            onChange={e => setEditBusinessType(e.target.value)}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <select
-                                                        className="form-input"
-                                                        style={{ width: '130px', fontSize: '0.8125rem' }}
-                                                        value={editRoomType}
-                                                        onChange={e => setEditRoomType(e.target.value as 'dormitory' | 'commercial')}
-                                                    >
-                                                        <option value="dormitory">หอพัก</option>
-                                                        <option value="commercial">พาณิชย์</option>
-                                                    </select>
-                                                )
-                                            ) : terms.isMarket ? (
+                                            {terms.isMarket ? (
                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                                                     <span className="badge" style={{ fontSize: '0.75rem', background: '#FDEBD3', color: '#C2410C', border: '1px solid #FBD9A8' }}>
                                                         <Store size={11} style={{ marginRight: 3 }} /> {room.zone || 'แผงทั่วไป'}
@@ -719,146 +582,44 @@ export default function RoomManagement({
                                             )}
                                         </td>
                                         <td className="text-center">
-                                            {editingRoom === room.id ? (
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    className="form-input mono text-center"
-                                                    style={{ width: '60px' }}
-                                                    value={editTenantCount}
-                                                    onChange={e => setEditTenantCount(e.target.value)}
-                                                />
-                                            ) : (
-                                                <span className="mono">{room.tenant_count || 1} {terms.isMarket ? 'ร้าน' : 'คน'}</span>
-                                            )}
+                                            <span className="mono">{room.tenant_count || 1} {terms.isMarket ? 'ร้าน' : 'คน'}</span>
                                         </td>
                                         <td className="text-right">
-                                            {editingRoom === room.id ? (
-                                                <input
-                                                    type="number"
-                                                    className="form-input mono"
-                                                    style={{ width: '120px', textAlign: 'right' }}
-                                                    value={editRentAmount}
-                                                    onChange={e => setEditRentAmount(e.target.value)}
-                                                    placeholder="0"
-                                                />
-                                            ) : (
-                                                <span className="mono">{formatCurrency(room.rent_amount)}</span>
-                                            )}
+                                            <span className="mono">{formatCurrency(room.rent_amount)}</span>
                                         </td>
                                         <td className="text-center">
-                                            {editingRoom === room.id ? (
-                                                <select
-                                                    className="form-input"
-                                                    style={{ width: '130px' }}
-                                                    value={editRentType}
-                                                    onChange={e => setEditRentType(e.target.value as Room['rent_type'])}
-                                                >
-                                                    {rentTypeOptions(config?.building_type).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                                </select>
-                                            ) : (
-                                                <span className={`badge ${room.rent_type === 'semester' || room.rent_type === 'yearly' ? 'badge-warning' : room.rent_type === 'daily' || room.rent_type === 'weekly' ? 'badge-info' : 'badge-success'}`}>
-                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{room.rent_type === 'semester' || room.rent_type === 'yearly' ? <CalendarDays size={12} /> : <CalendarCheck size={12} />} {rentTypeLabel(room.rent_type, config?.building_type)}</span>
-                                                </span>
-                                            )}
+                                            <span className={`badge ${room.rent_type === 'semester' || room.rent_type === 'yearly' ? 'badge-warning' : room.rent_type === 'daily' || room.rent_type === 'weekly' ? 'badge-info' : 'badge-success'}`}>
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>{room.rent_type === 'semester' || room.rent_type === 'yearly' ? <CalendarDays size={12} /> : <CalendarCheck size={12} />} {rentTypeLabel(room.rent_type, config?.building_type)}</span>
+                                            </span>
                                         </td>
                                         {terms.usesMeters && <td className="text-right mono">{room.current_meter_elec.toLocaleString()}</td>}
                                         {terms.usesMeters && <td className="text-right mono">{room.current_meter_water.toLocaleString()}</td>}
                                         {hasAnyCommercial && (
                                             <td className="text-center" style={{ fontSize: '0.75rem' }}>
                                                 {(room.room_type || 'dormitory') === 'commercial' ? (
-                                                    editingRoom === room.id ? (
-                                                        editRoomType === 'commercial' ? (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                                    <Zap size={12} color="#F59E2E" />
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input mono"
-                                                                        style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                                                        value={editCustomElecRate}
-                                                                        onChange={e => setEditCustomElecRate(e.target.value)}
-                                                                        placeholder={config.electricity_rate.toString()}
-                                                                    />
-                                                                </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                                    <Droplets size={12} color="#0A6CC2" />
-                                                                    <input
-                                                                        type="number"
-                                                                        className="form-input mono"
-                                                                        style={{ width: '80px', textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                                                        value={editCustomWaterRate}
-                                                                        onChange={e => setEditCustomWaterRate(e.target.value)}
-                                                                        placeholder="ค่าเริ่มต้น"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted">—</span>
-                                                        )
-                                                    ) : (
-                                                        <div>
-                                                            {room.custom_electricity_rate && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={12} color="#E8740C" /> {room.custom_electricity_rate} บ./หน่วย</div>
-                                                            )}
-                                                            {room.custom_water_config?.unit_rate && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Droplets size={12} color="#0A6CC2" /> {room.custom_water_config.unit_rate} บ./หน่วย</div>
-                                                            )}
-                                                            {!room.custom_electricity_rate && !room.custom_water_config && (
-                                                                <span className="text-muted">ค่าเริ่มต้น</span>
-                                                            )}
-                                                        </div>
-                                                    )
+                                                    <div>
+                                                        {room.custom_electricity_rate && (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Zap size={12} color="#E8740C" /> {room.custom_electricity_rate} บ./หน่วย</div>
+                                                        )}
+                                                        {room.custom_water_config?.unit_rate && (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Droplets size={12} color="#0A6CC2" /> {room.custom_water_config.unit_rate} บ./หน่วย</div>
+                                                        )}
+                                                        {!room.custom_electricity_rate && !room.custom_water_config && (
+                                                            <span className="text-muted">ค่าเริ่มต้น</span>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-muted">—</span>
                                                 )}
                                             </td>
                                         )}
-                                        <td className="text-center">
-                                            {editingRoom === room.id ? (
+                                        <td className="text-center" onClick={e => e.stopPropagation()}>
+                                            {showDeleteConfirm === room.id ? (
                                                 <div className="delete-confirm-actions">
-                                                    <button
-                                                        className="btn btn-success btn-sm"
-                                                        onClick={() => saveEdit(room.id)}
-                                                    >
-                                                        <Check size={16} />
-                                                        บันทึก
-                                                    </button>
-                                                    <button
-                                                        className="btn btn-secondary btn-sm"
-                                                        onClick={cancelEdit}
-                                                    >
-                                                        <X size={16} />
-                                                        ยกเลิก
-                                                    </button>
-                                                    {room.line_user_id && (
-                                                        <button
-                                                            className="btn btn-outline btn-sm"
-                                                            style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
-                                                            onClick={() => {
-                                                                if(confirm('ต้องการยกเลิกการเชื่อมต่อ LINE สำหรับห้องนี้หรือไม่?')) {
-                                                                    onUpdateRoom(room.id, { line_user_id: '' });
-                                                                    setEditingRoom(null);
-                                                                }
-                                                            }}
-                                                            title="ยกเลิกการเชื่อมต่อ LINE"
-                                                        >
-                                                            <Link2Off size={16} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : showDeleteConfirm === room.id ? (
-                                                <div className="delete-confirm-actions">
-                                                    <button
-                                                        className="btn btn-danger btn-sm"
-                                                        onClick={() => confirmDelete(room.id)}
-                                                    >
+                                                    <button className="btn btn-danger btn-sm" onClick={() => confirmDelete(room.id)}>
                                                         ยืนยัน
                                                     </button>
-                                                    <button
-                                                        className="btn btn-secondary btn-sm"
-                                                        onClick={() => setShowDeleteConfirm(null)}
-                                                    >
+                                                    <button className="btn btn-secondary btn-sm" onClick={() => setShowDeleteConfirm(null)}>
                                                         ยกเลิก
                                                     </button>
                                                 </div>
@@ -873,11 +634,12 @@ export default function RoomManagement({
                                                         <UserCheck size={16} />
                                                     </button>
                                                     <button
-                                                        className="btn btn-outline btn-sm btn-icon"
+                                                        className="btn btn-primary btn-sm"
                                                         onClick={() => startEdit(room)}
                                                         title="แก้ไข"
+                                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                                                     >
-                                                        <Edit2 size={16} />
+                                                        <Edit2 size={14} /> แก้ไข
                                                     </button>
                                                     <button
                                                         className="btn btn-outline btn-sm btn-icon"
@@ -891,140 +653,6 @@ export default function RoomManagement({
                                             )}
                                         </td>
                                     </tr>
-                                    {editingRoom === room.id && (
-                                        <tr key={`${room.id}-lang`} style={{ background: 'rgba(61, 143, 214,0.06)' }}>
-                                            <td colSpan={(hasAnyCommercial ? 11 : 10) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.5rem 2rem 0.5rem', borderTop: 'none' }}>
-                                                <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                                    <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                                        <Globe size={14} color="#0A6CC2" /> ภาษาบิล/แจ้งเตือนห้องนี้:
-                                                    </span>
-                                                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditLanguage('')}
-                                                            className="btn btn-sm"
-                                                            style={{
-                                                                background: editLanguage === '' ? '#0A6CC2' : 'var(--color-gray-100)',
-                                                                color: editLanguage === '' ? '#ffffff' : 'var(--color-gray-700)',
-                                                                border: '1px solid var(--color-gray-300)',
-                                                                borderRadius: '6px',
-                                                                fontSize: '0.75rem',
-                                                                padding: '0.2rem 0.5rem'
-                                                            }}
-                                                        >
-                                                            ค่าเริ่มต้น ({LANGUAGE_MAP[config.bill_customization?.default_language || 'th']?.flag} {LANGUAGE_MAP[config.bill_customization?.default_language || 'th']?.nativeName})
-                                                        </button>
-                                                        {LANGUAGE_OPTIONS.map(opt => (
-                                                            <button
-                                                                key={opt.code}
-                                                                type="button"
-                                                                onClick={() => setEditLanguage(opt.code)}
-                                                                className="btn btn-sm"
-                                                                style={{
-                                                                    background: editLanguage === opt.code ? '#0A6CC2' : 'var(--color-gray-100)',
-                                                                    color: editLanguage === opt.code ? '#ffffff' : 'var(--color-gray-700)',
-                                                                    border: '1px solid var(--color-gray-300)',
-                                                                    borderRadius: '6px',
-                                                                    fontSize: '0.75rem',
-                                                                    padding: '0.2rem 0.5rem',
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '3px'
-                                                                }}
-                                                            >
-                                                                <span>{opt.flag}</span>
-                                                                <span>{opt.nativeName}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {editingRoom === room.id && (
-                                        <tr key={`${room.id}-amenities`} style={{ background: 'rgba(61, 143, 214,0.06)' }}>
-                                            <td colSpan={(hasAnyCommercial ? 11 : 10) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.5rem 2rem', borderTop: 'none' }}>
-                                                <div style={{ background: 'var(--color-bg)', padding: '0.625rem 1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '0.5rem' }}>สิ่งอำนวยความสะดวก</div>
-                                                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                                                        {[...BUILTIN_AMENITIES.map(a => a.id), ...(config.custom_amenities ?? []),
-                                                          ...editAmenities.filter(a => !BUILTIN_AMENITIES.some(b => b.id === a) && !(config.custom_amenities ?? []).includes(a))
-                                                        ].map(key => {
-                                                            const on = editAmenities.includes(key);
-                                                            return (
-                                                                <button
-                                                                    key={key} type="button" aria-pressed={on}
-                                                                    onClick={() => setEditAmenities(prev => on ? prev.filter(x => x !== key) : [...prev, key])}
-                                                                    className="btn btn-sm"
-                                                                    style={{
-                                                                        background: on ? '#0A6CC2' : 'var(--color-gray-100)',
-                                                                        color: on ? '#fff' : 'var(--color-gray-700)',
-                                                                        border: '1px solid var(--color-gray-300)', borderRadius: '6px',
-                                                                        fontSize: '0.75rem', padding: '0.2rem 0.5rem',
-                                                                    }}
-                                                                >{amenityLabel(key)}</button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {editingRoom === room.id && commonFees.length > 0 && (
-                                        <tr key={`${room.id}-fees`} style={{ background: 'rgba(61, 143, 214,0.06)' }}>
-                                            <td colSpan={(hasAnyCommercial ? 10 : 9) - (terms.usesMeters ? 0 : 2)} style={{ padding: '0.75rem 2rem', borderTop: 'none' }}>
-                                                <div style={{ background: 'var(--color-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-gray-200)' }}>
-                                                    <div style={{ fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                        <Building2 size={16} color="#0A6CC2" />
-                                                        ตั้งค่าค่าบริการส่วนกลางรายห้อง
-                                                    </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
-                                                        {commonFees.filter(f => f.is_active).map(fee => {
-                                                            const override = editCommonFeeOverrides[fee.id] || {};
-                                                            const isActive = override.is_active ?? fee.is_active;
-                                                            const amount = override.amount ?? fee.amount;
-                                                            return (
-                                                                <div key={fee.id} style={{
-                                                                    display: 'flex', alignItems: 'center', gap: '0.75rem',
-                                                                    padding: '0.5rem 0.75rem', borderRadius: '8px',
-                                                                    background: isActive ? 'rgba(34, 163, 90,0.05)' : 'rgba(85, 112, 137,0.05)',
-                                                                    border: `1px solid ${isActive ? 'rgba(34, 163, 90,0.2)' : 'rgba(85, 112, 137,0.2)'}`,
-                                                                    opacity: isActive ? 1 : 0.6
-                                                                }}>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isActive}
-                                                                        onChange={e => setEditCommonFeeOverrides(prev => ({
-                                                                            ...prev,
-                                                                            [fee.id]: { ...prev[fee.id], is_active: e.target.checked }
-                                                                        }))}
-                                                                    />
-                                                                    <div style={{ flex: 1 }}>
-                                                                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-text)' }}>{fee.name}</div>
-                                                                    </div>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                                        <input
-                                                                            type="number"
-                                                                            disabled={!isActive}
-                                                                            className="form-input mono"
-                                                                            style={{ width: '70px', padding: '0.2rem 0.4rem', fontSize: '0.8rem', textAlign: 'right' }}
-                                                                            value={amount}
-                                                                            onChange={e => setEditCommonFeeOverrides(prev => ({
-                                                                                ...prev,
-                                                                                [fee.id]: { ...prev[fee.id], amount: Number(e.target.value) }
-                                                                            }))}
-                                                                        />
-                                                                        <span style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)' }}>บ.</span>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    </Fragment>
                                 ))}
                             </tbody>
                         </table>
@@ -1085,6 +713,24 @@ export default function RoomManagement({
                     </div>
                 </>
             )}
+
+            {/* Edit popup — the whole room on one sheet */}
+            {editingRoom && (() => {
+                const room = rooms.find(r => r.id === editingRoom);
+                if (!room) return null;
+                return (
+                    <RoomEditModal
+                        key={room.id}
+                        room={room}
+                        rooms={rooms}
+                        config={config}
+                        commonFees={commonFees}
+                        onSave={onUpdateRoom}
+                        onUnlinkLine={id => onUpdateRoom(id, { line_user_id: '' })}
+                        onClose={() => setEditingRoom(null)}
+                    />
+                );
+            })()}
 
             {/* Tenant Profile Modal */}
             {tenantRoomId && uid && buildingId && (() => {
