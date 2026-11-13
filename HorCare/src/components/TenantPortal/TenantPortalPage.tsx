@@ -391,7 +391,7 @@ function SlipUploader({
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
 /** What the invoice document needs besides the bill: who issues it and who it is for. */
-interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; dueDay?: number }
+interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; dueDay?: number; secondLang?: BillLanguage | null }
 
 function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
   bill: MonthlyBill;
@@ -446,8 +446,9 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
           title={`ใบแจ้งหนี้ ${formatPortalMonth(bill.month, 'th')}`}
           filename={invoiceNumber(bill)}
           onClose={() => setShowInvoice(false)}
+          allowImage
         >
-          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} dueDay={invoice.dueDay} payTo={payTo} />
+          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} dueDay={invoice.dueDay} payTo={payTo} lang={lang} secondLang={invoice.secondLang} />
         </DocumentViewer>
       )}
 
@@ -906,6 +907,7 @@ export default function TenantPortalPage() {
     tenantName: profile?.full_name,
     unitWord: config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',
     dueDay: bc?.due_day,
+    secondLang: bc?.bilingual_mode ? bc.secondary_language || 'en' : null,
   };
 
   const currentMonth = getCurrentMonth();

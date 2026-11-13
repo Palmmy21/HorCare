@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, Printer, X } from 'lucide-react';
+import { Download, Image as ImageIcon, Printer, Share2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { PaperSheet } from './PaperSheet';
-import { downloadPaperPdf, printPaperPdf } from './paperPdf';
+import { buildPaperImage, downloadPaperPdf, printPaperPdf } from './paperPdf';
+import { triggerFileDownload } from '../../utils/fileDownload';
+
+type ShareNav = Navigator & { canShare?: (d: ShareData) => boolean };
+const shareableFile = (f: File) => { try { return !!(navigator as ShareNav).canShare?.({ files: [f] }) && !!navigator.share; } catch { return false; } };
 
 /** A document on its own screen: the A4 page, with "download PDF" and "print" that produce the same page. */
-export function DocumentViewer({ title, filename, onClose, children, actions }: {
+export function DocumentViewer({ title, filename, onClose, children, actions, allowImage = false }: {
   title: string;
   /** PDF file name, without the extension */
   filename: string;
@@ -14,9 +18,33 @@ export function DocumentViewer({ title, filename, onClose, children, actions }: 
   children: ReactNode;
   /** extra buttons for the bar (e.g. "sign") */
   actions?: ReactNode;
+  /** a "picture" button: on a phone it goes to the share sheet (iPhone: บันทึกรูปภาพ → Photos), elsewhere it downloads */
+  allowImage?: boolean;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
-  const [busy, setBusy] = useState<'pdf' | 'print' | null>(null);
+  const [busy, setBusy] = useState<'pdf' | 'print' | 'image' | null>(null);
+  // sharing needs a fresh tap, and drawing the picture outlasts the first one: keep it for a second tap
+  const [image, setImage] = useState<File | null>(null);
+
+  const makeImage = async () => {
+    if (!sheetRef.current || busy) return;
+    setBusy('image');
+    try {
+      const file = new File([await buildPaperImage(sheetRef.current)], `${filename}.jpg`, { type: 'image/jpeg' });
+      if (shareableFile(file)) setImage(file);
+      else triggerFileDownload(file, file.name);
+    } catch (err) {
+      console.error('document image failed:', err);
+      toast.error('สร้างรูปไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setBusy(null);
+    }
+  };
+  const shareImage = async () => {
+    if (!image) return;
+    try { await navigator.share({ files: [image], title }); setImage(null); }
+    catch (err) { if ((err as Error).name !== 'AbortError') { triggerFileDownload(image, image.name); setImage(null); } }
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -45,6 +73,15 @@ export function DocumentViewer({ title, filename, onClose, children, actions }: 
       <div className="doc-viewer-bar">
         <div className="doc-viewer-title">{title}</div>
         {actions}
+        {allowImage && (image ? (
+          <button type="button" className="doc-viewer-btn primary doc-viewer-pulse" onClick={() => void shareImage()} title="บันทึกลงอัลบั้มรูป / แชร์">
+            <Share2 size={16} /> <span className="doc-viewer-label">บันทึกลงอัลบั้ม</span>
+          </button>
+        ) : (
+          <button type="button" className="doc-viewer-btn" onClick={() => void makeImage()} disabled={!!busy} title="บันทึกเป็นรูปภาพ">
+            <ImageIcon size={16} /> <span className="doc-viewer-label">{busy === 'image' ? 'กำลังสร้าง…' : 'รูปภาพ'}</span>
+          </button>
+        ))}
         <button type="button" className="doc-viewer-btn" onClick={() => run('print')} disabled={!!busy} title="พิมพ์">
           <Printer size={16} /> <span className="doc-viewer-label">{busy === 'print' ? 'กำลังเตรียม…' : 'พิมพ์'}</span>
         </button>

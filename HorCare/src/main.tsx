@@ -12,6 +12,20 @@ import StaffGuidePage from './components/StaffPortal/StaffGuidePage.tsx'
 import PosCarePage from './components/PosCare/PosCarePage.tsx'
 import UnitOwnerSummary from './components/Leasing/UnitOwnerSummary.tsx'
 
+// ── A new version was deployed while this tab was open → reload once ─────────
+// The page still points at the previous build's code-split files, which no longer exist, so opening a page loaded on
+// demand (สรุปยอด, รายงาน…) fails with "Failed to fetch dynamically imported module". Vite reports it as
+// vite:preloadError; reloading picks up the new build. Once per minute at most, so a real outage cannot loop.
+window.addEventListener('vite:preloadError', (e) => {
+  try {
+    const last = Number(sessionStorage.getItem('horcare_chunk_reload') || 0);
+    if (Date.now() - last < 60_000) return;
+    sessionStorage.setItem('horcare_chunk_reload', String(Date.now()));
+  } catch { /* storage blocked: still reload once */ }
+  e.preventDefault();
+  window.location.reload();
+});
+
 // ── Firestore internal assertion error → auto silent reload ──────────────────
 // Firebase SDK can enter a broken state when too many listeners are created /
 // destroyed quickly (React dev double-mount, tab switching, etc.).

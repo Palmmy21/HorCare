@@ -5,13 +5,13 @@ import {
     CheckCircle, XCircle, AlertTriangle,
     FileText, Send, Lock, Download, Eye, Printer, BarChart3,
     Home, Zap, Droplets, Banknote, ClipboardList, Calendar, MapPin,
-    MessageCircle, Building2, Pencil
+    MessageCircle, Building2, Pencil, Image as ImageIcon
 } from 'lucide-react';
 import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room, BillLanguage } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
-import InvoiceBill from './InvoiceBill';
+import BulkInvoiceExport from './BulkInvoiceExport';
 import { DocumentViewer } from '../Documents/DocumentViewer';
 import { InvoiceDocument } from '../Documents/InvoiceDocument';
 import { invoiceNumber } from '../../shared/invoice';
@@ -25,13 +25,6 @@ import type { BillAdjustment } from '../../types';
 import MonthlyReport from './MonthlyReport';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
-import html2canvas from 'html2canvas';
-import { triggerFileDownload, dataUrlToBlob } from '../../utils/fileDownload';
-
-import { errorInfo } from '../../shared/errorInfo';
-
-/** The Web Share API is not in every browser's typings; both members are optional. */
-type ShareNavigator = { share?: (data: ShareData) => Promise<void>; canShare?: (data: ShareData) => boolean };
 
 interface SummaryProps {
     bills: MonthlyBill[];
@@ -91,21 +84,13 @@ export default function Summary({
     });
     const [selectedBill, setSelectedBill] = useState<MonthlyBill | null>(null);
     const [previewLang, setPreviewLang] = useState<BillLanguage | null>(null);
-    // the old card-style bill, kept for tenants who read their bill in another language
-    const [legacyView, setLegacyView] = useState(false);
+    const [bulk, setBulk] = useState<null | { ids?: string[]; auto?: boolean }>(null);
     const { profile: selectedTenant } = useTenantProfile(uid ?? null, buildingId ?? null, selectedBill?.room_id ?? null);
-    const closeBill = () => { setSelectedBill(null); setPreviewLang(null); setLegacyView(false); };
+    const closeBill = () => { setSelectedBill(null); setPreviewLang(null); };
     const [showAllInvoices, setShowAllInvoices] = useState(false);
-    const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
-    const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-    const [downloadAllProgress, setDownloadAllProgress] = useState(0);
-    const [captureTarget, setCaptureTarget] = useState<MonthlyBill | null>(null);
     const [showMonthlyReport, setShowMonthlyReport] = useState(false);
     const [isExportingReport, setIsExportingReport] = useState(false);
-    const [preparedFiles, setPreparedFiles] = useState<File[]>([]);
-    const [showShareModal, setShowShareModal] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
-    const captureRef = useRef<HTMLDivElement>(null);
     const monthlyReportRef = useRef<HTMLDivElement>(null);
     const hiddenReportRef = useRef<HTMLDivElement>(null);
 
@@ -255,193 +240,10 @@ export default function Summary({
         }, 300);
     };
 
-    const captureAndDownload = async (bill: MonthlyBill, useShare: boolean = false): Promise<void> => {
-        setCaptureTarget(bill);
-
-        // Poll via rAF until React commits the hidden InvoiceBill, with a 3-second timeout
-        await new Promise<void>((resolve, reject) => {
-            const deadline = Date.now() + 3000;
-            const check = () => {
-                if (captureRef.current) {
-                    resolve();
-                } else if (Date.now() > deadline) {
-                    reject(new Error('Capture element not mounted'));
-                } else {
-                    requestAnimationFrame(check);
-                }
-            };
-            requestAnimationFrame(check);
-        });
-
-        // Small delay to ensure SVG QR code and DOM styles are completely painted
-        await new Promise(resolve => setTimeout(resolve, 150));
-
-        const el = captureRef.current;
-        if (!el) throw new Error('Capture element not mounted');
-
-        let dataUrl: string;
-        if (!legacyView) {
-            // the A4 invoice: html2canvas draws with the page's loaded fonts (Sarabun); toPng's skipFonts would not
-            await document.fonts?.ready;
-            const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
-            dataUrl = canvas.toDataURL('image/png');
-        } else try {
-            dataUrl = await toPng(el, {
-                pixelRatio: 2,
-                backgroundColor: '#ffffff',
-                cacheBust: true,
-                skipFonts: true,
-            });
-        } catch (toPngErr) {
-            console.warn('toPng failed on mobile, attempting html2canvas fallback:', toPngErr);
-            const canvas = await html2canvas(el, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-                useCORS: true,
-                logging: false,
-            });
-            dataUrl = canvas.toDataURL('image/png');
-        }
-
-        const fileName = `bill_${bill.room_number}_${currentMonth}.png`;
-        const blob = dataUrlToBlob(dataUrl);
-
-        const nav = navigator as unknown as ShareNavigator;
-        if (useShare && nav.share && nav.canShare) {
-            try {
-                const file = new File([blob], fileName, { type: 'image/png' });
-                if (nav.canShare({ files: [file] })) {
-                    await nav.share({
-                        files: [file],
-                        title: `บิลห้อง ${bill.room_number}`,
-                    });
-                    return;
-                }
-            } catch (errRaw) {
-                const err = errorInfo(errRaw);
-                if (err.name !== 'AbortError') {
-                    console.error('Share failed, falling back to download:', errRaw);
-                }
-            }
-        }
-
-        // Direct download using Blob & ObjectURL (reliable on Samsung Internet and Chrome Android)
-        triggerFileDownload(blob, fileName);
-    };
-
-    const handleDownloadBill = async (bill: MonthlyBill) => {
-        setDownloadingBillId(bill.id);
-        try {
-            // Direct download on device
-            await captureAndDownload(bill, false);
-        } catch (err) {
-            console.error('Download failed:', err);
-            alert('ดาวน์โหลดไม่สำเร็จ กรุณาลองใช้ปุ่มพิมพ์แทน');
-        } finally {
-            setDownloadingBillId(null);
-            setCaptureTarget(null);
-        }
-    };
-
-    const handleDownloadAllBills = async () => {
-        if (monthBills.length === 0) return;
-        setIsDownloadingAll(true);
-        setDownloadAllProgress(0);
-        
-        const nav = navigator as unknown as ShareNavigator;
-        const canShareFiles = nav.share && nav.canShare && nav.canShare({
-            files: [new File([''], 'test.png', { type: 'image/png' })]
-        });
-
-        const files: File[] = [];
-        const failed: string[] = [];
-        
-        try {
-            for (let i = 0; i < monthBills.length; i++) {
-                try {
-                    const bill = monthBills[i];
-                    setCaptureTarget(bill);
-                    await new Promise<void>((resolve, reject) => {
-                        const deadline = Date.now() + 3000;
-                        const check = () => {
-                            if (captureRef.current) resolve();
-                            else if (Date.now() > deadline) reject(new Error('Capture element not mounted'));
-                            else requestAnimationFrame(check);
-                        };
-                        requestAnimationFrame(check);
-                    });
-
-                    await new Promise(r => setTimeout(r, 150));
-
-                    const el = captureRef.current;
-                    if (!el) throw new Error('Capture element not mounted');
-
-                    let dataUrl: string;
-                    try {
-                        dataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true, skipFonts: true });
-                    } catch {
-                        const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
-                        dataUrl = canvas.toDataURL('image/png');
-                    }
-                    
-                    const fileName = `bill_${bill.room_number}_${currentMonth}.png`;
-                    const blob = dataUrlToBlob(dataUrl);
-
-                    if (canShareFiles) {
-                        files.push(new File([blob], fileName, { type: 'image/png' }));
-                    } else {
-                        triggerFileDownload(blob, fileName);
-                    }
-                } catch (err) {
-                    console.error(`Download failed for room ${monthBills[i].room_number}:`, err);
-                    failed.push(monthBills[i].room_number);
-                }
-                setCaptureTarget(null);
-                setDownloadAllProgress(i + 1);
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
-            
-            if (canShareFiles && files.length > 0) {
-                setPreparedFiles(files);
-                setShowShareModal(true);
-            }
-        } finally {
-            setIsDownloadingAll(false);
-            setCaptureTarget(null);
-            setDownloadAllProgress(0);
-            if (failed.length > 0) {
-                alert(`ดาวน์โหลดไม่สำเร็จ ${failed.length} ห้อง: ${failed.join(', ')}`);
-            }
-        }
-    };
-
-    const handleShareAll = async () => {
-        const nav = navigator as unknown as ShareNavigator;
-        if (nav.share && nav.canShare && nav.canShare({ files: preparedFiles })) {
-            try {
-                await nav.share({
-                    files: preparedFiles,
-                    title: `บิลทั้งหมดรอบเดือน ${formatMonthThai(currentMonth)}`
-                });
-                setShowShareModal(false);
-                setPreparedFiles([]);
-                return;
-            } catch (errRaw) {
-                const err = errorInfo(errRaw);
-                if (err.name !== 'AbortError') {
-                    console.warn('Share all failed, falling back to direct download:', errRaw);
-                }
-            }
-        }
-
-        // Fallback: trigger downloads directly
-        for (const file of preparedFiles) {
-            triggerFileDownload(file, file.name);
-            await new Promise(r => setTimeout(r, 250));
-        }
-        setShowShareModal(false);
-        setPreparedFiles([]);
-    };
+    // pictures / PDF of one bill or many: the bulk window draws the A4 invoices and, on a phone, hands them to the
+    // share sheet (iPhone: "บันทึกรูปภาพ" puts them in Photos)
+    const handleDownloadBill = (bill: MonthlyBill) => setBulk({ ids: [bill.id], auto: true });
+    const handleDownloadAllBills = () => setBulk({});
 
     return (
         <div>
@@ -490,12 +292,9 @@ export default function Summary({
                         <button
                             className="btn btn-outline btn-sm"
                             onClick={handleDownloadAllBills}
-                            disabled={isDownloadingAll || !!downloadingBillId}
+                            title="บันทึกใบแจ้งหนี้หลายรายการเป็นรูปหรือ PDF — บน iPhone บันทึกลงอัลบั้มรูปได้"
                         >
-                            <Download size={15} />
-                            {isDownloadingAll
-                                ? `ดาวน์โหลด ${downloadAllProgress}/${monthBills.length}...`
-                                : 'ดาวน์โหลดทุกห้อง'}
+                            <Download size={15} /> ดาวน์โหลดหลายบิล
                         </button>
                         {uid && buildingId && config.dorm_code && (
                             <>
@@ -738,11 +537,9 @@ export default function Summary({
                                                         className="btn btn-outline btn-sm"
                                                         onClick={() => bill && handleDownloadBill(bill)}
                                                         title="ดาวน์โหลดรูปบิล"
-                                                        disabled={!!downloadingBillId || isDownloadingAll || !hasBill}
+                                                        disabled={!hasBill}
                                                     >
-                                                        {downloadingBillId === bill?.id
-                                                            ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
-                                                            : <Download size={14} />}
+                                                        <Download size={14} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -845,12 +642,10 @@ export default function Summary({
                                             <button
                                                 className="btn btn-outline btn-sm flex-1"
                                                 onClick={() => bill && handleDownloadBill(bill)}
-                                                disabled={!!downloadingBillId || isDownloadingAll || !hasBill}
+                                                disabled={!hasBill}
 
                                             >
-                                                {downloadingBillId === bill?.id
-                                                    ? <span className="loading-spinner" style={{ width: 14, height: 14 }} />
-                                                    : <Download size={14} />}
+                                                <Download size={14} />
                                             </button>
                                         </div>
                                     </div>
@@ -924,11 +719,11 @@ export default function Summary({
             })()}
 
             {/* Invoice Modal */}
-            {/* ใบแจ้งหนี้ — the same A4 document the tenant sees in the portal */}
-            {selectedBill && !legacyView && (() => {
+            {/* ใบแจ้งหนี้ — the same A4 document the tenant sees in the portal, in the tenant's language */}
+            {selectedBill && (() => {
                 const room = rooms.find(r => r.id === selectedBill.room_id);
-                const roomLang = room?.language || billCustomization?.default_language || 'th';
-                const otherLang = roomLang !== 'th' || !!billCustomization?.bilingual_mode;
+                const lang: BillLanguage = previewLang || room?.language || billCustomization?.default_language || 'th';
+                const second: BillLanguage | null = billCustomization?.bilingual_mode ? billCustomization.secondary_language || 'en' : null;
                 const unitWord = room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName;
                 return (
                     <DocumentViewer
@@ -936,19 +731,23 @@ export default function Summary({
                         filename={invoiceNumber(selectedBill)}
                         onClose={closeBill}
                         actions={<>
+                            <select
+                                className="doc-viewer-btn doc-viewer-select"
+                                value={lang}
+                                onChange={e => setPreviewLang(e.target.value as BillLanguage)}
+                                aria-label="ภาษาของใบแจ้งหนี้"
+                                title="ภาษาของใบแจ้งหนี้"
+                            >
+                                {LANGUAGE_OPTIONS.map(o => <option key={o.code} value={o.code}>{o.flag} {o.nativeName}</option>)}
+                            </select>
                             {onEditBillExtras && (
                                 <button type="button" className="doc-viewer-btn" onClick={() => { setEditingBillId(selectedBill.id); closeBill(); }} title="แก้ไขบิล">
                                     <Pencil size={16} /> <span className="doc-viewer-label">แก้ไขบิล</span>
                                 </button>
                             )}
-                            <button type="button" className="doc-viewer-btn" onClick={() => handleDownloadBill(selectedBill)} disabled={!!downloadingBillId || isDownloadingAll} title="ดาวน์โหลดเป็นรูป สำหรับส่งทาง LINE">
-                                <Download size={16} /> <span className="doc-viewer-label">{downloadingBillId === selectedBill.id ? 'กำลังสร้าง…' : 'รูปสำหรับ LINE'}</span>
+                            <button type="button" className="doc-viewer-btn" onClick={() => handleDownloadBill(selectedBill)} title="บันทึกเป็นรูป สำหรับส่งทาง LINE หรือเก็บในอัลบั้ม">
+                                <ImageIcon size={16} /> <span className="doc-viewer-label">รูปภาพ</span>
                             </button>
-                            {otherLang && (
-                                <button type="button" className="doc-viewer-btn" onClick={() => setLegacyView(true)} title="ดูบิลในภาษาของผู้เช่า">
-                                    <span className="doc-viewer-label">ภาษาผู้เช่า</span><span aria-hidden>🌐</span>
-                                </button>
-                            )}
                         </>}
                     >
                         <InvoiceDocument
@@ -958,105 +757,27 @@ export default function Summary({
                             unitWord={unitWord}
                             dueDay={billCustomization?.due_day}
                             payTo={payTo}
+                            lang={lang}
+                            secondLang={second}
                         />
                     </DocumentViewer>
                 );
             })()}
 
-            {selectedBill && legacyView && (
-                <div className="modal-overlay" onClick={closeBill}>
-                    <div className="modal invoice-modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <FileText size={18} /> ใบเรียกเก็บ — ห้อง {selectedBill.room_number}
-                            </h3>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                {(() => {
-                                    const room = rooms.find(r => r.id === selectedBill.room_id);
-                                    const activeLang = previewLang || room?.language || billCustomization?.default_language || 'th';
-                                    return (
-                                        <div style={{ display: 'flex', gap: '2px', background: '#EBF1F7', padding: '3px', borderRadius: '8px' }}>
-                                            {LANGUAGE_OPTIONS.map(opt => (
-                                                <button
-                                                    key={opt.code}
-                                                    type="button"
-                                                    onClick={() => setPreviewLang(opt.code)}
-                                                    title={`${opt.nativeName} (${opt.name})`}
-                                                    style={{
-                                                        border: 'none',
-                                                        background: activeLang === opt.code ? '#ffffff' : 'transparent',
-                                                        boxShadow: activeLang === opt.code ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                                        padding: '2px 6px',
-                                                        borderRadius: '6px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '12px',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '2px',
-                                                        fontWeight: activeLang === opt.code ? 600 : 400
-                                                    }}
-                                                >
-                                                    <span>{opt.flag}</span>
-                                                    <span style={{ fontSize: '10px' }}>{opt.code.toUpperCase()}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    );
-                                })()}
-                                <button
-                                    className="btn btn-outline btn-sm btn-icon"
-                                    onClick={closeBill}
-                                >
-                                    <XCircle size={20} />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="modal-body">
-                            {(() => {
-                                const room = rooms.find(r => r.id === selectedBill.room_id);
-                                const rates = room ? getEffectiveRates(room, config) : null;
-                                const activeLang = previewLang || room?.language || billCustomization?.default_language || 'th';
-                                return (
-                                    <InvoiceBill
-                                        bill={selectedBill}
-                                        config={config}
-                                        billDate={billDate}
-                                        effectiveElecRate={rates?.electricityRate}
-                                        effectiveWaterConfig={rates?.waterConfig}
-                                        billCustomization={billCustomization} payTo={payTo}
-                                        language={activeLang}
-                                    />
-                                );
-                            })()}
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setLegacyView(false)}>
-                                กลับไปใบแจ้งหนี้ A4
-                            </button>
-                            {onEditBillExtras && (
-                                <button className="btn btn-outline" onClick={() => { setEditingBillId(selectedBill.id); closeBill(); }}>
-                                    <Pencil size={16} /> แก้ไขบิล
-                                </button>
-                            )}
-                            <button
-                                className="btn btn-outline"
-                                onClick={() => handleDownloadBill(selectedBill)}
-                                disabled={!!downloadingBillId || isDownloadingAll}
-
-                            >
-                                <Download size={18} />
-                                {downloadingBillId === selectedBill.id ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด'}
-                            </button>
-                            <button className="btn btn-primary" onClick={() => {
-                                setShowAllInvoices(false);
-                                setTimeout(() => window.print(), 100);
-                            }}>
-                                <Printer size={18} />
-                                พิมพ์
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {bulk && (
+                <BulkInvoiceExport
+                    bills={monthBills}
+                    rooms={rooms}
+                    config={config}
+                    payTo={payTo}
+                    uid={uid}
+                    buildingId={buildingId}
+                    month={currentMonth}
+                    unitName={unitName}
+                    initialIds={bulk.ids}
+                    autoStart={bulk.auto}
+                    onClose={() => setBulk(null)}
+                />
             )}
 
             {/* Confirmation Modal */}
@@ -1117,42 +838,6 @@ export default function Summary({
                 </div>
             )}
 
-
-            {/* Hidden capture area for bill image downloads */}
-            <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', width: legacyView ? '680px' : '794px', pointerEvents: 'none', zIndex: -1 }}>
-                {captureTarget && (() => {
-                    const room = rooms.find(r => r.id === captureTarget.room_id);
-                    const rates = room ? getEffectiveRates(room, config) : null;
-                    const captureLang = previewLang || room?.language || billCustomization?.default_language || 'th';
-                    // the picture sent on LINE is the A4 invoice, unless the owner is looking at the tenant-language bill
-                    if (!legacyView) {
-                        return (
-                            <div ref={captureRef} className="doc-sheet" style={{ minHeight: 0, boxShadow: 'none' }}>
-                                <InvoiceDocument
-                                    bill={captureTarget}
-                                    issuer={{ name: billCustomization?.dorm_name, address: billCustomization?.dorm_address, phone: billCustomization?.dorm_phone, logo: billCustomization?.dorm_logo }}
-                                    tenantName={captureTarget.id === selectedBill?.id ? selectedTenant?.full_name : undefined}
-                                    unitWord={room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName}
-                                    dueDay={billCustomization?.due_day}
-                                    payTo={payTo}
-                                />
-                            </div>
-                        );
-                    }
-                    return (
-                        <InvoiceBill
-                            ref={captureRef}
-                            bill={captureTarget}
-                            config={config}
-                            billDate={billDate}
-                            effectiveElecRate={rates?.electricityRate}
-                            effectiveWaterConfig={rates?.waterConfig}
-                            billCustomization={billCustomization} payTo={payTo}
-                            language={captureLang}
-                        />
-                    );
-                })()}
-            </div>
 
             {/* Off-screen MonthlyReport for unconstrained PDF capture (no scroll/clip) */}
             {showMonthlyReport && (
@@ -1332,51 +1017,6 @@ export default function Summary({
                                     ดูแพ็กเกจ
                                 </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Share Multiple Bills Modal */}
-            {showShareModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <div style={{
-                                width: '48px', height: '48px',
-                                borderRadius: '50%',
-                                background: 'rgba(34, 163, 90,0.1)',
-                                color: '#22A35A',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                margin: '0 auto 1rem auto'
-                            }}>
-                                <CheckCircle size={24} />
-                            </div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text, #102A43)', marginBottom: '0.5rem' }}>
-                                เตรียมรูปภาพสำเร็จ {preparedFiles.length} รูป
-                            </h3>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-light, #557089)' }}>
-                                คุณสามารถบันทึกรูปลงอัลบั้มบนเครื่องได้ทันที
-                            </p>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.75rem' }}>
-                            <button
-                                className="btn btn-outline"
-                                onClick={() => {
-                                    setShowShareModal(false);
-                                    setPreparedFiles([]);
-                                }}
-                                style={{ flex: 1 }}
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleShareAll}
-                                style={{ flex: 1, background: '#22A35A', borderColor: '#22A35A', color: '#fff' }}
-                            >
-                                <Download size={16} />
-                                บันทึกลงเครื่อง
-                            </button>
                         </div>
                     </div>
                 </div>

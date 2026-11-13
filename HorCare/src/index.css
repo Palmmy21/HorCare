@@ -6744,3 +6744,37 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
 .cat-tile-meta { font-size: 0.72rem; color: var(--color-text-muted, #557089); }
 .cat-tile-bar { display: block; height: 4px; border-radius: 2px; background: var(--color-gray-100, #EBF1F7); overflow: hidden; margin-top: 4px; }
 .cat-tile-bar > span { display: block; height: 100%; background: #15803D; }
+
+/* ===== Bulk invoice download ===== */
+.bie-modal { max-width: 640px; width: 100%; display: flex; flex-direction: column; max-height: 92vh; }
+.bie-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.bie-head .modal-title { display: inline-flex; align-items: center; gap: 0.5rem; margin: 0; }
+.bie-body { overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
+.bie-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.bie-label { width: 56px; flex: none; font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted); }
+.bie-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 10px; background: var(--color-gray-100, #EBF1F7); }
+.bie-seg button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0.3rem 0.75rem; border: none; border-radius: 8px; background: none; font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted); cursor: pointer; }
+.bie-seg button.is-on { background: var(--color-white, #fff); color: var(--color-primary, #0F4C81); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.bie-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.bie-quick button { min-height: 32px; padding: 0.25rem 0.7rem; border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-white, #fff); font-size: 0.78rem; font-weight: 600; color: var(--color-text); cursor: pointer; }
+.bie-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--color-border); border-radius: 12px; max-height: 44vh; overflow-y: auto; }
+.bie-list li + li { border-top: 1px solid var(--color-border); }
+.bie-list button { width: 100%; display: grid; grid-template-columns: 20px 64px 1fr auto auto; align-items: center; gap: 10px; min-height: 46px; padding: 0.4rem 0.75rem; border: none; background: none; text-align: left; color: var(--color-text-muted); cursor: pointer; font-size: 0.85rem; }
+.bie-list button.is-on { color: var(--color-text); background: rgba(15, 76, 129, 0.04); }
+.bie-list button.is-on svg { color: var(--color-primary, #0F4C81); }
+.bie-room { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bie-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bie-name small { color: var(--color-text-muted); }
+.bie-status { font-size: 0.72rem; font-weight: 600; color: #B45309; }
+.bie-status.paid { color: #15803D; }
+.bie-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bie-hint { margin: 0; font-size: 0.8rem; color: var(--color-text-muted); line-height: 1.55; }
+.bie-status-box { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; text-align: center; padding: 1.75rem 1.25rem; }
+.bie-big { font-size: 1.1rem; font-weight: 800; }
+.bie-bar { width: 100%; max-width: 320px; height: 6px; border-radius: 3px; background: var(--color-gray-100, #EBF1F7); overflow: hidden; }
+.bie-bar > span { display: block; height: 100%; background: var(--color-primary, #0F4C81); transition: width 0.2s; }
+.bie-modal .modal-footer { flex-wrap: wrap; }
+@media (max-width: 520px) {
+  .bie-list button { grid-template-columns: 20px 52px 1fr auto; }
+  .bie-list .bie-status { display: none; }
+}
