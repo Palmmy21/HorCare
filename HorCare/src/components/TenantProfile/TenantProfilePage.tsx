@@ -84,7 +84,7 @@ export default function TenantProfilePage({
   room, uid, buildingId, isPaid, onUpgrade, onClose, config,
   occupancy, canOverrideStatus = false, onUpdateRoom, actorName,
 }: TenantProfilePageProps) {
-  const { profile, events, eventsError, loading, saveProfile, addEvent, deleteEvent } =
+  const { profile, events, eventsError, loading, saveProfile, discardContract, addEvent, deleteEvent } =
     useTenantProfile(uid, buildingId, room.id);
 
   // Tenant PII (ID card, birthdate, contract) lives here — record who opened it.
@@ -228,6 +228,27 @@ export default function TenantProfilePage({
       status: newStatus,
     };
     await handleSaveContract(updated);
+  };
+
+  const handleDiscardContract = async () => {
+    const c = profile?.signed_contract;
+    if (!c || c.lessee_signature) return;
+    if (!window.confirm(`ยกเลิกร่างสัญญา ${c.contract_number}?\nผู้เช่าจะเซ็นผ่านลิงก์ที่ส่งไปแล้วไม่ได้อีก และห้องจะไม่ถูกจองไว้`)) return;
+    try {
+      setSaving(true);
+      await discardContract();
+      await addEvent({
+        type: 'note',
+        date: new Date().toISOString().slice(0, 10),
+        note: `ยกเลิกร่างสัญญา (เลขที่: ${c.contract_number}) ก่อนผู้เช่าลงนาม`,
+      });
+      toast.success('ยกเลิกร่างสัญญาแล้ว');
+    } catch (errRaw) {
+      console.error('Error discarding contract:', errRaw);
+      toast.error('ยกเลิกร่างสัญญาไม่สำเร็จ: ' + (errorInfo(errRaw).message || 'กรุณาลองใหม่'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const copyContractNumber = (num: string) => {
@@ -861,6 +882,30 @@ export default function TenantProfilePage({
                             >
                               <RefreshCw size={15} /> แก้ไขเงื่อนไข / ต่อสัญญาใหม่
                             </button>
+
+                            {!profile.signed_contract.lessee_signature && (
+                              <button
+                                type="button"
+                                onClick={handleDiscardContract}
+                                disabled={saving}
+                                className="btn btn-secondary"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem',
+                                  padding: '0.65rem 1.25rem',
+                                  borderRadius: '10px',
+                                  fontWeight: 600,
+                                  fontSize: '0.875rem',
+                                  flex: '1 1 160px',
+                                  color: '#B42318',
+                                  borderColor: 'rgba(180, 35, 24, 0.35)',
+                                }}
+                              >
+                                <Trash2 size={15} /> ยกเลิกร่างสัญญา
+                              </button>
+                            )}
                           </div>
                         </div>
                       ) : (

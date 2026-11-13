@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   collection, doc,
-  onSnapshot, setDoc, updateDoc, deleteDoc, addDoc,
+  onSnapshot, setDoc, updateDoc, deleteDoc, addDoc, deleteField,
   query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -115,6 +115,15 @@ export function useTenantProfile(
     }
   }, [uid, buildingId, roomId, profile]);
 
+  /** ยกเลิกร่างสัญญาที่ผู้เช่ายังไม่ได้เซ็น — the room stops being held, and the signing link already sent stops working */
+  const discardContract = useCallback(async () => {
+    if (!uid || !buildingId || !roomId || !profile?.signed_contract) return;
+    await updateDoc(profileDocRef(uid, buildingId, roomId), {
+      signed_contract: deleteField(),
+      updated_at: new Date().toISOString(),
+    });
+  }, [uid, buildingId, roomId, profile]);
+
   /** เพิ่ม event (move_in, move_out, ฯลฯ) */
   const addEvent = useCallback(async (
     data: Omit<TenantEvent, 'id' | 'room_id' | 'created_at'>,
@@ -133,5 +142,5 @@ export function useTenantProfile(
     await deleteDoc(doc(eventsColRef(uid, buildingId, roomId), eventId));
   }, [uid, buildingId, roomId]);
 
-  return { profile, events, eventsError, loading, saveProfile, addEvent, deleteEvent };
+  return { profile, events, eventsError, loading, saveProfile, discardContract, addEvent, deleteEvent };
 }
