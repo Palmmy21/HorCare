@@ -67,6 +67,11 @@ describe('a vendor says the stall is closed, from the chat', () => {
         expect(closures()).toHaveLength(1);
         expect(closures()[0]).toMatchObject({ room_id: 's1', room_number: 'A1', from_date: addDays(todayTh(), 1), reason: 'sick', status: 'active' });
         expect(listPaths(`${B}/notifications/`)).toHaveLength(1);
+        // and the people who run the market are actually told: an alert in the owner's inbox (bell + phone)
+        const inbox = listPaths(`users/${OWNER}/inbox/`).map(p => read(p)!);
+        expect(inbox).toHaveLength(1);
+        expect(inbox[0]).toMatchObject({ type: 'shop_closure', title: 'ร้านค้าแจ้งหยุด', building_id: BLD });
+        expect(String(inbox[0].body)).toContain('แผง A1');
 
         expect((await tap(sick))!.text).toContain('แจ้งหยุด');      // the same day twice
         expect(closures()).toHaveLength(1);

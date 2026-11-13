@@ -108,7 +108,7 @@ describe('each person\'s own switches', () => {
         expect(wantsPush({ push: false })).toBe(false);
         expect(cleanAlertPrefs('x')).toEqual({});
         // finance reads leasing (deposits): told about bookings too
-        expect(alertTypesFor(permissionsForRole('finance'))).toEqual(['booking', 'payment', 'monthly_summary']);
+        expect(alertTypesFor(permissionsForRole('finance'))).toEqual(['booking', 'payment', 'monthly_summary', 'shop_closure']);
         expect(alertTypesFor(null)).toEqual([...ALERT_TYPES]);
         expect(canReceiveAlert('stock', permissionsForRole('front_desk'))).toBe(false);
     });

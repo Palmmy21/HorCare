@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './_firebase.js';
 import { linePush, staffLineToken, roomLineToken } from './_line.js';
 import { portalUrlFor } from './_portal-link.js';
+import type { AlertType } from '../src/shared/alerts.js';
 
 export type NotificationEvent =
     | 'parcel.received'
@@ -199,8 +200,27 @@ export async function notify(input: NotifyInput): Promise<NotifyResult> {
                 channels[ch] = 'failed';
             }
         }
+
+        // For the people who run the property, the in-app record above is a log no screen shows: what reaches them is
+        // an alert (the app's bell, the phone, LINE for those who linked it), sent by role and their own switches.
+        const alertType = !input.roomId && !input.lineUserId ? TEAM_ALERTS[input.event] : undefined;
+        if (alertType) {
+            const { raiseAlert } = await import('./_alerts.js');
+            const told = await raiseAlert({ ownerUid: input.ownerUid, buildingId: input.buildingId, type: alertType, title: msg.title, body: msg.body, line: true });
+            if (told.recipients > 0) channels.in_app = 'sent';
+        }
     } catch (err) {
         console.error('[notify] failed:', (err as Error).message);
     }
     return { channels, delivered: channels.line === 'sent' || channels.in_app === 'sent' };
 }
+
+/**
+ * Events about the property, for its team rather than one tenant or staff member, and the alert kind they raise.
+ * (staff.registration_pending raises its own alert where it happens, with the approve link.)
+ */
+const TEAM_ALERTS: Partial<Record<NotificationEvent, AlertType>> = {
+    'shop.closure_submitted': 'shop_closure',
+    'visitor.arriving': 'walk_in',
+    'payment.needs_review': 'payment',
+};

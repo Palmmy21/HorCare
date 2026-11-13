@@ -8,6 +8,7 @@ import type { Permission } from './permissions.js';
 
 export const ALERT_TYPES = [
     'staff_link', 'line_request', 'maintenance', 'cleaning', 'job_status', 'help_request', 'chat', 'booking', 'payment', 'stock', 'monthly_summary',
+    'shop_closure', 'walk_in',
 ] as const;
 export type AlertType = (typeof ALERT_TYPES)[number];
 
@@ -65,6 +66,14 @@ export const ALERT_INFO: Record<AlertType, AlertInfo> = {
     monthly_summary: {
         label: 'ยอดรายเดือน', hint: 'สรุปยอดเก็บเงินของเดือนที่ผ่านมา ทุกวันที่ 1',
         permissions: ['finance.read'], url: '/?view=summary',
+    },
+    shop_closure: {
+        label: 'ร้านค้าแจ้งหยุด', hint: 'พ่อค้าแม่ค้าแจ้งหยุดขายทาง LINE หรือหน้าร้านค้า — วันนั้นไม่เก็บค่าแผง',
+        permissions: ['shop.read', 'collections.read'], url: '/?view=market',
+    },
+    walk_in: {
+        label: 'ขาจรแจ้งเข้าขาย', hint: 'ขาจรส่งคำขอเข้าขายจากลิงก์ของตลาด รออนุมัติ',
+        permissions: ['shop.read', 'collections.collect'], url: '/?view=market',
     },
 };
 
