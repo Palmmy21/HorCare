@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } fro
 import {
   LayoutDashboard, Home, FileText, Send, Settings as SettingsIcon,
   Menu, X, LogOut, Clock, Shield, ShieldCheck, Zap, Ban, Package, MessageSquare, Megaphone, BookOpenCheck, BookOpen, KeyRound, Wallet,
-  Building2, ChevronDown, ChevronLeft, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car, BookOpenText,
-  UserRound,
+  ChevronDown, ChevronLeft, ChevronsUpDown, MessageCircle, Plus, Check, Pencil, Users, Wrench, SlidersHorizontal, Lock, CreditCard, Trash2 as TrashIcon, Archive, Bell, Smartphone, Sparkles, Store, Map as MapIcon, Car, BookOpenText,
 } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -83,11 +82,13 @@ import type { BranchTarget } from './components/BranchSelector/BranchSelector';
 import { recordBranchAccess } from './hooks/useBranchSummary';
 import WorkspaceSwitcher from './components/Workspace/WorkspaceSwitcher';
 import { activeBuildingStorageKey } from './shared/workspace';
-import { ASSET_COLORS, assetKindOf } from './shared/assetTheme';
+import { SHELL_BAR_COLOR, assetKindOf } from './shared/assetTheme';
 
 import './index.css';
+import './styles/shell.css';
 import './styles/assetTheme.css';
 import horcareLogo from './assets/horcare_logo.png';
+import { AppSkeleton, PageSkeleton } from './components/Common/ShellSkeleton';
 import { LOGO_SRC } from './utils/brand';
 
 function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
@@ -504,8 +505,8 @@ function App() {
     deleteCommonFee,
   } = useFirestore(effectiveUid, effectiveBuildingId, currentMonth);
 
-  // The sidebar takes the colour of the kind of property that is open (shared/assetTheme.ts): a dormitory, a market and
-  // a hotel look different at a glance. Signed out or no branch open: the default HorCare blue.
+  // The neutral shell carries a pastel of the kind of property that is open (shared/assetTheme.ts) on the active item and
+  // the branch dot: a dormitory, a market and a hotel still look different at a glance.
   const openBuildingType = buildings.find(b => b.id === effectiveBuildingId)?.building_type ?? config?.building_type;
   const assetKind = (user || maidSession) && effectiveBuildingId ? assetKindOf(openBuildingType) : null;
   useEffect(() => {
@@ -513,8 +514,7 @@ function App() {
     if (assetKind) root.dataset.asset = assetKind; else delete root.dataset.asset;
     // the phone's browser bar follows too
     const meta = document.querySelector('meta[name="theme-color"]');
-    const colors = ASSET_COLORS[assetKind ?? 'dormitory'];
-    meta?.setAttribute('content', root.classList.contains('dark') ? colors.dark : colors.light);
+    meta?.setAttribute('content', root.classList.contains('dark') ? SHELL_BAR_COLOR.dark : SHELL_BAR_COLOR.light);
   }, [assetKind]);
 
 
@@ -756,35 +756,13 @@ function App() {
         aria-label={item.label}
         aria-current={currentView === item.id ? 'page' : undefined}
       >
-        {/* Icon with optional red dot */}
         <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
-          <item.icon size={nested ? 18 : 20} />
-          {showBadge && (
-            <span className="nav-item-badge" style={{
-              position: 'absolute', top: -3, right: -4,
-              width: 8, height: 8, borderRadius: '50%',
-              background: '#EF4444',
-              border: '1.5px solid #FFFFFF',
-              boxShadow: '0 0 6px rgba(239,68,68,0.7)',
-            }} />
-          )}
+          <item.icon size={nested ? 16 : 18} />
+          {showBadge && <span className="nav-item-badge sb-dot" aria-hidden />}
         </span>
         <span className="nav-label">{item.label}</span>
-        {/* Badge count on the right when not locked */}
-        {showBadge && (
-          <span className="nav-item-badge" style={{
-            marginLeft: 'auto',
-            minWidth: 18, height: 18, borderRadius: 9,
-            background: '#EF4444',
-            color: '#fff', fontSize: '0.6875rem', fontWeight: 700,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            padding: '0 5px',
-            boxShadow: '0 2px 6px rgba(239,68,68,0.5)',
-          }}>
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </span>
-        )}
-        {isLocked && <Lock className="nav-item-lock" size={13} style={{ marginLeft: 'auto', color: '#CFE2F6', opacity: 0.8 }} />}
+        {showBadge && <span className="nav-item-badge sb-count">{badgeCount > 99 ? '99+' : badgeCount}</span>}
+        {isLocked && <Lock className="nav-item-lock" size={13} />}
       </button>
     );
   };
@@ -1037,35 +1015,12 @@ function App() {
 
   // Still loading data (buildings must resolve first so we have a valid buildingId)
   if (!maidSession && (buildingsLoading || dataLoading || !activeBuildingId)) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
-        <div className="loading-spinner" style={{ width: 40, height: 40 }}></div>
-        <p>กำลังโหลดข้อมูล...</p>
-      </div>
-    );
+    // the app's own shape, shimmering (as the branch picker does), so opening a branch feels immediate
+    return <AppSkeleton />;
   }
 
   if (maidSession && (!activeBuildingId || dataLoading)) {
-    return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        flexDirection: 'column',
-        gap: '1rem'
-      }}>
-        <div className="loading-spinner" style={{ width: 40, height: 40 }}></div>
-        <p>กำลังโหลดข้อมูลแม่บ้าน...</p>
-      </div>
-    );
+    return <AppSkeleton />;
   }
 
   // A screen opened by a link gets the same plan check the menu applies (corrected while rendering, like the guards above).
@@ -1161,262 +1116,77 @@ function App() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-logo" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-          width: '100%',
-        }}>
+        <div className="sidebar-logo" style={{ justifyContent: sidebarCollapsed ? 'center' : 'space-between' }}>
           {!sidebarCollapsed ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
-                <img src={horcareLogo} alt="HorCare" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
-                <span style={{ fontWeight: 700, letterSpacing: '-0.02em' }}>HorCare</span>
+              <div className="sb-brand">
+                <img src={horcareLogo} alt="" />
+                <span>HorCare</span>
               </div>
-              <button
-                type="button"
-                onClick={handleToggleSidebar}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.18)',
-                  border: '1px solid rgba(255, 255, 255, 0.35)',
-                  borderRadius: '8px',
-                  width: 26,
-                  height: 26,
-                  color: '#FFFFFF',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  flexShrink: 0,
-                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.32)';
-                  e.currentTarget.style.transform = 'scale(1.08)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-                aria-label="ย่อแถบเมนู"
-                title="ย่อแถบเมนู"
-              >
-                <ChevronLeft size={16} strokeWidth={2.4} />
+              <button type="button" className="sb-icon-btn" onClick={handleToggleSidebar} aria-label="ย่อแถบเมนู" title="ย่อแถบเมนู">
+                <ChevronLeft size={16} />
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={handleToggleSidebar}
-              style={{
-                background: 'rgba(255, 255, 255, 0.15)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '6px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '12px',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'scale(1.08)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.28)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-              }}
-              aria-label="ขยายแถบเมนู"
-              title="คลิกเพื่อขยายแถบเมนู"
-            >
-              <img src={horcareLogo} alt="HorCare" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <button type="button" className="sb-rail-btn" onClick={handleToggleSidebar} aria-label="ขยายแถบเมนู" title="ขยายแถบเมนู">
+              <img src={horcareLogo} alt="HorCare" />
             </button>
           )}
         </div>
 
         {/* Building Switcher — Plus/Pro (multiple buildings) */}
         {!sidebarCollapsed && canAddBuilding && (
-          <div ref={buildingMenuRef} className="sidebar-building-switcher" style={{ position: 'relative', padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
-            <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'stretch' }}>
-            <button
-              onClick={goToBranchSelector}
-              title="เลือก/สลับสาขา"
-              style={{
-                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.18)', border: '1px solid rgba(255, 255, 255, 0.35)',
-                borderRadius: '12px', padding: '0.55rem 0.75rem', cursor: 'pointer',
-                color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 700,
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-            >
-              <Building2 size={15} style={{ flexShrink: 0, color: '#CFE2F6' }} />
-              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeBuilding?.name ?? '—'}
-              </span>
-              <ChevronDown size={14} style={{ flexShrink: 0, color: '#CFE2F6', transform: 'rotate(-90deg)' }} />
-            </button>
-            {/* Manage branches (rename / delete / add) — the old dropdown, kept reachable. Owner only. */}
-            {!isStaff && <button
-              type="button"
-              onClick={() => setBuildingMenuOpen(v => !v)}
-              aria-expanded={buildingMenuOpen}
-              title="จัดการสาขา (เปลี่ยนชื่อ / ลบ / เพิ่ม)"
-              style={{
-                flexShrink: 0, width: 38, background: 'rgba(255, 255, 255, 0.18)',
-                border: '1px solid rgba(255, 255, 255, 0.35)', borderRadius: '12px', color: '#CFE2F6',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Pencil size={15} />
-            </button>}
+          <div ref={buildingMenuRef} className="sidebar-building-switcher" style={{ position: 'relative' }}>
+            <div className="sb-branch">
+              <button type="button" className="sb-branch-btn" onClick={goToBranchSelector} title="เลือก/สลับสาขา">
+                <span className="sb-branch-dot" aria-hidden />
+                <span className="sb-branch-name">{activeBuilding?.name ?? '—'}</span>
+                <ChevronsUpDown size={14} />
+              </button>
+              {/* Manage branches (rename / delete / add). Owner only. */}
+              {!isStaff && (
+                <button type="button" className="sb-branch-edit" onClick={() => setBuildingMenuOpen(v => !v)} aria-expanded={buildingMenuOpen} title="จัดการสาขา (เปลี่ยนชื่อ / ลบ / เพิ่ม)">
+                  <Pencil size={14} />
+                </button>
+              )}
             </div>
 
             {buildingMenuOpen && !isStaff && (
-              <div style={{
-                position: 'absolute', top: 'calc(100% + 4px)', left: 'var(--space-3)', right: 'var(--space-3)',
-                background: '#08589F', border: '1.5px solid rgba(255,255,255,0.3)',
-                borderRadius: '12px', overflow: 'hidden', zIndex: 200,
-                boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
-              }}>
-                <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+              <div className="sb-menu">
+                <div className="sb-menu-list">
                   {buildings.map(b => (
-                    <div
-                      key={b.id}
-                      style={{
-                        display: 'flex', alignItems: 'center',
-                        borderBottom: '1px solid rgba(255,255,255,0.08)',
-                        background: b.id === activeBuildingId ? 'rgba(255,255,255,0.18)' : 'transparent',
-                        transition: 'background 0.15s ease',
-                      }}
-                    >
+                    <div key={b.id} className={`sb-menu-row${b.id === activeBuildingId ? ' is-on' : ''}`}>
                       {renamingBuildingId === b.id ? (
-                        <form
-                          style={{ flex: 1, display: 'flex', gap: '0.375rem', padding: '0.5rem 0.625rem', alignItems: 'center' }}
-                          onSubmit={e => { e.preventDefault(); handleRenameBuilding(b.id); }}
-                        >
-                          <input
-                            autoFocus
-                            value={renamingName}
-                            onChange={e => setRenamingName(e.target.value)}
-                            style={{
-                              flex: 1, background: 'rgba(255, 255, 255, 0.22)',
-                              border: '1.5px solid rgba(255, 255, 255, 0.65)',
-                              borderRadius: '8px', color: '#FFFFFF', fontWeight: 600,
-                              fontSize: '0.875rem', padding: '0.45rem 0.6rem',
-                              outline: 'none',
-                              boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.15)',
-                            }}
-                          />
-                          <button
-                            type="submit"
-                            title="บันทึก"
-                            style={{
-                              flexShrink: 0,
-                              background: '#22A35A', border: 'none', color: '#FFFFFF',
-                              borderRadius: '8px', cursor: 'pointer', width: 32, height: 32,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(34, 163, 90, 0.4)',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#15803D'; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#22A35A'; }}
-                          >
-                            <Check size={16} strokeWidth={3} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRenamingBuildingId(null)}
-                            title="ยกเลิก"
-                            style={{
-                              flexShrink: 0,
-                              background: '#EF4444', border: 'none', color: '#FFFFFF',
-                              borderRadius: '8px', cursor: 'pointer', width: 32, height: 32,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#DC2626'; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#EF4444'; }}
-                          >
-                            <X size={16} strokeWidth={3} />
-                          </button>
+                        <form className="sb-rename" style={{ flex: 1, padding: 4 }} onSubmit={e => { e.preventDefault(); handleRenameBuilding(b.id); }}>
+                          <input autoFocus value={renamingName} onChange={e => setRenamingName(e.target.value)} aria-label="ชื่อสาขา" />
+                          <button type="submit" title="บันทึก"><Check size={15} /></button>
+                          <button type="button" onClick={() => setRenamingBuildingId(null)} title="ยกเลิก"><X size={15} /></button>
                         </form>
                       ) : (
                         <>
-                          <button
-                            onClick={() => handleSwitchBuilding(b.id)}
-                            style={{
-                              flex: 1, textAlign: 'left', background: 'none', border: 'none',
-                              color: '#FFFFFF',
-                              fontSize: '0.875rem', fontWeight: b.id === activeBuildingId ? 700 : 500,
-                              padding: '0.65rem 0.875rem', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', gap: '0.625rem', minHeight: '44px',
-                            }}
-                          >
-                            {b.id === activeBuildingId ? (
-                              <Check size={16} color="#3D8FD6" style={{ flexShrink: 0 }} />
-                            ) : (
-                              <span style={{ width: 16, flexShrink: 0 }} />
-                            )}
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {b.name}
-                            </span>
+                          <button type="button" className="sb-menu-pick" onClick={() => handleSwitchBuilding(b.id)}>
+                            {b.id === activeBuildingId ? <Check size={15} /> : <span style={{ width: 15, flexShrink: 0 }} />}
+                            <span>{b.name}</span>
                           </button>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', paddingRight: '0.5rem' }}>
-                            <button
-                              onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }}
-                              style={{
-                                background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)',
-                                cursor: 'pointer', width: 32, height: 32, borderRadius: 6,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}
-                              title="เปลี่ยนชื่อ"
-                            >
-                              <Pencil size={15} />
+                          <button type="button" className="sb-menu-act" onClick={() => { setRenamingBuildingId(b.id); setRenamingName(b.name); }} title="เปลี่ยนชื่อ">
+                            <Pencil size={14} />
+                          </button>
+                          {buildings.length > 1 && (
+                            <button type="button" className="sb-menu-act danger" onClick={() => setDeleteBuildingConfirm(b.id)} title="ลบสาขา">
+                              <TrashIcon size={14} />
                             </button>
-                            {buildings.length > 1 && (
-                              <button
-                                onClick={() => setDeleteBuildingConfirm(b.id)}
-                                style={{
-                                  background: 'none', border: 'none', color: 'rgba(254,202,202,0.95)',
-                                  cursor: 'pointer', width: 32, height: 32, borderRadius: 6,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                }}
-                                title="ลบตึก"
-                              >
-                                <TrashIcon size={15} />
-                              </button>
-                            )}
-                          </div>
+                          )}
                         </>
                       )}
                     </div>
                   ))}
                 </div>
-
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', padding: '0.625rem 0.75rem', background: 'rgba(0,0,0,0.12)' }}>
+                <div className="sb-menu-foot">
                   {buildings.length >= maxBuildings ? (
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', padding: '0.25rem', display: 'block', textAlign: 'center' }}>
-                      ครบ {maxBuildings} สาขาแล้วตามแพ็กเกจ
-                    </span>
+                    <span className="sb-menu-note">ครบ {maxBuildings} สาขาแล้วตามแพ็กเกจ</span>
                   ) : (
-                    <button
-                      onClick={() => {
-                        setBuildingMenuOpen(false);
-                        setIsAddBuildingModalOpen(true);
-                      }}
-                      style={{
-                        width: '100%', background: 'rgba(255,255,255,0.12)', border: '1.5px dashed rgba(255,255,255,0.4)',
-                        borderRadius: '10px', color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 600,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        gap: '0.5rem', padding: '0.625rem 0.75rem', transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <Plus size={16} /> เพิ่มสาขาใหม่
+                    <button type="button" className="sb-menu-add" onClick={() => { setBuildingMenuOpen(false); setIsAddBuildingModalOpen(true); }}>
+                      <Plus size={15} /> เพิ่มสาขาใหม่
                     </button>
                   )}
                 </div>
@@ -1427,84 +1197,24 @@ function App() {
 
         {/* Single Building Name Bar — Start plan (1 building, no switcher) */}
         {!sidebarCollapsed && !canAddBuilding && activeBuilding && (
-          <div className="sidebar-building-switcher" style={{ padding: '0 var(--space-3)', marginBottom: 'var(--space-2)' }}>
+          <div className="sidebar-building-switcher">
             {renamingBuildingId === activeBuilding.id ? (
-              <form
-                style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}
-                onSubmit={e => { e.preventDefault(); handleRenameBuilding(activeBuilding.id); }}
-              >
-                <input
-                  autoFocus
-                  value={renamingName}
-                  onChange={e => setRenamingName(e.target.value)}
-                  placeholder="ชื่อหอพัก"
-                  style={{
-                    flex: 1, background: 'rgba(255, 255, 255, 0.22)',
-                    border: '1.5px solid rgba(255, 255, 255, 0.65)',
-                    borderRadius: '8px', color: '#FFFFFF', fontWeight: 600,
-                    fontSize: '0.875rem', padding: '0.45rem 0.65rem',
-                    outline: 'none', minWidth: 0,
-                    boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.15)',
-                  }}
-                />
-                <button
-                  type="submit"
-                  title="บันทึก"
-                  style={{
-                    flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32,
-                    background: '#22A35A',
-                    border: 'none',
-                    borderRadius: '8px', color: '#FFFFFF',
-                    cursor: 'pointer', transition: 'all 0.15s ease',
-                    boxShadow: '0 2px 8px rgba(34, 163, 90, 0.4)',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#15803D'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#22A35A'; }}
-                >
-                  <Check size={16} strokeWidth={3} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRenamingBuildingId(null)}
-                  title="ยกเลิก"
-                  style={{
-                    flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 32, height: 32,
-                    background: '#EF4444',
-                    border: 'none',
-                    borderRadius: '8px', color: '#FFFFFF',
-                    cursor: 'pointer', transition: 'all 0.15s ease',
-                    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#DC2626'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#EF4444'; }}
-                >
-                  <X size={16} strokeWidth={3} />
-                </button>
+              <form className="sb-rename" onSubmit={e => { e.preventDefault(); handleRenameBuilding(activeBuilding.id); }}>
+                <input autoFocus value={renamingName} onChange={e => setRenamingName(e.target.value)} placeholder="ชื่อหอพัก" aria-label="ชื่อหอพัก" />
+                <button type="submit" title="บันทึก"><Check size={15} /></button>
+                <button type="button" onClick={() => setRenamingBuildingId(null)} title="ยกเลิก"><X size={15} /></button>
               </form>
             ) : (
               <button
+                type="button"
+                className="sb-branch-btn"
+                style={{ width: '100%' }}
                 onClick={() => { if (!isStaff) { setRenamingBuildingId(activeBuilding.id); setRenamingName(activeBuilding.name); } }}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  background: 'rgba(255, 255, 255, 0.18)', border: '1.5px solid rgba(255, 255, 255, 0.35)',
-                  borderRadius: '12px', padding: '0.55rem 0.75rem', cursor: 'pointer',
-                  color: '#FFFFFF', fontSize: '0.85rem', fontWeight: 700,
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                  backdropFilter: 'blur(8px)',
-                }}
-                title="คลิกเพื่อเปลี่ยนชื่อหอพัก"
+                title={isStaff ? activeBuilding.name : 'คลิกเพื่อเปลี่ยนชื่อ'}
               >
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22A35A', boxShadow: '0 0 6px #22A35A', flexShrink: 0 }} />
-                <Building2 size={15} style={{ flexShrink: 0, color: '#CFE2F6' }} />
-                <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {activeBuilding.name}
-                </span>
-                <Pencil size={12} style={{ flexShrink: 0, color: 'rgba(255, 255, 255, 0.75)' }} />
+                <span className="sb-branch-dot" aria-hidden />
+                <span className="sb-branch-name">{activeBuilding.name}</span>
+                {!isStaff && <Pencil size={13} />}
               </button>
             )}
           </div>
@@ -1530,15 +1240,9 @@ function App() {
                       aria-expanded={open}
                       onClick={() => toggleNavGroup(group.id)}
                     >
-                      <GroupIcon size={20} />
+                      <GroupIcon size={18} />
                       <span className="nav-label">{group.label}</span>
-                      {!open && groupBadge > 0 && (
-                        <span className="nav-item-badge" style={{
-                          marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9, background: '#EF4444',
-                          color: '#fff', fontSize: '0.6875rem', fontWeight: 700, display: 'inline-flex',
-                          alignItems: 'center', justifyContent: 'center', padding: '0 5px',
-                        }}>{groupBadge > 99 ? '99+' : groupBadge}</span>
-                      )}
+                      {!open && groupBadge > 0 && <span className="nav-item-badge sb-count">{groupBadge > 99 ? '99+' : groupBadge}</span>}
                       <ChevronDown
                         size={16}
                         className="nav-group-chevron"
@@ -1552,180 +1256,57 @@ function App() {
         </nav>
 
         {/* Upgrade nudge for free users */}
-        {planProfile?.license === 'free' && !hasPaidSubscription && (
-          <button
-            className="sidebar-upgrade-nudge"
-            onClick={() => handleNavClick('pricing')}
-            style={{
-              margin: 'var(--space-4) var(--space-3) 0',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.12))',
-              border: '1.5px solid rgba(255,255,255,0.35)',
-              borderRadius: '12px',
-              padding: '0.75rem',
-              cursor: 'pointer', textAlign: 'left', width: 'calc(100% - calc(var(--space-3) * 2))',
-              color: '#FFFFFF',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <Zap size={14} color="#F7B86C" />
-              <span style={{ fontWeight: 800, fontSize: '0.8125rem', color: '#FFFFFF' }}>{!isStaff && canStartTrial(profile) ? `ทดลองใช้ Pro ฟรี ${TRIAL_DAYS} วัน` : 'อัปเกรดแผน'}</span>
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', fontWeight: 600, lineHeight: 1.4 }}>
-              {!isStaff && canStartTrial(profile) ? 'ใช้ได้ทุกฟีเจอร์ ไม่ต้องผูกบัตร' : 'HorCare ฿399/เดือน · ฟีเจอร์ครบ'}
-            </div>
+        {planProfile?.license === 'free' && !hasPaidSubscription && !sidebarCollapsed && (
+          <button type="button" className="sidebar-upgrade-nudge sb-nudge" onClick={() => handleNavClick('pricing')}>
+            <strong><Zap size={14} aria-hidden /> {!isStaff && canStartTrial(profile) ? `ทดลองใช้ Pro ฟรี ${TRIAL_DAYS} วัน` : 'อัปเกรดแผน'}</strong>
+            <span>{!isStaff && canStartTrial(profile) ? 'ใช้ได้ทุกฟีเจอร์ ไม่ต้องผูกบัตร' : 'HorCare ฿399/เดือน · ฟีเจอร์ครบ'}</span>
           </button>
         )}
 
-        {/* User info + logout */}
-        <div className="sidebar-user-info" style={{
-          marginTop: 'auto',
-          paddingTop: 'var(--space-4)',
-          borderTop: '1px solid rgba(255,255,255,0.2)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: sidebarCollapsed ? 'center' : 'stretch',
-        }}>
-          {!sidebarCollapsed && (maidSession ? (
-            <div className="sidebar-user-name">แม่บ้าน: {maidSession.maid_name}</div>
+        {/* Account, help, sign out */}
+        <div className="sidebar-user-info">
+          {maidSession ? (
+            !sidebarCollapsed && (
+              <div className="sb-user" style={{ cursor: 'default' }}>
+                <span className="sb-avatar" aria-hidden>{(maidSession.maid_name || '?').slice(0, 1)}</span>
+                <span className="sb-user-text"><strong>{maidSession.maid_name}</strong><small>แม่บ้าน</small></span>
+              </div>
+            )
           ) : (
-            <button type="button" className="sidebar-user-name sidebar-user-btn" onClick={() => { setMobileMenuOpen(false); setProfileOpen('profile'); }}
-              title="โปรไฟล์ · บทบาท · แพ็กเกจ">
-              <UserRound size={15} aria-hidden />
-              <span>{profile?.name || profile?.display_name || user?.email}</span>
+            <button type="button" className="sb-user" onClick={() => { setMobileMenuOpen(false); setProfileOpen('profile'); }} title="โปรไฟล์ · บทบาท · แพ็กเกจ">
+              <span className="sb-avatar" aria-hidden>{(profile?.name || profile?.display_name || user?.email || '?').slice(0, 1).toUpperCase()}</span>
+              {!sidebarCollapsed && (
+                <span className="sb-user-text">
+                  <strong>{profile?.name || profile?.display_name || user?.email}</strong>
+                  <small>โปรไฟล์ · แพ็กเกจ</small>
+                </span>
+              )}
             </button>
-          ))}
+          )}
           {!sidebarCollapsed && !maidSession && (
             <WorkspaceSwitcher variant="select" teams={teams} hasOwn={hasOwn} activeOwnerUid={membership?.owner_uid ?? null} onChoose={switchWorkspace} />
           )}
-
-          {/* Install PWA Button (only when in web browser) */}
           {!isStandalone && (
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))}
-              title="ติดตั้งแอป HorCare"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                gap: '0.625rem',
-                width: sidebarCollapsed ? '42px' : '100%',
-                height: sidebarCollapsed ? '42px' : 'auto',
-                padding: sidebarCollapsed ? '0' : '0.6rem 0.85rem',
-                marginBottom: '0.5rem',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%)',
-                border: '1px solid rgba(255,255,255,0.35)',
-                color: '#FFFFFF',
-                fontSize: '0.825rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                flexShrink: 0,
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.3)';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.12) 100%)';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'none';
-              }}
-            >
-              <Smartphone size={17} style={{ flexShrink: 0, color: '#F7B86C' }} />
-              {!sidebarCollapsed && <span>ติดตั้งแอป HorCare</span>}
+            <button type="button" className="sb-link" onClick={() => window.dispatchEvent(new CustomEvent('open-pwa-install'))} title="ติดตั้งแอป HorCare">
+              <Smartphone aria-hidden />
+              {!sidebarCollapsed && <span>ติดตั้งแอป</span>}
             </button>
           )}
-
-          {/* LINE Contact Button */}
-          <a
-            href="https://lin.ee/sBZQ5CF"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="ติดต่อฝ่ายบริการ (LINE Support)"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-              gap: '0.625rem',
-              width: sidebarCollapsed ? '42px' : '100%',
-              height: sidebarCollapsed ? '42px' : 'auto',
-              padding: sidebarCollapsed ? '0' : '0.6rem 0.85rem',
-              marginBottom: '0.5rem',
-              borderRadius: '12px',
-              background: '#FFFFFF',
-              border: 'none',
-              color: '#15803D',
-              fontSize: '0.825rem',
-              fontWeight: 700,
-              textDecoration: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              flexShrink: 0,
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = '#EFF8F2';
-              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 6px 18px rgba(0,0,0,0.15)';
-              (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.background = '#FFFFFF';
-              (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-              (e.currentTarget as HTMLAnchorElement).style.transform = 'none';
-            }}
-          >
-            {/* LINE icon SVG */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#15803D" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-              <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.627.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
-            </svg>
+          <a className="sb-link" href="https://lin.ee/sBZQ5CF" target="_blank" rel="noopener noreferrer" title="ติดต่อฝ่ายบริการทาง LINE">
+            <MessageCircle aria-hidden />
             {!sidebarCollapsed && <span>ติดต่อฝ่ายบริการ</span>}
           </a>
-
-          <button
-            className="nav-item"
-            onClick={maidSession ? handleMaidLogout : logout}
-            style={{
-              color: 'rgba(255,255,255,0.95)',
-              fontWeight: 700,
-              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-              width: sidebarCollapsed ? '42px' : '100%',
-              height: sidebarCollapsed ? '42px' : 'auto',
-              padding: sidebarCollapsed ? '0' : '0.55rem 0.85rem',
-              margin: '0',
-            }}
-            title="ออกจากระบบ"
-          >
-            <LogOut size={18} style={{ color: '#CFE2F6' }} />
+          <button type="button" className="sb-link" onClick={maidSession ? handleMaidLogout : logout} title="ออกจากระบบ">
+            <LogOut aria-hidden />
             {!sidebarCollapsed && <span>ออกจากระบบ</span>}
           </button>
-          {!sidebarCollapsed && (
-            <div className="app-version" style={{
-              color: 'rgba(255,255,255,0.75)',
-              fontWeight: 600,
-              fontSize: '0.6875rem',
-              marginTop: 'var(--space-2)'
-            }}>
-              HorCare Property Care
-            </div>
-          )}
+          {!sidebarCollapsed && <div className="app-version sb-version">HorCare Property Care</div>}
         </div>
       </aside>
 
       {/* Overlay for mobile menu */}
       {mobileMenuOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 99
-          }}
-          onClick={() => setMobileMenuOpen(false)}
-        />
+        <div className="sb-overlay" onClick={() => setMobileMenuOpen(false)} />
       )}
 
       {/* Main Content */}
@@ -1818,7 +1399,7 @@ function App() {
             </div>
           </div>
         )}
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<PageSkeleton />}>
         {currentView === 'dashboard' && user && activeBuildingId && !maidSession && staffPermissions === null && (
           <QuickStart
             key={activeBuildingId}
@@ -2089,7 +1670,7 @@ function App() {
         )}
 
         {currentView === 'manual' && (
-          <Suspense fallback={<div style={{ padding: '2rem' }}>กำลังโหลด…</div>}>
+          <Suspense fallback={<PageSkeleton />}>
             <ManualPage
               canOpen={v => isViewMode(v) && !hiddenViews.includes(v) && (!isStaff || canOpenView(v, staffPermissions))}
               onOpen={v => { if (isViewMode(v)) setCurrentView(v); }}

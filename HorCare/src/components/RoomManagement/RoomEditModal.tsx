@@ -202,7 +202,12 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
                             <div className="re-grid re-grid-3">
                                 <label className="re-field">
                                     <span className="re-label">โซน</span>
-                                    <input className="form-input" value={zone} onChange={e => setZone(e.target.value)} placeholder="เช่น โซน A" />
+                                    <input className="form-input" value={zone} onChange={e => setZone(e.target.value)} placeholder="เช่น โซน A" list="re-zone-options" />
+                                    {/* the market's zones (ตั้งค่า → ตลาดและแผงค้า) and the ones other stalls already use */}
+                                    <datalist id="re-zone-options">
+                                        {[...new Set([...(config.market_config?.zones ?? []), ...rooms.map(r => (r.zone ?? '').trim())].filter(Boolean))]
+                                            .map(z => <option key={z} value={z} />)}
+                                    </datalist>
                                 </label>
                                 <label className="re-field">
                                     <span className="re-label">ขนาดแผง</span>
