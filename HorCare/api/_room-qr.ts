@@ -75,9 +75,10 @@ async function openQr(req: VercelRequest, res: VercelResponse) {
     const oaId = await propertyOaId(entry.owner_uid, entry.building_id);
     if (!oaId) { deadEnd(res, 503, 'ระบบยังไม่พร้อม กรุณาติดต่อเจ้าของหอ'); return; }
     res.setHeader('Cache-Control', 'no-store');
-    const liff = process.env.VITE_LIFF_ID;
-    if (liff && oaId === process.env.VITE_LINE_OA_ID) { res.redirect(302, `https://liff.line.me/${liff}?room=${code}`); return; }
-    res.redirect(302, chatLink(oaId, code));
+    // the LIFF app that knows the scanner on this property's OA — HorCare's (tenant or vendor OA) or the team's own —
+    // and only the chat when there is none (api/_liff-join.ts)
+    const { joinDestination } = await import('./_liff-join.js');
+    res.redirect(302, (await joinDestination(code)) ?? chatLink(oaId, code));
 }
 
 const chatLink = (oaId: string, code: string) => `https://line.me/R/oaMessage/${encodeURIComponent(oaId)}/?${encodeURIComponent(code)}`;

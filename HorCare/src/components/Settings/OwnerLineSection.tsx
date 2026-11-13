@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MessageCircle, Copy, Loader2, Link2Off } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiPost } from '../../utils/api';
+import JoinQr from '../Common/JoinQr';
 import { OWNER_HELP } from '../../shared/ownerCommands';
 
 /** Settings → การเชื่อมต่อ: link this account to the team LINE OA — the admin menu, and figures (#ยอด #ค้าง #ห้องว่าง) for those who may see them. */
@@ -63,7 +64,7 @@ export default function OwnerLineSection({ ownerUid }: { ownerUid?: string }) {
             {code ? (
                 <div className="owner-line-code">
                     <div>
-                        <div className="owner-line-code-value">{code.code}</div>
+                        <JoinQr code={code.code} size={132} hint="สแกนด้วย LINE แล้วเชื่อมทันที" />
                         <div className="form-hint">ใช้ได้อีก {minutesLeft} นาที ครั้งเดียว</div>
                     </div>
                     <div className="listing-link-actions">

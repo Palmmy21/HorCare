@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Copy, Loader2, MessageCircle, RefreshCw, Sparkles, UserCheck, Users, Wrench, XCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { joinUrl } from '../../shared/joinCodes';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { useWorkOrders } from '../../hooks/useWorkOrders';
@@ -65,7 +66,8 @@ export default function StaffTeamTab({ uid, buildingId, onPendingChange }: Props
 
   const basic = status?.basic_id ?? (import.meta.env.VITE_LINE_STAFF_OA_ID as string | undefined) ?? null;
   const addFriendUrl = basic ? `https://line.me/R/ti/p/${encodeURIComponent(basic)}` : null;
-  const deepLink = basic && code?.code ? `https://line.me/R/oaMessage/${encodeURIComponent(basic)}/?${encodeURIComponent(code.code)}` : null;
+  // the QR opens the LIFF sign-up page (job, name, phone in one screen); the chat link stays for typing the code
+  const deepLink = code?.code ? joinUrl(window.location.origin, code.code) : null;
   const connected = !!status?.token_set && !!status.secret_set && status.webhook_matches !== false && status.webhook_active !== false;
 
   return (
@@ -90,8 +92,8 @@ export default function StaffTeamTab({ uid, buildingId, onPendingChange }: Props
         <strong style={{ display: 'flex', gap: 6, alignItems: 'center' }}><UserCheck size={16} /> ให้ช่าง/แม่บ้านลงทะเบียนเอง</strong>
         <ol style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', lineHeight: 1.7 }}>
           <li>คุณแสดง QR หรือส่งลิงก์ด้านล่างให้ช่าง/แม่บ้าน</li>
-          <li>เขาเพิ่มเพื่อน LINE OA แล้วส่งรหัส (ระบบกรอกให้อัตโนมัติเมื่อสแกน)</li>
-          <li>บอทถามหน้าที่ ชื่อ และเบอร์โทร ทีละข้อ</li>
+          <li>เขาสแกนด้วย LINE แล้วเลือกงาน กรอกชื่อและเบอร์โทรในหน้าเดียว (ไม่ต้องพิมพ์รหัส)</li>
+          <li>ระบบชวนเพิ่มเพื่อน LINE OA ให้เอง เพื่อรับงานในแชท</li>
           <li>คำขอมาขึ้นด้านล่าง — คุณกดอนุมัติ แล้วเขาจะรับงานทาง LINE ได้ทันที</li>
         </ol>
         {code === null ? <Loader2 className="spin" /> : code.code ? (

@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import horcareLogo from '../../assets/horcare_logo.png';
-import { ClipboardList, AlertTriangle, Building2, Smartphone, CheckCircle2, Hourglass } from 'lucide-react';
+import { ClipboardList, AlertTriangle, Building2, Smartphone, CheckCircle2, Hourglass, Wrench, Sparkles } from 'lucide-react';
+import { JOIN_TITLES_TH, isLiffId, type JoinKind } from '../../shared/joinCodes';
+
+interface JoinResponse {
+  kind: JoinKind; ok: boolean; outcome?: string; message: string; place?: string;
+  room_number?: string; current_rooms?: string[]; add_friend_url?: string;
+}
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,11 +21,50 @@ type GatewayState =
   | { status: 'room_result'; ok: boolean; title: string; message: string; addFriendUrl?: string }
   /** This LINE account looks after several rooms: which portal? */
   | { status: 'pick_room'; rooms: { portal: string; room_number: string; dorm_name: string }[] }
-  /** Already has a room and scanned another: moving, or taking one more? */
-  | { status: 'choose'; code: string; roomNumber: string; currentRooms: string[]; busy: boolean }
+  /** Already has a room and scanned another: moving, or taking one more? `join`: it came through /j/<code>. */
+  | { status: 'choose'; code: string; roomNumber: string; currentRooms: string[]; busy: boolean; join?: boolean }
+  /** A property's staff sign-up QR: who are you? */
+  | { status: 'staff_form'; code: string; place?: string; busy: boolean; error?: string }
   | { status: 'error'; message: string };
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID as string | undefined;
+
+/** Read before liff.init: a team's own LIFF app opens this page with ?team=<id> in its endpoint URL. */
+const TEAM = new URLSearchParams(window.location.search).get('team');
+
+/** Register whatever the scanned code is for (api/_liff-join.ts). */
+async function joinCall(code: string, extra: { mode?: 'move' | 'add'; form?: { role: string; name: string; phone: string } } = {}): Promise<{ status: number; data: JoinResponse & { error?: string; url?: string } }> {
+  const res = await fetch('/api/liff-join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'join', access_token: window.liff.getAccessToken(), code, ...(TEAM ? { team: TEAM } : {}), ...extra }),
+  });
+  return { status: res.status, data: await res.json().catch(() => ({})) as JoinResponse & { error?: string; url?: string } };
+}
+
+/** What a person sees after a /j/<code> registration that is not a room. */
+function joinResult(r: JoinResponse): Extract<GatewayState, { status: 'room_result' }> {
+  const friendNote = r.add_friend_url ? ' เหลืออีกขั้นเดียว: กดเพิ่มเพื่อนด้านล่าง เพื่อรับข้อความในแชท' : '';
+  const pending = r.outcome === 'pending';
+  return {
+    status: 'room_result', ok: r.ok,
+    title: !r.ok ? 'ลงทะเบียนไม่สำเร็จ' : pending ? 'รอแอดมินอนุมัติ' : `${JOIN_TITLES_TH[r.kind]}สำเร็จ`,
+    message: `${r.message}${r.place && r.ok ? ` · ${r.place}` : ''}${r.ok ? friendNote : ''}`,
+    addFriendUrl: r.ok ? r.add_friend_url : undefined,
+  };
+}
+
+/** Turn a /api/liff-join answer into the next screen (or a jump to the right LIFF app / chat). */
+function nextFromJoin(code: string, status: number, data: JoinResponse & { error?: string; url?: string }): GatewayState | 'navigated' {
+  if (status === 409 && data.url) { window.location.replace(data.url); return 'navigated'; }
+  if (status !== 200 || !data.kind) return { status: 'error', message: 'ลงทะเบียนไม่สำเร็จ กรุณาสแกนอีกครั้ง' };
+  if (data.kind === 'room') {
+    if (data.outcome === 'choose') return { status: 'choose', code, roomNumber: data.room_number ?? '', currentRooms: data.current_rooms ?? [], busy: false, join: true };
+    return roomResult({ outcome: data.outcome, room_number: data.room_number, dorm_name: data.place, add_friend_url: data.add_friend_url });
+  }
+  if (data.kind === 'staff_reg' && data.outcome === 'form') return { status: 'staff_form', code, place: data.place, busy: false };
+  return joinResult(data);
+}
 
 interface ScanResponse { outcome?: string; room_number?: string; dorm_name?: string; add_friend_url?: string; url?: string; error?: string; current_rooms?: string[]; adding?: boolean }
 
@@ -57,6 +102,51 @@ function roomResult(r: ScanResponse): Extract<GatewayState, { status: 'room_resu
   }
 }
 
+function StaffForm({ state, cardStyle, boxStyle, onSubmit }: {
+  state: Extract<GatewayState, { status: 'staff_form' }>;
+  cardStyle: React.CSSProperties; boxStyle: React.CSSProperties;
+  onSubmit: (form: { role: string; name: string; phone: string }) => void;
+}) {
+  const [role, setRole] = useState<'technician' | 'housekeeping' | ''>('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const ready = !!role && name.trim().length >= 2 && phone.replace(/\D/g, '').length >= 9 && !state.busy;
+  const roleBtn = (on: boolean): React.CSSProperties => ({
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '1rem 0.5rem', borderRadius: 16,
+    border: on ? '2px solid #0A6CC2' : '1px solid #CFE2F6', background: on ? 'rgba(10,108,194,0.08)' : '#FFFFFF',
+    color: '#102A43', fontFamily: 'inherit', fontSize: '1.05rem', fontWeight: 700, cursor: 'pointer',
+  });
+  const input: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box', padding: '0.875rem 1rem', borderRadius: 12, border: '1px solid #CFE2F6',
+    fontFamily: 'inherit', fontSize: '16px', color: '#102A43', background: '#FFFFFF',
+  };
+  const label: React.CSSProperties = { display: 'block', textAlign: 'left', color: '#3E5872', fontSize: '0.875rem', fontWeight: 600, margin: '1rem 0 0.375rem' };
+  return (
+    <div style={cardStyle}>
+      <img src={horcareLogo} alt="HorCare" style={{ width: 64, height: 64, borderRadius: 16, marginBottom: '1.25rem' }} />
+      <div style={boxStyle}>
+        <h2 style={{ fontWeight: 800, color: '#102A43', margin: '0 0 0.25rem', fontSize: '1.25rem' }}>สมัครเป็นทีมงาน</h2>
+        {state.place && <p style={{ color: '#557089', fontSize: '0.875rem', margin: 0 }}>{state.place}</p>}
+        <span style={label}>ทำงานอะไร</span>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button type="button" style={roleBtn(role === 'technician')} aria-pressed={role === 'technician'} onClick={() => setRole('technician')}><Wrench size={28} color="#0A6CC2" /> ช่าง</button>
+          <button type="button" style={roleBtn(role === 'housekeeping')} aria-pressed={role === 'housekeeping'} onClick={() => setRole('housekeeping')}><Sparkles size={28} color="#0A6CC2" /> แม่บ้าน</button>
+        </div>
+        <label style={label} htmlFor="sf-name">ชื่อ</label>
+        <input id="sf-name" style={input} value={name} onChange={e => setName(e.target.value)} placeholder="ชื่อ-นามสกุล" autoComplete="name" />
+        <label style={label} htmlFor="sf-phone">เบอร์โทร</label>
+        <input id="sf-phone" style={input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="08x-xxx-xxxx" inputMode="tel" autoComplete="tel" />
+        {state.error && <p role="alert" style={{ color: '#C62828', fontSize: '0.875rem', margin: '0.75rem 0 0' }}>{state.error}</p>}
+        <button type="button" disabled={!ready} onClick={() => role && onSubmit({ role, name: name.trim(), phone: phone.trim() })}
+          style={{ width: '100%', marginTop: '1.25rem', padding: '1rem', borderRadius: 14, border: 'none', background: ready ? '#0A6CC2' : '#A9B8C8', color: '#fff', fontFamily: 'inherit', fontSize: '1.05rem', fontWeight: 700, cursor: ready ? 'pointer' : 'default' }}>
+          {state.busy ? 'กำลังส่ง...' : 'ส่งใบสมัคร'}
+        </button>
+        <p style={{ color: '#557089', fontSize: '0.8125rem', margin: '0.75rem 0 0' }}>ผู้จัดการจะอนุมัติ แล้วแจ้งผลใน LINE</p>
+      </div>
+    </div>
+  );
+}
+
 function loadLiffSdk(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.liff) { resolve(); return; }
@@ -73,25 +163,42 @@ export default function TenantGateway() {
 
   useEffect(() => {
     async function init() {
-      if (!LIFF_ID) {
-        setState({ status: 'error', message: 'LIFF ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแลระบบ' });
-        return;
-      }
       try {
+        // a team's own OA has its own LIFF app (its LINE ids belong to its provider); HorCare's is built in
+        let liffId = LIFF_ID;
+        if (TEAM) {
+          const cfg = await fetch('/api/liff-join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'config', team: TEAM }) });
+          const found = cfg.ok ? (await cfg.json() as { liff_id?: string }).liff_id : undefined;
+          liffId = isLiffId(found) ? found : undefined;
+        }
+        if (!liffId) {
+          setState({ status: 'error', message: 'LIFF ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแลระบบ' });
+          return;
+        }
         await loadLiffSdk();
-        await window.liff.init({ liffId: LIFF_ID });
+        await window.liff.init({ liffId });
 
         // read only after liff.init(): that is what restores the query from the LIFF URL
-        const roomCode = new URLSearchParams(window.location.search).get('room');
+        const params = new URLSearchParams(window.location.search);
+        const roomCode = params.get('room');
+        const joinCode = params.get('join');
 
         // a phone camera may open the QR in the browser; LINE Login still proves who is scanning
-        if (!window.liff.isInClient() && !roomCode) {
+        if (!window.liff.isInClient() && !roomCode && !joinCode) {
           setState({ status: 'no_liff' });
           return;
         }
 
         if (!window.liff.isLoggedIn()) {
           window.liff.login({ redirectUri: window.location.href });
+          return;
+        }
+
+        // /j/<code>: any registration — room, stall, walk-in, staff, admin, cashier
+        if (joinCode) {
+          const { status, data } = await joinCall(joinCode);
+          const next = nextFromJoin(joinCode, status, data);
+          if (next !== 'navigated') setState(next);
           return;
         }
 
@@ -264,6 +371,12 @@ export default function TenantGateway() {
     const answer = async (mode: 'move' | 'add') => {
       setState({ ...state, busy: true });
       try {
+        if (state.join) {
+          const { status, data } = await joinCall(state.code, { mode });
+          const next = nextFromJoin(state.code, status, data);
+          if (next !== 'navigated') setState(next);
+          return;
+        }
         const { ok, data } = await scanRoom(state.code, mode);
         setState(ok ? roomResult(data) : { status: 'error', message: 'ลงทะเบียนไม่สำเร็จ กรุณาสแกนอีกครั้ง' });
       } catch {
@@ -292,6 +405,22 @@ export default function TenantGateway() {
         </div>
       </div>
     );
+  }
+
+  // ── Staff sign-up QR: job, name, phone — few words, big buttons ──
+  if (state.status === 'staff_form') {
+    return <StaffForm state={state} cardStyle={cardStyle} boxStyle={boxStyle}
+      onSubmit={async form => {
+        setState({ ...state, busy: true, error: undefined });
+        try {
+          const { status, data } = await joinCall(state.code, { form });
+          if (status === 200 && data.kind === 'staff_reg' && !data.ok && data.outcome === 'bad_form') { setState({ ...state, busy: false, error: data.message }); return; }
+          const next = nextFromJoin(state.code, status, data);
+          if (next !== 'navigated') setState(next);
+        } catch {
+          setState({ ...state, busy: false, error: 'ส่งไม่สำเร็จ กรุณาลองใหม่' });
+        }
+      }} />;
   }
 
   // ── After scanning a room's QR ──

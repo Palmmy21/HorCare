@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Copy, Link2Off, Loader2, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
+import JoinQr from '../Common/JoinQr';
 
 /**
  * "POS Care ทาง LINE": link this HorCare account to the HorCare Staff OA (a one-time HCP- code), so the person can open
@@ -46,12 +47,12 @@ export default function PosLineCard({ ownerUid, compact = false }: { ownerUid: s
                 <div className="pos-link-body">
                     <ol>
                         <li>{oaId ? <>เพิ่มเพื่อน <a href={`https://line.me/R/ti/p/${encodeURIComponent(oaId)}`} target="_blank" rel="noopener noreferrer">LINE HorCare Staff</a></> : 'เพิ่มเพื่อน LINE HorCare Staff'}</li>
-                        <li>กด "สร้างรหัส" แล้วส่งรหัส HCP- ในแชทนั้น (ใช้ได้ 15 นาที)</li>
+                        <li>กด "สร้างรหัส" แล้วสแกน QR ด้วย LINE (ใช้ได้ 15 นาที) — หรือส่งรหัส HCP- ในแชทนั้น</li>
                         <li>กด "เปิด POS Care" ในเมนูของแชท</li>
                     </ol>
                     {code && (
                         <div className="pos-link-code">
-                            <strong className="mono">{code.code}</strong>
+                            <JoinQr code={code.code} size={132} hint="สแกนด้วย LINE แล้วเชื่อมทันที" />
                             <small>ใช้ได้อีก {minutes} นาที ครั้งเดียว</small>
                             <div className="pos-link-actions">
                                 <button type="button" className="btn btn-outline btn-sm" onClick={() => void copy(code.code)}><Copy size={14} aria-hidden /> คัดลอก</button>

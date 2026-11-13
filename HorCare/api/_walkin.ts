@@ -112,7 +112,8 @@ export async function saveWalkInCode(code: string, owner: string, building: stri
 export async function walkInLineUrl(owner: string, building: string, code: string): Promise<{ url: string; oa_id: string } | null> {
     const oa = await propertyOaId(owner, building);
     if (!oa) return null;
-    return { url: `https://line.me/R/oaMessage/${encodeURIComponent(oa)}/?${encodeURIComponent(code)}`, oa_id: oa };
+    // through /j/<code>: the LIFF app links the request at once; with none set up it opens the chat with the code ready
+    return { url: `${appBaseUrl()}/j/${encodeURIComponent(code)}`, oa_id: oa };
 }
 
 const dayText = (d: string) => new Date(`${d}T00:00:00+07:00`).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' });

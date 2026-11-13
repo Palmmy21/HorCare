@@ -14,6 +14,9 @@ interface Status {
     webhook_matches?: boolean | null;
     token_valid?: boolean | null;
     encryption_ready?: boolean;
+    /** the team's LIFF app, when set up (api/_line-oa.ts liff_setup) */
+    liff_id?: string | null;
+    login_channel_id?: string | null;
 }
 
 const CONSOLE_URL = 'https://developers.line.biz/console/';
@@ -45,6 +48,93 @@ function Check_({ ok, children }: { ok: boolean | null; children: React.ReactNod
             {ok === false ? <AlertTriangle size={16} aria-hidden /> : <CheckCircle2 size={16} aria-hidden />}
             <span>{children}</span>
         </li>
+    );
+}
+
+const LIFF_ERRORS: Record<string, string> = {
+    invalid_input: 'Channel ID ต้องเป็นตัวเลข และ Channel secret ต้องมี 32 ตัวอักษร',
+    invalid_login_channel: 'LINE ไม่ยอมรับ Channel ID / secret นี้ ตรวจว่าคัดลอกจาก LINE Login channel (ไม่ใช่ Messaging API)',
+    liff_failed: 'LINE สร้าง LIFF ไม่สำเร็จ ตรวจว่า channel เป็นแบบ LINE Login และสถานะ Published แล้วลองใหม่',
+    not_connected: 'เชื่อม OA ก่อน แล้วค่อยตั้ง LIFF',
+    encryption_not_configured: ERRORS.encryption_not_configured,
+};
+
+/**
+ * Scan a QR, registered — on the team's own OA too. LINE ids belong to one provider, so the team needs a LIFF app on a
+ * LINE Login channel in the same provider as its OA: two values pasted here, and HorCare creates the LIFF app itself.
+ */
+function LiffSetup({ ownerUid, buildingId, status, onChanged }: { ownerUid: string; buildingId?: string; status: Status; onChanged: () => Promise<void> }) {
+    const [channelId, setChannelId] = useState('');
+    const [secret, setSecret] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [editing, setEditing] = useState(false);
+    const ready = /^\d{6,20}$/.test(channelId.trim()) && /^[0-9a-f]{32}$/i.test(secret.trim());
+
+    const setup = async () => {
+        setBusy(true);
+        setError(null);
+        try {
+            await apiPost('line-oa', { action: 'liff_setup', owner_uid: ownerUid, building_id: buildingId, login_channel_id: channelId, login_channel_secret: secret });
+            setChannelId(''); setSecret(''); setEditing(false);
+            toast.success('เปิดลงทะเบียนด้วย QR (LIFF) แล้ว');
+            await onChanged();
+        } catch (e) {
+            const err = e as ApiError;
+            setError(LIFF_ERRORS[err.code] ?? err.message ?? 'ตั้งค่าไม่สำเร็จ');
+        } finally {
+            setBusy(false);
+        }
+    };
+    const remove = async () => {
+        if (!confirm('ปิดการลงทะเบียนด้วย QR (LIFF)? QR จะกลับไปเปิดแชทพร้อมรหัสแทน')) return;
+        setBusy(true);
+        try { await apiPost('line-oa', { action: 'liff_remove', owner_uid: ownerUid, building_id: buildingId }); toast.success('ปิด LIFF แล้ว'); await onChanged(); }
+        catch (e) { toast.error((e as ApiError).message ?? 'ไม่สำเร็จ'); }
+        finally { setBusy(false); }
+    };
+
+    if (status.liff_id && !editing) {
+        return (
+            <div className="oa-liff">
+                <div className="oa-connected"><Check size={18} aria-hidden /> ลงทะเบียนด้วย QR อัตโนมัติ (LIFF) เปิดอยู่</div>
+                <p className="form-hint">ผู้เช่าสแกน QR ห้องด้วย LINE แล้วลงทะเบียนทันที ไม่ต้องส่งรหัส · LIFF ID <span className="mono">{status.liff_id}</span></p>
+                <div className="oa-actions">
+                    <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => setEditing(true)}>เปลี่ยน channel</button>
+                    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void remove()}>ปิด LIFF</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <details className="oa-more oa-liff" open={editing || undefined}>
+            <summary><ChevronDown size={14} aria-hidden /> แนะนำ: ให้ผู้เช่าสแกน QR แล้วลงทะเบียนอัตโนมัติ (LIFF)</summary>
+            <p>ตอนนี้สแกน QR แล้วผู้เช่าต้องกดส่งรหัสในแชทเอง เปิด LIFF แล้วสแกนครั้งเดียวจบ</p>
+            <ol className="oa-steps">
+                <li>
+                    <div className="oa-step-title">ใน Console เลือก <strong>provider เดียวกับ OA นี้</strong> → Create a new channel → <strong>LINE Login</strong></div>
+                    <div className="oa-actions"><ExtLink href={CONSOLE_URL}>เปิด Console</ExtLink></div>
+                </li>
+                <li><div className="oa-step-title">แท็บ Basic settings → ตั้ง <strong>Linked OA</strong> เป็น {status.display_name ?? status.oa_id} แล้วกด Publish channel</div></li>
+                <li>
+                    <label className="oa-step-title" htmlFor="liff-cid">คัดลอก <strong>Channel ID</strong> มาวาง</label>
+                    <input id="liff-cid" className="form-input" inputMode="numeric" autoComplete="off" placeholder="ตัวเลข 10 หลัก" value={channelId} onChange={e => { setChannelId(e.target.value); setError(null); }} />
+                </li>
+                <li>
+                    <label className="oa-step-title" htmlFor="liff-secret">คัดลอก <strong>Channel secret</strong> มาวาง</label>
+                    <input id="liff-secret" className="form-input" type="password" autoComplete="off" spellCheck={false} placeholder="32 ตัวอักษร" value={secret} onChange={e => { setSecret(e.target.value); setError(null); }} />
+                </li>
+            </ol>
+            {error && <div className="oa-alert" role="alert"><AlertTriangle size={16} aria-hidden /><span>{error}</span></div>}
+            <div className="oa-actions">
+                <button type="button" className="btn btn-primary btn-sm" disabled={busy || !ready} onClick={() => void setup()}>
+                    {busy ? <Loader2 size={14} className="spin" aria-hidden /> : <Check size={14} aria-hidden />} สร้าง LIFF ให้อัตโนมัติ
+                </button>
+                {editing && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>ยกเลิก</button>}
+            </div>
+            <p className="form-hint">HorCare สร้าง LIFF app และตั้ง Endpoint URL ให้เอง ค่าทั้งสองถูกเข้ารหัสก่อนเก็บ</p>
+        </details>
     );
 }
 
@@ -156,6 +246,7 @@ export default function LineOaCard({ ownerUid, buildingId }: { ownerUid: string;
                         <p>ถ้าเปิดไว้ ผู้เช่าจะได้ทั้งคำตอบจากบอท HorCare และข้อความอัตโนมัติของ LINE ซ้อนกัน เข้า LINE Official Account Manager → ตั้งค่า → ตั้งค่าการตอบกลับ แล้วปิด “ข้อความตอบกลับอัตโนมัติ” (ข้อความทักทายเปิดไว้ได้)</p>
                         <ExtLink href={MANAGER_URL}>เปิด LINE Official Account Manager</ExtLink>
                     </details>
+                    <LiffSetup ownerUid={ownerUid} buildingId={buildingId} status={status} onChanged={load} />
                     <p className="form-hint">
                         QR ที่พิมพ์ไว้จะพาไป OA นี้อัตโนมัติ ไม่ต้องพิมพ์ใหม่ ผู้เช่าที่อยู่บน OA กลางยังรับบิลได้ตามเดิม จนกว่าจะสแกนใหม่และแอดมินอนุมัติ
                     </p>

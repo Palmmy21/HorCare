@@ -78,9 +78,9 @@ const thread = () => read(`${B}/line_threads/${VENDOR}`);
 const threadTexts = () => listPaths(`${B}/line_threads/${VENDOR}/messages/`).map(p => read(p)?.text as string);
 
 describe('walk-in vendors on LINE', () => {
-    it('the confirmation opens the market\'s OA with the request\'s own code', async () => {
+    it('the confirmation opens the request\'s own registration link (LIFF, else the market\'s chat)', async () => {
         const r = await request();
-        expect(r.line_url).toBe(`https://line.me/R/oaMessage/%40market/?${r.line_code}`);
+        expect(r.line_url).toBe(`https://hor-care.vercel.app/j/${r.line_code}`);
         expect((await request({ phone: '0812345679' })).line_code).not.toBe(r.line_code);
     });
 

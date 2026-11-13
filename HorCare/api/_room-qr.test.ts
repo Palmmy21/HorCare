@@ -100,16 +100,16 @@ describe('the QR address', () => {
         process.env.VITE_LIFF_ID = '123-abc';
         const code = await codeOf();
         const res = await open(code);
-        expect(res.location).toBe(`https://liff.line.me/123-abc?room=${code}`);
+        expect(res.location).toBe(`https://liff.line.me/123-abc?join=${code}`);
         delete process.env.VITE_LIFF_ID;
     });
 
-    it('a property on its own OA keeps the chat, even with LIFF set up', async () => {
+    it('a market stall opens the same LIFF app: the vendor OA shares HorCare\'s provider', async () => {
         process.env.VITE_LIFF_ID = '123-abc';
         process.env.VITE_LINE_MARKET_OA_ID = '@market';
         const code = await codeOf();
         seed(B, { id: BLD, building_type: 'market' });
-        expect((await open(code)).location).toContain('oaMessage/%40market');
+        expect((await open(code)).location).toBe(`https://liff.line.me/123-abc?join=${code}`);
         delete process.env.VITE_LIFF_ID;
         delete process.env.VITE_LINE_MARKET_OA_ID;
     });

@@ -3,6 +3,8 @@ import { X, UserPlus, Loader2, MessageCircle, Copy, Link2Off, Wrench, Sparkles }
 import toast from 'react-hot-toast';
 import { apiPost, ApiError } from '../../utils/api';
 import { STAFF_ROLE_LABELS_TH, type StaffRole, type WorkStaff, SPECIALTY_SUGGESTIONS } from '../../shared/workOrders';
+import { joinUrl } from '../../shared/joinCodes';
+import JoinQr from '../Common/JoinQr';
 
 interface Props {
     ownerUid: string;
@@ -93,7 +95,7 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {staff.map(s => {
                                 const code = codes[s.id];
-                                const deep = code && lineOaId ? `https://line.me/R/oaMessage/${encodeURIComponent(lineOaId)}/?${encodeURIComponent(code.code)}` : null;
+                                const deep = code ? joinUrl(window.location.origin, code.code) : null;
                                 return (
                                     <div key={s.id} className="card" style={{ padding: '0.625rem 0.75rem', opacity: s.active ? 1 : 0.6 }}>
                                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -121,11 +123,11 @@ export default function StaffManagerModal({ ownerUid, buildingId, staff, onClose
                                         </div>
                                         {code && (
                                             <div style={{ marginTop: 8, padding: 8, background: 'var(--color-gray-50)', borderRadius: 8, fontSize: '0.8125rem' }}>
-                                                <div>ให้ {s.name} ส่งรหัสนี้ในแชท LINE ของหอ (ใช้ได้ 24 ชม. ครั้งเดียว):</div>
-                                                <div className="mono" style={{ fontSize: '1.125rem', fontWeight: 800, letterSpacing: '0.06em', margin: '4px 0' }}>{code.code}</div>
-                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                <div style={{ marginBottom: 6 }}>ให้ {s.name} สแกน QR นี้ด้วย LINE (ใช้ได้ 24 ชม. ครั้งเดียว) — หรือส่งรหัสในแชท LINE {lineOaId ?? 'ของทีมงาน'}:</div>
+                                                <JoinQr code={code.code} size={120} hint="สแกนด้วย LINE แล้วเชื่อมทันที" />
+                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                                                     <button className="btn btn-outline btn-sm" onClick={() => void copy(code.code)}><Copy size={12} /> คัดลอกรหัส</button>
-                                                    {deep && <button className="btn btn-outline btn-sm" onClick={() => void copy(deep)}><Copy size={12} /> คัดลอกลิงก์ LINE</button>}
+                                                    {deep && <button className="btn btn-outline btn-sm" onClick={() => void copy(deep)}><Copy size={12} /> คัดลอกลิงก์ลงทะเบียน</button>}
                                                 </div>
                                             </div>
                                         )}

@@ -6,11 +6,16 @@
  * `line_oas/{id}` is backend only (the rules' catch-all denies clients). The id doubles as the webhook address, and the
  * channel secret and access token are stored encrypted (AES-256-GCM, key in LINE_OA_ENC_KEY: 32 bytes, base64).
  *
- * /api/line-oa: status | connect | disconnect. Changing it affects every property of the team, so it is owner only.
+ * /api/line-oa: status | connect | disconnect | liff_setup | liff_remove. Changing it affects every property of the team, so it is owner only.
+ *
+ * LIFF (scan a QR, registered — nothing to send): a LINE user id belongs to one provider, so a team's OA needs its own LIFF
+ * app on a LINE Login channel in the same provider. The owner pastes that channel's id and secret (liff_setup); HorCare
+ * creates the LIFF app through LINE's LIFF API and keeps `login_channel_id`, `login_secret_enc` and `liff_id` here.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { db } from './_firebase.js';
+
+import { admin, db } from './_firebase.js';
 import { appBaseUrl } from './_app-url.js';
 import { writeAudit } from './_audit.js';
 import { authorize } from './_rbac.js';
@@ -69,6 +74,36 @@ export async function loadTeamOa(id: string, opts: { fresh?: boolean } = {}): Pr
     return oa;
 }
 
+/** A team's LIFF app, if it set one up: what the LIFF page initialises with and the channel its tokens must come from. */
+export interface TeamLiff { id: string; ownerUid: string; oaId: string; liffId: string; loginChannelId: string }
+
+function teamLiffFrom(id: string, d: FirebaseFirestore.DocumentData | undefined): TeamLiff | null {
+    if (!d?.liff_id || !d.login_channel_id) return null;
+    return { id, ownerUid: d.owner_uid, oaId: d.oa_id, liffId: d.liff_id, loginChannelId: String(d.login_channel_id) };
+}
+export async function teamLiffById(id: string): Promise<TeamLiff | null> {
+    if (!/^[0-9a-f]{32}$/.test(id)) return null;
+    return teamLiffFrom(id, (await db.collection(COLLECTION).doc(id).get()).data());
+}
+export async function teamLiffOf(ownerUid: string): Promise<TeamLiff | null> {
+    const d = await ownerOaDoc(ownerUid);
+    return d ? teamLiffFrom(d.id, d.data()) : null;
+}
+
+const LIFF_API = 'https://api.line.me/liff/v1/apps';
+/** The page a team's LIFF app opens: the shared gateway, told which team's LIFF app it runs in. */
+const liffEndpoint = (id: string) => `${appBaseUrl()}/portal?team=${id}`;
+
+/** A short-lived access token for a LINE Login channel (client credentials), or null when the id / secret are wrong. */
+async function loginChannelToken(channelId: string, secret: string): Promise<string | null> {
+    const r = await fetch('https://api.line.me/oauth2/v3/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'client_credentials', client_id: channelId, client_secret: secret }),
+    });
+    if (!r.ok) return null;
+    return ((await r.json()) as { access_token?: string }).access_token ?? null;
+}
+
 async function ownerOaDoc(ownerUid: string) {
     return (await db.collection(COLLECTION).where('owner_uid', '==', ownerUid).get()).docs[0] ?? null;
 }
@@ -114,7 +149,11 @@ async function liveWebhook(id: string): Promise<{ webhook_active: boolean | null
     }
 }
 
-interface Body { action?: 'status' | 'connect' | 'disconnect'; owner_uid?: string; building_id?: string; channel_secret?: unknown; access_token?: unknown }
+interface Body {
+    action?: 'status' | 'connect' | 'disconnect' | 'liff_setup' | 'liff_remove';
+    owner_uid?: string; building_id?: string; channel_secret?: unknown; access_token?: unknown;
+    login_channel_id?: unknown; login_channel_secret?: unknown;
+}
 
 const webhookUrl = (id: string) => `${appBaseUrl()}/api/line-team-webhook/${id}`;
 
@@ -140,7 +179,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json({
             connected: true, oa_id: d.oa_id, display_name: d.display_name, connected_at: d.connected_at, webhook_url: webhookUrl(current!.id),
             ...live,
+            liff_id: d.liff_id ?? null, login_channel_id: d.login_channel_id ?? null, liff_endpoint: liffEndpoint(current!.id),
         });
+        return;
+    }
+
+    if (body.action === 'liff_setup') {
+        if (!current) { res.status(409).json({ error: 'not_connected' }); return; }
+        const channelId = typeof body.login_channel_id === 'string' ? body.login_channel_id.replace(/\s+/g, '') : '';
+        const secret = typeof body.login_channel_secret === 'string' ? body.login_channel_secret.replace(/\s+/g, '').toLowerCase() : '';
+        if (!/^\d{6,20}$/.test(channelId) || !/^[0-9a-f]{32}$/.test(secret)) { res.status(400).json({ error: 'invalid_input' }); return; }
+        if (!encKey()) { res.status(503).json({ error: 'encryption_not_configured' }); return; }
+        const token = await loginChannelToken(channelId, secret);
+        if (!token) { res.status(400).json({ error: 'invalid_login_channel' }); return; }
+
+        const d = current.data();
+        const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+        const app = {
+            view: { type: 'full', url: liffEndpoint(current.id) },
+            description: `HorCare ลงทะเบียน · ${d.display_name ?? d.oa_id}`.slice(0, 64),
+            features: { qrCode: true },
+            scope: ['profile', 'openid'],
+            // asks to add the linked OA as a friend on the way in (the channel's "Linked OA" setting decides which OA)
+            botPrompt: 'aggressive',
+        };
+        let liffId: string | null = d.login_channel_id === channelId && d.liff_id ? d.liff_id : null;
+        if (liffId) {
+            const upd = await fetch(`${LIFF_API}/${liffId}`, { method: 'PUT', headers, body: JSON.stringify(app) });
+            if (upd.status === 404) liffId = null;
+            else if (!upd.ok) { res.status(502).json({ error: 'liff_failed', status: upd.status }); return; }
+        }
+        if (!liffId) {
+            const add = await fetch(LIFF_API, { method: 'POST', headers, body: JSON.stringify(app) });
+            if (!add.ok) { res.status(502).json({ error: 'liff_failed', status: add.status }); return; }
+            liffId = ((await add.json()) as { liffId?: string }).liffId ?? null;
+            if (!liffId) { res.status(502).json({ error: 'liff_failed' }); return; }
+        }
+        await current.ref.update({ login_channel_id: channelId, login_secret_enc: encryptSecret(secret), liff_id: liffId, liff_set_at: new Date().toISOString() });
+        await audit('team LIFF app set up', liffId);
+        res.status(200).json({ ok: true, liff_id: liffId, login_channel_id: channelId, liff_endpoint: liffEndpoint(current.id) });
+        return;
+    }
+
+    if (body.action === 'liff_remove') {
+        const d = current?.data();
+        if (!current || !d?.liff_id) { res.status(200).json({ ok: true }); return; }
+        // best effort: the LIFF app on LINE's side goes too, so nothing keeps pointing at HorCare
+        try {
+            const token = await loginChannelToken(String(d.login_channel_id), decryptSecret(d.login_secret_enc));
+            if (token) await fetch(`${LIFF_API}/${d.liff_id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+        } catch { /* the stored fields are cleared either way */ }
+        await current.ref.update({ login_channel_id: admin.firestore.FieldValue.delete(), login_secret_enc: admin.firestore.FieldValue.delete(), liff_id: admin.firestore.FieldValue.delete(), liff_set_at: admin.firestore.FieldValue.delete() });
+        await audit('team LIFF app removed', String(d.liff_id));
+        res.status(200).json({ ok: true });
         return;
     }
 
@@ -185,10 +276,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const ref = db.collection(COLLECTION).doc(id);
         const previous = current?.data();
         const undo = () => (previous ? ref.set(previous) : ref.delete());
+        const keepLiff = previous && previous.bot_user_id === info.userId && previous.liff_id
+            ? { login_channel_id: previous.login_channel_id, login_secret_enc: previous.login_secret_enc, liff_id: previous.liff_id, liff_set_at: previous.liff_set_at ?? null }
+            : {};
         await ref.set({
             owner_uid: ctx.ownerUid, oa_id: oaId, bot_user_id: info.userId, display_name: info.displayName,
             secret_enc: encryptSecret(secret), token_enc: encryptSecret(token),
             connected_at: new Date().toISOString(), connected_by: ctx.uid,
+            ...keepLiff,
         });
         cache.delete(id);
 

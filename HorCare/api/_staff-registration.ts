@@ -12,6 +12,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { cleanPhone } from '../src/shared/leasing.js';
 import { db } from './_firebase.js';
 import { authorize, buildingExists } from './_rbac.js';
 import { writeAudit } from './_audit.js';
@@ -19,7 +20,7 @@ import { appBaseUrl, notify } from './_notify.js';
 import { linePush, staffLineToken } from './_line.js';
 import { rateLimitBy } from './_abuse-guard.js';
 import {
-    MAX_PENDING_PER_PROPERTY, REG_CODE_TTL_DAYS, ROLE_TH, isRegCode, samePhone, sessionExpired, stepRegistration,
+    MAX_PENDING_PER_PROPERTY, REG_CODE_TTL_DAYS, ROLE_TH, cleanPersonName, isRegCode, samePhone, sessionExpired, stepRegistration,
     type BotReply, type RegSession, type StaffRegistration,
 } from '../src/shared/staffRegistration.js';
 import type { WorkStaff } from '../src/shared/workOrders.js';
@@ -142,6 +143,42 @@ export async function handleStaffChat(lineUserId: string, rawText: string, now: 
         if (reg.exists && (reg.data() as StaffRegistration).status !== 'approved') return [text(STATUS_MESSAGES[(reg.data() as StaffRegistration).status])];
     }
     return staffHelp(lineUserId, now);
+}
+
+export type LiffRegResult =
+    | { ok: true; status: 'pending'; dormName: string }
+    | { ok: true; status: 'form'; dormName: string }
+    | { ok: false; reason: 'invalid' | 'expired' | 'too_many' | 'full' | 'already_pending' | 'bad_form'; message: string };
+
+/**
+ * The same sign-up as the chat conversation, from the LIFF page's form in one go (HCR- code + role, name, phone).
+ * Without `form` it only checks the code and says the form may be shown. Nobody is linked until a manager approves.
+ */
+export async function registerStaffFromLiff(
+    lineUserId: string, rawCode: string, form: { role?: unknown; name?: unknown; phone?: unknown } | null, now: number = Date.now(),
+): Promise<LiffRegResult> {
+    const code = rawCode.trim().toUpperCase();
+    if (!isRegCode(code)) return { ok: false, reason: 'invalid', message: CODE_FAILURES.invalid };
+    if (!(await rateLimitBy(`line:${lineUserId}`, 'staffreg-code', 10, 3600, now)).ok) return { ok: false, reason: 'too_many', message: CODE_FAILURES.too_many };
+    const doc = (await db.collection('staff_reg_codes').doc(sha256(code)).get()).data() as RegCodeDoc | undefined;
+    if (!doc || !doc.active || !(await buildingExists(doc.owner_uid, doc.building_id))) return { ok: false, reason: 'invalid', message: CODE_FAILURES.invalid };
+    if (doc.expires_at <= now) return { ok: false, reason: 'expired', message: CODE_FAILURES.expired };
+
+    const regs = (await db.collection(`${baseOf(doc.owner_uid, doc.building_id)}/staff_registrations`).where('status', '==', 'pending').get()).docs.map(d => d.data() as StaffRegistration);
+    if (regs.some(r => r.line_user_id === lineUserId)) return { ok: false, reason: 'already_pending', message: STATUS_MESSAGES.pending };
+    if (regs.length >= MAX_PENDING_PER_PROPERTY) return { ok: false, reason: 'full', message: CODE_FAILURES.full };
+    const cfg = (await db.doc(`${baseOf(doc.owner_uid, doc.building_id)}/data/config`).get()).data();
+    const dormName: string = cfg?.bill_customization?.dorm_name || '';
+    if (!form) return { ok: true, status: 'form', dormName };
+
+    const role = form.role === 'technician' || form.role === 'housekeeping' ? form.role : null;
+    const name = typeof form.name === 'string' ? cleanPersonName(form.name) : null;
+    const phone = typeof form.phone === 'string' ? cleanPhone(form.phone) : null;
+    if (!role || !name || typeof phone !== 'string') return { ok: false, reason: 'bad_form', message: 'กรุณาเลือกงาน และกรอกชื่อกับเบอร์โทรให้ถูกต้อง' };
+    const session: RegSession = { line_user_id: lineUserId, owner_uid: doc.owner_uid, building_id: doc.building_id, step: 'confirm', updated_at: now };
+    await submitRegistration(session, { kind: 'submit', role, name, phone }, now);
+    await db.doc(`staff_reg_sessions/${lineUserId}`).delete().catch(() => undefined);
+    return { ok: true, status: 'pending', dormName };
 }
 
 async function submitRegistration(s: RegSession, a: Extract<BotReply, { kind: 'submit' }>, now: number): Promise<void> {

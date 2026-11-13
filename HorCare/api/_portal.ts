@@ -266,9 +266,11 @@ function liffChannelId(): string {
     return process.env.LINE_LOGIN_CHANNEL_ID || process.env.LIFF_CHANNEL_ID || (process.env.VITE_LIFF_ID ?? process.env.LIFF_ID ?? '').split('-')[0];
 }
 
-/** The LINE user behind an access token issued to OUR LIFF channel, or null. */
-export async function lineUserFromAccessToken(token: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
-    const channelId = liffChannelId();
+/**
+ * The LINE user behind an access token issued to OUR LIFF channel, or null.
+ * `channelId`: the LINE Login channel the token must come from — HorCare's by default, a team's own for its LIFF app.
+ */
+export async function lineUserFromAccessToken(token: string, fetchImpl: typeof fetch = fetch, channelId: string = liffChannelId()): Promise<string | null> {
     if (!channelId) throw new Error('liff_not_configured');
     const verify = await fetchImpl(`https://api.line.me/oauth2/v2.1/verify?access_token=${encodeURIComponent(token)}`);
     if (!verify.ok) return null;
