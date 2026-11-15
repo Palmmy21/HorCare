@@ -293,6 +293,64 @@ describe('what the bot says', () => {
         expect(reply()).toBeNull();
     });
 
+    describe('a person at the property is talking: the bot steps back', () => {
+        const THREAD = `users/${OWNER}/buildings/${BLD}/line_threads/${LINE_USER}`;
+        const water = () => seed(`users/${OWNER}/buildings/${BLD}/faqs/f2`, { id: 'f2', title: 'ค่าน้ำ', keywords: ['ค่าน้ำ'], answer: 'ค่าน้ำหน่วยละ 18 บาทค่ะ', enabled: true, hit_count: 0, created_at: '2026-01-01', updated_at: '2026-01-01' });
+
+        it('a Q&A answer carries a "talk to a person" button, and writing again goes to a person instead of the bot', async () => {
+            await scanCard();
+            water();
+            fetchMock.mockClear();
+            await post([text('ค่าน้ำคิดยังไงคะ')]);
+            const first = reply()!;
+            expect(first[0].text).toBe('ค่าน้ำหน่วยละ 18 บาทค่ะ');
+            expect(first[0].quickReply!.items.map(i => i.action.text)).toEqual(['คุยกับเจ้าหน้าที่']);
+
+            // not what they asked: the follow-up is not answered by the bot again, nor "received"
+            fetchMock.mockClear();
+            await post([text('ไม่ใช่ค่ะ ค่าน้ำเดือนนี้ของห้องหนูผิด')]);
+            expect(reply()).toBeNull();
+            expect(read(THREAD)?.unread_count).toBeGreaterThanOrEqual(1);
+
+            // the button reaches a person
+            fetchMock.mockClear();
+            await post([text('คุยกับเจ้าหน้าที่')]);
+            expect(reply()![0].text).toContain('แจ้งเจ้าหน้าที่แล้ว');
+            expect(read(THREAD)?.help_requested_at).toBeTruthy();
+        });
+
+        it('after a staff reply, ordinary messages get no Q&A answer and no "received" — but "บิล" still works', async () => {
+            await scanCard();
+            water();
+            seed(THREAD, { line_user_id: LINE_USER, room_id: 'r101', room_number: '101', tenant_name: null, last_message_text: 'ส่งช่างไปแล้วค่ะ', last_message_at: new Date().toISOString(), last_direction: 'out', unread_count: 0, last_ack_at: null, staff_replied_at: new Date().toISOString() });
+            fetchMock.mockClear();
+            await post([text('ค่าน้ำเดือนนี้ด้วยนะคะ')]);
+            expect(reply()).toBeNull();
+            expect(read(THREAD)?.unread_count).toBe(1);
+
+            fetchMock.mockClear();
+            await post([text('บิล')]);
+            expect(reply()).not.toBeNull();
+        });
+
+        it('after "ขอความช่วยเหลือ", the next message is left for the person', async () => {
+            await scanCard();
+            await post([text('ขอความช่วยเหลือ')]);
+            fetchMock.mockClear();
+            await post([text('แอร์ไม่เย็นค่ะ')]);
+            expect(reply()).toBeNull();
+        });
+
+        it('a staff reply older than the window lets the bot answer again', async () => {
+            await scanCard();
+            water();
+            seed(THREAD, { line_user_id: LINE_USER, room_id: 'r101', room_number: '101', tenant_name: null, last_message_text: 'x', last_message_at: '2026-01-01T00:00:00Z', last_direction: 'out', unread_count: 0, last_ack_at: null, staff_replied_at: '2026-01-01T00:00:00Z' });
+            fetchMock.mockClear();
+            await post([text('ค่าน้ำเท่าไหร่คะ')]);
+            expect(reply()![0].text).toBe('ค่าน้ำหน่วยละ 18 บาทค่ะ');
+        });
+    });
+
     it('tells a stranger how to register instead of showing a menu', async () => {
         await post([text('เมนู', STRANGER)]);
         expect(reply()![0].text).toContain('ยังไม่ได้ลงทะเบียน');

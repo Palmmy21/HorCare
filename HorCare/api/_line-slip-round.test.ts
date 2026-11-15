@@ -98,6 +98,19 @@ describe('a slip for the round, sent in LINE', () => {
         expect(reply()!.text).toContain('ถูกใช้ไปแล้ว');
     });
 
+    it('several photos in a row get one "is this a slip?" question, and none while a person is talking with the vendor', async () => {
+        qrPayload = null;
+        await photo('600000000011');
+        expect(reply()!.text).toContain('นี่คือสลิป');
+        await photo('600000000012');
+        expect(reply()?.text ?? '').not.toContain('นี่คือสลิป');
+
+        const thread = `${B}/line_threads/${VENDOR}`;
+        seed(thread, { ...read(thread)!, slip_question_at: '2026-01-01T00:00:00Z', staff_replied_at: new Date().toISOString() });
+        await photo('600000000013');
+        expect(reply()?.text ?? '').not.toContain('นี่คือสลิป');
+    });
+
     it('a photo with no readable QR, while money is owed, gets a "this is a slip" button that sends it through the check', async () => {
         qrPayload = null;
         await photo('600000000009');

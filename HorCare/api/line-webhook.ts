@@ -10,7 +10,7 @@ import { propertyOaId } from './_line-oa.js';
 import { linkedRooms, recordFriendship, roomsOnThisOa } from './_line-binding.js';
 import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
 import { readSlipDetails } from './_slip-ai.js';
-import { describeReply, getTenantLink, inboxLinkOf, recordBotReply, recordInbound } from './_line-inbox.js';
+import { claimSlipQuestion, describeReply, getTenantLink, inboxLinkOf, markFaqAnswered, recordBotReply, recordInbound } from './_line-inbox.js';
 import { WALKIN_QUICK, bindWalkInCode, dropWalkInMenuIfRegistered, walkInLinkOf, walkInNewReply, walkInStatusReply } from './_walkin.js';
 import { isWalkInCode } from '../src/shared/market.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -115,6 +115,9 @@ const conversation = new AsyncLocalStorage<{ lineUserId: string; replied: boolea
  * A reply token works once and only for a short while: a second answer to the same event, or one LINE turns down
  * (token expired after a slow slip check, LINE busy), is pushed to the person instead — the answer always arrives.
  */
+/** Under a Q&A answer: sends the "support" command, so a person is told and the bot steps back. */
+const TALK_TO_PERSON = 'คุยกับเจ้าหน้าที่';
+
 async function lineReply(replyToken: string, messages: object[]): Promise<void> {
     const who = conversation.getStore();
     let sent = !who?.replied && await sendLineReply(replyToken, messages);
@@ -244,7 +247,7 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     const quiet = cmd !== null || isInvitationToken(text) || isRoomCode(text) || isWalkInCode(text) || DORM_CODE_RE.test(text.toUpperCase());
     const inbound = await recordInbound(lineUserId, { kind: 'text', text, quiet }).catch(err => {
         console.error('recordInbound failed:', (err as Error).message);
-        return { recorded: false, shouldAck: false };
+        return { recorded: false, shouldAck: false, personHandling: false };
     });
 
     // ── 0. Walk-in vendors (ขาจร): the request's own code links this LINE to it and to the market's chat ──
@@ -400,11 +403,16 @@ async function dispatchEvent(event: LineEvent, lineUserId: string, replyToken: s
     // HorCare inbox, and the tenant gets one short acknowledgement (throttled to once per
     // few hours so a chatty conversation isn't answered by a bot every time).
     if (inbound.recorded) {
+        // A person is talking with this tenant (replied lately, was asked for, or the Q&A answer just missed):
+        // the bot says nothing — a canned answer in the middle of a conversation only confuses.
+        if (inbound.personHandling) return;
         // The owner's own Q&A answers first; anything it can't answer is left for a person.
         const link = await getTenantLink(lineUserId);
         const answer = link ? await findFaqAnswer(link, text).catch(() => null) : null;
         if (answer) {
-            await lineReply(replyToken, [{ type: 'text', text: answer }]);
+            // one tap reaches a person when the answer is not what they asked; writing again does too (personHandling)
+            await lineReply(replyToken, [botText(answer, [TALK_TO_PERSON])]);
+            await markFaqAnswered(lineUserId).catch(err => console.warn('[line-inbox] faq mark failed:', (err as Error).message));
             return;
         }
         if (inbound.shouldAck) {
@@ -827,7 +835,7 @@ const MEDIA_ACK_TEXT = 'ได้รับรูปแล้วค่ะ 🙏 �
 const VOICE_ACK_TEXT = 'ได้รับข้อความเสียงแล้วค่ะ 🙏 เจ้าของหอจะฟังและตอบกลับโดยเร็วที่สุด';
 
 const KIND_LABEL: Partial<Record<MessageKind, string>> = { image: '[รูปภาพ]', audio: '[ข้อความเสียง]', video: '[วิดีโอ]', file: '[ไฟล์]' };
-const NOT_STORED = { recorded: false, shouldAck: false };
+const NOT_STORED = { recorded: false, shouldAck: false, personHandling: false };
 const logStoreFailure = (err: unknown) => { console.error('storeInboxMedia failed:', (err as Error).message); return NOT_STORED; };
 
 /** Keep a file a tenant sent (photo, voice message, short video, document) and add it to the inbox. */
@@ -891,7 +899,8 @@ async function handleImage(lineUserId: string, replyToken: string, messageId: st
         return;
     }
     // No QR could be read, but money is owed: it may well be a slip — one tap sends it through the slip check.
-    if (await owesMoney(link)) {
+    // Not while a person is talking with the tenant (photos of a leak are not slips), and once for a burst of photos.
+    if (!inbound.personHandling && await owesMoney(link) && await claimSlipQuestion(lineUserId).catch(() => true)) {
         await lineReply(replyToken, [{
             type: 'text', text: 'ได้รับรูปแล้วค่ะ 📷\n\nถ้าเป็นสลิปโอนเงิน กดปุ่ม "นี่คือสลิป" ด้านล่าง ระบบจะตรวจยอดให้ทันทีค่ะ',
             quickReply: { items: [

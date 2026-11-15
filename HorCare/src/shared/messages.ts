@@ -35,10 +35,36 @@ export interface LineThread {
   last_ack_at: string | null;
   /** Last press of "ขอความช่วยเหลือ": the conversation is flagged while it has unread messages. */
   help_requested_at?: string;
+  /** Last reply a person at the property sent from the HorCare inbox. */
+  staff_replied_at?: string;
+  /** Last time the bot answered this tenant from the property's Q&A. */
+  faq_answered_at?: string;
 }
 
 /** Waiting for a person after the tenant asked for help (and nobody has read it since). */
 export const needsHelp = (t: Pick<LineThread, 'help_requested_at' | 'unread_count'>): boolean => !!t.help_requested_at && t.unread_count > 0;
+
+/** After a person replies, or the tenant asks for one, the bot keeps out of the conversation this long. */
+export const PERSON_CHAT_MS = 12 * 3600 * 1000;
+/** A tenant who writes again soon after a Q&A answer is not satisfied with it: a person takes over. */
+export const FAQ_FOLLOW_UP_MS = 30 * 60 * 1000;
+
+const within = (iso: string | null | undefined, ms: number, now: number) => !!iso && now - Date.parse(iso) < ms;
+
+/**
+ * A person is (or is about to be) talking with this tenant: the bot stays out of ordinary conversation — no Q&A
+ * answers, no "we got your message", no "is this a slip?" under every photo. Explicit commands (บิล, ส่งสลิป) and
+ * readable slips are still handled: the tenant asked for those.
+ */
+export function personHandling(
+  t: Pick<LineThread, 'staff_replied_at' | 'help_requested_at' | 'faq_answered_at'> | null | undefined,
+  now: number,
+): boolean {
+  if (!t) return false;
+  return within(t.staff_replied_at, PERSON_CHAT_MS, now)
+    || within(t.help_requested_at, PERSON_CHAT_MS, now)
+    || within(t.faq_answered_at, FAQ_FOLLOW_UP_MS, now);
+}
 
 export interface LineMessage {
   id: string;

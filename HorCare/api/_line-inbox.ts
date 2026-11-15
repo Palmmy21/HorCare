@@ -19,7 +19,7 @@ import { roomsOfLink, sameRoom } from '../src/shared/lineRooms.js';
 import { loadMediaDataUrl } from './_line-media.js';
 import { raiseAlert } from './_alerts.js';
 import {
-    MAX_INCOMING_CHARS, MAX_OUTGOING_CHARS,
+    MAX_INCOMING_CHARS, MAX_OUTGOING_CHARS, personHandling,
     type LineMessage, type LineThread, type MessageKind, type MessageMedia,
 } from '../src/shared/messages.js';
 
@@ -35,9 +35,13 @@ const threadPath = (owner: string, bld: string, lid: string) => `users/${owner}/
 
 export interface RecordResult {
     recorded: boolean;
-    /** Send the tenant a one-off "received" reply (throttled). */
+    /** Send the tenant a one-off "received" reply (throttled; never while a person is handling the chat). */
     shouldAck: boolean;
+    /** A person is talking with this tenant (messages.ts personHandling): the bot keeps out of the conversation. */
+    personHandling: boolean;
 }
+
+const NOT_RECORDED: RecordResult = { recorded: false, shouldAck: false, personHandling: false };
 
 export interface TenantLink { uid: string; building_id: string; room_id: string; room_number: string; slip_expected_until?: number }
 
@@ -83,11 +87,11 @@ export async function recordInbound(
     },
 ): Promise<RecordResult> {
     const link = await inboxLinkOf(lineUserId);
-    if (!link) return { recorded: false, shouldAck: false };
+    if (!link) return NOT_RECORDED;
     const { uid, building_id, room_id, room_number } = link;
 
     const text = input.text.trim().slice(0, MAX_INCOMING_CHARS);
-    if (!text) return { recorded: false, shouldAck: false };
+    if (!text) return NOT_RECORDED;
 
     const tenantName = link.walkin ? (link.tenant_name ?? null)
         : ((await db.doc(`users/${uid}/buildings/${building_id}/tenants/${room_id}`).get()).data()?.full_name as string | undefined) ?? null;
@@ -103,12 +107,14 @@ export async function recordInbound(
 
     // One transaction so two quick messages can't lose an unread increment.
     let alert = false;
+    let person = false;
     const shouldAck = await db.runTransaction<boolean>(async tx => {
         const snap = await tx.get(ref);
         const prev = snap.exists ? (snap.data() as LineThread) : null;
         alert = !input.quiet && (!prev || prev.unread_count === 0 || prev.last_direction !== 'in'
             || now.getTime() - Date.parse(prev.last_message_at) > CHAT_ALERT_QUIET_MS);
-        const ack = !input.quiet && (!prev?.last_ack_at || now.getTime() - Date.parse(prev.last_ack_at) > ACK_EVERY_MS);
+        person = personHandling(prev, now.getTime());
+        const ack = !input.quiet && !person && (!prev?.last_ack_at || now.getTime() - Date.parse(prev.last_ack_at) > ACK_EVERY_MS);
         const thread: LineThread = {
             line_user_id: lineUserId, room_id, room_number, tenant_name: tenantName,
             last_message_text: text.slice(0, 200), last_message_at: nowIso, last_direction: 'in',
@@ -125,7 +131,30 @@ export async function recordInbound(
             title: link.walkin ? `💬 ${tenantName}` : `💬 ห้อง ${room_number}${tenantName ? ` · ${tenantName}` : ''}`, body: text.slice(0, 140),
         });
     }
-    return { recorded: true, shouldAck };
+    return { recorded: true, shouldAck, personHandling: person };
+}
+
+/** Several photos in a row get one "is this a slip?" question, not one under each. */
+export const SLIP_QUESTION_EVERY_MS = 30 * 60 * 1000;
+
+/** True when the bot may ask this tenant whether a photo is a slip now (and notes that it did). */
+export async function claimSlipQuestion(lineUserId: string): Promise<boolean> {
+    const link = await inboxLinkOf(lineUserId);
+    if (!link) return true;
+    const ref = db.doc(threadPath(link.uid, link.building_id, lineUserId));
+    return db.runTransaction(async tx => {
+        const prev = (await tx.get(ref)).data()?.slip_question_at as string | undefined;
+        if (prev && Date.now() - Date.parse(prev) < SLIP_QUESTION_EVERY_MS) return false;
+        tx.set(ref, { slip_question_at: new Date().toISOString() }, { merge: true });
+        return true;
+    });
+}
+
+/** The bot just answered from the property's Q&A: a quick follow-up from the tenant goes to a person instead. */
+export async function markFaqAnswered(lineUserId: string): Promise<void> {
+    const link = await inboxLinkOf(lineUserId);
+    if (!link) return;
+    await db.doc(threadPath(link.uid, link.building_id, lineUserId)).set({ faq_answered_at: new Date().toISOString() }, { merge: true });
 }
 
 /**
@@ -257,7 +286,8 @@ async function handleAuthorized(
     const now = new Date().toISOString();
     const msg: LineMessage = { id: randomUUID(), direction: 'out', kind: 'text', text, at: now, by: ctx.displayName };
     await db.doc(`${ref.path}/messages/${msg.id}`).set(msg);
-    await ref.update({ last_message_text: text.slice(0, 200), last_message_at: now, last_direction: 'out', unread_count: 0 });
+    // staff_replied_at: for a while the bot leaves this conversation to the person (messages.ts personHandling)
+    await ref.update({ last_message_text: text.slice(0, 200), last_message_at: now, last_direction: 'out', unread_count: 0, staff_replied_at: now });
     // Log that a message was sent and to whom — not its content.
     await writeAudit({
         ownerUid: ctx.ownerUid, propertyId: buildingId, userId: ctx.uid, userName: ctx.displayName, role: ctx.role,

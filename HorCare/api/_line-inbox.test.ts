@@ -48,7 +48,7 @@ afterEach(() => {
 describe('recordInbound', () => {
     it('stores the message in the tenant\'s own property and opens a thread', async () => {
         const r = await recordInbound(TENANT, { kind: 'text', text: '  น้ำไม่ไหลค่ะ  ' });
-        expect(r).toEqual({ recorded: true, shouldAck: true });
+        expect(r).toEqual({ recorded: true, shouldAck: true, personHandling: false });
         expect(read(T)).toMatchObject({
             line_user_id: TENANT, room_id: 'r101', room_number: '101', tenant_name: 'Somchai',
             last_message_text: 'น้ำไม่ไหลค่ะ', last_direction: 'in', unread_count: 1,
@@ -66,8 +66,8 @@ describe('recordInbound', () => {
     });
 
     it('ignores senders who are not registered tenants, and empty text', async () => {
-        expect(await recordInbound('U' + 'c'.repeat(32), { kind: 'text', text: 'hi' })).toEqual({ recorded: false, shouldAck: false });
-        expect(await recordInbound(TENANT, { kind: 'text', text: '   ' })).toEqual({ recorded: false, shouldAck: false });
+        expect(await recordInbound('U' + 'c'.repeat(32), { kind: 'text', text: 'hi' })).toEqual({ recorded: false, shouldAck: false, personHandling: false });
+        expect(await recordInbound(TENANT, { kind: 'text', text: '   ' })).toEqual({ recorded: false, shouldAck: false, personHandling: false });
         expect(listPaths(`${B}/line_threads/`)).toHaveLength(0);
     });
 
@@ -78,6 +78,14 @@ describe('recordInbound', () => {
         // an old acknowledgement expires
         seed(T, { ...read(T)!, last_ack_at: new Date(Date.now() - ACK_EVERY_MS - 1000).toISOString() });
         expect((await recordInbound(TENANT, { kind: 'text', text: 'three' })).shouldAck).toBe(true);
+    });
+
+    it('after a staff reply the bot steps back: no "received" reply, the message still reaches the inbox', async () => {
+        await recordInbound(TENANT, { kind: 'text', text: 'น้ำไม่ไหล' });
+        seed(T, { ...read(T)!, staff_replied_at: new Date().toISOString(), last_ack_at: null });
+        const r = await recordInbound(TENANT, { kind: 'text', text: 'ตอนนี้ยังไม่ไหลเลยค่ะ' });
+        expect(r).toEqual({ recorded: true, shouldAck: false, personHandling: true });
+        expect(read(T)?.unread_count).toBe(2);
     });
 
     it('caps very long messages and keeps a short preview', async () => {
@@ -109,7 +117,7 @@ describe('sending replies', () => {
         const push = fetchMock.mock.calls.find(c => String(c[0]).endsWith('/message/push'))!;
         expect(push[1].headers.Authorization).toBe(`Bearer ${TOKEN}`);
         expect(JSON.parse(push[1].body)).toEqual({ to: TENANT, messages: [{ type: 'text', text: 'ได้ค่ะ จะส่งช่างไปดูให้' }] });
-        expect(read(T)).toMatchObject({ last_direction: 'out', unread_count: 0, last_message_text: 'ได้ค่ะ จะส่งช่างไปดูให้' });
+        expect(read(T)).toMatchObject({ last_direction: 'out', unread_count: 0, last_message_text: 'ได้ค่ะ จะส่งช่างไปดูให้', staff_replied_at: expect.any(String) });
         const out = listPaths(`${T}/messages/`).map(p => read(p)!).find(m => m.direction === 'out');
         expect(out).toMatchObject({ by: 'Owner', kind: 'text' });
         const audits = listPaths(`users/${OWNER}/audit_logs/`).map(p => read(p)!);
