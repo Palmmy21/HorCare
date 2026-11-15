@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, BookOpen, FileBarChart, Landmark, Receipt, ListOrdered, Send, Settings2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, BarChart3, BookOpen, FileBarChart, Landmark, Receipt, ListOrdered, Send, Settings2, ShieldCheck } from 'lucide-react';
 import RevenueAuditPanel from '../Market/RevenueAuditPanel';
 import type { Building } from '../../types';
 import { useLedgerEntries, useLedgers } from '../../hooks/useLedgerData';
@@ -40,6 +40,11 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
     const activeTab: Tab = current || tab === 'overview' || tab === 'audit' ? tab : 'settings';
     // the charts follow the properties of the selected ledger; with no ledger yet they cover every property
     const chartBuildings = current ? buildings.filter(b => current.property_ids.includes(b.id)) : buildings;
+    // the last automatic posting run left something out (api/_ledger-auto.ts writes this on the ledger)
+    const lastAuto = (current as { auto_post?: { problems: number; first_problem: string | null } } | undefined)?.auto_post;
+    const autoProblem = lastAuto && lastAuto.problems > 0 ? lastAuto : null;
+    // properties no ledger keeps the books of: money taken there is posted nowhere
+    const uncovered = loading || error ? [] : buildings.filter(b => !ledgers.some(l => l.property_ids?.includes(b.id)));
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -64,6 +69,25 @@ export default function LedgerPage({ ownerUid, buildings }: { ownerUid: string; 
                 </select>
             )}
             {error && <div style={{ color: '#B91C1C' }}>คุณไม่มีสิทธิ์ดูสมุดบัญชี หรือโหลดไม่สำเร็จ</div>}
+            {/* money was taken but could not be posted: say so here, where the owner looks for it */}
+            {autoProblem && activeTab !== 'settings' && (
+                <div role="alert" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'rgba(245,158,46,0.12)', border: '1px solid rgba(245,158,46,0.45)', borderRadius: 10, padding: '0.625rem 0.875rem', fontSize: '0.85rem', color: '#92400E' }}>
+                    <AlertTriangle size={16} style={{ flex: 'none', marginTop: 2 }} aria-hidden />
+                    <span style={{ flex: 1 }}>
+                        <strong>มี {autoProblem.problems} รายการที่ลงบัญชีอัตโนมัติไม่ได้</strong> — {autoProblem.first_problem ?? 'ดูรายละเอียดที่แท็บ "ลงบัญชี"'}
+                    </span>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab('post')}>ดูที่แท็บลงบัญชี</button>
+                </div>
+            )}
+            {uncovered.length > 0 && activeTab !== 'settings' && (
+                <div role="status" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--color-gray-50)', border: '1px solid var(--color-gray-200)', borderRadius: 10, padding: '0.625rem 0.875rem', fontSize: '0.85rem' }}>
+                    <AlertTriangle size={16} style={{ flex: 'none', marginTop: 2 }} aria-hidden />
+                    <span style={{ flex: 1 }}>
+                        <strong>{uncovered.map(b => b.name).join(', ')}</strong> ยังไม่อยู่ในสมุดบัญชีเล่มใด เงินที่รับที่นี่ (บิล, POS Care) จะไม่ถูกลงบัญชี
+                    </span>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => setTab('settings')}>ไปที่ตั้งค่า</button>
+                </div>
+            )}
             {activeTab === 'overview' && <FinanceOverviewTab key={current?.id ?? 'all'} ownerUid={ownerUid} buildings={chartBuildings.length ? chartBuildings : buildings} />}
             {!loading && activeTab === 'settings' && <LedgerSettingsTab ownerUid={ownerUid} buildings={buildings} ledgers={ledgers} selectedId={selected || current?.id || 'new'} onSelect={setSelected} />}
             {current && activeTab === 'guided' && <GuidedEntryTab ownerUid={ownerUid} ledger={current} />}

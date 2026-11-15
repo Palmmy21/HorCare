@@ -14,7 +14,13 @@ import { loadBuilding, loadCharges } from './_accounting-data.js';
 import { buildVouchers, thDate, type VoucherKind } from '../src/shared/accounting.js';
 import { isLocked, ledgerGaps, postedSources, postingProfile, validateEntryLines, voucherToLines, type JournalEntry, type Ledger } from '../src/shared/ledger.js';
 
-export interface AutoPostResult { posted: number; reason?: 'no_ledger' | 'ledger_incomplete' | 'blocked' | 'error' }
+export interface AutoPostResult {
+    posted: number;
+    /** Why money just taken is not (all) in the books. 'blocked' = some items could not be posted (see problem). */
+    reason?: 'no_ledger' | 'off' | 'ledger_incomplete' | 'blocked' | 'error';
+    /** The first thing in the way, in the owner's words. */
+    problem?: string;
+}
 
 export const entryId = (ledgerId: string, key: string) => createHash('sha1').update(`${ledgerId}|${key}`).digest('hex').slice(0, 24);
 const DAY_MS = 86_400_000;
@@ -22,9 +28,18 @@ const DAY_MS = 86_400_000;
 export async function autoPostCharges(owner: string, buildingId: string, who: { uid: string; displayName: string }): Promise<AutoPostResult> {
     try {
         const ledgers = (await db.collection(`users/${owner}/ledgers`).get()).docs.map(d => d.data() as Ledger);
-        const ledger = ledgers.find(l => l.property_ids.includes(buildingId));
+        const ledger = ledgers.find(l => l.property_ids?.includes(buildingId));
         if (!ledger) return { posted: 0, reason: 'no_ledger' };
-        if (ledgerGaps(ledger).length) return { posted: 0, reason: 'ledger_incomplete' };
+        if (ledger.options?.auto_post === false) return { posted: 0, reason: 'off' };
+        // what the ledger page shows about the last automatic run (the same field autoPostBuilding writes)
+        const note = (posted: number, problems: string[]) => db.doc(`users/${owner}/ledgers/${ledger.id}`)
+            .update({ auto_post: { at: new Date().toISOString(), posted, problems: problems.length, first_problem: problems[0] ?? null } })
+            .catch(e => console.warn('[auto-post] status not kept:', (e as Error).message));
+        const gaps = ledgerGaps(ledger);
+        if (gaps.length) {
+            await note(0, gaps.map(g => g.message));
+            return { posted: 0, reason: 'ledger_incomplete', problem: gaps[0].message };
+        }
 
         const nowIso = new Date().toISOString();
         const to = thDate(nowIso);
@@ -34,18 +49,22 @@ export async function autoPostCharges(owner: string, buildingId: string, who: { 
         const entries = (await db.collection(`${base}/entries`).get()).docs.map(d => d.data() as JournalEntry);
 
         let posted = 0;
-        // invoices first: a receipt is only accepted once the invoice it settles is in the books
+        const problems: string[] = [];
+        // invoices first: a receipt is only accepted once the invoice it settles is in the books. One item that cannot
+        // be posted never holds back the rest — it used to stop every receipt of the property, silently.
         for (const kind of ['invoice', 'receipt'] as const) {
             const result = buildVouchers({
                 profile: postingProfile(ledger), kind, from, to, docs, payments, exported: postedSources(entries), requireCustomerCode: false,
             });
+            problems.push(...result.problems.map(p => p.message));
             for (const v of result.vouchers) {
-                if (isLocked(v.voucher_date, ledger.locked_through)) continue;
+                if (isLocked(v.voucher_date, ledger.locked_through)) { problems.push(`${v.doc_ref}: งวดบัญชีวันที่ ${v.voucher_date} ปิดแล้ว`); continue; }
                 const id = entryId(ledger.id, v.key);
                 const ref = db.doc(`${base}/entries/${id}`);
                 if ((await ref.get()).exists) continue;
                 const lines = voucherToLines(v);
-                if (validateEntryLines(lines, ledger.accounts).length) continue;
+                const issues = validateEntryLines(lines, ledger.accounts);
+                if (issues.length) { problems.push(`${v.doc_ref}: ${issues[0].message}`); continue; }
                 const entry: JournalEntry = {
                     id, ledger_id: ledger.id, kind: v.kind, key: v.key, doc_ref: v.doc_ref, date: v.voucher_date,
                     memo: v.kind === 'invoice' ? `ตั้งลูกหนี้ ${v.room_number}` : `รับชำระ ${v.room_number}`, lines, total_satang: v.total_dr_satang,
@@ -55,9 +74,9 @@ export async function autoPostCharges(owner: string, buildingId: string, who: { 
                 entries.push(entry);
                 posted++;
             }
-            if (kind === 'invoice' && result.problems.length) return { posted, reason: 'blocked' };
         }
-        return { posted };
+        await note(posted, problems);
+        return problems.length ? { posted, reason: 'blocked', problem: problems[0] } : { posted };
     } catch (e) {
         console.error('autoPostCharges failed', e);
         return { posted: 0, reason: 'error' };

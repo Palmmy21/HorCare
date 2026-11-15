@@ -7,6 +7,8 @@
  * computed here from the rates and plans, never taken from the browser (a manager may override a stay total).
  *
  * read:    snapshot | quote | finance_series (13 months of charges and receipts, for the owner's charts)
+ *          receipts (a month of money taken here, for the payments page)
+ * verify:  payment_verify (a transfer is confirmed as received in the bank → its receipt goes into the books)
  * manage:  rate_save | plan_save | plan_end | charge_extra | charge_void | week_generate
  * collect: stall_charge | stall_attendance | walk_in_charge | charge_pay | charge_slip
  * booking: booking_create | booking_status | booking_cancel
@@ -42,10 +44,11 @@ export const config = { maxDuration: 60 };
 type Action =
     | 'snapshot' | 'quote' | 'rate_save' | 'plan_save' | 'plan_end' | 'charge_extra' | 'charge_void' | 'week_generate'
     | 'stall_charge' | 'stall_attendance' | 'walk_in_charge' | 'charge_pay' | 'charge_slip'
-    | 'booking_create' | 'booking_status' | 'booking_cancel' | 'day_close' | 'finance_series';
+    | 'booking_create' | 'booking_status' | 'booking_cancel' | 'day_close' | 'finance_series' | 'receipts' | 'payment_verify';
 
 const PERMISSION: Record<Action, Permission> = {
-    snapshot: 'collections.read', quote: 'booking.read', finance_series: 'collections.read',
+    snapshot: 'collections.read', quote: 'booking.read', finance_series: 'collections.read', receipts: 'collections.read',
+    payment_verify: 'payment.reconcile',
     rate_save: 'collections.manage', plan_save: 'collections.manage', plan_end: 'collections.manage', charge_extra: 'collections.manage',
     charge_void: 'collections.manage', week_generate: 'collections.collect',
     stall_charge: 'collections.collect', stall_attendance: 'collections.collect', walk_in_charge: 'collections.collect',
@@ -220,6 +223,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             for (const c of [...(recent.data ?? []), ...(open.data ?? [])] as Charge[]) byId.set(c.id, c);
             const trim = (c: Charge) => ({ id: c.id, kind: c.kind, room_number: c.room_number, party_name: c.party_name, period_start: c.period_start, period_end: c.period_end, amount_satang: c.amount_satang, paid_satang: c.paid_satang, status: c.status });
             res.status(200).json({ from, charges: [...byId.values()].map(trim), payments: ((pays.data ?? []) as ChargePayment[]).map(p => ({ amount_satang: p.amount_satang, method: p.method, received_at: p.received_at })) });
+            return;
+        }
+
+        // ── receipts: the money taken here in a month (POS Care, the round, front desk), for the payments page ──
+        if (action === 'receipts') {
+            const month = typeof body.month === 'string' && /^d{4}-(0[1-9]|1[0-2])$/.test(body.month) ? body.month : today.slice(0, 7);
+            const { start, end } = monthBounds(`${month}-01`);
+            // Thai days: 00:00 in Thailand is 17:00 UTC the day before
+            const pays = await sb.from('charge_payments').select('*').eq('owner_uid', owner).eq('building_id', buildingId)
+                .gte('received_at', `${addDays(start, -1)}T17:00:00Z`).lt('received_at', `${end}T17:00:00Z`).limit(20000);
+            if (pays.error) fail(pays.error);
+            const rows = (pays.data ?? []) as (ChargePayment & { verification?: string; slip_ref?: string | null })[];
+            const ids = [...new Set(rows.map(p => p.charge_id))];
+            const chargeOf = new Map<string, Charge>();
+            for (let i = 0; i < ids.length; i += 200) {
+                const c = await sb.from('charges').select('*').eq('owner_uid', owner).eq('building_id', buildingId).in('id', ids.slice(i, i + 200));
+                if (c.error) fail(c.error);
+                for (const x of (c.data ?? []) as Charge[]) chargeOf.set(x.id, x);
+            }
+            res.status(200).json({
+                month, can_verify: ctx.permissions.includes('payment.reconcile'),
+                receipts: rows.map(p => {
+                    const c = chargeOf.get(p.charge_id);
+                    return {
+                        id: p.id, charge_id: p.charge_id, amount_satang: p.amount_satang, method: p.method, kind: p.kind, received_at: p.received_at,
+                        received_by_name: p.received_by_name, bank_account_id: p.bank_account_id, note: p.note, has_slip: !!p.slip_ref,
+                        // cash needs no bank check; a transfer counts in the books once verified
+                        verification: p.method === 'cash' ? 'n/a' : (p.verification === 'verified' || p.verification === 'rejected' ? p.verification : 'unverified'),
+                        room_number: c?.room_number ?? null, party_name: c?.party_name ?? '', charge_kind: c?.kind ?? 'extra', description: c?.description ?? '',
+                    };
+                }).sort((a, b) => b.received_at.localeCompare(a.received_at)),
+            });
+            return;
+        }
+
+        // ── payment_verify: someone who reconciles money saw this transfer in the bank account ──
+        if (action === 'payment_verify') {
+            const pay = await one<ChargePayment & { verification?: string }>('charge_payments', uuid(body.payment_id));
+            if (pay.method !== 'transfer') throw new HttpError(400, 'not_a_transfer');
+            if (pay.verification !== 'verified') {
+                const { error } = await sb.from('charge_payments').update({ verification: 'verified' }).eq('id', pay.id).eq('owner_uid', owner).eq('building_id', buildingId);
+                if (error) fail(error);
+                await audit('UPDATE', 'charge', pay.charge_id, `transfer ${pay.amount_satang / 100} verified`);
+            }
+            const posted = await post();
+            res.status(200).json({ ok: true, posted });
             return;
         }
 
@@ -426,6 +475,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!input) throw new HttpError(400, 'invalid_input');
             const charge = await one<Charge>('charges', uuid(body.charge_id));
             const pay = await record(charge, { amount_satang: input.amount_satang, method: input.method, bank: input.bank_account_id, note: input.note });
+            // a transfer taken on someone's word waits for payment_verify, like a slip
+            if (input.method === 'transfer') {
+                const stamp = await sb.from('charge_payments').update({ verification: 'unverified' }).eq('id', pay.id).eq('owner_uid', owner).eq('building_id', buildingId);
+                if (stamp.error) console.error('transfer not marked unverified', stamp.error);
+            }
             await audit('UPDATE', 'charge', charge.id, `${input.method} ${input.amount_satang / 100}`);
             const posted = await post();
             res.status(200).json({ payment: pay, charge: await one<Charge>('charges', charge.id), posted });
@@ -478,8 +532,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             const pay = await record(charge, { amount_satang: amount, method: 'transfer', bank, note: 'slip' });
-            // evidence on the payment: what the AI read, and that it is a slip only — not yet matched to a bank statement line
-            const stamp = await sb.from('charge_payments').update({ verification: 'unverified', slip_ref: fingerprint, slip_details: slipDetails }).eq('id', pay.id).eq('owner_uid', owner).eq('building_id', buildingId);
+            // evidence on the payment: what was read from the slip. A slip the BANK confirmed (amount and receiving account
+            // matched) is money in the account: verified, so its receipt is posted now. Anything else is still a claim.
+            const stamp = await sb.from('charge_payments').update({ verification: evaluation.autoApprove && evaluation.bankVerified ? 'verified' : 'unverified', slip_ref: fingerprint, slip_details: slipDetails }).eq('id', pay.id).eq('owner_uid', owner).eq('building_id', buildingId);
             if (stamp.error) console.error('slip evidence not stored', stamp.error);
             const shrunk = await compressSlipToDataUrl(buf);
             if (shrunk) {

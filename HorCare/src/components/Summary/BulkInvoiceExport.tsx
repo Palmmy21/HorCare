@@ -263,6 +263,7 @@ export default function BulkInvoiceExport({ bills, rooms, config, payTo, uid, bu
                   issuer={{ name: bc?.dorm_name, address: bc?.dorm_address, phone: bc?.dorm_phone, logo: bc?.dorm_logo }}
                   tenantName={names.get(b.room_id) || undefined}
                   unitWord={room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName}
+                  placeName={room?.building_name}
                   dueDay={bc?.due_day}
                   payTo={payTo}
                   lang={langOf(b)}

@@ -755,6 +755,7 @@ export default function Summary({
                             issuer={{ name: billCustomization?.dorm_name, address: billCustomization?.dorm_address, phone: billCustomization?.dorm_phone, logo: billCustomization?.dorm_logo }}
                             tenantName={selectedTenant?.full_name}
                             unitWord={unitWord}
+                            placeName={room?.building_name}
                             dueDay={billCustomization?.due_day}
                             payTo={payTo}
                             lang={lang}

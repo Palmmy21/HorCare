@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
 import type { Building } from '../../types';
 import { apiPost } from '../../utils/api';
+import { useLiveRefresh } from '../../hooks/useLiveRefresh';
 import { useBuildingBilling, useBuildingPayments } from '../../hooks/useAccountingData';
 import {
   aging, compare, monthlyRows, monthsBack, openItems, toCsv, topDebtors,
@@ -45,14 +46,20 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
   const [series, setSeries] = useState<{ key: string; charges: ChargeLike[]; chargePayments: ChargePaymentLike[] } | null>(null);
 
   // Daily / weekly charges live in Supabase; a property that does not use them (or has no Supabase yet) simply has none.
-  useEffect(() => {
+  // Fetched again every few seconds (and when the tab comes back), so money taken in POS Care shows without a reload.
+  const loadSeries = useCallback((isCancelled: () => boolean = () => false) => {
     if (!buildingId) return;
-    let cancelled = false;
     apiPost<{ charges: ChargeLike[]; payments: ChargePaymentLike[] }>('collections', { owner_uid: ownerUid, building_id: buildingId, action: 'finance_series', months: 24 })
-      .then(r => { if (!cancelled) setSeries({ key: buildingId, charges: r.charges, chargePayments: r.payments }); })
-      .catch(() => { if (!cancelled) setSeries({ key: buildingId, charges: [], chargePayments: [] }); });
-    return () => { cancelled = true; };
+      .then(r => { if (!isCancelled()) setSeries({ key: buildingId, charges: r.charges, chargePayments: r.payments }); })
+      // a failed refresh keeps what is on screen; a failed first load shows the property without charges
+      .catch(() => { if (!isCancelled()) setSeries(prev => (prev?.key === buildingId ? prev : { key: buildingId, charges: [], chargePayments: [] })); });
   }, [ownerUid, buildingId]);
+  useEffect(() => {
+    let cancelled = false;
+    loadSeries(() => cancelled);
+    return () => { cancelled = true; };
+  }, [loadSeries]);
+  useLiveRefresh(() => loadSeries(), 30_000);
   const charges = series?.key === buildingId ? series : null;
 
   const input: FinanceInput = useMemo(() => ({

@@ -486,6 +486,47 @@ describe('the books', () => {
         expect(entries().map(e => e.kind)).toEqual(['invoice']);
     });
 
+    it('a transfer taken at the counter shows on the payments list as waiting, and is posted once someone confirms it reached the bank', async () => {
+        ledger();
+        await stayRate(1000);
+        const id = (await book({ check_in: today, check_out: d(1) })).body.booking.charge_id;
+        const paid = await call(OWNER, { action: 'charge_pay', charge_id: id, method: 'transfer', amount: 1000, bank_account_id: 'acc1' });
+        expect(paid.statusCode).toBe(200);
+        expect(entries().map(e => e.kind)).toEqual(['invoice']);
+
+        const list = await call(OWNER, { action: 'receipts' });
+        expect(list.body.can_verify).toBe(true);
+        expect(list.body.receipts).toHaveLength(1);
+        expect(list.body.receipts[0]).toMatchObject({ amount_satang: 100000, method: 'transfer', verification: 'unverified', charge_kind: 'stay' });
+
+        // the front desk collects but may not confirm bank money
+        expect((await call('desk', { action: 'payment_verify', payment_id: list.body.receipts[0].id })).statusCode).toBe(403);
+        const ok = await call(OWNER, { action: 'payment_verify', payment_id: list.body.receipts[0].id });
+        expect(ok.body.posted.posted).toBe(1);
+        expect(entries().map(e => e.kind).sort()).toEqual(['invoice', 'receipt']);
+        expect((await call(OWNER, { action: 'receipts' })).body.receipts[0].verification).toBe('verified');
+    });
+
+    it('one charge the books cannot take does not hold back the rest, and the ledger says what is wrong', async () => {
+        ledger();
+        const l = read(`users/${OWNER}/ledgers/L1`) as { posting: { channels: Record<string, string> } };
+        seed(`users/${OWNER}/ledgers/L1`, { ...l, options: { invoice_date_basis: 'issued_at', count_unverified_transfers: true, opening_cutoff_month: null } });
+        await stayRate(1000);
+        // a transfer into an account the ledger has no channel for: that receipt cannot be posted
+        seed(`users/${OWNER}/buildings/${B1}/bank_accounts/acc9`, { id: 'acc9', status: 'active', bank_code: '004', account_number: '1234567890', account_name: 'x' });
+        const a = (await book({ check_in: today, check_out: d(1) })).body.booking.charge_id;
+        const r1 = await call(OWNER, { action: 'charge_pay', charge_id: a, method: 'transfer', amount: 1000, bank_account_id: 'acc9' });
+        expect(r1.body.posted).toMatchObject({ reason: 'blocked' });
+        expect(r1.body.posted.problem).toBeTruthy();
+        expect((read(`users/${OWNER}/ledgers/L1`) as { auto_post?: { problems: number } }).auto_post?.problems).toBeGreaterThan(0);
+
+        // cash for another stay still goes in
+        const b = (await book({ check_in: d(2), check_out: d(3) })).body.booking.charge_id;
+        await call(OWNER, { action: 'charge_pay', charge_id: b, method: 'cash', amount: 1000 });
+        expect(entries().filter(e => e.kind === 'receipt')).toHaveLength(1);
+        expect(entries().filter(e => e.kind === 'invoice')).toHaveLength(2);
+    });
+
     it('without a ledger the money is still recorded and nothing is posted; collection never fails because of the books', async () => {
         await stayRate(1000);
         const id = (await book({ check_in: today, check_out: d(1) })).body.booking.charge_id;

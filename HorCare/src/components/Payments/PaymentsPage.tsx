@@ -12,6 +12,7 @@ import { useBankTransactions } from '../../hooks/useBankTransactions';
 import { useBuildingPayments } from '../../hooks/useAccountingData';
 import BankLogo from './BankLogo';
 import SlipChecksPanel from './SlipChecksPanel';
+import CollectionReceiptsPanel from './CollectionReceiptsPanel';
 import { useBankAccounts } from '../../hooks/useBankAccounts';
 import { maskAccountNumber } from '../../shared/banks';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, VERIFICATION_LABELS, resolvePaymentMethod, type PaymentRecordFields } from '../../utils/paymentMethods';
@@ -419,6 +420,8 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
                     </label>
                 </div>
             </div>
+
+            {uid && buildingId && <CollectionReceiptsPanel ownerUid={uid} buildingId={buildingId} month={currentMonth} accounts={accounts} />}
 
             {overdueItems.length > 0 && (
                 <div style={{

@@ -5,8 +5,10 @@ import BankQrCard from '../Payments/BankQrCard';
 import { collectionsError } from '../../hooks/useCollections';
 import { outstanding, type Charge } from '../../shared/collections';
 import type { BankAccount } from '../../shared/banks';
+import { autoPostNote, type AutoPostOutcome } from '../../shared/autoPostNote';
 
 interface SlipResult {
+  posted?: AutoPostOutcome;
   recorded: boolean; auto?: boolean; needs_review?: boolean; note?: string; ai_amount?: number | null;
   outstanding_satang?: number; suggested_bank_account_id?: string | null;
 }
@@ -69,14 +71,20 @@ export default function PayDialog({ charge, accounts, call, onDone, onClose, onA
   const amountOk = Number.isFinite(amountNum) && amountNum > 0 && Math.round(amountNum * 100) <= left;
   const shown = amountOk ? amountNum.toLocaleString('th-TH') : '—';
 
-  const finish = (msg: string) => { toast.success(msg); onDone(); onClose(); };
+  /** The money is recorded; say so, and say it when the ledger could not take it (it never fails the collection). */
+  const finish = (msg: string, posted?: AutoPostOutcome) => {
+    toast.success(msg);
+    const note = autoPostNote(posted);
+    if (note) toast(`${note} — แจ้งผู้ดูแลบัญชี`, { icon: '⚠️', duration: 7000 });
+    onDone(); onClose();
+  };
 
   const payManual = async (m: 'cash' | 'transfer') => {
     if (!amountOk) return;
     setBusy(true);
     try {
-      await call({ action: 'charge_pay', charge_id: charge.id, method: m, amount: amountNum, ...(m === 'transfer' ? { bank_account_id: bankId, note: 'โอน (ไม่มีรูปสลิป)' } : {}) });
-      finish(m === 'cash' ? `รับเงินสด ฿${shown} แล้ว` : `บันทึกรับโอน ฿${shown} แล้ว`);
+      const r = await call<{ posted?: AutoPostOutcome }>({ action: 'charge_pay', charge_id: charge.id, method: m, amount: amountNum, ...(m === 'transfer' ? { bank_account_id: bankId, note: 'โอน (ไม่มีรูปสลิป)' } : {}) });
+      finish(m === 'cash' ? `รับเงินสด ฿${shown} แล้ว` : `บันทึกรับโอน ฿${shown} แล้ว`, r.posted);
     } catch (e) { toast.error(collectionsError(e)); } finally { setBusy(false); }
   };
 
@@ -86,7 +94,7 @@ export default function PayDialog({ charge, accounts, call, onDone, onClose, onA
     setBusy(true);
     try {
       const r = await call<SlipResult>({ action: 'charge_slip', charge_id: charge.id, image, confirm: true, amount: amountNum, bank_account_id: bankId });
-      if (r.recorded) { finish(r.auto ? `รับโอน ฿${shown} แล้ว — AI ตรวจสลิปผ่าน` : `รับโอน ฿${shown} แล้ว พร้อมรูปสลิป`); return; }
+      if (r.recorded) { finish(r.auto ? `รับโอน ฿${shown} แล้ว — AI ตรวจสลิปผ่าน` : `รับโอน ฿${shown} แล้ว พร้อมรูปสลิป`, r.posted); return; }
       setNote(r.note ?? 'บันทึกไม่ได้ — ตรวจยอดอีกครั้ง');
     } catch (e) { toast.error(collectionsError(e)); } finally { setBusy(false); }
   };

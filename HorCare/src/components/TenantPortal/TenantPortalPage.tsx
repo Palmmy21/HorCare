@@ -9,6 +9,8 @@ import {
   translateCategory,
   translateMaintenanceStatus,
 } from '../../utils/i18n/portalTranslations';
+import { UNIT_CATEGORY_LABELS, categoryOf } from '../../shared/unitCategory';
+import { CLEANING_SLOTS, CLEANING_TEXT, PORTAL_CLEANING_TYPES, cleaningSlotLabel, cleaningTypeLabel } from '../../utils/i18n/cleaningTranslations';
 import {
   Home, Zap, Droplets, Phone, ChevronDown, ChevronUp,
   CheckCircle2, XCircle, Clock, AlertCircle, Link2Off,
@@ -391,7 +393,7 @@ function SlipUploader({
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
 /** What the invoice document needs besides the bill: who issues it and who it is for. */
-interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; dueDay?: number; secondLang?: BillLanguage | null }
+interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; placeName?: string; dueDay?: number; secondLang?: BillLanguage | null }
 
 function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
   bill: MonthlyBill;
@@ -448,7 +450,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
           onClose={() => setShowInvoice(false)}
           allowImage
         >
-          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} dueDay={invoice.dueDay} payTo={payTo} lang={lang} secondLang={invoice.secondLang} />
+          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} placeName={invoice.placeName} dueDay={invoice.dueDay} payTo={payTo} lang={lang} secondLang={invoice.secondLang} />
         </DocumentViewer>
       )}
 
@@ -905,7 +907,9 @@ export default function TenantPortalPage() {
   const invoiceCtx: InvoiceContext = {
     issuer: { name: bc?.dorm_name || buildingName, address: bc?.dorm_address, phone: bc?.dorm_phone, logo: bc?.dorm_logo },
     tenantName: profile?.full_name,
-    unitWord: config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',
+    // a branch may hold several kinds of property: the unit's own kind names it (บ้านเช่า, ที่ดิน), as on the owner's copy
+    unitWord: room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config?.building_type)] : config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',
+    placeName: room?.building_name,
     dueDay: bc?.due_day,
     secondLang: bc?.bilingual_mode ? bc.secondary_language || 'en' : null,
   };
@@ -1643,6 +1647,7 @@ function CleaningSection({ requests, onChanged, lang }: {
   requests: CleaningRequest[]; onChanged: () => void; lang: BillLanguage;
 }) {
   const t = PORTAL_TRANSLATIONS[lang] ?? PORTAL_TRANSLATIONS.th;
+  const ct = CLEANING_TEXT[lang] ?? CLEANING_TEXT.th;
   const loading = false;
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1658,17 +1663,12 @@ function CleaningSection({ requests, onChanged, lang }: {
   }>({
     service_type: 'general',
     preferred_date: '',
-    preferred_time_slot: 'เช้า (09:00 - 12:00)',
+    preferred_time_slot: CLEANING_SLOTS[0],
     description: '',
   });
 
-  const cleaningTypeOpts: { value: CleaningServiceType; label: string; desc: string }[] = [
-    { value: 'general', label: 'ทำความสะอาดทั่วไป', desc: 'กวาด ถู ปัดฝุ่น' },
-    { value: 'bathroom', label: 'ขัดล้างห้องน้ำ', desc: 'ล้างสุขภัณฑ์/พื้น' },
-    { value: 'balcony', label: 'ล้างระเบียง', desc: 'ขัดพื้น/ซักล้าง' },
-    { value: 'deep', label: 'บิ๊กคลีนนิ่ง', desc: 'ทำความสะอาดละเอียด' },
-    { value: 'checkout', label: 'ก่อนย้ายออก', desc: 'เคลียร์ห้อง' },
-  ];
+  const cleaningTypeOpts: { value: CleaningServiceType; label: string; desc: string }[] =
+    PORTAL_CLEANING_TYPES.map(value => ({ value, ...ct.types[value] }));
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1697,7 +1697,7 @@ function CleaningSection({ requests, onChanged, lang }: {
       });
       onChanged();
 
-      setForm({ service_type: 'general', preferred_date: '', preferred_time_slot: 'เช้า (09:00 - 12:00)', description: '' });
+      setForm({ service_type: 'general', preferred_date: '', preferred_time_slot: CLEANING_SLOTS[0], description: '' });
       setPhoto(null);
       setShowForm(false);
       toast.success(t.cleaning_success_toast);
@@ -1733,7 +1733,7 @@ function CleaningSection({ requests, onChanged, lang }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '0.875rem' }}>
           {requests.map(req => {
             const badge = getStatusBadge(req.status);
-            const typeLabel = cleaningTypeOpts.find(o => o.value === req.service_type)?.label ?? req.service_type;
+            const typeLabel = cleaningTypeLabel(req.service_type, lang);
 
             return (
               <div
@@ -1774,28 +1774,28 @@ function CleaningSection({ requests, onChanged, lang }: {
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.25rem' }}>
                     <CalendarDays size={12} />
                     <span>
-                      {req.preferred_date ? formatPortalDate(req.preferred_date, lang) : 'วันนัดหมาย'}{' '}
-                      {req.preferred_time_slot ? `(${req.preferred_time_slot})` : ''}
+                      {req.preferred_date ? formatPortalDate(req.preferred_date, lang) : ct.appointment}{' '}
+                      {req.preferred_time_slot ? `(${cleaningSlotLabel(req.preferred_time_slot, lang)})` : ''}
                     </span>
                   </div>
                 )}
 
                 {req.assigned_maid_name && (
                   <div style={{ fontSize: '0.775rem', color: '#08589F', background: '#F2F7FC', padding: '0.3rem 0.55rem', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                    <CheckCircle2 size={12} /> ผู้รับผิดชอบ: <strong>{req.assigned_maid_name}</strong>
+                    <CheckCircle2 size={12} /> {ct.assigned}: <strong>{req.assigned_maid_name}</strong>
                   </div>
                 )}
 
                 {req.completed_note && (
                   <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#15803D', borderLeft: '3px solid #15803D', paddingLeft: '0.5rem', lineHeight: 1.4 }}>
-                    <strong>ผลการทำความสะอาด:</strong> {req.completed_note}
+                    <strong>{ct.result}:</strong> {req.completed_note}
                   </div>
                 )}
 
                 {req.image_url && (
                   <img
                     src={req.image_url}
-                    alt="รูปทำความสะอาด"
+                    alt={ct.photo_alt}
                     style={{ marginTop: '0.5rem', width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-gray-200)', cursor: 'pointer' }}
                     onClick={() => { if (req.image_url) window.open(req.image_url, '_blank'); }}
                   />
@@ -1841,7 +1841,7 @@ function CleaningSection({ requests, onChanged, lang }: {
           {/* Service type options */}
           <div style={{ marginBottom: '0.875rem' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
-              ประเภทบริการทำความสะอาด
+              {ct.service_type}
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.4rem' }}>
               {cleaningTypeOpts.map(opt => {
@@ -1874,7 +1874,7 @@ function CleaningSection({ requests, onChanged, lang }: {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem', marginBottom: '0.875rem' }}>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.35rem' }}>
-                วันที่ต้องการ (ถ้ามี)
+                {ct.preferred_date}
               </label>
               <input
                 type="date"
@@ -1885,17 +1885,15 @@ function CleaningSection({ requests, onChanged, lang }: {
             </div>
             <div>
               <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.35rem' }}>
-                ช่วงเวลา
+                {ct.time_slot}
               </label>
               <select
                 value={form.preferred_time_slot}
                 onChange={e => setForm(f => ({ ...f, preferred_time_slot: e.target.value }))}
                 style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #DCE5EF', padding: '0.5rem', fontSize: '0.85rem' }}
               >
-                <option value="เช้า (09:00 - 12:00)">เช้า (09:00 - 12:00)</option>
-                <option value="บ่าย (13:00 - 16:00)">บ่าย (13:00 - 16:00)</option>
-                <option value="เย็น (16:00 - 18:00)">เย็น (16:00 - 18:00)</option>
-                <option value="สะดวกทั้งวัน">สะดวกทั้งวัน</option>
+                {/* the value stays Thai for the housekeeper; the tenant reads their own language */}
+                {CLEANING_SLOTS.map((slot, i) => <option key={slot} value={slot}>{ct.slots[i]}</option>)}
               </select>
             </div>
           </div>
@@ -1903,11 +1901,11 @@ function CleaningSection({ requests, onChanged, lang }: {
           {/* Description */}
           <div style={{ marginBottom: '0.875rem' }}>
             <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--color-gray-500)', display: 'block', marginBottom: '0.4rem' }}>
-              รายละเอียดเพิ่มเติม / จุดที่เน้นเป็นพิเศษ
+              {ct.details}
             </label>
             <textarea
               rows={2}
-              placeholder="เช่น เน้นขัดร่องกระเบื้องห้องน้ำ, ทำความสะอาดตู้เย็น..."
+              placeholder={ct.details_placeholder}
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               style={{
@@ -1936,7 +1934,7 @@ function CleaningSection({ requests, onChanged, lang }: {
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <img
                   src={photo}
-                  alt="Cleaning Photo"
+                  alt={ct.photo_alt}
                   style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 10, border: '1.5px solid #DCE5EF' }}
                 />
                 <button

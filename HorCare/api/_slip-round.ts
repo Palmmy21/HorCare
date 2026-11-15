@@ -69,7 +69,7 @@ export async function applyRoundSlip(input: {
         });
         if (!error && data) {
             const payId = (data as { id: string }).id;
-            await sb.from('charge_payments').update({ verification: 'unverified', slip_ref: fingerprint, slip_details: { ...evaluation.details, checks: evaluation.verdict?.checks ?? null } })
+            await sb.from('charge_payments').update({ verification: evaluation.bankVerified ? 'verified' : 'unverified', slip_ref: fingerprint, slip_details: { ...evaluation.details, checks: evaluation.verdict?.checks ?? null } })
                 .eq('id', payId).eq('owner_uid', input.owner).eq('building_id', input.buildingId);
             if (dataUrl) await db.doc(`users/${input.owner}/buildings/${input.buildingId}/slip_images/charge-pay-${payId}`).set({ data_url: dataUrl, charge_id: charge.id, payment_id: payId, created_at: admin.firestore.FieldValue.serverTimestamp() });
             await autoPostCharges(input.owner, input.buildingId, { uid: `line:${input.lineUserId}`, displayName: 'สลิปทาง LINE' });

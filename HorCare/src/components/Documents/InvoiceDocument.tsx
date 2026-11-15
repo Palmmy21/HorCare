@@ -29,12 +29,14 @@ const monthName = (month: string, t: InvoiceText) =>
  *
  * Worded in the tenant's language; with `secondLang` (the property's bilingual mode) every label carries both.
  */
-export function InvoiceDocument({ bill, issuer, tenantName, unitWord, dueDay, payTo, lang = 'th', secondLang }: {
+export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName, dueDay, payTo, lang = 'th', secondLang }: {
   bill: MonthlyBill;
   issuer: DocIssuer;
   tenantName?: string;
   /** what the unit is called in Thai (ห้อง / บ้านเช่า / ที่ดิน); other languages use their own word */
   unitWord?: string;
+  /** the unit's own building / project inside the branch (ตึก B, โชคชัยการ์เด้นโฮม) — a branch may hold several */
+  placeName?: string;
   dueDay?: number;
   payTo?: PayAccount | null;
   lang?: BillLanguage;
@@ -83,7 +85,7 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, dueDay, pa
         <div className="doc-box">
           <div className="doc-box-label">{L('billed_to')}</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>{tenantName || fill(t.tenant_of, { unit, no: bill.room_number })}</div>
-          <div>{unit} <b>{bill.room_number}</b></div>
+          <div>{unit} <b>{bill.room_number}</b>{placeName?.trim() ? ` · ${placeName.trim()}` : ''}</div>
           <div style={{ color: '#4B5563' }}>{fill(t.service_month, { month: monthName(bill.month, t) })}</div>
         </div>
         <div className="doc-box">
