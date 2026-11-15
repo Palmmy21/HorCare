@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { cleanPlaceIssuers, type PlaceIssuer } from '../../shared/billIssuer';
+import { wingsOf } from '../../shared/wings';
 import { Save, Zap, Droplets, Home, Lock, Eye, EyeOff, Check, Building2, Trees, Hotel, LayoutGrid, FileText, BarChart3, Settings as SettingsIcon, AlertTriangle, Palette, Sun, Moon, Monitor, MessageCircle, Copy, RefreshCw, Share2, QrCode, ExternalLink, ImageIcon, Trash2, Bell, BellOff, BellRing, Mail, ShieldCheck, Printer, Lightbulb, CheckCircle2, Globe, Upload, Store, Plus, Clock, X } from 'lucide-react';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -59,6 +61,8 @@ interface SettingsProps {
     isPaid?: boolean;
     onUpgrade?: () => void;
     uid?: string;
+    /** The branch's units: their buildings (ตึก / โครงการ) may each carry their own name on the bill. */
+    rooms?: { id: string; building_name?: string; is_active?: boolean }[];
     /** The property being edited (public vacancy page, viewing requests). */
     buildingId?: string;
     /** Open on this tab (the branch page's account menu opens on 'account'). */
@@ -106,7 +110,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; desc: string; icon: typeo
 ];
 
 export default function Settings(props: SettingsProps) {
-    const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid, buildingId } = props;
+    const { config, onSaveConfig, mode, onSetMode, emailVerified, userEmail, onSendVerifyEmail, onRefreshEmailVerified, isPaid = false, onUpgrade, uid, buildingId, rooms } = props;
     const [activeTab, setActiveTab] = useState<SettingsTab>(props.initialTab ?? 'general');
     const [formData, setFormData] = useState({
         building_type: config.building_type || 'dormitory',
@@ -248,6 +252,11 @@ export default function Settings(props: SettingsProps) {
         bilingual_mode: config.bill_customization?.bilingual_mode || false,
         secondary_language: (config.bill_customization?.secondary_language || 'en') as BillLanguage,
     });
+    // name / address / phone on the bill per building of the branch; empty = the branch's own (shared/billIssuer.ts)
+    const [placeIssuers, setPlaceIssuers] = useState<Record<string, PlaceIssuer>>(config.bill_customization?.place_issuers ?? {});
+    const places = useMemo(() => wingsOf(rooms ?? []), [rooms]);
+    const setPlace = (place: string, field: keyof PlaceIssuer, value: string) =>
+        setPlaceIssuers(prev => ({ ...prev, [place]: { ...prev[place], [field]: value } }));
     const [lateFee, setLateFee] = useState(() => lateFeeFormOf(config));
     const [prorateRentOn, setProrateRentOn] = useState(!!config.prorate_rent);
     const [dormLogo, setDormLogo] = useState<string | undefined>(config.bill_customization?.dorm_logo);
@@ -283,6 +292,7 @@ export default function Settings(props: SettingsProps) {
             secondary_language: (config.bill_customization?.secondary_language || 'en') as BillLanguage,
         });
         setDormLogo(config.bill_customization?.dorm_logo);
+        setPlaceIssuers(config.bill_customization?.place_issuers ?? {});
         setLateFee(lateFeeFormOf(config));
         setProrateRentOn(!!config.prorate_rent);
         setDormCode(config.dorm_code || '');
@@ -300,7 +310,7 @@ export default function Settings(props: SettingsProps) {
         });
     }
 
-    const snapshot = JSON.stringify({ formData, billForm, dormLogo, dormCode, portalPin, marketConfig, lateFee, prorateRentOn });
+    const snapshot = JSON.stringify({ formData, billForm, dormLogo, dormCode, portalPin, marketConfig, lateFee, prorateRentOn, placeIssuers });
     const [baseline, setBaseline] = useState<string | null>(null);
     const [baselineFor, setBaselineFor] = useState(prevConfig);
     if (baselineFor !== prevConfig) { setBaselineFor(prevConfig); setBaseline(null); }
@@ -395,6 +405,8 @@ export default function Settings(props: SettingsProps) {
                 bilingual_mode: billForm.bilingual_mode,
                 secondary_language: billForm.secondary_language,
                 ...(dormLogo ? { dorm_logo: dormLogo } : {}),
+                // details of buildings that still exist; one not loaded here (rooms unknown) keeps what was saved
+                ...((issuers => (issuers ? { place_issuers: issuers } : {}))(rooms ? cleanPlaceIssuers(placeIssuers, places) : config.bill_customization?.place_issuers)),
                 // legacy PromptPay values stay until they are moved onto a bank account (Payments → receiving accounts)
                 ...(config.bill_customization?.promptpay_number ? { promptpay_number: config.bill_customization.promptpay_number, promptpay_name: config.bill_customization.promptpay_name ?? '' } : {}),
             },
@@ -1223,6 +1235,28 @@ export default function Settings(props: SettingsProps) {
                         placeholder="เช่น 123 ถ.มิตรภาพ อ.เมือง จ.ขอนแก่น 40000"
                     />
                 </div>
+
+                {places.length > 0 && (
+                    <div className="form-group" style={{ border: '1px solid var(--color-gray-200)', borderRadius: 12, padding: '0.875rem 1rem' }}>
+                        <label className="form-label" style={{ marginBottom: 2 }}>ชื่อบนบิลแยกตามตึก / โครงการ</label>
+                        <p className="form-hint" style={{ marginTop: 0 }}>
+                            สาขานี้มี {places.length} ตึก/โครงการ (จากช่อง "ตึก" ของแต่ละ{terms.unitPrefix.trim() || 'ห้อง'}) ใส่ชื่อ ที่อยู่ หรือเบอร์โทรของแต่ละแห่ง แล้วบิลของ{terms.unitPrefix.trim() || 'ห้อง'}ในแห่งนั้นจะใช้ข้อมูลนี้ที่หัวบิล ช่องที่เว้นว่างใช้ข้อมูลของสาขาด้านบน
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                            {places.map(place => (
+                                <div key={place} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 0.7fr) repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', alignItems: 'center' }}>
+                                    <strong style={{ fontSize: '0.875rem', overflowWrap: 'anywhere' }}>{place}</strong>
+                                    <input type="text" className="form-input" aria-label={`ชื่อบนบิลของ ${place}`} placeholder={billForm.dorm_name || 'ชื่อบนบิล'} maxLength={200}
+                                        value={placeIssuers[place]?.name ?? ''} onChange={e => setPlace(place, 'name', e.target.value)} />
+                                    <input type="text" className="form-input" aria-label={`ที่อยู่ของ ${place}`} placeholder={billForm.dorm_address || 'ที่อยู่'} maxLength={500}
+                                        value={placeIssuers[place]?.address ?? ''} onChange={e => setPlace(place, 'address', e.target.value)} />
+                                    <input type="text" className="form-input" aria-label={`เบอร์โทรของ ${place}`} placeholder={billForm.dorm_phone || 'เบอร์โทร'} maxLength={100}
+                                        value={placeIssuers[place]?.phone ?? ''} onChange={e => setPlace(place, 'phone', e.target.value)} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="form-group" style={{ background: 'rgba(10, 108, 194,0.08)', border: '1px solid rgba(10, 108, 194,0.25)', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.875rem', lineHeight: 1.5 }}>
                     <strong>QR สำหรับรับเงินในบิล</strong> สร้างจากบัญชีรับเงินหลักของสถานที่นี้ ตั้งค่าได้ที่หน้า <em>การชำระเงิน → บัญชีรับเงิน</em> (ใส่เลข PromptPay เบอร์โทรหรือเลขบัตรประชาชนที่บัญชีนั้นได้)

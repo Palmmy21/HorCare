@@ -3,6 +3,7 @@ import { db, admin } from './_firebase.js';
 import { buildBillFlex, linePush, runPooled, roomLineToken } from './_line.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
+import { issuerFor } from '../src/shared/billIssuer.js';
 import { portalLinkFor } from './_portal-link.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
@@ -118,7 +119,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const bilingual = !!cfg.bill_customization?.bilingual_mode;
                 const secLang = cfg.bill_customization?.secondary_language || 'en';
                 const pay = invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl());
-                const messages: object[] = [buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay })];
+                // a branch with several places: the bill carries the name of the unit's own (src/shared/billIssuer.ts)
+                const placeName = issuerFor(cfg.bill_customization, roomData?.building_name).name || dormName;
+                const messages: object[] = [buildBillFlex(bill as MonthlyBill, placeName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay })];
                 await linePush(lineUserId, messages, await roomLineToken(roomData)); // the OA this room linked through
                 await billDoc.ref.update({ is_notified: true });
                 sent++;

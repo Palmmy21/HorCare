@@ -10,6 +10,7 @@ import {
   translateMaintenanceStatus,
 } from '../../utils/i18n/portalTranslations';
 import { UNIT_CATEGORY_LABELS, categoryOf } from '../../shared/unitCategory';
+import { issuerFor } from '../../shared/billIssuer';
 import { CLEANING_SLOTS, CLEANING_TEXT, PORTAL_CLEANING_TYPES, cleaningSlotLabel, cleaningTypeLabel } from '../../utils/i18n/cleaningTranslations';
 import {
   Home, Zap, Droplets, Phone, ChevronDown, ChevronUp,
@@ -905,7 +906,7 @@ export default function TenantPortalPage() {
 
   const bc = config?.bill_customization;
   const invoiceCtx: InvoiceContext = {
-    issuer: { name: bc?.dorm_name || buildingName, address: bc?.dorm_address, phone: bc?.dorm_phone, logo: bc?.dorm_logo },
+    issuer: (i => ({ ...i, name: i.name || buildingName }))(issuerFor(bc, room?.building_name)),
     tenantName: profile?.full_name,
     // a branch may hold several kinds of property: the unit's own kind names it (บ้านเช่า, ที่ดิน), as on the owner's copy
     unitWord: room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config?.building_type)] : config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',

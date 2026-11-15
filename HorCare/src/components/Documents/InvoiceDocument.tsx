@@ -85,7 +85,7 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
         <div className="doc-box">
           <div className="doc-box-label">{L('billed_to')}</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>{tenantName || fill(t.tenant_of, { unit, no: bill.room_number })}</div>
-          <div>{unit} <b>{bill.room_number}</b>{placeName?.trim() ? ` · ${placeName.trim()}` : ''}</div>
+          <div>{unit} <b>{bill.room_number}</b>{placeName?.trim() && placeName.trim() !== issuer.name?.trim() ? ` · ${placeName.trim()}` : ''}</div>
           <div style={{ color: '#4B5563' }}>{fill(t.service_month, { month: monthName(bill.month, t) })}</div>
         </div>
         <div className="doc-box">

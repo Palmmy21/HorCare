@@ -1664,6 +1664,7 @@ function App() {
             onRefreshEmailVerified={refreshEmailVerified}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
+            rooms={rooms}
             uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
           />

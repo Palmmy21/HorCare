@@ -17,6 +17,7 @@ import { InvoiceDocument } from '../Documents/InvoiceDocument';
 import { invoiceNumber } from '../../shared/invoice';
 import { useTenantProfile } from '../../hooks/useTenantProfiles';
 import { categoryOf, UNIT_CATEGORY_LABELS } from '../../shared/unitCategory';
+import { issuerFor } from '../../shared/billIssuer';
 import PrintBillSlip from './PrintBillSlip';
 import BillEditModal from './BillEditModal';
 import RentBillModal from './RentBillModal';
@@ -752,7 +753,7 @@ export default function Summary({
                     >
                         <InvoiceDocument
                             bill={selectedBill}
-                            issuer={{ name: billCustomization?.dorm_name, address: billCustomization?.dorm_address, phone: billCustomization?.dorm_phone, logo: billCustomization?.dorm_logo }}
+                            issuer={issuerFor(billCustomization, room?.building_name)}
                             tenantName={selectedTenant?.full_name}
                             unitWord={unitWord}
                             placeName={room?.building_name}

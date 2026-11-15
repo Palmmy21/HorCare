@@ -93,6 +93,8 @@ export interface BillCustomization {
   default_language?: BillLanguage;   // ภาษาเริ่มต้นของบิลและการแจ้งเตือน (default: 'th')
   bilingual_mode?: boolean;          // แสดงบิล 2 ภาษาคู่ขนาน (เช่น ไทย + อังกฤษ)
   secondary_language?: BillLanguage; // ภาษาที่สองเมื่อเปิดโหมด 2 ภาษา (default: 'en')
+  /** Name / address / phone on the bill per building of the branch (src/shared/billIssuer.ts); empty = the branch's own. */
+  place_issuers?: Record<string, import('../shared/billIssuer.js').PlaceIssuer>;
 }
 
 export interface MarketConfig {

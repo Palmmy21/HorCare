@@ -9,6 +9,7 @@ import { InvoiceDocument } from '../Documents/InvoiceDocument';
 import { buildPaperPdfMany, sheetCanvas } from '../Documents/paperPdf';
 import { invoiceNumber } from '../../shared/invoice';
 import { UNIT_CATEGORY_LABELS, categoryOf } from '../../shared/unitCategory';
+import { issuerFor } from '../../shared/billIssuer';
 import { formatCurrency, formatMonthThai } from '../../utils/calculations';
 import { triggerFileDownload } from '../../utils/fileDownload';
 import { safeFileNames, zipStore } from '../../utils/zip';
@@ -260,7 +261,7 @@ export default function BulkInvoiceExport({ bills, rooms, config, payTo, uid, bu
               <div key={b.id} className="doc-sheet" style={{ minHeight: 0, boxShadow: 'none', marginBottom: 24 }} data-name={invoiceNumber(b)}>
                 <InvoiceDocument
                   bill={b}
-                  issuer={{ name: bc?.dorm_name, address: bc?.dorm_address, phone: bc?.dorm_phone, logo: bc?.dorm_logo }}
+                  issuer={issuerFor(bc, room?.building_name)}
                   tenantName={names.get(b.room_id) || undefined}
                   unitWord={room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName}
                   placeName={room?.building_name}
