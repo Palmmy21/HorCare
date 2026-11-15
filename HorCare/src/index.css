@@ -5873,6 +5873,16 @@ html.dark .btn-meter-photo:hover {
 .plan-group-tools .btn-icon:hover, .plan-size .btn-icon:hover, .plan-panel-head .btn-icon:hover { background: var(--color-gray-100); color: var(--color-gray-900); }
 .plan-group-tools .btn-icon:disabled, .plan-size .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 .plan-group-tools .btn-icon.danger { color: var(--color-danger); }
+/* a building of the property: its floors sit inside one block */
+.plan-wing { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-4); background: var(--color-gray-50); border: 1px solid var(--color-gray-200); border-radius: var(--radius-xl); }
+.plan-wing-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.plan-wing-name { display: inline-flex; align-items: center; gap: var(--space-2); font-size: 1.0625rem; font-weight: 700; color: var(--color-gray-900); }
+.plan-wing-select { width: auto; max-width: 11rem; min-height: 32px; padding: 0.2rem 0.5rem; font-size: 0.8125rem; }
+.plan-board.compact .plan-wing { padding: 0; background: none; border: none; border-radius: 0; gap: var(--space-2); }
+.plan-board.compact .plan-wing + .plan-wing { padding-top: var(--space-3); border-top: 1px solid var(--color-gray-200); }
+.plan-board.compact .plan-wing-name { font-size: 0.875rem; }
+@media (max-width: 640px) { .plan-wing { padding: var(--space-3) var(--space-2); } }
+
 .plan-cols { display: inline-flex; align-items: center; gap: 2px; font-size: 0.8125rem; color: var(--color-gray-600); padding: 0 var(--space-2); }
 
 .plan-scroll { overflow-x: auto; margin: 0 calc(-1 * var(--space-1)); padding: var(--space-1); }

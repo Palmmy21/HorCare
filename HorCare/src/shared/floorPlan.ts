@@ -3,7 +3,7 @@
 // and only stored once the owner edits it; every read reconciles it with the current rooms, so a room added or
 // removed elsewhere never leaves the plan stale.
 import type { DormConfig } from '../types';
-import { hasWings, wingLabel } from './wings';
+import { hasWings, wingLabel, wingsOf } from './wings';
 
 export type PlanKind = 'floors' | 'zones' | 'streets';
 
@@ -35,6 +35,8 @@ export const MIN_COLS = 4;
 export const MAX_COLS = 16;
 export const MAX_SPAN = 4;
 export const UNPLACED_GROUP_NAME = 'ยังไม่ได้จัดวาง';
+/** Heading for floors that belong to no building, in a plan that has buildings. */
+export const NO_WING_LABEL = 'ยังไม่ระบุอาคาร';
 
 export function planKindOf(type: DormConfig['building_type'] | undefined): PlanKind {
   if (type === 'market') return 'zones';
@@ -266,13 +268,117 @@ export function removeGroup(plan: FloorPlan, groupId: string): FloorPlan | null 
   return withGroups(plan, plan.groups.filter(x => x.id !== groupId));
 }
 
+/** Move a floor up or down among the floors of its own building. */
 export function moveGroup(plan: FloorPlan, groupId: string, by: -1 | 1): FloorPlan {
   const i = plan.groups.findIndex(g => g.id === groupId);
-  const j = i + by;
-  if (i < 0 || j < 0 || j >= plan.groups.length) return plan;
+  if (i < 0) return plan;
+  const wing = splitGroupName(plan.groups[i].name).wing;
+  let j = i + by;
+  while (j >= 0 && j < plan.groups.length && splitGroupName(plan.groups[j].name).wing !== wing) j += by;
+  if (j < 0 || j >= plan.groups.length) return plan;
   const groups = [...plan.groups];
   [groups[i], groups[j]] = [groups[j], groups[i]];
   return withGroups(plan, groups);
+}
+
+// ── Buildings (ตึก / อาคาร) of the plan. A floor belongs to a building by its name: "ตึก A · ชั้น 2". ──
+
+const joinName = (wing: string, floor: string) => (wing ? `${wing}${WING_SEP}${floor}` : floor);
+
+/** The plan's floors building by building, in the order each building first appears ('' = floors with no building). */
+export function groupsByWing(plan: FloorPlan): { wing: string; groups: PlanGroup[] }[] {
+  const out: { wing: string; groups: PlanGroup[] }[] = [];
+  for (const g of plan.groups) {
+    const wing = splitGroupName(g.name).wing;
+    const at = out.find(s => s.wing === wing);
+    if (at) at.groups.push(g); else out.push({ wing, groups: [g] });
+  }
+  return out;
+}
+
+/** The buildings named on the plan. */
+export const wingsOfPlan = (plan: FloorPlan): string[] => groupsByWing(plan).map(s => s.wing).filter(Boolean);
+
+const wingNameOf = (name: string) => {
+  const n = name.split(' ').filter(Boolean).join(' ');
+  return !n || n.includes(WING_SEP.trim()) ? '' : wingLabel(n);
+};
+
+/** A new building with its first floor; "B" becomes "ตึก B". Refused when the name is empty or taken. */
+export function addWing(plan: FloorPlan, name: string, firstFloor = 'ชั้น 1'): FloorPlan | null {
+  const wing = wingNameOf(name);
+  if (!wing || wingsOfPlan(plan).includes(wing)) return null;
+  return addGroup(plan, joinName(wing, firstFloor));
+}
+
+export function renameWing(plan: FloorPlan, wing: string, name: string): FloorPlan | null {
+  const next = wingNameOf(name);
+  if (!wing || !next || (next !== wing && wingsOfPlan(plan).includes(next))) return null;
+  return withGroups(plan, plan.groups.map(g => {
+    const at = splitGroupName(g.name);
+    return at.wing === wing ? { ...g, name: joinName(next, at.floor) } : g;
+  }));
+}
+
+/**
+ * Put a floor in a building ('' = none), after that building's other floors. An empty floor of the same name there
+ * (the one a new building starts with) gives way; one with units on it refuses the move.
+ */
+export function setGroupWing(plan: FloorPlan, groupId: string, wing: string): FloorPlan | null {
+  const g = plan.groups.find(x => x.id === groupId);
+  if (!g) return null;
+  const name = joinName(wing, splitGroupName(g.name).floor);
+  if (name === g.name) return plan;
+  const clash = plan.groups.find(x => x.name === name);
+  if (clash && (clash.cells.length > 0 || clash.gaps.length > 0)) return null;
+  const rest = plan.groups.filter(x => x.id !== groupId && x.id !== clash?.id);
+  let at = -1;
+  rest.forEach((x, i) => { if (splitGroupName(x.name).wing === wing) at = i; });
+  const moved = { ...g, name };
+  return withGroups(plan, at < 0 ? [...rest, moved] : [...rest.slice(0, at + 1), moved, ...rest.slice(at + 1)]);
+}
+
+/** Rename a floor, keeping it in its building. */
+export function renameFloor(plan: FloorPlan, groupId: string, floor: string): FloorPlan | null {
+  const g = plan.groups.find(x => x.id === groupId);
+  const n = floor.trim();
+  if (!g || !n || n.includes(WING_SEP.trim())) return null;
+  return renameGroup(plan, groupId, joinName(splitGroupName(g.name).wing, n));
+}
+
+/** Move a whole building up or down the plan. */
+export function moveWing(plan: FloorPlan, wing: string, by: -1 | 1): FloorPlan {
+  const sections = groupsByWing(plan);
+  const i = sections.findIndex(s => s.wing === wing);
+  const j = i + by;
+  if (i < 0 || j < 0 || j >= sections.length) return plan;
+  [sections[i], sections[j]] = [sections[j], sections[i]];
+  return withGroups(plan, sections.flatMap(s => s.groups));
+}
+
+/** The building_name a room gets for a building of the plan: the spelling the rooms already use, else the plan's. */
+export function buildingNameFor(wing: string, rooms: PlanRoom[]): string {
+  return wingsOf(rooms).find(b => wingLabel(b) === wing) ?? wing;
+}
+
+/**
+ * Rooms whose building on the plan is not the one on the room: the building_name each should get, so the rest of
+ * the app (the building switcher, the name on the bill) follows the plan. A building the rooms already know keeps
+ * its spelling there ("A" for "ตึก A"); floors with no building change nothing.
+ */
+export function roomWingChanges(plan: FloorPlan, rooms: PlanRoom[]): { id: string; building_name: string }[] {
+  const byId = new Map(rooms.map(r => [r.id, r]));
+  const out: { id: string; building_name: string }[] = [];
+  for (const g of plan.groups) {
+    const wing = splitGroupName(g.name).wing;
+    if (!wing) continue;
+    const building = buildingNameFor(wing, rooms);
+    for (const c of g.cells) {
+      const r = byId.get(c.room_id);
+      if (r && clean(r.building_name) !== building) out.push({ id: r.id, building_name: building });
+    }
+  }
+  return out;
 }
 
 /** Change a group's width; refused while something would fall outside it. */

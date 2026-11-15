@@ -1,14 +1,15 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  ArrowDown, ArrowUp, Box, Check, ClipboardList, Link2, Map as MapIcon, MessageCircle, Minus, Pencil, Plus, Receipt, RotateCcw,
+  ArrowDown, ArrowUp, Box, Building2, Check, ClipboardList, Link2, Map as MapIcon, MessageCircle, Minus, Pencil, Plus, Receipt, RotateCcw,
   Square, Trash2, Unlink, UserRound, X,
 } from 'lucide-react';
 import type { CleaningRequest, DormConfig, MaintenanceRequest, MonthlyBill, Room } from '../../types';
 import type { Permission } from '../../shared/permissions';
 import {
-  addGap, addGroup, autoPlan, planForWing, linkUnits, moveGroup, moveUnit, placeUnit, planKindOf, PLAN_LABELS, reconcile, removeGap,
-  removeGroup, renameGroup, resizeUnit, setCols, unlinkUnit, MAX_COLS, MAX_SPAN, MIN_COLS, daysUntil, type FloorPlan,
+  addGap, addGroup, addWing, autoPlan, buildingNameFor, planForWing, linkUnits, moveGroup, moveUnit, moveWing, placeUnit, planKindOf, PLAN_LABELS, reconcile, removeGap,
+  removeGroup, renameFloor, renameWing, resizeUnit, roomWingChanges, setCols, setGroupWing, splitGroupName, unlinkUnit, wingsOfPlan,
+  MAX_COLS, MAX_SPAN, MIN_COLS, NO_WING_LABEL, WING_SEP, daysUntil, type FloorPlan,
 } from '../../shared/floorPlan';
 import { layerLabel, legendOf, type PlanLayer, type UnitMark } from '../../shared/planLayers';
 import type { RoundStatus } from '../../shared/collections';
@@ -97,6 +98,10 @@ export default function FloorPlanPage(props: Props) {
   const [newNumber, setNewNumber] = useState('');
   const [newGroup, setNewGroup] = useState('');
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  // buildings (ตึก / อาคาร): only a plan of floors has them
+  const [newWing, setNewWing] = useState('');
+  const [floorWing, setFloorWing] = useState('');
+  const [renamingWing, setRenamingWing] = useState<{ wing: string; name: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -113,6 +118,7 @@ export default function FloorPlanPage(props: Props) {
   const focus = selected.length === 1 ? roomsById.get(selected[0]) : undefined;
   useEffect(() => { setAreaInput(focus?.area_sqm ? String(focus.area_sqm) : ''); setConfirmDelete(false); }, [focus?.id, focus?.area_sqm]);
 
+  const planWings = useMemo(() => (kind === 'floors' ? wingsOfPlan(plan) : []), [kind, plan]);
   const legend = legendOf(Object.values(view.marks));
   const apply = (next: FloorPlan | null, refusal: string) => { if (next) setDraft(next); else toast.error(refusal); };
 
@@ -122,8 +128,16 @@ export default function FloorPlanPage(props: Props) {
     if (!draft) return;
     setBusy(true);
     try {
-      await save(reconcile(draft, rooms, kind), actorName);
-      toast.success('บันทึกผังแล้ว');
+      const next = reconcile(draft, rooms, kind);
+      await save(next, actorName);
+      // a unit placed in a building on the plan belongs to that building everywhere (building switcher, name on the bill)
+      const moved = kind === 'floors' && canUpdateRoom ? roomWingChanges(next, rooms) : [];
+      let failed = 0;
+      for (const m of moved) {
+        try { await props.onUpdateRoom(m.id, { building_name: m.building_name }); } catch { failed++; }
+      }
+      if (failed) toast.error(`บันทึกผังแล้ว แต่อัปเดตอาคารของ ${failed} ${unitName}ไม่สำเร็จ ลองบันทึกผังอีกครั้ง`);
+      else toast.success(moved.length ? `บันทึกผังแล้ว · อัปเดตอาคารของ ${moved.length} ${unitName}` : 'บันทึกผังแล้ว');
       cancelEdit();
     } catch { toast.error('บันทึกผังไม่สำเร็จ — ตรวจสิทธิ์การแก้ไขของบัญชีนี้'); }
     finally { setBusy(false); }
@@ -143,7 +157,12 @@ export default function FloorPlanPage(props: Props) {
       const created = await props.onAddRoom(number);
       if (!created) throw new Error('not_created');
       const group = draft.groups.find(g => g.id === slot.groupId);
-      if (group && group.name) await props.onUpdateRoom(created.id, kind === 'floors' ? { floor: group.name.replace(/^ชั้น\s*/, '') } : { zone: group.name });
+      if (group && group.name) {
+        const at = splitGroupName(group.name);
+        await props.onUpdateRoom(created.id, kind === 'floors'
+          ? { floor: at.floor.replace(/^ชั้น\s*/, ''), ...(at.wing ? { building_name: buildingNameFor(at.wing, rooms) } : {}) }
+          : { zone: group.name });
+      }
       const next = placeUnit(draft, created.id, slot.groupId, slot.col, slot.row);
       if (next) setDraft(next);
       toast.success(`เพิ่ม${unitName} ${number} แล้ว`);
@@ -179,12 +198,20 @@ export default function FloorPlanPage(props: Props) {
   const groupTools = (g: FloorPlan['groups'][number]) => (
     <span className="plan-group-tools">
       {renaming?.id === g.id ? (
-        <form onSubmit={e => { e.preventDefault(); apply(renameGroup(plan, g.id, renaming.name), 'ชื่อนี้ซ้ำหรือว่าง'); setRenaming(null); }} className="plan-inline-form">
+        <form onSubmit={e => { e.preventDefault(); apply(renameFloor(plan, g.id, renaming.name), 'ชื่อนี้ซ้ำหรือว่าง'); setRenaming(null); }} className="plan-inline-form">
           <input className="form-input" value={renaming.name} onChange={e => setRenaming({ id: g.id, name: e.target.value })} aria-label={`ชื่อ${L.group}`} autoFocus />
           <button type="submit" className="btn-icon" aria-label="บันทึกชื่อ"><Check size={15} /></button>
         </form>
       ) : (
-        <button type="button" className="btn-icon" onClick={() => setRenaming({ id: g.id, name: g.name })} aria-label={`เปลี่ยนชื่อ ${g.name}`} title="เปลี่ยนชื่อ"><Pencil size={14} /></button>
+        <button type="button" className="btn-icon" onClick={() => setRenaming({ id: g.id, name: splitGroupName(g.name).floor })} aria-label={`เปลี่ยนชื่อ ${g.name}`} title="เปลี่ยนชื่อ"><Pencil size={14} /></button>
+      )}
+      {planWings.length > 0 && (
+        <select className="form-input plan-wing-select" aria-label={`อาคารของ ${g.name}`} title="ย้ายชั้นนี้ไปอาคาร"
+          value={splitGroupName(g.name).wing}
+          onChange={e => apply(setGroupWing(plan, g.id, e.target.value), `อาคารนั้นมี${L.group}ชื่อนี้อยู่แล้ว เปลี่ยนชื่อ${L.group}ก่อน`)}>
+          <option value="">{NO_WING_LABEL}</option>
+          {planWings.map(w => <option key={w} value={w}>{w}</option>)}
+        </select>
       )}
       <span className="plan-cols" title="จำนวนช่องต่อแถว">
         <button type="button" className="btn-icon" disabled={g.cols <= MIN_COLS} onClick={() => apply(setCols(plan, g.id, g.cols - 1), 'ยังมียูนิตอยู่ในคอลัมน์สุดท้าย ย้ายออกก่อน')} aria-label="ลดช่องต่อแถว"><Minus size={14} /></button>
@@ -196,6 +223,21 @@ export default function FloorPlanPage(props: Props) {
       {g.cells.length === 0 && (
         <button type="button" className="btn-icon danger" onClick={() => apply(removeGroup(plan, g.id), 'ย้ายยูนิตออกก่อนจึงลบได้')} aria-label={`ลบ ${g.name}`} title={`ลบ${L.group}`}><Trash2 size={14} /></button>
       )}
+    </span>
+  );
+
+  const wingTools = (wing: string) => (
+    <span className="plan-group-tools">
+      {renamingWing?.wing === wing ? (
+        <form onSubmit={e => { e.preventDefault(); apply(renameWing(plan, wing, renamingWing.name), 'ชื่ออาคารซ้ำหรือว่าง'); setRenamingWing(null); }} className="plan-inline-form">
+          <input className="form-input" value={renamingWing.name} onChange={e => setRenamingWing({ wing, name: e.target.value })} aria-label="ชื่ออาคาร" autoFocus />
+          <button type="submit" className="btn-icon" aria-label="บันทึกชื่ออาคาร"><Check size={15} /></button>
+        </form>
+      ) : (
+        <button type="button" className="btn-icon" onClick={() => setRenamingWing({ wing, name: wing })} aria-label={`เปลี่ยนชื่อ ${wing}`} title="เปลี่ยนชื่ออาคาร"><Pencil size={14} /></button>
+      )}
+      <button type="button" className="btn-icon" onClick={() => setDraft(moveWing(plan, wing, -1))} aria-label={`เลื่อน ${wing} ขึ้น`} title="เลื่อนอาคารขึ้น"><ArrowUp size={14} /></button>
+      <button type="button" className="btn-icon" onClick={() => setDraft(moveWing(plan, wing, 1))} aria-label={`เลื่อน ${wing} ลง`} title="เลื่อนอาคารลง"><ArrowDown size={14} /></button>
     </span>
   );
 
@@ -243,7 +285,19 @@ export default function FloorPlanPage(props: Props) {
         <div className="plan-editbar" role="region" aria-label="แก้ไขผัง">
           <p>ลาก{unitName}เพื่อย้ายหรือสลับ · กด <Plus size={13} aria-hidden /> ที่ช่องว่างเพื่อเพิ่ม{unitName}หรือเว้นช่อง · กด{unitName}แล้วปรับขนาดหรือพื้นที่ได้ทางขวา · Shift+คลิกเลือกหลาย{unitName}เพื่อรวม{terms.tenantLabel}</p>
           <div className="plan-editbar-actions">
-            <form onSubmit={e => { e.preventDefault(); apply(addGroup(plan, newGroup), `ชื่อ${L.group}ซ้ำหรือว่าง`); setNewGroup(''); }} className="plan-inline-form">
+            {kind === 'floors' && (
+              <form onSubmit={e => { e.preventDefault(); apply(addWing(plan, newWing), 'ชื่ออาคารซ้ำหรือว่าง'); setNewWing(''); }} className="plan-inline-form">
+                <input className="form-input" value={newWing} onChange={e => setNewWing(e.target.value)} placeholder="อาคารใหม่ เช่น ตึก B" aria-label="ชื่ออาคารใหม่" />
+                <button type="submit" className="btn btn-outline btn-sm" disabled={!newWing.trim()}><Building2 size={14} /> เพิ่มอาคาร</button>
+              </form>
+            )}
+            <form onSubmit={e => { e.preventDefault(); const wing = planWings.includes(floorWing) ? floorWing : ''; apply(addGroup(plan, wing ? `${wing}${WING_SEP}${newGroup.trim()}` : newGroup), `ชื่อ${L.group}ซ้ำหรือว่าง`); setNewGroup(''); }} className="plan-inline-form">
+              {planWings.length > 0 && (
+                <select className="form-input plan-wing-select" value={planWings.includes(floorWing) ? floorWing : ''} onChange={e => setFloorWing(e.target.value)} aria-label={`อาคารของ${L.group}ใหม่`}>
+                  <option value="">{NO_WING_LABEL}</option>
+                  {planWings.map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
+              )}
               <input className="form-input" value={newGroup} onChange={e => setNewGroup(e.target.value)} placeholder={`${L.group}ใหม่ เช่น ${kind === 'floors' ? 'ชั้น 5' : kind === 'zones' ? 'โซน F' : 'ซอย 3'}`} aria-label={`ชื่อ${L.group}ใหม่`} />
               <button type="submit" className="btn btn-outline btn-sm" disabled={!newGroup.trim()}><Plus size={14} /> เพิ่ม{L.group}</button>
             </form>
@@ -298,7 +352,7 @@ export default function FloorPlanPage(props: Props) {
             onDropUnit: (id, g, c, r) => apply(moveUnit(plan, id, g, c, r), 'วางตรงนั้นไม่ได้ — ช่องไม่พอหรือขนาดไม่เท่ากัน'),
             onSlotClick: (g, c, r) => { setSelected([]); setNewNumber(''); setSlot({ groupId: g, col: c, row: r }); },
             onGapClick: id => setDraft(removeGap(plan, id)),
-            groupTools,
+            groupTools, wingTools,
           } : undefined}
           activeSlot={slot} slotMenu={slotMenu}
         />

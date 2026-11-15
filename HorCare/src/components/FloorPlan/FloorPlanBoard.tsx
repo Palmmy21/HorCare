@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { AlertCircle, CalendarClock, Check, Clock, Link2, Minus, Plus, Wrench } from 'lucide-react';
-import { rowsOf, type FloorPlan, type PlanGroup } from '../../shared/floorPlan';
+import { AlertCircle, Building2, CalendarClock, Check, Clock, Link2, Minus, Plus, Wrench } from 'lucide-react';
+import { groupsByWing, rowsOf, splitGroupName, NO_WING_LABEL, type FloorPlan, type PlanGroup } from '../../shared/floorPlan';
 import type { UnitMark } from '../../shared/planLayers';
 
 export interface BoardUnit {
@@ -22,6 +22,8 @@ export interface BoardEdit {
   onSlotClick: (groupId: string, col: number, row: number) => void;
   onGapClick: (gapId: string) => void;
   groupTools?: (g: PlanGroup) => ReactNode;
+  /** Tools on a building's header (rename, move). */
+  wingTools?: (wing: string) => ReactNode;
 }
 
 interface Props {
@@ -48,9 +50,12 @@ export default function FloorPlanBoard({ plan, units, marks, tenantGroups, group
   const [dropAt, setDropAt] = useState<string | null>(null);
   const highlight = new Set([...(hoverTenant ?? []), ...selected.flatMap(id => tenantGroups[id] ?? [])]);
 
-  return (
-    <div className={`plan-board${compact ? ' compact' : ''}${edit ? ' editing' : ''}`}>
-      {plan.groups.map(g => {
+  // a plan with buildings shows each building as its own block, its floors inside
+  const sections = groupsByWing(plan);
+  const byBuilding = sections.some(s => s.wing);
+
+  const renderGroup = (g: PlanGroup) => {
+        const title = byBuilding ? splitGroupName(g.name).floor : g.name;
         const rows = Math.max(1, rowsOf(g) + (edit ? 1 : 0));
         const taken = new Set<string>();
         for (const b of [...g.cells, ...g.gaps]) for (let c = b.col; c < b.col + b.w; c++) for (let r = b.row; r < b.row + b.h; r++) taken.add(`${c}:${r}`);
@@ -60,7 +65,7 @@ export default function FloorPlanBoard({ plan, units, marks, tenantGroups, group
         return (
           <section key={g.id} className="plan-group" aria-label={g.name}>
             <header className="plan-group-head">
-              <h3 className="plan-group-name">{g.name}</h3>
+              <h3 className="plan-group-name">{title}</h3>
               <span className="plan-group-count">{count} {unitLabel}</span>
               {edit?.groupTools?.(g)}
             </header>
@@ -123,7 +128,22 @@ export default function FloorPlanBoard({ plan, units, marks, tenantGroups, group
             {activeSlot?.groupId === g.id && slotMenu}
           </section>
         );
-      })}
+  };
+
+  return (
+    <div className={`plan-board${compact ? ' compact' : ''}${edit ? ' editing' : ''}`}>
+      {!byBuilding ? plan.groups.map(renderGroup) : sections.map(s => (
+        <section key={s.wing || '-'} className="plan-wing" aria-label={s.wing || NO_WING_LABEL}>
+          <header className="plan-wing-head">
+            <h2 className="plan-wing-name"><Building2 size={compact ? 14 : 17} aria-hidden /> {s.wing || NO_WING_LABEL}</h2>
+            <span className="plan-group-count">
+              {s.groups.length} {groupLabel} · {s.groups.reduce((n, g) => n + g.cells.length, 0)} {unitLabel}
+            </span>
+            {s.wing && edit?.wingTools?.(s.wing)}
+          </header>
+          {s.groups.map(renderGroup)}
+        </section>
+      ))}
     </div>
   );
 }

@@ -157,3 +157,53 @@ describe('several buildings in one property', () => {
     expect(plan.groups).toHaveLength(3);
   });
 });
+
+describe('arranging the plan by building', () => {
+  const names = (p: FloorPlan) => p.groups.map(g => g.name);
+  const idOf = (p: FloorPlan, name: string) => p.groups.find(g => g.name === name)!.id;
+
+  it('adds buildings and moves floors into them', async () => {
+    const { addWing, groupsByWing, setGroupWing, wingsOfPlan } = await import('./floorPlan');
+    let p = addWing(autoPlan(dorm, 'floors'), 'B')!; // ชั้น 2, ชั้น 1, ตึก B · ชั้น 1 (empty)
+    expect(wingsOfPlan(p)).toEqual(['ตึก B']);
+    expect(addWing(p, 'ตึก B')).toBeNull();
+    expect(addWing(p, ' ')).toBeNull();
+    // the building's empty first floor gives way to the real one
+    p = setGroupWing(p, idOf(p, 'ชั้น 1'), 'ตึก B')!;
+    expect(names(p)).toEqual(['ชั้น 2', 'ตึก B · ชั้น 1']);
+    expect(p.groups[1].cells).toHaveLength(2);
+    p = setGroupWing(p, idOf(p, 'ชั้น 2'), 'ตึก B')!;
+    expect(groupsByWing(p)).toHaveLength(1);
+    // a floor with units is never replaced
+    p = addGroup(p, 'ชั้น 2')!;
+    const withUnit = placeUnit({ ...p, groups: p.groups.map(g => g.name === 'ตึก B · ชั้น 2' ? { ...g, cells: g.cells.slice(1) } : g) }, 'c', idOf(p, 'ชั้น 2'), 0, 0)!;
+    expect(setGroupWing(withUnit, idOf(withUnit, 'ชั้น 2'), 'ตึก B')).toBeNull();
+    // and back out of the building
+    expect(names(setGroupWing(p, idOf(p, 'ตึก B · ชั้น 1'), '')!)).toContain('ชั้น 1');
+  });
+
+  it('renames and reorders buildings and their floors', async () => {
+    const { addWing, groupsByWing, moveGroup, moveWing, renameFloor, renameWing, wingsOfPlan } = await import('./floorPlan');
+    let p = addWing(addWing(autoPlan(dorm, 'floors'), 'A')!, 'อาคารจอดรถ')!;
+    p = renameWing(p, 'ตึก A', 'C')!;
+    expect(wingsOfPlan(p)).toEqual(['ตึก C', 'อาคารจอดรถ']);
+    expect(renameWing(p, 'ตึก C', 'อาคารจอดรถ')).toBeNull();
+    p = renameFloor(p, idOf(p, 'อาคารจอดรถ · ชั้น 1'), 'ชั้น G')!;
+    expect(names(p)).toContain('อาคารจอดรถ · ชั้น G');
+    expect(groupsByWing(moveWing(p, 'อาคารจอดรถ', -1)).map(s => s.wing)).toEqual(['', 'อาคารจอดรถ', 'ตึก C']);
+    // a floor moves among the floors of its own building only
+    expect(names(moveGroup(p, idOf(p, 'ชั้น 1'), 1))).toEqual(names(p));
+    expect(names(moveGroup(p, idOf(p, 'ชั้น 1'), -1)).slice(0, 2)).toEqual(['ชั้น 1', 'ชั้น 2']);
+  });
+
+  it('tells which rooms change building, in the spelling the rooms already use', async () => {
+    const { addWing, roomWingChanges, setGroupWing } = await import('./floorPlan');
+    const rooms = [room('a', '101', { building_name: 'A' }), room('b', '102'), room('c', '201', { building_name: 'A' })];
+    let p = addWing(autoPlan(rooms, 'floors'), 'A')!;
+    expect(roomWingChanges(p, rooms)).toEqual([]);
+    p = setGroupWing(p, idOf(p, 'ชั้น 1'), 'ตึก A')!;
+    expect(roomWingChanges(p, rooms)).toEqual([{ id: 'b', building_name: 'A' }]);
+    p = setGroupWing(addWing(p, 'อาคาร 2')!, idOf(p, 'ชั้น 2'), 'อาคาร 2')!;
+    expect(roomWingChanges(p, rooms)).toContainEqual({ id: 'c', building_name: 'อาคาร 2' });
+  });
+});
