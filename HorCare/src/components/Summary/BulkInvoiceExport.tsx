@@ -265,7 +265,8 @@ export default function BulkInvoiceExport({ bills, rooms, config, payTo, uid, bu
                   tenantName={names.get(b.room_id) || undefined}
                   unitWord={room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config.building_type)] : unitName}
                   placeName={room?.building_name}
-                  dueDay={bc?.due_day}
+                  due={bc}
+                  room={room}
                   payTo={payTo}
                   lang={langOf(b)}
                   secondLang={secondLang}

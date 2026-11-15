@@ -4,6 +4,7 @@ import { buildBillFlex, linePush, runPooled, thaiMonthLabel, roomLineToken } fro
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { portalLinkFor } from './_portal-link.js';
+import { resolveDueDate } from '../src/shared/billDue.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
@@ -107,6 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     { type: 'text', text },
                     buildBillFlex(bill as MonthlyBill, dormName, dueDay, month, {
                         portalUrl, lang: roomLang, bilingual, secLang,
+                        dueDate: resolveDueDate(bill, cfg.bill_customization, roomData),
                         pay: invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl()),
                     })
                 ];

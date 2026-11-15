@@ -5,6 +5,7 @@ import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import type { BillLanguage, LateFeeConfig, MonthlyBill } from '../src/types/index.js';
 import { upsertLateFee } from './_late-fees.js';
+import { resolveDueDate, type DueRoom } from '../src/shared/billDue.js';
 
 /**
  * ทวงบิลอัตโนมัติ (Vercel Cron — ดู vercel.json, รันทุกวัน 09:00 เวลาไทย)
@@ -33,10 +34,6 @@ function pad(n: number): string { return String(n).padStart(2, '0'); }
 function todayICT(): { y: number; m: number; d: number } {
     const t = new Date(Date.now() + 7 * 3600_000);
     return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
-}
-
-function daysInMonth(y: number, m: number): number {
-    return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -94,22 +91,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const lineByRoom = new Map<string, string>();
             const channelByRoom = new Map<string, unknown>(); // the OA each room linked through
             const langByRoom = new Map<string, BillLanguage>();
+            const dueByRoom = new Map<string, DueRoom>(); // a room's own due day
             roomsSnap.docs.forEach(r => {
                 const rdata = r.data();
                 if (rdata.line_user_id) lineByRoom.set(r.id, rdata.line_user_id);
                 if (rdata.line_channel) channelByRoom.set(r.id, rdata.line_channel);
                 if (rdata.language) langByRoom.set(r.id, rdata.language as BillLanguage);
+                if (rdata.due_day) dueByRoom.set(r.id, { due_day: rdata.due_day });
             });
 
             await runPooled(bills, PUSH_CONCURRENCY, async (billDoc) => {
                 const bill = billDoc.data();
+                // due on the due day counted from the day the bill was issued (this month, or the next when issued after it)
+                const dueDate = resolveDueDate(bill, { ...cfg.bill_customization, due_day: dueDay }, dueByRoom.get(bill.room_id))
+                    || `${bill.month}-${pad(Math.min(dueDay, 28))}`;
 
                 // Late fee first: it applies whether or not the tenant has LINE, and on days with no reminder too.
                 let lateFee = 0;
                 try {
                     lateFee = await upsertLateFee(base, {
                         id: billDoc.id, room_id: bill.room_id as string, room_number: bill.room_number as string, month: bill.month as string,
-                    }, cfg.late_fee as LateFeeConfig | undefined, dueDay, todayKey);
+                    }, cfg.late_fee as LateFeeConfig | undefined, dueDate, todayKey);
                     if (lateFee > 0) lateFeesCharged++;
                 } catch (err) {
                     console.error(`late fee failed (${billDoc.ref.path}):`, (err as Error).message);
@@ -129,11 +131,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if (lastKey === todayKey) { skipped++; return; }
                 }
 
-                // กำหนดชำระ = วันที่ due_day ของเดือนบิล (กันเดือนสั้นด้วย clamp)
-                const [by, bm] = String(bill.month).split('-').map(Number);
-                const due = Math.min(dueDay, daysInMonth(by, bm));
+                const [dy, dm, due] = dueDate.split('-').map(Number);
                 const daysUntilDue = Math.round(
-                    (Date.UTC(by, bm - 1, due) - Date.UTC(today.y, today.m - 1, today.d)) / 86400000,
+                    (Date.UTC(dy, dm - 1, due) - Date.UTC(today.y, today.m - 1, today.d)) / 86400000,
                 );
 
                 let text: string | null = null;
@@ -157,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     await linePush(lineUserId, [
                         { type: 'text', text },
                         buildBillFlex(bill as MonthlyBill, dormName, dueDay, bill.month as string, {
-                            lang: roomLang, bilingual, secLang, pay: invoicePay(payAccount, bill.total_bill as number, appBaseUrl()),
+                            lang: roomLang, bilingual, secLang, dueDate, pay: invoicePay(payAccount, bill.total_bill as number, appBaseUrl()),
                         }),
                     ], await roomLineToken({ line_channel: channelByRoom.get(bill.room_id) }));
                     await billDoc.ref.update({

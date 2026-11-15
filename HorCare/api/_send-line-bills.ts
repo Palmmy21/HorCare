@@ -4,6 +4,7 @@ import { buildBillFlex, linePush, runPooled, roomLineToken } from './_line.js';
 import { invoicePay, loadPayAccount } from './_payment-qr.js';
 import { appBaseUrl } from './_notify.js';
 import { issuerFor } from '../src/shared/billIssuer.js';
+import { resolveDueDate } from '../src/shared/billDue.js';
 import { portalLinkFor } from './_portal-link.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
@@ -121,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const pay = invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl());
                 // a branch with several places: the bill carries the name of the unit's own (src/shared/billIssuer.ts)
                 const placeName = issuerFor(cfg.bill_customization, roomData?.building_name).name || dormName;
-                const messages: object[] = [buildBillFlex(bill as MonthlyBill, placeName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay })];
+                const messages: object[] = [buildBillFlex(bill as MonthlyBill, placeName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay, dueDate: resolveDueDate(bill, cfg.bill_customization, roomData) })];
                 await linePush(lineUserId, messages, await roomLineToken(roomData)); // the OA this room linked through
                 await billDoc.ref.update({ is_notified: true });
                 sent++;

@@ -26,10 +26,10 @@ export function isLateFeeActive(cfg: LateFeeConfig | null | undefined): cfg is L
     return !!cfg?.enabled && Number(cfg.amount) > 0;
 }
 
-/** Late fee owed today for a bill of `month`, in whole baht (0 when not late, or late fees are off). */
-export function lateFeeAmount(cfg: LateFeeConfig | null | undefined, month: string, dueDay: number, today: string): number {
-    if (!isLateFeeActive(cfg)) return 0;
-    const days = chargeableLateDays(dueDateOf(month, dueDay), today, cfg.grace_days);
+/** Late fee owed today for a bill due on `dueDate` (shared/billDue.ts), in whole baht (0 when not late, or late fees are off). */
+export function lateFeeAmount(cfg: LateFeeConfig | null | undefined, dueDate: string, today: string): number {
+    if (!isLateFeeActive(cfg) || !dueDate) return 0;
+    const days = chargeableLateDays(dueDate, today, cfg.grace_days);
     if (days <= 0) return 0;
     const amount = Math.round(Number(cfg.amount));
     if (cfg.mode === 'flat') return amount;

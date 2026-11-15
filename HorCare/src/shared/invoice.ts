@@ -76,11 +76,3 @@ export function invoiceLines(bill: MonthlyBill): InvoiceLine[] {
 export function invoiceNumber(bill: Pick<MonthlyBill, 'month' | 'room_number'>): string {
   return `INV-${bill.month.replace('-', '')}-${String(bill.room_number ?? '').replace(/\s+/g, '')}`;
 }
-
-/** Due on `dueDay` of the bill's month, clamped to the month's last day (as the reminders count it). */
-export function invoiceDueDate(month: string, dueDay: number | undefined): string {
-  const [y, m] = month.split('-').map(Number);
-  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const day = Math.min(Math.max(1, Math.floor(dueDay || 5)), last);
-  return `${month}-${String(day).padStart(2, '0')}`;
-}

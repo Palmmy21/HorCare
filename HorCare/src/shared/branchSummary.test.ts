@@ -29,6 +29,12 @@ describe('isOverdueBill', () => {
     expect(isOverdueBill({ ...bill, payment_status: 'pending' }, 5, 0, '2026-12-01')).toBe(false);
     expect(isOverdueBill({ ...bill, is_saved: false }, 5, 0, '2026-12-01')).toBe(false);
   });
+  it('gives a bill issued after the due day until the next month', () => {
+    const late = { ...bill, created_at: '2026-11-25T03:00:00.000Z' };
+    expect(isOverdueBill(late, 5, 0, '2026-12-05')).toBe(false);
+    expect(isOverdueBill(late, 5, 0, '2026-12-06')).toBe(true);
+    expect(isOverdueBill({ ...late, due_date: '2026-12-20' }, 5, 0, '2026-12-10')).toBe(false);
+  });
   it('treats a legacy bill without a status as unpaid', () => {
     expect(isOverdueBill({ month: '2026-10', is_saved: true }, 5, 0, '2026-11-13')).toBe(true);
   });

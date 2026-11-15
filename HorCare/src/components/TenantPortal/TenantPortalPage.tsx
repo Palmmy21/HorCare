@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { portalCall, portalPost, isLegacyPortalUrl, portalLink, setPortalPin, PortalError } from './portalApi';
-import type { Room, DormConfig, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory, Fine, BillLanguage, CleaningRequest, CleaningServiceType } from '../../types';
+import type { Room, DormConfig, BillCustomization, MonthlyBill, TenantProfile, MaintenanceRequest, MaintenanceCategory, Fine, BillLanguage, CleaningRequest, CleaningServiceType } from '../../types';
 import {
   PORTAL_TRANSLATIONS,
   LANGUAGE_OPTIONS,
@@ -394,7 +394,7 @@ function SlipUploader({
 
 // ── Bill Card ─────────────────────────────────────────────────────────────────
 /** What the invoice document needs besides the bill: who issues it and who it is for. */
-interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; placeName?: string; dueDay?: number; secondLang?: BillLanguage | null }
+interface InvoiceContext { issuer: DocIssuer; tenantName?: string; unitWord: string; placeName?: string; due?: BillCustomization | null; room?: Pick<Room, 'due_day' | 'bill_footer'> | null; secondLang?: BillLanguage | null }
 
 function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
   bill: MonthlyBill;
@@ -451,7 +451,7 @@ function BillCard({ bill, defaultOpen, payTo, onChanged, lang, invoice }: {
           onClose={() => setShowInvoice(false)}
           allowImage
         >
-          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} placeName={invoice.placeName} dueDay={invoice.dueDay} payTo={payTo} lang={lang} secondLang={invoice.secondLang} />
+          <InvoiceDocument bill={bill} issuer={invoice.issuer} tenantName={invoice.tenantName} unitWord={invoice.unitWord} placeName={invoice.placeName} due={invoice.due} room={invoice.room} payTo={payTo} lang={lang} secondLang={invoice.secondLang} />
         </DocumentViewer>
       )}
 
@@ -911,7 +911,8 @@ export default function TenantPortalPage() {
     // a branch may hold several kinds of property: the unit's own kind names it (บ้านเช่า, ที่ดิน), as on the owner's copy
     unitWord: room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config?.building_type)] : config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',
     placeName: room?.building_name,
-    dueDay: bc?.due_day,
+    due: bc,
+    room,
     secondLang: bc?.bilingual_mode ? bc.secondary_language || 'en' : null,
   };
 

@@ -4,12 +4,16 @@ import { toast } from 'react-hot-toast';
 import type { MonthlyBill } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
 import { ADJUSTMENT_PRESETS, baseTotal, cleanAdjustments } from '../../shared/billAdjustments';
+import { isIsoDay } from '../../shared/billDue';
+import { formatBillDate } from '../../utils/i18n/billTranslations';
 
 interface Row { id?: string; label: string; amount: string; sign: 1 | -1 }
 
 interface Props {
     bill: MonthlyBill;
-    onSave: (billId: string, adjustments: { id: string; label: string; amount: number }[], note: string) => Promise<void>;
+    onSave: (billId: string, adjustments: { id: string; label: string; amount: number }[], note: string, dueDate?: string | null) => Promise<void>;
+    /** The due date the settings give this bill ('YYYY-MM-DD'), shown when the bill has none of its own. */
+    autoDue?: string;
     onClose: () => void;
 }
 
@@ -20,9 +24,10 @@ const rowsOf = (bill: MonthlyBill): Row[] =>
  * Edit one bill from สรุปยอด: the meter, rent and fee lines stay as calculated; the owner adds extra charges or
  * discounts and a note, and sees the new total before saving. The tenant sees these lines on every bill copy.
  */
-export default function BillEditModal({ bill, onSave, onClose }: Props) {
+export default function BillEditModal({ bill, onSave, onClose, autoDue }: Props) {
     const [rows, setRows] = useState<Row[]>(() => (bill.adjustments?.length ? rowsOf(bill) : [{ label: '', amount: '', sign: 1 }]));
     const [note, setNote] = useState(bill.bill_note ?? '');
+    const [dueDate, setDueDate] = useState(isIsoDay(bill.due_date) ? bill.due_date : '');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +52,7 @@ export default function BillEditModal({ bill, onSave, onClose }: Props) {
         setBusy(true);
         setError(null);
         try {
-            await onSave(bill.id, checked.adjustments, note.trim().slice(0, 300));
+            await onSave(bill.id, checked.adjustments, note.trim().slice(0, 300), isIsoDay(dueDate) ? dueDate : null);
             toast.success(`บันทึกบิลห้อง ${bill.room_number} แล้ว`);
             onClose();
         } catch (err) {
@@ -129,6 +134,19 @@ export default function BillEditModal({ bill, onSave, onClose }: Props) {
                         <label className="be-section" htmlFor="be-note">หมายเหตุในบิล (ผู้เช่าจะเห็น)</label>
                         <textarea id="be-note" className="form-input" rows={2} maxLength={300} value={note} disabled={readOnly}
                             onChange={e => setNote(e.target.value)} placeholder="เช่น ค่าซ่อมแอร์วันที่ 12 ตามใบเสร็จช่าง" />
+                    </section>
+
+                    <section>
+                        <label className="be-section" htmlFor="be-due">วันครบกำหนดชำระของบิลนี้</label>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input id="be-due" type="date" className="form-input mono" style={{ maxWidth: 190 }} value={dueDate} disabled={readOnly}
+                                onChange={e => setDueDate(e.target.value)} />
+                            {dueDate && !readOnly && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDueDate('')}>ใช้ค่าที่ตั้งไว้</button>}
+                        </div>
+                        <p className="be-hint">
+                            {dueDate ? 'บิลนี้ใช้วันที่ที่กำหนดเอง ทั้งในใบแจ้งหนี้ การแจ้งเตือน และค่าปรับล่าช้า'
+                                : `เว้นว่าง = ตามการตั้งค่า${autoDue ? ` (${formatBillDate(autoDue, 'th')})` : ''}`}
+                        </p>
                     </section>
 
                     <div className="be-total">

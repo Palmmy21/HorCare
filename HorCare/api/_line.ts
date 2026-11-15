@@ -214,6 +214,7 @@ export function thaiMonthLabel(month: string): string {
 
 import { BillLanguage, t, tBilingual, formatMonthLabel, type TranslationKey } from './_translations.js';
 import type { InvoicePay } from './_payment-qr.js';
+import { resolveDueDate } from '../src/shared/billDue.js';
 
 interface BillFlexOptions {
     portalUrl?: string;
@@ -222,6 +223,8 @@ interface BillFlexOptions {
     secLang?: BillLanguage;
     /** Where to pay; the QR and the account go inside the invoice instead of in separate messages. */
     pay?: InvoicePay;
+    /** The bill's due date ('YYYY-MM-DD') by the property's settings and the room's own; else worked out from the due day. */
+    dueDate?: string;
 }
 
 /** LINE postback data for "แบ่งจ่าย" on a bill / fine; parsed by parseSplitModePostback. */
@@ -392,6 +395,8 @@ export function buildBillFlex(
 ): object {
     const { lang, L } = labeler(opts);
     const monthFormatted = formatMonthLabel(month, lang);
+    // the due date counts from the day the bill was issued; callers that know the property's settings and the room pass it
+    const due = opts.dueDate || resolveDueDate(bill, { due_day: dueDay }) || `${month}-01`;
     const total = Number(bill.total_bill) || 0;
     const unit = t('unit_label', lang);
     const serviceTitle = L('flex_service_bill');
@@ -424,7 +429,7 @@ export function buildBillFlex(
         room: bill.room_number,
         subtitle: `${serviceTitle} · ${monthFormatted}`,
         total,
-        when: `${L('due_date')} ${dueDay} ${monthFormatted}`,
+        when: `${L('due_date')} ${Number(due.slice(8, 10))} ${formatMonthLabel(due.slice(0, 7), lang)}`,
         items,
         pay: opts.pay,
         portalUrl: opts.portalUrl,

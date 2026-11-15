@@ -1,4 +1,5 @@
 import type { BillLanguage } from '../../types';
+import { dueNoteTemplate, fillDueNote, resolveDueDate, type DueBill, type DueRoom, type DueSettings } from '../../shared/billDue';
 
 export interface LanguageOption {
     code: BillLanguage;
@@ -52,6 +53,7 @@ export type TranslationKey =
     | 'baht_label'
     | 'due_notice_prefix'
     | 'due_notice_suffix'
+    | 'due_notice_by'
     | 'flex_service_bill'
     | 'flex_open_portal'
     | 'flex_send_slip';
@@ -88,6 +90,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         baht_label: 'บาท',
         due_notice_prefix: 'กรุณาชำระภายในวันที่',
         due_notice_suffix: 'ของทุกเดือน',
+        due_notice_by: 'กรุณาชำระภายในวันที่ {date}',
         flex_service_bill: '📋 ใบแจ้งค่าบริการ',
         flex_open_portal: '🔗 เปิดพอร์ทัล / ดูบิล',
         flex_send_slip: '📎 กรุณาส่งสลิปยืนยันการโอนเงินมาในแชทนี้ด้วยนะคะ 🙏',
@@ -123,6 +126,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         baht_label: 'THB',
         due_notice_prefix: 'Please make payment before the',
         due_notice_suffix: 'of each month',
+        due_notice_by: 'Please make payment by {date}',
         flex_service_bill: '📋 Service Invoice',
         flex_open_portal: '🔗 View Bill / Portal',
         flex_send_slip: '📎 Please attach transfer slip in this chat. Thank you! 🙏',
@@ -158,6 +162,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         baht_label: 'ဘတ်',
         due_notice_prefix: 'လစဉ်',
         due_notice_suffix: 'ရက်မတိုင်မီ ငွေပေးချေပါရန်',
+        due_notice_by: '{date} မတိုင်မီ ငွေပေးချေပါရန်',
         flex_service_bill: '📋 ဝန်ဆောင်ခတောင်းခံလွှာ',
         flex_open_portal: '🔗 ဘေလ်ကြည့်ရန် / ပေါ်တယ်',
         flex_send_slip: '📎 ငွေလွှဲစလစ်ကို ဤချက်ထဲသို့ ပို့ပေးပါ ကျေးဇူးတင်ပါသည် 🙏',
@@ -193,6 +198,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         baht_label: '泰铢',
         due_notice_prefix: '请在每月',
         due_notice_suffix: '日前完成缴费',
+        due_notice_by: '请在 {date} 前完成缴费',
         flex_service_bill: '📋 账单服务通知',
         flex_open_portal: '🔗 查看账单详情',
         flex_send_slip: '📎 转账后请在此聊天发送付款水单凭证，谢谢！🙏',
@@ -228,6 +234,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         baht_label: 'ບາດ',
         due_notice_prefix: 'ກະລຸນາຊຳລະພາຍໃນວັນທີ',
         due_notice_suffix: 'ຂອງທຸກເດືອນ',
+        due_notice_by: 'ກະລຸນາຊຳລະພາຍໃນວັນທີ {date}',
         flex_service_bill: '📋 ໃບແຈ້ງຄ່າບໍລິການ',
         flex_open_portal: '🔗 ເປີດພໍທັລ / ເບິ່ງບິນ',
         flex_send_slip: '📎 ກະລຸນາສົ່ງສະລິບຢືນຢັນການໂອນເງິນມາໃນແຊັດນີ້ດ້ວຍ ຂອບໃຈ 🙏',
@@ -263,6 +270,7 @@ export const TRANSLATIONS: Record<BillLanguage, Record<TranslationKey, string>> 
         baht_label: 'THB',
         due_notice_prefix: 'Vui lòng thanh toán trước ngày',
         due_notice_suffix: 'hàng tháng',
+        due_notice_by: 'Vui lòng thanh toán trước ngày {date}',
         flex_service_bill: '📋 Thông báo hoá đơn dịch vụ',
         flex_open_portal: '🔗 Xem hoá đơn / Cổng thông tin',
         flex_send_slip: '📎 Vui lòng gửi ảnh biên lai chuyển khoản vào đoạn chat này 🙏',
@@ -368,40 +376,21 @@ export function formatBillMonth(monthStr: string, lang: BillLanguage = 'th'): st
 }
 
 /**
- * แปลงข้อความกำหนดชำระท้ายบิล
+ * หมายเหตุกำหนดชำระท้ายบิลของบิลใบหนึ่ง: ข้อความของห้อง / ของสาขา (แทน {วันครบกำหนด} ด้วยวันจริง)
+ * หรือประโยคมาตรฐาน "กรุณาชำระภายในวันที่ 5 ธันวาคม 2569" — วันครบกำหนดนับจากวันออกบิล (shared/billDue.ts)
  */
-export function formatDueNotice(
-    dueDay: number,
+export function billFooterNote(
+    bill: DueBill,
+    settings: DueSettings | null | undefined,
+    room: DueRoom | null | undefined,
     lang: BillLanguage = 'th',
     bilingual: boolean = false,
     secondaryLang: BillLanguage = 'en'
 ): string {
-    const formatSingle = (l: BillLanguage) => {
-        const prefix = t('due_notice_prefix', l);
-        const suffix = t('due_notice_suffix', l);
-        if (l === 'en') {
-            const ord = getOrdinalSuffix(dueDay);
-            return `${prefix} ${dueDay}${ord} ${suffix}`;
-        }
-        if (l === 'zh') {
-            return `${prefix} ${dueDay} ${suffix}`;
-        }
-        if (l === 'my') {
-            return `${prefix} ${dueDay} ${suffix}`;
-        }
-        return `${prefix} ${dueDay} ${suffix}`;
-    };
-
-    const primaryText = formatSingle(lang);
-    if (!bilingual || lang === secondaryLang) {
-        return primaryText;
-    }
-    const secondaryText = formatSingle(secondaryLang);
-    return `${primaryText} / ${secondaryText}`;
-}
-
-function getOrdinalSuffix(n: number): string {
-    const s = ['th', 'st', 'nd', 'rd'];
-    const v = n % 100;
-    return s[(v - 20) % 10] || s[v] || s[0];
+    const due = resolveDueDate(bill, settings, room);
+    const template = dueNoteTemplate(settings, room);
+    if (template) return fillDueNote(template, formatBillDate(due, lang));
+    if (!due) return '';
+    const single = (l: BillLanguage) => t('due_notice_by', l).replace('{date}', formatBillDate(due, l));
+    return !bilingual || lang === secondaryLang ? single(lang) : `${single(lang)} / ${single(secondaryLang)}`;
 }

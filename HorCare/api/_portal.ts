@@ -38,7 +38,7 @@ const MAX_SIGNATURE_CHARS = 300_000;
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 // What the portal shows. Anything else in these documents (LINE ids, PIN, registration code, ID-card number …) stays server-side.
-const ROOM_FIELDS = ['room_number', 'room_type', 'rent_amount', 'rent_type', 'language', 'zone', 'stall_size', 'floor', 'building_name', 'unit_category'];
+const ROOM_FIELDS = ['room_number', 'room_type', 'rent_amount', 'rent_type', 'language', 'zone', 'stall_size', 'floor', 'building_name', 'unit_category', 'due_day', 'bill_footer'];
 const CONFIG_FIELDS = ['building_type', 'collection_style', 'bill_customization'];
 const PROFILE_VIEW_FIELDS = ['full_name', 'nickname', 'phone', 'occupation', 'emergency_name', 'emergency_phone', 'emergency_relation',
     'move_in_date', 'contract_end_date', 'tenant_count', 'signed_contract'];

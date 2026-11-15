@@ -1,5 +1,5 @@
 import { db } from './_firebase.js';
-import { lateFeeAmount, lateFeeFineId } from '../src/shared/lateFee.js';
+import { isLateFeeActive, lateFeeAmount, lateFeeFineId } from '../src/shared/lateFee.js';
 import type { LateFeeConfig } from '../src/types/index.js';
 
 /**
@@ -12,14 +12,21 @@ export async function upsertLateFee(
     buildingPath: string,
     bill: { id: string; room_id: string; room_number: string; month: string },
     cfg: LateFeeConfig | undefined,
-    dueDay: number,
+    /** the bill's due date, 'YYYY-MM-DD' (resolveDueDate) */
+    dueDate: string,
     today: string,
 ): Promise<number> {
-    const fee = lateFeeAmount(cfg, bill.month, dueDay, today);
-    if (fee <= 0) return 0;
-
+    if (!isLateFeeActive(cfg)) return 0;
+    const fee = lateFeeAmount(cfg, dueDate, today);
     const ref = db.doc(`${buildingPath}/fines/${lateFeeFineId(bill.id)}`);
     const snap = await ref.get();
+    if (fee <= 0) {
+        // not late (any more): the due date moved — set on the bill, or counted from the issue date — so a late fee
+        // this cron charged earlier is withdrawn, unless the tenant already paid it or sent a slip for it
+        const old = snap.data() as { status?: string; source?: string } | undefined;
+        if (old && old.source === 'late_fee' && old.status !== 'paid' && old.status !== 'pending') await ref.delete();
+        return 0;
+    }
     const now = new Date().toISOString();
     if (!snap.exists) {
         await ref.set({

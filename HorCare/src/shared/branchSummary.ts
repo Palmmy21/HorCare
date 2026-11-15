@@ -3,6 +3,7 @@
 // Dates are Thai calendar days ("YYYY-MM-DD"), months "YYYY-MM".
 
 import { dueDateOf, chargeableLateDays } from './lateFee.js';
+import { resolveDueDate, type DueRoom, type DueSettings } from './billDue.js';
 
 /** The four looks a branch card can take; every building_type maps onto one. */
 export type BranchKind = 'dorm' | 'condo' | 'market' | 'resort';
@@ -45,19 +46,25 @@ export interface BranchSummaryResponse {
 
 export interface BillFacts {
   month?: string;
+  room_id?: string;
   is_saved?: boolean;
   payment_status?: string;
   total_bill?: number;
+  created_at?: string;
+  due_date?: string | null;
 }
 
 /**
  * A bill is overdue when it was issued (saved), is not paid and the tenant has not sent a slip for it (`pending` is
  * waiting on the owner, not the tenant), and today is past its due date plus the grace days of the late-fee setting.
+ * The due date counts from the day the bill was issued (shared/billDue.ts); `due` is the due day or the property's
+ * due settings, `room` the bill's room when it has a due day of its own.
  */
-export function isOverdueBill(b: BillFacts, dueDay: number, graceDays: number, today: string): boolean {
+export function isOverdueBill(b: BillFacts, due: number | DueSettings, graceDays: number, today: string, room?: DueRoom | null): boolean {
   if (!b.is_saved || !b.month) return false;
   if ((b.payment_status ?? 'unpaid') !== 'unpaid') return false;
-  return chargeableLateDays(dueDateOf(b.month, dueDay), today, Math.max(0, graceDays || 0)) > 0;
+  const dueDate = resolveDueDate(b, typeof due === 'number' ? { due_day: due } : due, room);
+  return chargeableLateDays(dueDate, today, Math.max(0, graceDays || 0)) > 0;
 }
 
 /** 'YYYY-MM' n months before today's month. */
@@ -67,9 +74,9 @@ export function monthsBack(today: string, n: number): string {
 }
 
 /**
- * The months whose bills are already overdue today (past the due day plus grace), newest first, going back
- * `lookback` months — the same rule as isOverdueBill, so the server can count overdue bills by month instead of
- * reading every bill.
+ * The months whose bills can be overdue today (their own due day plus grace has passed), newest first, going back
+ * `lookback` months. A bill issued after its month's due day is due the month after, so only the months of
+ * settledOverdueMonths() can be counted without looking at each bill.
  */
 export function overdueMonths(today: string, dueDay: number, graceDays: number, lookback: number): string[] {
   const out: string[] = [];
@@ -78,6 +85,16 @@ export function overdueMonths(today: string, dueDay: number, graceDays: number, 
     if (chargeableLateDays(dueDateOf(month, dueDay), today, Math.max(0, graceDays || 0)) > 0) out.push(month);
   }
   return out;
+}
+
+/**
+ * Of overdueMonths(), the months whose bills are overdue whenever in that month they were issued: the next month's
+ * due day (plus grace) has passed as well. The server counts these by month and reads only the newer ones.
+ */
+export function settledOverdueMonths(today: string, dueDay: number, graceDays: number, lookback: number): string[] {
+  const next = (month: string) => { const [y, m] = month.split('-').map(Number); return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7); };
+  return overdueMonths(today, dueDay, graceDays, lookback)
+    .filter(month => chargeableLateDays(dueDateOf(next(month), dueDay), today, Math.max(0, graceDays || 0)) > 0);
 }
 
 /** Collected vs expected for one month, the same sum the dashboard's money panel makes. */

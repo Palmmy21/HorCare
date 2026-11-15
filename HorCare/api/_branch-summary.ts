@@ -21,10 +21,11 @@ import { authorize, buildingExists } from './_rbac.js';
 import { supabase, SupabaseNotConfigured } from './_supabase.js';
 import { contractOccupancy, effectiveOccupancy, type LeaseFacts, type ProfileFacts, type ReservationFacts, type StatusOverride } from '../src/shared/roomOccupancy.js';
 import {
-    branchKind, isOverdueBill, monthRevenue, monthsBack, overdueMonths, roomsBookedTonight, OPEN_REPAIR_STATUSES,
+    branchKind, isOverdueBill, monthRevenue, monthsBack, overdueMonths, settledOverdueMonths, roomsBookedTonight, OPEN_REPAIR_STATUSES,
     type BillFacts, type BookingFacts, type BranchSummary, type BranchSummaryResponse,
 } from '../src/shared/branchSummary.js';
 import { todayTh } from '../src/shared/market.js';
+import type { DueRoom, DueSettings } from '../src/shared/billDue.js';
 import { errorInfo } from '../src/shared/errorInfo.js';
 
 export const config = { maxDuration: 20 };
@@ -40,6 +41,9 @@ const accessDocId = (owner: string, buildingId: string) => `${owner}__${building
 /** server-only: no client rule opens this collection */
 const summaryDoc = (owner: string, buildingId: string) => db.doc(`branch_summaries/${owner}__${buildingId}`);
 
+/** Rooms with a due day of their own, by room id. (Months counted in bulk use the property's due day.) */
+type RoomDue = Map<string, DueRoom>;
+
 interface BillFigures { overdue: number; collected: number; expected: number }
 
 /**
@@ -47,31 +51,37 @@ interface BillFigures { overdue: number; collected: number; expected: number }
  * payment_status), so the single-field indexes serve them and no composite index is needed. A bill with no
  * payment_status counts as unpaid, so "unpaid" is everything saved minus what is paid or pending.
  */
-async function billFiguresByAggregate(base: string, today: string, dueDay: number, grace: number): Promise<BillFigures> {
+async function billFiguresByAggregate(base: string, today: string, due: DueSettings, grace: number, roomDue: RoomDue): Promise<BillFigures> {
     const bills = db.collection(`${base}/bills`);
-    const months = overdueMonths(today, dueDay, grace, OVERDUE_LOOKBACK_MONTHS);
+    const dueDay = Number(due.due_day) || 5;
+    // months overdue whenever their bills were issued are counted; the newest one or two depend on each bill's issue
+    // date (a bill issued after the due day is due the month after), so those bills are read
+    const months = settledOverdueMonths(today, dueDay, grace, OVERDUE_LOOKBACK_MONTHS);
+    const recent = overdueMonths(today, dueDay, grace, OVERDUE_LOOKBACK_MONTHS).filter(m => !months.includes(m));
     const month = today.slice(0, 7);
     const saved = bills.where('is_saved', '==', true);
     const sum = { total: admin.firestore.AggregateField.sum('total_bill') };
-    const [inOverdueMonths, settled, expected, collected] = await Promise.all([
+    const [inOverdueMonths, settled, expected, collected, recentBills] = await Promise.all([
         months.length ? saved.where('month', 'in', months).count().get() : null,
         months.length ? saved.where('month', 'in', months).where('payment_status', 'in', ['paid', 'pending']).count().get() : null,
         saved.where('month', '==', month).aggregate(sum).get(),
         saved.where('month', '==', month).where('payment_status', '==', 'paid').aggregate(sum).get(),
+        recent.length ? saved.where('month', 'in', recent).get() : null,
     ]);
+    const recentOverdue = (recentBills?.docs ?? []).filter(d => { const b = d.data() as BillFacts; return isOverdueBill(b, due, grace, today, roomDue.get(b.room_id ?? '')); }).length;
     return {
-        overdue: Math.max(0, (inOverdueMonths?.data().count ?? 0) - (settled?.data().count ?? 0)),
+        overdue: Math.max(0, (inOverdueMonths?.data().count ?? 0) - (settled?.data().count ?? 0)) + recentOverdue,
         expected: Number(expected.data().total) || 0,
         collected: Number(collected.data().total) || 0,
     };
 }
 
 /** The old way: read every bill of the lookback window. Used when an aggregation is refused. */
-async function billFiguresByReading(base: string, today: string, dueDay: number, grace: number): Promise<BillFigures> {
+async function billFiguresByReading(base: string, today: string, due: DueSettings, grace: number, roomDue: RoomDue): Promise<BillFigures> {
     const snap = await db.collection(`${base}/bills`).where('month', '>=', monthsBack(today, OVERDUE_LOOKBACK_MONTHS)).get();
     const bills = snap.docs.map(d => d.data() as BillFacts);
     const revenue = monthRevenue(bills, today.slice(0, 7));
-    return { overdue: bills.filter(b => isOverdueBill(b, dueDay, grace, today)).length, ...revenue };
+    return { overdue: bills.filter(b => isOverdueBill(b, due, grace, today, roomDue.get(b.room_id ?? ''))).length, ...revenue };
 }
 
 interface OrgFacts { leases: LeaseFacts[]; reservations: ReservationFacts[]; bookings: (BookingFacts & { building_id: string })[] }
@@ -136,15 +146,16 @@ async function countBranch(
         }
     }
 
-    const cfg = (cfgSnap.data() ?? {}) as { bill_customization?: { due_day?: number }; due_day?: number; late_fee?: { grace_days?: number } };
-    const dueDay = Number(cfg.bill_customization?.due_day ?? cfg.due_day) || 5;
+    const cfg = (cfgSnap.data() ?? {}) as { bill_customization?: DueSettings; due_day?: number; late_fee?: { grace_days?: number } };
+    const due: DueSettings = { ...cfg.bill_customization, due_day: Number(cfg.bill_customization?.due_day ?? cfg.due_day) || 5 };
     const grace = Number(cfg.late_fee?.grace_days) || 0;
+    const roomDue: RoomDue = new Map(roomsSnap.docs.filter(d => d.data().due_day).map(d => [d.id, { due_day: d.data().due_day as number }]));
     let figures: BillFigures;
     try {
-        figures = await billFiguresByAggregate(base, today, dueDay, grace);
+        figures = await billFiguresByAggregate(base, today, due, grace, roomDue);
     } catch (err) {
         console.warn(`branches: aggregate for ${buildingId} refused, reading bills:`, errorInfo(err).message);
-        figures = await billFiguresByReading(base, today, dueDay, grace);
+        figures = await billFiguresByReading(base, today, due, grace, roomDue);
     }
 
     return {

@@ -8,6 +8,7 @@ import { isInvitationToken, redeemInvitation } from './_invitations.js';
 import { claimRoom, isRoomCode, scanRoomCode, type ScanResult } from './_room-qr.js';
 import { propertyOaId } from './_line-oa.js';
 import { linkedRooms, recordFriendship, roomsOnThisOa } from './_line-binding.js';
+import { dueDateOfBill } from './_bill-due.js';
 import { roomNumbersText, roomsOfLink, sameRoom, type BindMode, type LinkedRoom } from '../src/shared/lineRooms.js';
 import { readSlipDetails } from './_slip-ai.js';
 import { claimSlipQuestion, describeReply, getTenantLink, inboxLinkOf, markFaqAnswered, recordBotReply, recordInbound } from './_line-inbox.js';
@@ -699,7 +700,8 @@ async function handleBillCommand(lineUserId: string, replyToken: string) {
 
     const bill = billDoc.data();
     const pay = invoicePay(await loadPayAccount(uid, building_id), bill.total_bill as number, appBaseUrl());
-    await lineReply(replyToken, [buildBillFlex(bill as MonthlyBill, dorm_name || '-', due_day ?? 5, bill.month as string, { pay })]);
+    const dueDate = await dueDateOfBill(uid, building_id, bill);
+    await lineReply(replyToken, [buildBillFlex(bill as MonthlyBill, dorm_name || '-', due_day ?? 5, bill.month as string, { pay, dueDate })]);
 }
 
 /** LINE takes five messages in a reply: up to four bill cards, then a line about whatever did not fit. */
@@ -718,7 +720,7 @@ async function replyBillsOfRooms(replyToken: string, rooms: LinkedRoom[]) {
         if (!accounts.has(key)) accounts.set(key, await loadPayAccount(r.uid, r.building_id));
         const pay = invoicePay(accounts.get(key)!, bill.total_bill as number, appBaseUrl());
         cards.push({
-            card: buildBillFlex(bill as MonthlyBill, r.dorm_name || '-', r.due_day ?? 5, bill.month as string, { pay }),
+            card: buildBillFlex(bill as MonthlyBill, r.dorm_name || '-', r.due_day ?? 5, bill.month as string, { pay, dueDate: await dueDateOfBill(r.uid, r.building_id, bill) }),
             paid: bill.payment_status === 'paid', room: r.room_number,
         });
     }

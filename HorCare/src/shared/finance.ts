@@ -1,10 +1,11 @@
 // Owner-facing money picture: what was billed, what was collected, what is still owed — by month, category and age.
 // Pure functions over the documents the app already holds (bills, fines, recorded payments, daily/weekly charges), so
 // the charts and the exported dataset always come from the same numbers. Money is integer satang, months are "YYYY-MM".
+import { resolveDueDate, type DueRoom, type DueSettings } from './billDue.js';
 import { REVENUE_CATEGORIES, REVENUE_CATEGORY_LABELS_TH, monthEnd, thDate, toSatang, type RevenueCategory } from './accounting.js';
 
 export interface BillLike {
-  id: string; room_number: string; month: string; is_saved?: boolean;
+  id: string; room_id?: string; room_number: string; month: string; is_saved?: boolean; due_date?: string | null;
   room_rent?: number; elec_bill?: number; water_bill?: number; common_fee?: number; total_bill: number;
   payment_status?: string; paid_amount?: number; paid_at?: string; slip_submitted_at?: string; updated_at?: string; created_at?: string;
   payment_method?: string; paid_method?: string; slip_image?: boolean;
@@ -26,6 +27,8 @@ export interface ChargePaymentLike { amount_satang: number; method: 'cash' | 'tr
 
 export interface FinanceInput {
   bills: BillLike[]; fines: FineLike[]; payments: PaymentLike[]; charges: ChargeLike[]; chargePayments: ChargePaymentLike[];
+  /** The property's due-date settings and each room's own (shared/billDue.ts). Without them a bill is due at its month's end. */
+  due?: { settings?: DueSettings | null; rooms?: Record<string, DueRoom> };
 }
 
 export type Method = 'cash' | 'transfer' | 'other';
@@ -142,12 +145,17 @@ export function compare(input: FinanceInput, month: string): Comparison {
 
 // ── What is still owed ──────────────────────────────────────────────────────
 
+/** A bill's due date by the property's settings (counted from the day it was issued); its month's end when they are not known. */
+function billDue(b: BillLike, due: FinanceInput['due']): string {
+  return (due?.settings && resolveDueDate(b, due.settings, b.room_id ? due.rooms?.[b.room_id] : undefined)) || monthEnd(b.month);
+}
+
 export function openItems(input: FinanceInput): OpenItem[] {
   const out: OpenItem[] = [];
   for (const b of input.bills) {
     if (b.is_saved === false || isPaid(b.payment_status)) continue;
     const left = toSatang(b.total_bill) - (b.allocated_satang ?? 0);
-    if (left > 0) out.push({ id: `bill:${b.id}`, label: `ห้อง ${b.room_number}`, due: monthEnd(b.month), outstanding_satang: left });
+    if (left > 0) out.push({ id: `bill:${b.id}`, label: `ห้อง ${b.room_number}`, due: billDue(b, input.due), outstanding_satang: left });
   }
   for (const f of input.fines) {
     if (isPaid(f.status)) continue;

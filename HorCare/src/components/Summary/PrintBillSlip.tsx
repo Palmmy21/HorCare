@@ -1,5 +1,6 @@
 import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization, BillLanguage } from '../../types';
-import { t, tBilingual, formatBillDate, formatBillMonth, formatDueNotice } from '../../utils/i18n/billTranslations';
+import type { DueRoom } from '../../shared/billDue';
+import { t, tBilingual, formatBillDate, formatBillMonth, billFooterNote } from '../../utils/i18n/billTranslations';
 
 interface Props {
     bill: MonthlyBill;
@@ -8,6 +9,8 @@ interface Props {
     effectiveElecRate?: number;
     effectiveWaterConfig?: WaterConfig;
     billCustomization?: BillCustomization;
+    /** the bill's room, for its own due day / note */
+    room?: DueRoom | null;
     language?: BillLanguage;
     bilingualMode?: boolean;
     secondaryLanguage?: BillLanguage;
@@ -15,7 +18,7 @@ interface Props {
 
 function n(v: number) { return v.toLocaleString('th-TH'); }
 
-export default function PrintBillSlip({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, language, bilingualMode, secondaryLanguage }: Props) {
+export default function PrintBillSlip({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, room, language, bilingualMode, secondaryLanguage }: Props) {
     const lang: BillLanguage = language ?? billCustomization?.default_language ?? 'th';
     const isBilingual: boolean = bilingualMode ?? billCustomization?.bilingual_mode ?? false;
     const secLang: BillLanguage = secondaryLanguage ?? billCustomization?.secondary_language ?? 'en';
@@ -25,8 +28,7 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
     const dormName = billCustomization?.dorm_name || tBilingual('invoice_or_receipt', lang, isBilingual, secLang);
     const phone    = billCustomization?.dorm_phone || '';
     const address  = billCustomization?.dorm_address || '';
-    const defaultFooter = formatDueNotice(billCustomization?.due_day ?? 5, lang, isBilingual, secLang);
-    const footer   = billCustomization?.footer_text || defaultFooter;
+    const footer   = billFooterNote(bill, billCustomization, room, lang, isBilingual, secLang);
     const isFlat   = waterCfg.type === 'flat_rate_tier';
     const tenants  = Math.max(1, bill.tenant_count || 1);
 

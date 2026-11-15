@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
     X, Check, Home, Building2, Store, Zap, Droplets, Globe, Sparkles, Receipt, Users, Minus, Plus,
-    MessageCircle, Link2Off, Loader2, Gauge, Wallet,
+    MessageCircle, Link2Off, Loader2, Gauge, Wallet, CalendarClock,
 } from 'lucide-react';
 import type { Room, DormConfig, CommonFee, BillLanguage } from '../../types';
 import { BUILTIN_AMENITIES, amenityLabel } from '../../utils/amenities';
-import { LANGUAGE_OPTIONS, LANGUAGE_MAP } from '../../utils/i18n/billTranslations';
+import { LANGUAGE_OPTIONS, LANGUAGE_MAP, billFooterNote } from '../../utils/i18n/billTranslations';
+import { DUE_TOKEN, validDueDay } from '../../shared/billDue';
 import { getWorkspaceTerms, rentTypeOptions } from '../../utils/workspaceTerminology';
 import { UNIT_CATEGORIES, UNIT_CATEGORY_LABELS, categoryOf, defaultCategoryFor, unitHasMeters, type UnitCategory } from '../../shared/unitCategory';
 
@@ -38,6 +39,8 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
     );
     const [feeOverrides, setFeeOverrides] = useState<FeeOverrides>(room.common_fee_overrides || {});
     const [language, setLanguage] = useState<BillLanguage | ''>(room.language || '');
+    const [dueDay, setDueDay] = useState(room.due_day ? String(room.due_day) : '');
+    const [billFooter, setBillFooter] = useState(room.bill_footer || '');
     const [amenities, setAmenities] = useState<string[]>(room.amenities || []);
     const [category, setCategory] = useState<UnitCategory>(categoryOf(room, config?.building_type));
     // undefined = by category (land has no meters); a tick is the owner's own choice
@@ -76,6 +79,8 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
                 : null,
             common_fee_overrides: feeOverrides,
             language: language ? (language as BillLanguage) : undefined,
+            due_day: validDueDay(dueDay),
+            bill_footer: billFooter.trim() || null,
             amenities,
             // the branch's own kind is stored as null (= follow the branch) so changing the branch type later still carries these units
             unit_category: category === defaultCategoryFor(config?.building_type) ? null : category,
@@ -360,6 +365,33 @@ export default function RoomEditModal({ room, rooms, config, commonFees, onSave,
                                 </button>
                             ))}
                         </div>
+                    </section>
+
+                    {/* Due date and bill note of this unit only */}
+                    <section className="re-section">
+                        <h3 className="re-section-title"><CalendarClock size={16} /> กำหนดชำระและหมายเหตุบิลเฉพาะ{terms.unitName}นี้</h3>
+                        <div className="re-hint">เว้นว่างเพื่อใช้ค่าของสาขา (ตั้งค่า → ใบแจ้งหนี้)</div>
+                        <label className="form-label" htmlFor="re-due-day">กำหนดชำระวันที่</label>
+                        <input id="re-due-day" className="form-input mono" style={{ maxWidth: 120 }} inputMode="numeric" maxLength={2}
+                            value={dueDay} onChange={e => setDueDay(e.target.value.replace(/\D/g, ''))}
+                            placeholder={String(config.bill_customization?.due_day || 5)} />
+                        <label className="form-label" htmlFor="re-bill-footer" style={{ marginTop: 10 }}>หมายเหตุท้ายบิล</label>
+                        <textarea id="re-bill-footer" className="form-input" rows={2} maxLength={300} value={billFooter}
+                            onChange={e => setBillFooter(e.target.value)}
+                            placeholder={`เช่น กรุณาชำระภายในวันที่ ${DUE_TOKEN} (ตามสัญญาเช่า)`} />
+                        <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 6 }}
+                            onClick={() => setBillFooter(v => `${v.trimEnd()} ${DUE_TOKEN}`.trimStart())}>
+                            + แทรกวันครบกำหนด
+                        </button>
+                        {(validDueDay(dueDay) || billFooter.trim()) && (
+                            <div className="re-hint" style={{ marginTop: 8, whiteSpace: 'pre-line' }}>
+                                ตัวอย่างบนบิลที่ออกวันนี้: {billFooterNote(
+                                    { month: new Date().toISOString().slice(0, 7), created_at: new Date().toISOString() },
+                                    config.bill_customization, { due_day: validDueDay(dueDay), bill_footer: billFooter },
+                                    (language || config.bill_customization?.default_language || 'th') as BillLanguage,
+                                )}
+                            </div>
+                        )}
                     </section>
 
                     {/* LINE */}

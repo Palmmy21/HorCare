@@ -2,7 +2,7 @@
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import type { PaymentRec } from '../shared/accounting';
-import type { Fine, MonthlyBill, Room } from '../types';
+import type { BillCustomization, Fine, MonthlyBill, Room } from '../types';
 
 function useLive<T>(path: string | null) {
   const [snap, setSnap] = useState<{ path: string; list: T[]; error: boolean } | null>(null);
@@ -28,6 +28,12 @@ export type RecordedPayment = PaymentRec & { bank_account_id?: string | null; ro
 export function useBuildingPayments(ownerUid: string | null, buildingId: string | null) {
   const { list, loading } = useLive<RecordedPayment>(ownerUid && buildingId ? `users/${ownerUid}/buildings/${buildingId}/payments` : null);
   return { payments: useMemo(() => [...list].sort((a, b) => b.paid_at.localeCompare(a.paid_at)), [list]), loading };
+}
+
+/** The property's bill settings (due day, due-note mode), read from its config document. */
+export function useBuildingBillSettings(ownerUid: string | null, buildingId: string | null): BillCustomization | null {
+  const { list } = useLive<{ bill_customization?: BillCustomization }>(ownerUid && buildingId ? `users/${ownerUid}/buildings/${buildingId}/data` : null);
+  return useMemo(() => list.find(d => d.bill_customization)?.bill_customization ?? null, [list]);
 }
 
 export type BillingItem = (MonthlyBill | Fine) & { allocated_satang?: number; payments_recorded?: boolean };

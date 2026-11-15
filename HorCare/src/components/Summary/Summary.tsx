@@ -11,6 +11,7 @@ import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room, BillLanguage } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
 import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
+import { resolveDueDate } from '../../shared/billDue';
 import BulkInvoiceExport from './BulkInvoiceExport';
 import { DocumentViewer } from '../Documents/DocumentViewer';
 import { InvoiceDocument } from '../Documents/InvoiceDocument';
@@ -47,7 +48,7 @@ interface SummaryProps {
     canSendLine?: boolean;
     onUpgrade?: () => void;
     /** Add extra charges / discounts and a note to a bill; omitted when this account may not edit bills. */
-    onEditBillExtras?: (billId: string, adjustments: BillAdjustment[], note: string) => Promise<void>;
+    onEditBillExtras?: (billId: string, adjustments: BillAdjustment[], note: string, dueDate?: string | null) => Promise<void>;
     /** Issue rent-only bills (no meters) for units with no bill this month; omitted when this account may not. */
     onCreateRentBills?: (items: { room: Room; rent: number; prorate?: MonthlyBill['rent_prorate'] }[], month: string) => Promise<{ created: number; skipped: number }>;
     unitName?: string;
@@ -716,7 +717,9 @@ export default function Summary({
             {/* Edit a bill: extra charges / discounts and a note (always the live copy of the bill) */}
             {editingBillId && onEditBillExtras && (() => {
                 const live = monthBills.find(b => b.id === editingBillId);
-                return live ? <BillEditModal bill={live} onSave={onEditBillExtras} onClose={() => setEditingBillId(null)} /> : null;
+                if (!live) return null;
+                const autoDue = resolveDueDate({ ...live, due_date: null }, billCustomization, rooms.find(r => r.id === live.room_id));
+                return <BillEditModal bill={live} onSave={onEditBillExtras} onClose={() => setEditingBillId(null)} autoDue={autoDue} />;
             })()}
 
             {/* Invoice Modal */}
@@ -757,7 +760,8 @@ export default function Summary({
                             tenantName={selectedTenant?.full_name}
                             unitWord={unitWord}
                             placeName={room?.building_name}
-                            dueDay={billCustomization?.due_day}
+                            due={billCustomization}
+                            room={room}
                             payTo={payTo}
                             lang={lang}
                             secondLang={second}
@@ -832,6 +836,7 @@ export default function Summary({
                                     effectiveElecRate={rates?.electricityRate}
                                     effectiveWaterConfig={rates?.waterConfig}
                                     billCustomization={billCustomization}
+                                    room={room}
                                     language={roomLang}
                                 />
                             );

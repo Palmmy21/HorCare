@@ -85,3 +85,15 @@ describe('fine card', () => {
         expect(paid).not.toContain('postback');
     });
 });
+
+describe('the due date on the bill card', () => {
+    const when = (b: MonthlyBill, opts = {}) => JSON.stringify(buildBillFlex(b, 'บ้านสุข', 5, b.month, opts));
+    it('counts from the day the bill was issued: this month up to the due day, the next month after it', () => {
+        expect(when(bill({ month: '2026-11', created_at: '2026-11-25T03:00:00.000Z' }))).toContain('กำหนดชำระ 5 ธ.ค. 2569');
+        expect(when(bill({ month: '2026-11', created_at: '2026-11-03T03:00:00.000Z' }))).toContain('กำหนดชำระ 5 พ.ย. 2569');
+    });
+    it('uses the date the caller resolved, and the bill’s own', () => {
+        expect(when(bill({ month: '2026-11' }), { dueDate: '2026-12-10' })).toContain('กำหนดชำระ 10 ธ.ค. 2569');
+        expect(when(bill({ month: '2026-11', due_date: '2026-12-20' }))).toContain('กำหนดชำระ 20 ธ.ค. 2569');
+    });
+});

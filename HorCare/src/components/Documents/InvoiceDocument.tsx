@@ -5,7 +5,9 @@ import type { BillLanguage, MonthlyBill } from '../../types';
 import { bankByCode, formatAccountNumber, type PayAccount } from '../../shared/banks';
 import { paymentQrPayload } from '../../shared/thaiQr';
 import { bahtText } from '../../shared/voucher';
-import { invoiceDueDate, invoiceLines, invoiceNumber, type InvoiceLine } from '../../shared/invoice';
+import { resolveDueDate, type DueRoom, type DueSettings } from '../../shared/billDue';
+import { billFooterNote } from '../../utils/i18n/billTranslations';
+import { invoiceLines, invoiceNumber, type InvoiceLine } from '../../shared/invoice';
 import { thaiLongDate, type DocIssuer } from './docFormat';
 import { fill, invoiceText, type InvoiceText } from './invoiceText';
 
@@ -29,7 +31,7 @@ const monthName = (month: string, t: InvoiceText) =>
  *
  * Worded in the tenant's language; with `secondLang` (the property's bilingual mode) every label carries both.
  */
-export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName, dueDay, payTo, lang = 'th', secondLang }: {
+export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName, due, room, payTo, lang = 'th', secondLang }: {
   bill: MonthlyBill;
   issuer: DocIssuer;
   tenantName?: string;
@@ -37,7 +39,9 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
   unitWord?: string;
   /** the unit's own building / project inside the branch (ตึก B, โชคชัยการ์เด้นโฮม) — a branch may hold several */
   placeName?: string;
-  dueDay?: number;
+  /** the property's due-date settings and the unit's own (shared/billDue.ts): the due date and the note under the total */
+  due?: DueSettings | null;
+  room?: DueRoom | null;
   payTo?: PayAccount | null;
   lang?: BillLanguage;
   secondLang?: BillLanguage | null;
@@ -58,6 +62,7 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
   const bank = payTo ? bankByCode(payTo.bank_code) : undefined;
   const thaiWords = lang === 'th' || secondLang === 'th';
   const no = invoiceNumber(bill);
+  const dueNote = billFooterNote(bill, due, room, lang, !!t2, secondLang ?? undefined);
 
   const lineLabel = (l: InvoiceLine) => (l.kind === 'fee' || l.kind === 'adjustment' ? l.label : L(l.kind));
   const lineNote = (l: InvoiceLine) =>
@@ -92,7 +97,7 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
           <dl className="doc-kv" style={{ margin: 0 }}>
             <dt>{L('invoice_no')}</dt><dd className="doc-num">{no}</dd>
             <dt>{L('issued')}</dt><dd>{longDate(issued, t)}</dd>
-            <dt>{L('due')}</dt><dd>{longDate(invoiceDueDate(bill.month, dueDay), t)}</dd>
+            <dt>{L('due')}</dt><dd>{longDate(resolveDueDate(bill, due, room), t)}</dd>
           </dl>
         </div>
       </div>
@@ -139,6 +144,7 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
       </div>
 
       {bill.bill_note?.trim() && <div className="doc-note doc-block"><b>{L('note')}:</b> {bill.bill_note}</div>}
+      {!paid && dueNote && <div className="doc-note doc-block" style={{ whiteSpace: 'pre-line' }}>{dueNote}</div>}
 
       {paid ? (
         <div className="doc-pay doc-block">

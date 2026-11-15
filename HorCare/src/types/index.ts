@@ -89,6 +89,10 @@ export interface BillCustomization {
   promptpay_name?: string;
   footer_text: string;        // ข้อความด้านล่างบิล
   due_day: number;            // กำหนดชำระวันที่
+  /** หมายเหตุกำหนดชำระท้ายบิล: auto = คำนวณวันให้ทุกบิล, fixed = วันที่ที่เจ้าของกำหนด, manual = ข้อความที่พิมพ์เอง (src/shared/billDue.ts) */
+  due_note_mode?: import('../shared/billDue.js').DueNoteMode;
+  /** 'YYYY-MM-DD' — วันครบกำหนดที่กำหนดเอง (โหมด fixed) */
+  due_fixed_date?: string;
   dorm_logo?: string;         // base64 โลโก้หอพัก (แสดงในพอร์ทัลผู้เช่า)
   default_language?: BillLanguage;   // ภาษาเริ่มต้นของบิลและการแจ้งเตือน (default: 'th')
   bilingual_mode?: boolean;          // แสดงบิล 2 ภาษาคู่ขนาน (เช่น ไทย + อังกฤษ)
@@ -191,6 +195,10 @@ export interface Room {
   amenities?: string[];        // amenity ids (see src/utils/amenities.ts) or custom names
   // ภาษาเฉพาะห้องสำหรับบิลและการแจ้งเตือน (ถ้าไม่ระบุจะใช้ค่าเริ่มต้นของหอพัก)
   language?: BillLanguage;
+  /** วันครบกำหนดชำระเฉพาะห้องนี้ (1–31); ว่าง = ตามค่าของสาขา (src/shared/billDue.ts) */
+  due_day?: number | null;
+  /** หมายเหตุท้ายบิลเฉพาะห้องนี้ (ใส่ {วันครบกำหนด} ได้); ว่าง = ตามค่าของสาขา */
+  bill_footer?: string | null;
   /** Parking spots assigned to this room — a copy kept in step with parking_spots, billed every month (roomFees()). */
   parking?: RoomParking[];
 }
@@ -246,6 +254,8 @@ export interface MonthlyBill {
   adjustments?: BillAdjustment[];
   /** Note printed on the bill for the tenant. */
   bill_note?: string;
+  /** 'YYYY-MM-DD' — due date set on this bill by hand; unset = worked out from the issue date (shared/billDue.ts). */
+  due_date?: string | null;
   /** Issued without meter readings (rent + fees only); recording the meters later turns it into a normal bill. */
   rent_only?: boolean;
   total_bill: number;

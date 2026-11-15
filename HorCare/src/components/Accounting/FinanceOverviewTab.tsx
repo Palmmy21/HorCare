@@ -3,7 +3,7 @@ import { Download, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
 import type { Building } from '../../types';
 import { apiPost } from '../../utils/api';
 import { useLiveRefresh } from '../../hooks/useLiveRefresh';
-import { useBuildingBilling, useBuildingPayments } from '../../hooks/useAccountingData';
+import { useBuildingBilling, useBuildingBillSettings, useBuildingPayments, useBuildingRooms } from '../../hooks/useAccountingData';
 import {
   aging, compare, monthlyRows, monthsBack, openItems, toCsv, topDebtors,
   type BillLike, type ChargeLike, type ChargePaymentLike, type FineLike, type FinanceInput, type MonthRow,
@@ -43,6 +43,9 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
   const [month, setMonth] = useState(today.slice(0, 7));
   const { bills, fines, loading: l1 } = useBuildingBilling(ownerUid, buildingId || null);
   const { payments, loading: l2 } = useBuildingPayments(ownerUid, buildingId || null);
+  // "overdue" follows each bill's real due date: the property's due settings and a room's own due day
+  const dueSettings = useBuildingBillSettings(ownerUid, buildingId || null);
+  const { rooms } = useBuildingRooms(ownerUid, buildingId || null);
   const [series, setSeries] = useState<{ key: string; charges: ChargeLike[]; chargePayments: ChargePaymentLike[] } | null>(null);
 
   // Daily / weekly charges live in Supabase; a property that does not use them (or has no Supabase yet) simply has none.
@@ -64,7 +67,8 @@ export default function FinanceOverviewTab({ ownerUid, buildings }: { ownerUid: 
 
   const input: FinanceInput = useMemo(() => ({
     bills: bills as unknown as BillLike[], fines: fines as unknown as FineLike[], payments, charges: charges?.charges ?? [], chargePayments: charges?.chargePayments ?? [],
-  }), [bills, fines, payments, charges]);
+    due: dueSettings ? { settings: dueSettings, rooms: Object.fromEntries(rooms.filter(r => r.due_day).map(r => [r.id, { due_day: r.due_day }])) } : undefined,
+  }), [bills, fines, payments, charges, dueSettings, rooms]);
 
   const view = useMemo(() => {
     const m25 = monthsBack(month, 25);

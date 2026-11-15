@@ -1,7 +1,8 @@
 import { forwardRef } from 'react';
 import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization, BillLanguage } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
-import { t, tBilingual, formatBillDate, formatBillMonth, formatDueNotice } from '../../utils/i18n/billTranslations';
+import { t, tBilingual, formatBillDate, formatBillMonth, billFooterNote } from '../../utils/i18n/billTranslations';
+import type { DueRoom } from '../../shared/billDue';
 import { QRCodeSVG } from 'qrcode.react';
 import { paymentQrPayload } from '../../shared/thaiQr';
 import { bankByCode, type PayAccount } from '../../shared/banks';
@@ -13,6 +14,8 @@ interface InvoiceBillProps {
     effectiveElecRate?: number;
     effectiveWaterConfig?: WaterConfig;
     billCustomization?: BillCustomization;
+    /** the bill's room, for its own due day / note */
+    room?: DueRoom | null;
     /** The account the printed QR pays into (the property's default active account). No account → no QR. */
     payTo?: PayAccount | null;
     language?: BillLanguage;
@@ -21,7 +24,7 @@ interface InvoiceBillProps {
 }
 
 const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
-    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, payTo, language, bilingualMode, secondaryLanguage }, ref) => {
+    ({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, room, payTo, language, bilingualMode, secondaryLanguage }, ref) => {
         let qrPayload: string | null = null;
         try { qrPayload = payTo ? paymentQrPayload(payTo, bill.total_bill) : null; } catch { qrPayload = null; } // a malformed account simply prints no QR
         const lang: BillLanguage = language ?? billCustomization?.default_language ?? 'th';
@@ -40,8 +43,7 @@ const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
             billCustomization.dorm_phone
         );
 
-        const defaultFooter = formatDueNotice(billCustomization?.due_day || 5, lang, isBilingual, secLang);
-        const footerText = billCustomization?.footer_text || defaultFooter;
+        const footerText = billFooterNote(bill, billCustomization, room, lang, isBilingual, secLang);
 
         const phoneLabel = isBilingual ? 'โทร. / Tel.' : (lang === 'en' ? 'Tel.' : (lang === 'zh' ? '电话:' : 'โทร.'));
 

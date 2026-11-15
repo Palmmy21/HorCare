@@ -526,7 +526,7 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
      * Extra charges / discounts and the note on one bill (Summary → แก้ไขบิล). The total is re-based on the server copy
      * inside a transaction, so a meter re-save in between is never overwritten; a closed or paid bill is refused.
      */
-    const updateBillExtras = useCallback(async (billId: string, adjustments: BillAdjustment[], note: string) => {
+    const updateBillExtras = useCallback(async (billId: string, adjustments: BillAdjustment[], note: string, dueDate?: string | null) => {
         if (!userPath) return;
         const ref = doc(db, userPath, 'bills', billId);
         const before = await runTransaction(db, async tx => {
@@ -537,7 +537,10 @@ export function useFirestore(userId: string | null, buildingId: string | null, a
             if (cur.payment_status === 'paid' || cur.payment_status === 'pending') throw new Error('bill_paid');
             const base = (Number(cur.total_bill) || 0) - adjustmentsTotal(cur);
             const total = Math.round((base + adjustments.reduce((sum, a) => sum + a.amount, 0)) * 100) / 100;
-            tx.update(ref, { adjustments, bill_note: note, total_bill: total, updated_at: new Date().toISOString() });
+            // dueDate: a day sets this bill's own due date, null goes back to the calculated one, undefined leaves it
+            // (written only when it changes, so an edit that leaves the date alone touches the same fields as before)
+            const dueChanged = dueDate !== undefined && (dueDate ?? null) !== (cur.due_date ?? null);
+            tx.update(ref, { adjustments, bill_note: note, total_bill: total, updated_at: new Date().toISOString(), ...(dueChanged ? { due_date: dueDate } : {}) });
             return cur;
         });
         logActivity({

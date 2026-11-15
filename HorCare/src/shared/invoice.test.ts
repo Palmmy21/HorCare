@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { invoiceDueDate, invoiceLines, invoiceNumber } from './invoice';
+import { invoiceLines, invoiceNumber } from './invoice';
 import type { MonthlyBill } from '../types';
 
 const bill = (over: Partial<MonthlyBill> = {}) => ({
@@ -26,10 +26,6 @@ describe('invoiceLines', () => {
   });
 });
 
-describe('invoice number and due date', () => {
+describe('invoice number', () => {
   it('is stable per bill', () => expect(invoiceNumber({ month: '2026-10', room_number: 'A 1' })).toBe('INV-202610-A1'));
-  it('clamps the due day to the month', () => {
-    expect(invoiceDueDate('2026-02', 31)).toBe('2026-02-28');
-    expect(invoiceDueDate('2026-10', undefined)).toBe('2026-10-05');
-  });
 });

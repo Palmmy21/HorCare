@@ -9,6 +9,19 @@ import { auth } from '../../firebase/config';
 import type { DormConfig, WaterConfig, BillLanguage, MarketConfig, LateFeeConfig } from '../../types';
 
 /** Late-fee form values, with defaults for a property that has never set them. */
+/** The due-note part of the bill form; a note the app wrote itself as a default counts as "automatic". */
+function dueFormOf(c: DormConfig): { footer_text: string; due_note_mode: DueNoteMode; due_fixed_date: string } {
+    const bc = c.bill_customization;
+    const mode = dueNoteMode(bc);
+    return { footer_text: mode === 'manual' ? bc?.footer_text ?? '' : '', due_note_mode: mode, due_fixed_date: bc?.due_fixed_date ?? '' };
+}
+
+const DUE_NOTE_MODES: { mode: DueNoteMode; label: string; hint: string }[] = [
+    { mode: 'auto', label: 'อัตโนมัติ', hint: 'ระบบคำนวณวันครบกำหนดของแต่ละบิลจากวันออกบิลและวันกำหนดชำระ แล้วพิมพ์วันที่จริงลงในบิล' },
+    { mode: 'fixed', label: 'กำหนดวันเอง', hint: 'ระบบเสนอวันให้ แล้วแก้เป็นวันที่ต้องการได้ ทุกบิลจะใช้วันนี้' },
+    { mode: 'manual', label: 'พิมพ์ข้อความเอง', hint: 'พิมพ์หมายเหตุเองทั้งหมด จะใส่วันครบกำหนดลงในข้อความด้วยก็ได้' },
+];
+
 function lateFeeFormOf(c: DormConfig): Required<LateFeeConfig> {
     return {
         enabled: c.late_fee?.enabled ?? false,
@@ -19,7 +32,8 @@ function lateFeeFormOf(c: DormConfig): Required<LateFeeConfig> {
     };
 }
 import { generateDormCode } from '../../utils/calculations';
-import { LANGUAGE_OPTIONS } from '../../utils/i18n/billTranslations';
+import { LANGUAGE_OPTIONS, billFooterNote } from '../../utils/i18n/billTranslations';
+import { DUE_TOKEN, dueNoteMode, isIsoDay, resolveDueDate, type DueNoteMode } from '../../shared/billDue';
 import { getWorkspaceTerms, DEFAULT_MARKET_ZONES } from '../../utils/workspaceTerminology';
 import type { ThemeMode } from '../../hooks/useTheme';
 import ListingSettingsSection from './ListingSettingsSection';
@@ -246,7 +260,7 @@ export default function Settings(props: SettingsProps) {
         dorm_name: config.bill_customization?.dorm_name || '',
         dorm_address: config.bill_customization?.dorm_address || '',
         dorm_phone: config.bill_customization?.dorm_phone || '',
-        footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
+        ...dueFormOf(config),
         due_day: config.bill_customization?.due_day || 5,
         default_language: (config.bill_customization?.default_language || 'th') as BillLanguage,
         bilingual_mode: config.bill_customization?.bilingual_mode || false,
@@ -255,6 +269,17 @@ export default function Settings(props: SettingsProps) {
     // name / address / phone on the bill per building of the branch; empty = the branch's own (shared/billIssuer.ts)
     const [placeIssuers, setPlaceIssuers] = useState<Record<string, PlaceIssuer>>(config.bill_customization?.place_issuers ?? {});
     const places = useMemo(() => wingsOf(rooms ?? []), [rooms]);
+    // what a bill issued right now would carry, with the form as it stands
+    const duePreview = useMemo(() => {
+        const now = new Date().toISOString();
+        const bill = { month: now.slice(0, 7), created_at: now };
+        const day = { due_day: Number(billForm.due_day) || 5 };
+        return {
+            auto: resolveDueDate(bill, day),
+            note: billFooterNote(bill, { ...day, due_note_mode: billForm.due_note_mode, due_fixed_date: billForm.due_fixed_date, footer_text: billForm.footer_text },
+                null, billForm.default_language, billForm.bilingual_mode, billForm.secondary_language),
+        };
+    }, [billForm]);
     const setPlace = (place: string, field: keyof PlaceIssuer, value: string) =>
         setPlaceIssuers(prev => ({ ...prev, [place]: { ...prev[place], [field]: value } }));
     const [lateFee, setLateFee] = useState(() => lateFeeFormOf(config));
@@ -285,7 +310,7 @@ export default function Settings(props: SettingsProps) {
             dorm_name: config.bill_customization?.dorm_name || '',
             dorm_address: config.bill_customization?.dorm_address || '',
             dorm_phone: config.bill_customization?.dorm_phone || '',
-            footer_text: config.bill_customization?.footer_text || 'กรุณาชำระภายในวันที่ 5 ของทุกเดือน',
+            ...dueFormOf(config),
             due_day: config.bill_customization?.due_day || 5,
             default_language: (config.bill_customization?.default_language || 'th') as BillLanguage,
             bilingual_mode: config.bill_customization?.bilingual_mode || false,
@@ -399,8 +424,10 @@ export default function Settings(props: SettingsProps) {
                 dorm_name: billForm.dorm_name,
                 dorm_address: billForm.dorm_address,
                 dorm_phone: billForm.dorm_phone,
-                footer_text: billForm.footer_text,
+                footer_text: billForm.due_note_mode === 'manual' ? billForm.footer_text.trim() : '',
                 due_day: Number(billForm.due_day) || 5,
+                due_note_mode: billForm.due_note_mode,
+                ...(billForm.due_note_mode === 'fixed' && isIsoDay(billForm.due_fixed_date) ? { due_fixed_date: billForm.due_fixed_date } : {}),
                 default_language: billForm.default_language,
                 bilingual_mode: billForm.bilingual_mode,
                 secondary_language: billForm.secondary_language,
@@ -1264,17 +1291,6 @@ export default function Settings(props: SettingsProps) {
 
                 <div className="settings-grid">
                     <div className="form-group">
-                        <label className="form-label">ข้อความด้านล่างบิล (Footer)</label>
-                        <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '0.75rem 1rem', fontSize: '1rem' }}
-                            value={billForm.footer_text}
-                            onChange={e => handleBillFormChange('footer_text', e.target.value)}
-                            placeholder="เช่น กรุณาชำระภายในวันที่ 5 ของทุกเดือน"
-                        />
-                    </div>
-                    <div className="form-group">
                         <label className="form-label">กำหนดชำระ (วันที่)</label>
                         <input
                             type="number"
@@ -1282,11 +1298,56 @@ export default function Settings(props: SettingsProps) {
                             style={{ maxWidth: '120px', padding: '0.75rem 1rem', fontSize: '1rem' }}
                             value={billForm.due_day}
                             min={1}
-                            max={28}
+                            max={31}
                             onChange={e => handleBillFormChange('due_day', e.target.value)}
                         />
-                        <p className="form-hint">วันที่กำหนดชำระในแต่ละเดือน</p>
+                        <p className="form-hint">
+                            วันสุดท้ายที่ต้องชำระ นับจากวันออกบิล: ออกบิลไม่เกินวันที่ {Number(billForm.due_day) || 5} ครบกำหนดในเดือนนั้น ออกหลังจากนั้นครบกำหนดวันที่ {Number(billForm.due_day) || 5} ของเดือนถัดไป
+                        </p>
                     </div>
+                </div>
+
+                <div className="form-group">
+                    <label className="form-label">หมายเหตุกำหนดชำระท้ายบิล</label>
+                    <div className="seg" role="group" aria-label="วิธีตั้งหมายเหตุกำหนดชำระ" style={{ flexWrap: 'wrap' }}>
+                        {DUE_NOTE_MODES.map(m => (
+                            <button key={m.mode} type="button" className={`seg-item${billForm.due_note_mode === m.mode ? ' active' : ''}`} aria-pressed={billForm.due_note_mode === m.mode}
+                                onClick={() => setBillForm(prev => ({
+                                    ...prev, due_note_mode: m.mode,
+                                    // a date to start from: what the automatic rule gives a bill issued today
+                                    due_fixed_date: m.mode === 'fixed' && !isIsoDay(prev.due_fixed_date) ? duePreview.auto : prev.due_fixed_date,
+                                }))}>
+                                {m.label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="form-hint" style={{ marginTop: '0.375rem' }}>{DUE_NOTE_MODES.find(m => m.mode === billForm.due_note_mode)?.hint}</p>
+
+                    {billForm.due_note_mode === 'fixed' && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                            <input type="date" className="form-input mono" style={{ maxWidth: 200, padding: '0.75rem 1rem', fontSize: '1rem' }} aria-label="วันครบกำหนดที่กำหนดเอง"
+                                value={billForm.due_fixed_date} onChange={e => handleBillFormChange('due_fixed_date', e.target.value)} />
+                            <p className="form-hint">ใช้กับบิลที่ออกไม่เกินวันนี้ บิลที่ออกหลังจากนี้ระบบคำนวณให้อัตโนมัติ จนกว่าจะเข้ามาแก้วันที่ใหม่</p>
+                        </div>
+                    )}
+                    {billForm.due_note_mode === 'manual' && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                            <textarea className="form-input" rows={2} maxLength={300} style={{ padding: '0.75rem 1rem', fontSize: '1rem' }} aria-label="ข้อความหมายเหตุท้ายบิล"
+                                value={billForm.footer_text} onChange={e => handleBillFormChange('footer_text', e.target.value)}
+                                placeholder={`เช่น กรุณาชำระภายในวันที่ ${DUE_TOKEN} หากเกินกำหนดมีค่าปรับวันละ 50 บาท`} />
+                            <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: '0.375rem' }}
+                                onClick={() => handleBillFormChange('footer_text', `${billForm.footer_text.trimEnd()} ${DUE_TOKEN}`.trimStart())}>
+                                + แทรกวันครบกำหนด
+                            </button>
+                            <p className="form-hint">{DUE_TOKEN} จะถูกแทนด้วยวันครบกำหนดจริงของแต่ละบิล ถ้าไม่ใส่ ข้อความจะแสดงตามที่พิมพ์ไว้ทุกบิล</p>
+                        </div>
+                    )}
+
+                    <div style={{ marginTop: '0.625rem', border: '1px solid var(--color-gray-200)', borderRadius: 12, padding: '0.625rem 0.875rem', fontSize: '0.875rem', lineHeight: 1.5 }}>
+                        <div style={{ color: 'var(--color-gray-500)', fontSize: '0.75rem' }}>ตัวอย่างบนบิลที่ออกวันนี้</div>
+                        <div style={{ whiteSpace: 'pre-line' }}>{duePreview.note || '—'}</div>
+                    </div>
+                    <p className="form-hint">ตั้งวันครบกำหนดหรือหมายเหตุเฉพาะห้องได้ที่หน้าแก้ไขห้อง และแก้วันครบกำหนดของบิลใบเดียวได้ที่ สรุปยอด → แก้ไขบิล</p>
                 </div>
             </div>
 
@@ -1308,7 +1369,7 @@ export default function Settings(props: SettingsProps) {
                         />
                     </label>
                     <p className="form-hint" style={{ marginTop: '0.25rem' }}>
-                        ระบบตรวจทุกเช้า บิลที่ยังไม่จ่ายเลยวันที่ {Number(billForm.due_day) || 5}
+                        ระบบตรวจทุกเช้า บิลที่ยังไม่จ่ายเลยวันครบกำหนดของบิลนั้น
                         {Number(lateFee.grace_days) > 0 ? ` + ผ่อนผัน ${lateFee.grace_days} วัน` : ''} จะได้รายการค่าปรับในห้องนั้น
                         และแจ้งในข้อความทวงทาง LINE ผู้เช่าที่ส่งสลิปแล้วรอตรวจจะไม่ถูกปรับเพิ่ม
                     </p>

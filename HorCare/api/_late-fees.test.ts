@@ -14,30 +14,39 @@ beforeEach(() => resetFake());
 
 describe('upsertLateFee', () => {
     it('does nothing before the due date + grace days', async () => {
-        expect(await upsertLateFee(B, BILL, PER_DAY, 5, '2026-10-07')).toBe(0);
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-10-05', '2026-10-07')).toBe(0);
         expect(read(FINE)).toBeUndefined();
     });
 
     it('creates one late-fee fine and grows it day by day up to the cap', async () => {
-        expect(await upsertLateFee(B, BILL, PER_DAY, 5, '2026-10-08')).toBe(50);
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-10-05', '2026-10-08')).toBe(50);
         expect(read(FINE)).toMatchObject({ amount: 50, status: 'unpaid', source: 'late_fee', bill_id: BILL.id, room_id: 'r101' });
 
-        expect(await upsertLateFee(B, BILL, PER_DAY, 5, '2026-10-11')).toBe(200);
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-10-05', '2026-10-11')).toBe(200);
         expect(read(FINE)).toMatchObject({ amount: 200 });
 
-        expect(await upsertLateFee(B, BILL, PER_DAY, 5, '2026-11-30')).toBe(300);
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-10-05', '2026-11-30')).toBe(300);
         expect(read(FINE)).toMatchObject({ amount: 300 });
     });
 
     it('never changes a fine the tenant already paid or sent a slip for', async () => {
         seed(FINE, { amount: 100, status: 'pending', source: 'late_fee', bill_id: BILL.id });
-        expect(await upsertLateFee(B, BILL, PER_DAY, 5, '2026-10-20')).toBe(100);
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-10-05', '2026-10-20')).toBe(100);
         expect(read(FINE)).toMatchObject({ amount: 100, status: 'pending' });
     });
 
+    it('withdraws a fee charged before the bill was really due, but not one already paid', async () => {
+        seed(FINE, { amount: 100, status: 'unpaid', source: 'late_fee', bill_id: BILL.id });
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-11-05', '2026-10-20')).toBe(0);
+        expect(read(FINE)).toBeUndefined();
+        seed(FINE, { amount: 100, status: 'paid', source: 'late_fee', bill_id: BILL.id });
+        expect(await upsertLateFee(B, BILL, PER_DAY, '2026-11-05', '2026-10-20')).toBe(0);
+        expect(read(FINE)).toMatchObject({ status: 'paid' });
+    });
+
     it('does nothing when late fees are off', async () => {
-        expect(await upsertLateFee(B, BILL, { ...PER_DAY, enabled: false }, 5, '2026-12-01')).toBe(0);
-        expect(await upsertLateFee(B, BILL, undefined, 5, '2026-12-01')).toBe(0);
+        expect(await upsertLateFee(B, BILL, { ...PER_DAY, enabled: false }, '2026-10-05', '2026-12-01')).toBe(0);
+        expect(await upsertLateFee(B, BILL, undefined, '2026-10-05', '2026-12-01')).toBe(0);
         expect(read(FINE)).toBeUndefined();
     });
 });
