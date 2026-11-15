@@ -130,3 +130,22 @@
 .doc-viewer-pulse { animation: doc-pulse 1.4s ease-in-out infinite; }
 @keyframes doc-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(15, 76, 129, 0.45); } 50% { box-shadow: 0 0 0 6px rgba(15, 76, 129, 0); } }
 @media (prefers-reduced-motion: reduce) { .doc-viewer-pulse { animation: none; } }
+
+/* ── printing a document (printSheet.ts puts a copy of the sheet in #doc-print-host) ──
+   Only that copy prints, at its A4 layout (794px = 210mm, so nothing re-wraps), pages breaking between blocks.
+   index.css hides everything it does not know about when printing; this wins over it. */
+@page doc-a4 { size: A4 portrait; margin: 14mm 0 12mm; }
+#doc-print-host { display: none; }
+@media print {
+  html.doc-printing, html.doc-printing body { background: #FFFFFF !important; height: auto !important; overflow: visible !important; }
+  html.doc-printing body > :not(#doc-print-host) { display: none !important; }
+  html.doc-printing #doc-print-host { display: block; page: doc-a4; }
+  html.doc-printing #doc-print-host, html.doc-printing #doc-print-host * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact; /* table header fills, the invoice's dark heading row */
+  }
+  #doc-print-host .doc-sheet { width: 100%; min-height: 0; padding: 0 18mm; box-shadow: none; border-radius: 0; }
+  #doc-print-host .doc-block { break-inside: avoid; }
+  #doc-print-host .doc-section-title { break-after: avoid; }
+}

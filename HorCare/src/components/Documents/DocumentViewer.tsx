@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import { Download, Image as ImageIcon, Printer, Share2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { PaperSheet } from './PaperSheet';
-import { buildPaperImage, downloadPaperPdf, printPaperPdf } from './paperPdf';
+import { buildPaperImage, downloadPaperPdf, printDocument } from './paperPdf';
 import { triggerFileDownload } from '../../utils/fileDownload';
 
 type ShareNav = Navigator & { canShare?: (d: ShareData) => boolean };
 const shareableFile = (f: File) => { try { return !!(navigator as ShareNav).canShare?.({ files: [f] }) && !!navigator.share; } catch { return false; } };
 
-/** A document on its own screen: the A4 page, with "download PDF" and "print" that produce the same page. */
+/** A document on its own screen: the A4 page, with "download PDF" and "print" (the browser's print dialog, just the page). */
 export function DocumentViewer({ title, filename, onClose, children, actions, allowImage = false }: {
   title: string;
   /** PDF file name, without the extension */
@@ -59,7 +59,7 @@ export function DocumentViewer({ title, filename, onClose, children, actions, al
     setBusy(kind);
     try {
       if (kind === 'pdf') await downloadPaperPdf(sheetRef.current, `${filename}.pdf`);
-      else await printPaperPdf(sheetRef.current);
+      else await printDocument(sheetRef.current);
     } catch (err) {
       console.error('document export failed:', err);
       toast.error(kind === 'pdf' ? 'สร้างไฟล์ PDF ไม่สำเร็จ กรุณาลองใหม่' : 'เปิดหน้าพิมพ์ไม่สำเร็จ กรุณาลองใหม่');
@@ -91,7 +91,7 @@ export function DocumentViewer({ title, filename, onClose, children, actions, al
         <button type="button" className="doc-viewer-btn" onClick={onClose} aria-label="ปิด"><X size={16} /></button>
       </div>
       <div className="doc-viewer-body">
-        <PaperSheet onSheet={el => { sheetRef.current = el; }}>{children}</PaperSheet>
+        <PaperSheet printable onSheet={el => { sheetRef.current = el; }}>{children}</PaperSheet>
       </div>
     </div>,
     document.body,

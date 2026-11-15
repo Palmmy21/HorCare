@@ -31,6 +31,13 @@ describe('pageBands', () => {
     expect(bands[bands.length - 1].end).toBe(3000);
   });
 
+  it('moves a heading at the foot of a page over with the text it heads', () => {
+    // body lines fill page 1 up to 1000; a heading 1004–1036 fits, its first line 1040–1080 does not
+    const blocks = [...lines(20, 50, 0), { top: 1004, bottom: 1036, keepWithNext: true }, { top: 1040, bottom: 1080 }, { top: 1084, bottom: 1124 }];
+    const bands = pageBands(blocks, 1200, 1123, 60);
+    expect(bands[0].end).toBe(996);
+  });
+
   it('adds no blank page for the bottom padding', () => {
     expect(pageBands(lines(21, 50, 60), 60 + 21 * 50 + 1500, 1123, 60)).toHaveLength(2);
   });

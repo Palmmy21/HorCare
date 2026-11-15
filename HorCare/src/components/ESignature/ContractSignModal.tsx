@@ -22,7 +22,7 @@ import SignaturePad from './SignaturePad';
 import ShareContractModal from './ShareContractModal';
 import { PaperSheet } from '../Documents/PaperSheet';
 import { ContractDocument } from '../Documents/ContractDocument';
-import { downloadPaperPdf, printPaperPdf } from '../Documents/paperPdf';
+import { downloadPaperPdf, printDocument } from '../Documents/paperPdf';
 
 interface ContractSignModalProps {
   room: Room;
@@ -322,10 +322,10 @@ export default function ContractSignModal({
     }
   };
 
-  // Print — the same PDF, so the paper copy matches the downloaded one
+  // Print — the A4 page alone, broken between paragraphs like the PDF
   const handlePrint = () => {
     if (!printAreaRef.current) return;
-    printPaperPdf(printAreaRef.current).catch(err => {
+    printDocument(printAreaRef.current).catch(err => {
       console.error(err);
       toast.error('เปิดหน้าพิมพ์ไม่สำเร็จ กรุณาลองใหม่');
     });
@@ -1225,7 +1225,7 @@ export default function ContractSignModal({
 
               {/* ────────────────── A4 PAPER DOCUMENT (same page the tenant signs and the PDF) ────────────────── */}
               <div style={{ width: '100%', maxWidth: '820px' }}>
-                <PaperSheet onSheet={el => { printAreaRef.current = el; }}>
+                <PaperSheet printable onSheet={el => { printAreaRef.current = el; }}>
                   <ContractDocument
                     c={{ ...form, verification_code: verificationCode }}
                     issuer={{

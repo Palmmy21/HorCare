@@ -7,10 +7,13 @@
  */
 export interface Band { start: number; end: number }
 
-export function pageBands(blocks: { top: number; bottom: number }[], total: number, pageHeight: number, margin: number): Band[] {
+export interface PageBlock { top: number; bottom: number; /** a heading: never cut right below it */ keepWithNext?: boolean }
+
+export function pageBands(blocks: PageBlock[], total: number, pageHeight: number, margin: number): Band[] {
   const inside = (y: number) => blocks.some(b => b.top < y - 0.5 && b.bottom > y + 0.5);
   // a cut just below a block, where no other block is in the way
-  const cuts = [...new Set(blocks.map(b => Math.ceil(b.bottom)))].filter(y => !inside(y)).sort((a, b) => a - b);
+  const kept = new Set(blocks.filter(b => b.keepWithNext).map(b => Math.ceil(b.bottom)));
+  const cuts = [...new Set(blocks.map(b => Math.ceil(b.bottom)))].filter(y => !inside(y) && !kept.has(y)).sort((a, b) => a - b);
   const lastContent = blocks.length ? Math.max(...blocks.map(b => b.bottom)) : total;
 
   const bands: Band[] = [];

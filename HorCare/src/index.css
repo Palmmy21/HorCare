@@ -6159,10 +6159,14 @@ html.dark .plan-unit.tone-bad { border-color: rgba(227, 93, 93, 0.5); }
   body:has(.qr-sheet-print) #root { display: none !important; }
   .qr-sheet-print { display: block !important; position: static; }
   .qr-sheet-print, .qr-sheet-print * { visibility: visible; }
-  .qr-sheet-page { break-after: page; display: flex; flex-direction: column; min-height: 275mm; }
+  html:has(.qr-sheet-print), body:has(.qr-sheet-print) { background: #fff !important; }
+  /* 9 cards must fit one sheet whatever the printer does: A4 or Letter, the browser's own margins (iPhone Safari
+     ignores @page). A page pinned to 275mm overflowed there and the third row slid onto the next sheet, leaving
+     pages of 6 and 3 cards. 3 × 78mm + gaps ≈ 246mm fits a Letter page with 16mm margins. */
+  .qr-sheet-page { break-after: page; break-inside: avoid; }
   .qr-sheet-page:last-child { break-after: auto; }
-  .qr-sheet-print .qr-sheet-grid { flex: 1; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 87mm); gap: 3mm; }
-  .qr-sheet-print .qr-sheet-card { border: 1px dashed #000; border-radius: 0; padding: 4mm 3mm; justify-content: center; }
+  .qr-sheet-print .qr-sheet-grid { grid-template-columns: repeat(3, 1fr); grid-template-rows: none; grid-auto-rows: 78mm; gap: 3mm; }
+  .qr-sheet-print .qr-sheet-card { border: 1px dashed #000; border-radius: 0; padding: 4mm 3mm; justify-content: center; overflow: hidden; }
   .qr-sheet-foot { display: block; padding-top: 2mm; text-align: right; font-size: 8pt; color: #000; }
 }
 

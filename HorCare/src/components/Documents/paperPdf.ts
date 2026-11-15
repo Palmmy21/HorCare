@@ -1,6 +1,7 @@
 import type { jsPDF as JsPDF } from 'jspdf';
 import { A4_HEIGHT_PX, A4_WIDTH_PX } from './PaperSheet';
 import { pageBands } from './pageBands';
+import { canPrintNatively, cloneSheet, printSheet } from './printSheet';
 
 /** Top/bottom margin of continuation pages, in sheet pixels (≈13 mm). */
 const PAGE_MARGIN_PX = 48;
@@ -8,23 +9,14 @@ const SCALE = 2;
 
 /**
  * A copy of the sheet at full A4 width, off screen: the on-screen sheet may be scaled down (or re-flowed on a phone),
- * and the PDF must be drawn from the real size. Canvases (QR codes) are copied by hand — cloneNode leaves them blank.
+ * and the PDF must be drawn from the real size.
  */
 function offscreenCopy(sheet: HTMLElement): { node: HTMLElement; dispose: () => void } {
   const host = document.createElement('div');
   host.style.cssText = `position:fixed;left:-20000px;top:0;width:${A4_WIDTH_PX}px;pointer-events:none;`;
-  const node = sheet.cloneNode(true) as HTMLElement;
-  node.classList.remove('doc-sheet--fluid'); // a phone shows the re-flowed page; the PDF is always A4
-  node.style.minHeight = '0';
+  const node = cloneSheet(sheet);
   host.appendChild(node);
   document.body.appendChild(host);
-  const from = sheet.querySelectorAll('canvas');
-  node.querySelectorAll('canvas').forEach((c, i) => {
-    const src = from[i];
-    if (!src) return;
-    c.width = src.width; c.height = src.height;
-    c.getContext('2d')?.drawImage(src, 0, 0);
-  });
   return { node, dispose: () => host.remove() };
 }
 
@@ -45,7 +37,8 @@ export async function appendSheet(pdf: JsPDF, node: HTMLElement, startOnNewPage:
   const top = node.getBoundingClientRect().top;
   const blocks = Array.from(node.querySelectorAll<HTMLElement>('.doc-block')).map(el => {
     const r = el.getBoundingClientRect();
-    return { top: r.top - top, bottom: r.bottom - top };
+    // a heading is never left alone at the foot of a page
+    return { top: r.top - top, bottom: r.bottom - top, keepWithNext: el.classList.contains('doc-section-title') };
   });
   const total = node.offsetHeight;
   const canvas = await sheetCanvas(node);
@@ -109,6 +102,12 @@ export async function buildPaperImage(sheet: HTMLElement): Promise<Blob> {
 export async function downloadPaperPdf(sheet: HTMLElement, filename: string): Promise<void> {
   const pdf = await buildPaperPdf(sheet);
   pdf.save(filename.replace(/[\\/:*?"<>|]+/g, '_'));
+}
+
+/** The พิมพ์ button: the browser's print dialog with just the sheet; in LINE (no printing there) the PDF instead. */
+export async function printDocument(sheet: HTMLElement): Promise<void> {
+  if (canPrintNatively()) printSheet(sheet);
+  else await printPaperPdf(sheet);
 }
 
 /**

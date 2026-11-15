@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import './documents.css';
+import { registerPrintableSheet } from './printSheet';
 
 /** A4 at 96 dpi. The page is always laid out at this width, so lines break the same on a phone and on paper. */
 export const A4_WIDTH_PX = 794;
@@ -15,7 +16,13 @@ const FLUID_BELOW_PX = 560;
  *
  * Mark each piece the PDF may not split (a paragraph, a table row, the signature block) with `className="doc-block"`.
  */
-export function PaperSheet({ children, onSheet }: { children: ReactNode; /** the page element, for PDF export */ onSheet?: (el: HTMLDivElement | null) => void }) {
+export function PaperSheet({ children, onSheet, printable = false }: {
+  children: ReactNode;
+  /** the page element, for PDF export */
+  onSheet?: (el: HTMLDivElement | null) => void;
+  /** the document open on screen: Ctrl+P prints this sheet alone (printSheet.ts) */
+  printable?: boolean;
+}) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState({ scale: 1, height: A4_HEIGHT_PX, left: 0, fluid: false });
@@ -37,6 +44,11 @@ export function PaperSheet({ children, onSheet }: { children: ReactNode; /** the
     return () => ro.disconnect();
     // the sheet element is a new one after switching between paper and re-flowed: observe that one
   }, [box.fluid]);
+
+  useEffect(() => {
+    const el = innerRef.current;
+    return printable && el ? registerPrintableSheet(el) : undefined;
+  }, [printable, box.fluid]);
 
   const setInner = (el: HTMLDivElement | null) => {
     innerRef.current = el;
