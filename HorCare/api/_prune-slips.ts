@@ -49,7 +49,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const images = await pruneCollection('slip_images', cutoff);
         const refs = await pruneCollection('slip_refs', cutoff);
-        res.status(200).json({ ok: true, retain_months: RETAIN_MONTHS, deleted: { slip_images: images, slip_refs: refs } });
+        // notes of LINE events already handled (api/line-webhook.ts claimEvent): LINE resends within minutes, a day is plenty
+        // (a top-level collection, read as one: no collection-group index needed)
+        const old = await db.collection('line_events')
+            .where('created_at', '<', admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000)).limit(BATCH * 3).get();
+        for (let i = 0; i < old.docs.length; i += BATCH) {
+            const batch = db.batch();
+            old.docs.slice(i, i + BATCH).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+        const events = old.size;
+        res.status(200).json({ ok: true, retain_months: RETAIN_MONTHS, deleted: { slip_images: images, slip_refs: refs, line_events: events } });
     } catch (err) {
         console.error('prune-slips failed:', (err as Error).message);
         res.status(500).json({ ok: false, error: (err as Error).message });

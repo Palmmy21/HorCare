@@ -31,3 +31,13 @@ describe('finding the QR on a slip', () => {
         expect(await decodeSlipQR(plain)).toEqual({ payload: null, looksLikeSlip: false });
     }, 30_000);
 });
+
+describe('telling a slip QR from any other QR', () => {
+    it('accepts a transfer slip, refuses a QR to pay into and anything else', async () => {
+        const { isThaiSlipQR } = await import('./_slip.js');
+        expect(isThaiSlipQR(PAYLOAD)).toBe(true);
+        expect(isThaiSlipQR('00020101021129370016A000000677010111011300668123456785802TH530376463041234')).toBe(false); // PromptPay
+        expect(isThaiSlipQR('https://line.me/R/ti/p/@horcare')).toBe(false);
+        expect(isThaiSlipQR('WIFI:T:WPA;S:dorm;P:12345678;;')).toBe(false);
+    });
+});

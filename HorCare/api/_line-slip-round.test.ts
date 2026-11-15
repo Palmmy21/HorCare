@@ -127,3 +127,15 @@ describe('a slip for the round, sent in LINE', () => {
         expect(msgs.filter(m => m.direction === 'out').length).toBeGreaterThanOrEqual(2);
     });
 });
+
+describe('an event LINE sends again', () => {
+    it('is answered once: the redelivery of the same webhookEventId is dropped', async () => {
+        qrPayload = null;
+        await post({ type: 'message', webhookEventId: '01HXEVENT0000000000000001', message: { type: 'image', id: '600000000021' } });
+        expect(reply()).not.toBeNull();
+        await post({ type: 'message', webhookEventId: '01HXEVENT0000000000000001', deliveryContext: { isRedelivery: true }, message: { type: 'image', id: '600000000021' } });
+        expect(fetchMock).not.toHaveBeenCalled();
+        await post({ type: 'message', webhookEventId: '01HXEVENT0000000000000002', message: { type: 'text', text: 'บิล' } });
+        expect(fetchMock).toHaveBeenCalled();
+    });
+});

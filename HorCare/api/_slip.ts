@@ -81,7 +81,8 @@ export async function decodeSlipQR(image: Buffer): Promise<SlipQR> {
  */
 export function isThaiSlipQR(payload: string): boolean {
     const digits = payload.replace(/\D/g, '');
-    return /^00\d{2}/.test(payload) && digits.length >= 18;
+    // "000201…" is a QR to pay INTO (PromptPay, the QR printed on a bill): a picture of one is not proof of payment
+    return /^00\d{2}/.test(payload) && !payload.startsWith('000201') && digits.length >= 18;
 }
 
 /** Stable fingerprint of a slip's QR payload — used as the dedup key. */

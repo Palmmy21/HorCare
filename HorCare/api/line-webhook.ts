@@ -92,6 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 /** The parts of a LINE webhook event this handler reads. */
 interface LineEvent {
     type?: string;
+    /** LINE's id of this event; the same on a redelivery. */
+    webhookEventId?: string;
     replyToken?: string;
     source?: { userId?: string };
     message?: {
@@ -133,9 +135,33 @@ async function lineReply(replyToken: string, messages: object[]): Promise<void> 
     if (who && said) await recordBotReply(who.lineUserId, said).catch(err => console.warn('[line-inbox] bot reply not kept:', (err as Error).message));
 }
 
+/**
+ * True the first time an event is seen. LINE sends an event again when the webhook was slow to answer (a slip being
+ * checked, a cold start); handled twice, the person gets the same answer twice. Kept in line_events/{webhookEventId}
+ * (server only, pruned by the cleanup cron). When the note cannot be written the event is handled anyway.
+ */
+async function claimEvent(eventId: string): Promise<boolean> {
+    if (!/^[A-Za-z0-9_-]{6,80}$/.test(eventId)) return true;
+    const ref = db.doc(`line_events/${eventId}`);
+    try {
+        return await db.runTransaction(async tx => {
+            if ((await tx.get(ref)).exists) return false;
+            tx.set(ref, { created_at: admin.firestore.Timestamp.fromMillis(Date.now()) });
+            return true;
+        });
+    } catch (err) {
+        console.warn('[line] event note failed:', (err as Error).message);
+        return true;
+    }
+}
+
 async function handleEvent(event: LineEvent) {
     const userId = event.source?.userId;
     const started = Date.now();
+    if (event.webhookEventId && !(await claimEvent(event.webhookEventId))) {
+        console.log(`[line] ${event.type} ${userId?.slice(-6) ?? '-'} sent again by LINE: already handled`);
+        return;
+    }
     try {
         if (!userId) return await handleEventInner(event);
         return await conversation.run({ lineUserId: userId, replied: false }, () => handleEventInner(event));
@@ -891,7 +917,13 @@ async function handleImage(lineUserId: string, replyToken: string, messageId: st
         return;
     }
     const qr = await decodeSlipQR(img.buffer);
-    const slip = isSlipImage({ hasQr: !!qr.payload, expectedUntil: link.slip_expected_until });
+    // only a transfer slip's own QR counts: a photo that happens to show some other QR (a payment QR, Wi-Fi, a parcel
+    // label) is an ordinary photo for the owner
+    const slip = isSlipImage({ hasQr: qr.looksLikeSlip, expectedUntil: link.slip_expected_until });
+    // "ส่งสลิป" covers the one photo that follows it, not every photo of the next half hour
+    if (slip && link.slip_expected_until) {
+        await db.collection('line_rooms').doc(lineUserId).update({ slip_expected_until: admin.firestore.FieldValue.delete() }).catch(() => undefined);
+    }
 
     const inbound = await storeInboxMedia(lineUserId, messageId, 'image', img, slip ? '[รูปภาพ — สลิปโอนเงิน]' : undefined)
         .catch(logStoreFailure);
@@ -904,7 +936,7 @@ async function handleImage(lineUserId: string, replyToken: string, messageId: st
     // Not while a person is talking with the tenant (photos of a leak are not slips), and once for a burst of photos.
     if (!inbound.personHandling && await owesMoney(link) && await claimSlipQuestion(lineUserId).catch(() => true)) {
         await lineReply(replyToken, [{
-            type: 'text', text: 'ได้รับรูปแล้วค่ะ 📷\n\nถ้าเป็นสลิปโอนเงิน กดปุ่ม "นี่คือสลิป" ด้านล่าง ระบบจะตรวจยอดให้ทันทีค่ะ',
+            type: 'text', text: `ได้รับรูปแล้วค่ะ 🙏 ${ownerWord()}จะดูและตอบกลับโดยเร็วที่สุด\n\n(เฉพาะกรณีรูปนี้เป็นสลิปโอนเงิน กดปุ่ม "นี่คือสลิป" ด้านล่างเพื่อให้ระบบตรวจยอดค่ะ)`,
             quickReply: { items: [
                 { type: 'action', action: { type: 'postback', label: 'นี่คือสลิป', data: `${SLIP_IMAGE_POSTBACK}${messageId}`, displayText: 'นี่คือสลิปโอนเงิน' } },
                 { type: 'action', action: { type: 'postback', label: 'ไม่ใช่สลิป', data: SLIP_IMAGE_NO, displayText: 'ไม่ใช่สลิป' } },
