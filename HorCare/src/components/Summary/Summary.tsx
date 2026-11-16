@@ -148,7 +148,7 @@ export default function Summary({
         }
     };
 
-    const NO_SEND_RIGHT = 'บัญชีนี้ไม่มีสิทธิ์ส่งบิล (ส่งได้เฉพาะเจ้าของ ผู้จัดการ และการเงิน)';
+    const NO_SEND_RIGHT = 'บัญชีนี้ไม่มีสิทธิ์ส่งหรือทวงบิล (ทำได้เฉพาะเจ้าของ ผู้จัดการ และการเงิน)';
     // One room's bill, sent (or sent again) to that room's LINE — after a correction, or for a room that linked late.
     const [sendingBillId, setSendingBillId] = useState<string | null>(null);
     const roomSendTitle = (room: Room | undefined, bill: MonthlyBill | undefined) =>
@@ -199,13 +199,14 @@ export default function Summary({
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
+                    owner_uid: uid,
                     building_id: buildingId,
                     month: currentMonth
                 })
             });
 
             const json = await res.json();
-            if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+            if (!res.ok) throw new Error(res.status === 403 ? NO_SEND_RIGHT : json?.error || `HTTP ${res.status}`);
             setRemindResult(json.data);
             setRemindStatus('done');
         } catch (error) {
@@ -348,7 +349,7 @@ export default function Summary({
                                     {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
                                 </button>
                         )}
-                        {uid && buildingId && config.dorm_code && (
+                        {canSendBills && uid && buildingId && config.dorm_code && (
                             <>
                                 <button
                                     className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}

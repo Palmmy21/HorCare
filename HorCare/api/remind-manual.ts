@@ -8,6 +8,8 @@ import { resolveDueDate } from '../src/shared/billDue.js';
 
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
+import { authorize } from './_rbac.js';
+import { SEND_BILLS_PERMISSION } from '../src/shared/permissions.js';
 
 const PUSH_CONCURRENCY = 8;
 export const config = { maxDuration: 60 };
@@ -36,9 +38,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const idToken = authHeader.split('Bearer ')[1];
         const decodedToken = await admin.auth().verifyIdToken(idToken);
-        const uid = decodedToken.uid;
-
         const bodyData = req.body?.data || req.body || {};
+        // a member of the owner's team chases the owner's bills: the same roles that may send them (manager, finance)
+        let uid = decodedToken.uid;
+        if (typeof bodyData.owner_uid === 'string' && bodyData.owner_uid && bodyData.owner_uid !== decodedToken.uid) {
+            const ctx = await authorize(req, res, { ownerUid: bodyData.owner_uid, buildingId: bodyData.building_id, permission: SEND_BILLS_PERMISSION });
+            if (!ctx) return;
+            uid = ctx.ownerUid;
+        }
         const { building_id, month } = bodyData;
         
         if (!building_id || !month) {

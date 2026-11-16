@@ -113,8 +113,8 @@ export const ROLE_LABELS_TH: Record<Role, string> = {
 };
 
 /**
- * Sending bills to tenants on LINE (the whole month, or one room): the owner, the property manager and finance —
- * the roles that may change a payment. Checked by the API (api/_send-line-bills.ts); the UI only hides the buttons.
+ * Sending bills to tenants on LINE (the whole month, or one room) and chasing unpaid ones: the owner, the property manager and finance —
+ * the roles that may change a payment. Checked by the API (api/_send-line-bills.ts, api/remind-manual.ts); the UI only hides the buttons.
  */
 export const SEND_BILLS_PERMISSION: Permission = 'payment.update';
 
