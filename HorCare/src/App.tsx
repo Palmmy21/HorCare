@@ -12,7 +12,7 @@ import { useFirestore } from './hooks/useFirestore';
 import { useBuildings } from './hooks/useBuildings';
 import { useMembership } from './hooks/useMembership';
 import { canOpenView, firstOpenView } from './shared/viewAccess';
-import { ROLE_LABELS_TH } from './shared/permissions';
+import { ROLE_LABELS_TH, SEND_BILLS_PERMISSION } from './shared/permissions';
 import { useLineThreads } from './hooks/useLineThreads';
 import { useSecurityAlerts } from './hooks/useSecurityAlerts';
 import { groupNav, groupOfView, isGroupOpen, navGroupDefs, parseSavedState, type NavGroupState, type TransientClose } from './utils/navGroups';
@@ -1564,6 +1564,7 @@ function App() {
             uid={orgUid}
             buildingId={activeBuildingId ?? undefined}
             canSendLine={lineEnabled}
+            canSendBills={staffPermissions === null || staffPermissions.includes(SEND_BILLS_PERMISSION)}
             onUpgrade={() => setCurrentView('pricing')}
             onEditBillExtras={staffPermissions === null || staffPermissions.includes('payment.update') ? updateBillExtras : undefined}
             onCreateRentBills={collectionStyle === 'monthly' && (staffPermissions === null || staffPermissions.includes('meter.record')) ? createRentBills : undefined}

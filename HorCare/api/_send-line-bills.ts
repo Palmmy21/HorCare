@@ -10,6 +10,8 @@ import { portalLinkFor } from './_portal-link.js';
 import { errorInfo } from '../src/shared/errorInfo.js';
 import type { MonthlyBill } from '../src/types/index.js';
 import { autoPostSafe } from './_ledger-auto.js';
+import { authorize } from './_rbac.js';
+import { SEND_BILLS_PERMISSION } from '../src/shared/permissions.js';
 
 async function fcmPushToOwner(uid: string, title: string, body: string) {
     try {
@@ -57,12 +59,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const idToken = authHeader.split('Bearer ')[1];
         const decodedToken = await admin.auth().verifyIdToken(idToken);
-        const uid = decodedToken.uid;
-
         const bodyData = req.body?.data || req.body || {};
-        const { building_id, month } = bodyData;
-        
-        if (!building_id || !month) {
+        // a member of the owner's team sends the owner's bills: only the roles that may (manager, finance)
+        let uid = decodedToken.uid;
+        if (typeof bodyData.owner_uid === 'string' && bodyData.owner_uid && bodyData.owner_uid !== decodedToken.uid) {
+            const ctx = await authorize(req, res, { ownerUid: bodyData.owner_uid, buildingId: bodyData.building_id, permission: SEND_BILLS_PERMISSION });
+            if (!ctx) return;
+            uid = ctx.ownerUid;
+        }
+        const { building_id } = bodyData;
+        // bill_id: send that one room's bill (again, if it was sent before) instead of the whole month
+        const billId = typeof bodyData.bill_id === 'string' && bodyData.bill_id ? bodyData.bill_id : null;
+        let month = bodyData.month;
+
+        if (!building_id || (!month && !billId)) {
             res.status(400).json({ error: 'Missing building_id or month' });
             return;
         }
@@ -74,6 +84,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const payAccount = await loadPayAccount(uid, building_id);
         let appUrl = (process.env.APP_URL ?? '').replace(/\/$/, '');
         if (appUrl && !appUrl.startsWith('http')) appUrl = `https://${appUrl}`;
+
+        /** Push one bill to the LINE of its room and mark it as sent. Throws when LINE refuses it. */
+        const pushBill = async (ref: FirebaseFirestore.DocumentReference, bill: FirebaseFirestore.DocumentData, roomData: FirebaseFirestore.DocumentData | undefined) => {
+            const portalUrl = appUrl
+                ? `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: bill.room_id }))}`
+                : undefined;
+            const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';
+            const bilingual = !!cfg.bill_customization?.bilingual_mode;
+            const secLang = cfg.bill_customization?.secondary_language || 'en';
+            const pay = invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl());
+            // a branch with several places: the bill carries the name of the unit's own (src/shared/billIssuer.ts)
+            const placeName = issuerFor(cfg.bill_customization, roomData?.building_name).name || dormName;
+            const messages: object[] = [buildBillFlex(bill as MonthlyBill, placeName, dueDay, String(bill.month ?? month), { portalUrl, lang: roomLang, bilingual, secLang, pay, dueDate: resolveDueDate(bill, cfg.bill_customization, roomData) })];
+            await linePush(roomData?.line_user_id as string, messages, await roomLineToken(roomData)); // the OA this room linked through
+            await ref.update({ is_notified: true });
+        };
+
+        if (billId) {
+            const billDoc = await db.doc(`users/${uid}/buildings/${building_id}/bills/${billId}`).get();
+            const bill = billDoc.data();
+            if (!bill || bill.is_saved !== true) {
+                res.status(404).json({ error: 'ไม่พบบิลที่บันทึกแล้วของห้องนี้' });
+                return;
+            }
+            month = bill.month;
+            const roomSnap = await db.doc(`users/${uid}/buildings/${building_id}/rooms/${bill.room_id}`).get();
+            const roomData = roomSnap.data();
+            const lineUserId = roomData?.line_user_id as string | undefined;
+            if (!lineUserId) {
+                res.status(200).json({ data: { sent: 0, skipped: 1, reason: 'not_linked', results: [`⏭ ห้อง ${bill.room_number} (ยังไม่ลงทะเบียน LINE)`] } });
+                return;
+            }
+            try {
+                await pushBill(billDoc.ref, bill, roomData);
+            } catch (errRaw) {
+                console.error('Send one bill error:', errRaw);
+                res.status(502).json({ error: `ส่งบิลห้อง ${bill.room_number} ไม่สำเร็จ: ${errorInfo(errRaw).message}` });
+                return;
+            }
+            console.log(`sendLineBills uid=${uid} building=${building_id} bill=${billId} room=${bill.room_number} sent=1`);
+            await autoPostSafe(uid, building_id);
+            res.status(200).json({ data: { sent: 1, skipped: 0, results: [`✅ ห้อง ${bill.room_number}`] } });
+            return;
+        }
 
         const [allBillsSnap, roomsSnap] = await Promise.all([
             db.collection(`users/${uid}/buildings/${building_id}/bills`).get(),
@@ -113,18 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             try {
-                const portalUrl = appUrl
-                    ? `${appUrl}/?p=${encodeURIComponent(await portalLinkFor({ ownerUid: uid, buildingId: building_id, roomId: bill.room_id }))}`
-                    : undefined;
-                const roomLang = roomData?.language || cfg.bill_customization?.default_language || 'th';
-                const bilingual = !!cfg.bill_customization?.bilingual_mode;
-                const secLang = cfg.bill_customization?.secondary_language || 'en';
-                const pay = invoicePay(payAccount, bill.total_bill as number, appUrl || appBaseUrl());
-                // a branch with several places: the bill carries the name of the unit's own (src/shared/billIssuer.ts)
-                const placeName = issuerFor(cfg.bill_customization, roomData?.building_name).name || dormName;
-                const messages: object[] = [buildBillFlex(bill as MonthlyBill, placeName, dueDay, month, { portalUrl, lang: roomLang, bilingual, secLang, pay, dueDate: resolveDueDate(bill, cfg.bill_customization, roomData) })];
-                await linePush(lineUserId, messages, await roomLineToken(roomData)); // the OA this room linked through
-                await billDoc.ref.update({ is_notified: true });
+                await pushBill(billDoc.ref, bill, roomData);
                 sent++;
                 results.push(`✅ ห้อง ${bill.room_number}`);
             } catch (errRaw) {

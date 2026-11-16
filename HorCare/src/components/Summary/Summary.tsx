@@ -7,6 +7,7 @@ import {
     Home, Zap, Droplets, Banknote, ClipboardList, Calendar, MapPin,
     MessageCircle, Building2, Pencil, Image as ImageIcon
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import app from '../../firebase/config';
 import type { MonthlyBill, DormConfig, Room, BillLanguage } from '../../types';
 import { formatCurrency, formatMonthThai, getEffectiveRates } from '../../utils/calculations';
@@ -46,6 +47,8 @@ interface SummaryProps {
     buildingId?: string;
 
     canSendLine?: boolean;
+    /** This account may send bills on LINE (owner, property manager, finance). The buttons are hidden otherwise. */
+    canSendBills?: boolean;
     onUpgrade?: () => void;
     /** Add extra charges / discounts and a note to a bill; omitted when this account may not edit bills. */
     onEditBillExtras?: (billId: string, adjustments: BillAdjustment[], note: string, dueDate?: string | null) => Promise<void>;
@@ -66,6 +69,7 @@ export default function Summary({
     buildingId,
 
     canSendLine = true,
+    canSendBills = true,
     onUpgrade,
     onEditBillExtras,
     onCreateRentBills,
@@ -127,19 +131,54 @@ export default function Summary({
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
+                    owner_uid: uid,
                     building_id: buildingId,
                     month: currentMonth
                 })
             });
 
             const json = await res.json();
-            if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+            if (!res.ok) throw new Error(res.status === 403 ? NO_SEND_RIGHT : json?.error || `HTTP ${res.status}`);
             setLineResult(json.data);
             setLineStatus('done');
         } catch (error) {
             console.error('Send LINE bills error:', error);
             setLineStatus('error');
             alert(`ส่งบิลไม่สำเร็จ: ${(error as Error).message}`);
+        }
+    };
+
+    const NO_SEND_RIGHT = 'บัญชีนี้ไม่มีสิทธิ์ส่งบิล (ส่งได้เฉพาะเจ้าของ ผู้จัดการ และการเงิน)';
+    // One room's bill, sent (or sent again) to that room's LINE — after a correction, or for a room that linked late.
+    const [sendingBillId, setSendingBillId] = useState<string | null>(null);
+    const roomSendTitle = (room: Room | undefined, bill: MonthlyBill | undefined) =>
+        !bill ? 'ยังไม่มีบิลของเดือนนี้'
+            : !canSendLine ? 'ส่งบิลผ่าน LINE ใช้ได้ในแพ็กเกจที่สูงขึ้น'
+            : !room?.line_user_id ? `${unitName ?? 'ห้อง'}นี้ยังไม่ลงทะเบียน LINE จึงส่งบิลไม่ได้`
+            : bill.is_notified ? 'ส่งบิลนี้ทาง LINE อีกครั้ง' : `ส่งบิลนี้ให้${unitName ?? 'ห้อง'}นี้ทาง LINE`;
+    const handleSendRoomBill = async (bill: MonthlyBill) => {
+        if (!uid || !buildingId || sendingBillId) return;
+        if (!canSendLine) { setShowLineUpgradeModal(true); return; }
+        if (bill.is_notified && !window.confirm(`บิล${unitName ?? 'ห้อง'} ${bill.room_number} ส่งทาง LINE ไปแล้ว ต้องการส่งอีกครั้งหรือไม่?`)) return;
+        setSendingBillId(bill.id);
+        try {
+            const { getAuth } = await import('firebase/auth');
+            const token = await getAuth(app).currentUser?.getIdToken();
+            if (!token) throw new Error('Not authenticated');
+            const res = await fetch('/api/send-line-bills', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ owner_uid: uid, building_id: buildingId, bill_id: bill.id }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(res.status === 403 ? NO_SEND_RIGHT : json?.error || `HTTP ${res.status}`);
+            if (json.data?.sent) toast.success(`ส่งบิล${unitName ?? 'ห้อง'} ${bill.room_number} ทาง LINE แล้ว`);
+            else toast.error(`${unitName ?? 'ห้อง'} ${bill.room_number} ยังไม่ลงทะเบียน LINE จึงยังไม่ได้ส่ง`);
+        } catch (error) {
+            console.error('Send room bill error:', error);
+            toast.error(`ส่งบิลไม่สำเร็จ: ${(error as Error).message}`);
+        } finally {
+            setSendingBillId(null);
         }
     };
 
@@ -298,9 +337,8 @@ export default function Summary({
                         >
                             <Download size={15} /> ดาวน์โหลดหลายบิล
                         </button>
-                        {uid && buildingId && config.dorm_code && (
-                            <>
-                                <button
+                        {canSendBills && uid && buildingId && config.dorm_code && (
+                            <button
                                     className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
                                     onClick={canSendLine ? handleSendLineBills : () => setShowLineUpgradeModal(true)}
                                     disabled={canSendLine && (lineStatus === 'sending' || remindStatus === 'sending')}
@@ -309,6 +347,9 @@ export default function Summary({
                                     {canSendLine ? <MessageCircle size={15} /> : <Lock size={15} />}
                                     {lineStatus === 'sending' ? 'กำลังส่ง...' : 'ส่งบิลผ่าน LINE'}
                                 </button>
+                        )}
+                        {uid && buildingId && config.dorm_code && (
+                            <>
                                 <button
                                     className={`btn btn-sm ${canSendLine ? 'btn-line' : 'btn-outline'}`}
                                     onClick={canSendLine ? handleRemindManualBills : () => setShowLineUpgradeModal(true)}
@@ -535,6 +576,18 @@ export default function Summary({
                                                             แก้ไข
                                                         </button>
                                                     )}
+{canSendBills && uid && buildingId && config.dorm_code && (
+                                                        <button
+                                                            className="btn btn-outline btn-sm"
+                                                            onClick={() => bill && handleSendRoomBill(bill)}
+                                                            title={roomSendTitle(room, bill)}
+                                                            disabled={!hasBill || sendingBillId !== null || (canSendLine && !room.line_user_id)}
+                                                            style={hasBill && canSendLine && room.line_user_id ? { color: '#06C755', borderColor: '#06C755' } : undefined}
+                                                        >
+                                                            {canSendLine ? <Send size={14} /> : <Lock size={14} />}
+                                                            {sendingBillId === bill?.id ? 'กำลังส่ง...' : bill?.is_notified ? 'ส่งอีกครั้ง' : 'ส่ง LINE'}
+                                                        </button>
+                                                    )}
                                                     <button
                                                         className="btn btn-outline btn-sm"
                                                         onClick={() => bill && handleDownloadBill(bill)}
@@ -641,7 +694,19 @@ export default function Summary({
                                                     แก้ไข
                                                 </button>
                                             )}
-                                            <button
+{canSendBills && uid && buildingId && config.dorm_code && (
+                                                        <button
+                                                            className="btn btn-outline btn-sm flex-1"
+                                                            onClick={() => bill && handleSendRoomBill(bill)}
+                                                            title={roomSendTitle(room, bill)}
+                                                            disabled={!hasBill || sendingBillId !== null || (canSendLine && !room.line_user_id)}
+                                                            style={hasBill && canSendLine && room.line_user_id ? { color: '#06C755', borderColor: '#06C755' } : undefined}
+                                                        >
+                                                            {canSendLine ? <Send size={14} /> : <Lock size={14} />}
+                                                            {sendingBillId === bill?.id ? 'กำลังส่ง...' : bill?.is_notified ? 'ส่งอีกครั้ง' : 'ส่ง LINE'}
+                                                        </button>
+                                                    )}
+                                                    <button
                                                 className="btn btn-outline btn-sm flex-1"
                                                 onClick={() => bill && handleDownloadBill(bill)}
                                                 disabled={!hasBill}
@@ -747,6 +812,16 @@ export default function Summary({
                             {onEditBillExtras && (
                                 <button type="button" className="doc-viewer-btn" onClick={() => { setEditingBillId(selectedBill.id); closeBill(); }} title="แก้ไขบิล">
                                     <Pencil size={16} /> <span className="doc-viewer-label">แก้ไขบิล</span>
+                                </button>
+                            )}
+                            {canSendBills && uid && buildingId && config.dorm_code && (
+                                <button
+                                    type="button" className="doc-viewer-btn" onClick={() => handleSendRoomBill(selectedBill)}
+                                    title={roomSendTitle(room, selectedBill)}
+                                    disabled={sendingBillId !== null || (canSendLine && !room?.line_user_id)}
+                                >
+                                    {canSendLine ? <Send size={16} /> : <Lock size={16} />}
+                                    <span className="doc-viewer-label">{sendingBillId === selectedBill.id ? 'กำลังส่ง...' : 'ส่ง LINE'}</span>
                                 </button>
                             )}
                             <button type="button" className="doc-viewer-btn" onClick={() => handleDownloadBill(selectedBill)} title="บันทึกเป็นรูป สำหรับส่งทาง LINE หรือเก็บในอัลบั้ม">
