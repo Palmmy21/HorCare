@@ -13,7 +13,7 @@
 import { db } from './_firebase.js';
 import { readSlipDetails } from './_slip-ai.js';
 import {
-    describeChecks, parseSlipQr, senderBankFromQr, verifySlip,
+    describeChecks, inspectSlipQr, parseSlipQr, senderBankFromQr, verifySlip,
     type ReceiverCandidate, type SlipDetails, type SlipVerdict,
 } from './_slip-verify.js';
 import { bankAccountLabel, bankByCode, digitsOnly, type BankAccount } from '../src/shared/banks.js';
@@ -32,6 +32,11 @@ export interface SlipEvaluation {
     bankVerified: boolean;
     details: SlipDetails | null;
     verdict: SlipVerdict | null;
+    /**
+     * Thai, for the owner: why the QR on the slip is not trusted — not a slip QR, a broken checksum, or it disagrees
+     * with what is printed on the slip. Empty when the QR is fine or there is none.
+     */
+    qrIssues: string[];
     /** Extra fields to merge into the bill / fine document (never contains undefined). */
     fields: Record<string, unknown>;
     verifyNote: string;
@@ -78,7 +83,7 @@ export async function evaluateSlip(input: {
     // Only "not a reused slip" is known here — never word it as if the payment itself was checked.
     const legacyNote = qrPresent ? 'AI ยังไม่ได้ตรวจยอด/ชื่อ — โปรดตรวจสลิปด้วยตา' : 'อ่าน QR ไม่ได้ — โปรดตรวจสลิปด้วยตา';
     const none: SlipEvaluation = {
-        autoApprove: false, outcome: 'review', problems: [], qrPresent, bankVerified: false, details: null, verdict: null, fields: {}, verifyNote: legacyNote, aiAmount: null, splitAmount: null,
+        autoApprove: false, outcome: 'review', problems: [], qrPresent, bankVerified: false, details: null, verdict: null, qrIssues: [], fields: {}, verifyNote: legacyNote, aiAmount: null, splitAmount: null,
     };
 
     if (!input.isPro) return none;
@@ -130,8 +135,9 @@ export async function evaluateSlip(input: {
     }
 
     const { candidates } = await loadReceiverCandidates(input.ownerUid, input.buildingId);
+    // a transfer the bank confirmed needs no second opinion on its QR; otherwise the QR itself is examined
     const checked = verifySlip({
-        details, qrPresent, duplicate: false, expectedAmount: input.expectedAmount, candidates, billCreatedAt: input.billCreatedAt,
+        details, qrPresent, ...(bankVerified ? {} : { qrPayload: input.qrPayload }), duplicate: false, expectedAmount: input.expectedAmount, candidates, billCreatedAt: input.billCreatedAt,
     });
     // with a slip service configured, only a bank-confirmed slip is approved on its own
     const verdict: SlipVerdict = bankConfigured && !bankVerified ? { ...checked, auto_approve: false } : checked;
@@ -148,7 +154,7 @@ export async function evaluateSlip(input: {
         slip_receiver_account: details.receiver_account,
         slip_datetime: details.datetime_iso,
         slip_account_id: matched?.id,
-        transaction_ref: qr.reference ?? details.reference,
+        transaction_ref: qr.reference ?? inspectSlipQr(input.qrPayload)?.reference ?? details.reference,
         slip_checks: verdict.checks,
         ...bankFields,
     });
@@ -167,7 +173,9 @@ export async function evaluateSlip(input: {
     const summary = describeChecks(verdict.checks);
     const problems = slipProblems(verdict, details, input.expectedAmount);
     const c = verdict.checks;
-    const splitAmount = !verdict.auto_approve && c.amount === 'fail' && !!matched && c.datetime !== 'fail'
+    const qrIssues = verdict.qr_issues ?? [];
+    const qrWarning = qrIssues.length ? ` · ⚠️ QR น่าสงสัย อาจเป็นสลิปปลอม: ${qrIssues.join(' / ')}` : '';
+    const splitAmount = !verdict.auto_approve && c.amount === 'fail' && c.qr !== 'fail' && !!matched && c.datetime !== 'fail'
         && details.amount != null && details.amount > 0 && details.amount < input.expectedAmount
         ? details.amount : null;
     // remembered on the bill so the "split payment" button can be checked against this exact slip
@@ -178,14 +186,14 @@ export async function evaluateSlip(input: {
         problems: verdict.auto_approve ? [] : problems,
         qrPresent,
         bankVerified,
-        details, verdict, fields,
+        details, verdict, qrIssues, fields,
         aiAmount: details.amount,
         splitAmount,
         verifyNote: verdict.auto_approve
             ? bankVerified
                 ? `อนุมัติอัตโนมัติ — ธนาคารยืนยันรายการโอนแล้ว — ${summary}`
                 : `อนุมัติอัตโนมัติจากสลิป (ยังไม่ยืนยันกับบัญชีธนาคาร) — ${summary}`
-            : `${bankVerified ? 'ธนาคารยืนยันรายการโอนแล้ว' : bankWaitNote(bank) ?? 'ตรวจสลิปแล้ว'} — ${summary} · โปรดตรวจด้วยตา`,
+            : `${bankVerified ? 'ธนาคารยืนยันรายการโอนแล้ว' : bankWaitNote(bank) ?? 'ตรวจสลิปแล้ว'} — ${summary}${qrWarning} · โปรดตรวจด้วยตา`,
     };
 }
 
@@ -203,7 +211,7 @@ function slipProblems(verdict: SlipVerdict, details: SlipDetails, expectedAmount
     const c = verdict.checks;
     const out: string[] = [];
     if (c.amount === 'fail') out.push(`ยอดในสลิป ${baht(details.amount ?? 0)} ไม่ตรงกับยอดที่ต้องชำระ ${baht(expectedAmount)}`);
-    if (c.receiver_name === 'fail' || c.receiver_account === 'fail') out.push('ชื่อ/บัญชีผู้รับในสลิปไม่ใช่บัญชีของหอพัก');
+    if ((c.receiver_name === 'fail' || c.receiver_account === 'fail') && !verdict.receiver_conflict) out.push('ชื่อ/บัญชีผู้รับในสลิปไม่ใช่บัญชีของหอพัก');
     if (c.datetime === 'fail') out.push('สลิปนี้โอนก่อนออกบิล อาจเป็นสลิปเก่า');
     return out;
 }
@@ -219,6 +227,7 @@ export function tenantSlipReply(roomNumber: string, e: SlipEvaluation): string {
         const list = e.problems.map(p => `- ${p}`).join('\n');
         return `❌ สลิปห้อง ${roomNumber} ไม่ตรงกับบิลค่ะ\n\n${list}\n\nระบบยังไม่ได้รับยอดนี้ กรุณาตรวจสอบแล้วส่งสลิปที่ถูกต้องอีกครั้ง หรือติดต่อเจ้าของหอค่ะ`;
     }
+    if (e.qrIssues.length) return `[ระบบ] รับสลิปห้อง ${roomNumber} แล้วค่ะ\n\nระบบตรวจ QR ในสลิปไม่ผ่าน เจ้าของหอจะตรวจสอบสลิปนี้ด้วยตนเองค่ะ`;
     return e.qrPresent
         ? `[ระบบ] รับสลิปห้อง ${roomNumber} แล้วค่ะ\n\nระบบยังตรวจยอดอัตโนมัติไม่ได้ เจ้าของหอจะตรวจสอบและยืนยันยอดให้อีกครั้งค่ะ`
         : `[ระบบ] รับสลิปห้อง ${roomNumber} แล้วค่ะ\n\nระบบอ่าน QR ในสลิปไม่ชัด เจ้าของหอจะตรวจสอบให้นะคะ\n(ถ้าเป็นไปได้ ส่งภาพสลิปที่ชัดขึ้นจะตรวจไวกว่าค่ะ)`;

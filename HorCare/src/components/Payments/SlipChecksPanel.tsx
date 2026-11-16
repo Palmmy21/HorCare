@@ -15,12 +15,19 @@ const LABELS: { key: keyof SlipChecks; label: string }[] = [
     { key: 'receiver_account', label: 'เลขบัญชี' },
     { key: 'datetime', label: 'วัน-เวลา' },
     { key: 'duplicate', label: 'สลิปไม่ซ้ำ' },
+    { key: 'qr', label: 'QR สลิป' },
 ];
 
 const STYLE: Record<SlipCheck, { color: string; bg: string; Icon: React.ElementType; hint: string }> = {
     pass: { color: '#166534', bg: 'rgba(34, 163, 90,0.12)', Icon: CheckCircle2, hint: 'ตรงกัน' },
     fail: { color: '#B91C1C', bg: 'rgba(220,38,38,0.12)', Icon: XCircle, hint: 'ไม่ตรงกัน' },
     unknown: { color: '#557089', bg: 'rgba(85, 112, 137,0.12)', Icon: HelpCircle, hint: 'อ่านไม่ได้ / เทียบไม่ได้' },
+};
+
+const QR_HINT: Record<SlipCheck, string> = {
+    pass: 'เป็น QR ของสลิปจริง รหัสตรวจสอบถูกต้อง และตรงกับข้อมูลที่พิมพ์บนสลิป',
+    fail: 'QR ไม่ใช่ของสลิป รหัสตรวจสอบผิด หรือไม่ตรงกับข้อมูลบนสลิป — อาจเป็นสลิปปลอม',
+    unknown: 'อ่าน QR ไม่ได้',
 };
 
 const fmtTime = (iso?: string) => (iso ? new Date(iso).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : undefined);
@@ -30,9 +37,9 @@ export default function SlipChecksPanel({ checks, read, expectedAmount, compact 
     const chips = (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {LABELS.filter(l => !(compact && l.key === 'duplicate')).map(({ key, label }) => {
-                const s = STYLE[checks[key]];
+                const s = STYLE[checks[key] ?? 'unknown'];
                 return (
-                    <span key={key} title={`${label}: ${s.hint}`} style={{
+                    <span key={key} title={`${label}: ${key === 'qr' ? QR_HINT[checks.qr ?? 'unknown'] : s.hint}`} style={{
                         display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: compact ? '0.68rem' : '0.75rem', fontWeight: 700,
                         color: s.color, background: s.bg, borderRadius: 999, padding: compact ? '0.1rem 0.4rem' : '0.2rem 0.55rem',
                     }}>

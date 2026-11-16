@@ -51,7 +51,12 @@ describe('parseSlipDetails', () => {
         expect(parseSlipDetails(JSON.stringify(full))).toEqual({
             amount: 3500, sender_name: 'น.ส. มาลี', receiver_name: 'นาย สมชาย ใ', receiver_account: 'xxx-x-x6789-x',
             receiver_bank: 'กสิกรไทย', sender_bank: 'ไทยพาณิชย์', datetime_iso: '2026-10-08T14:30:00+07:00', reference: 'REF123',
+            references: [],
         });
+    });
+    it('keeps every code printed on the slip, for comparing with its QR', () => {
+        const d = parseSlipDetails(JSON.stringify({ ...full, references: [' 016321145500BTF01234 ', '', 42, null, 'REF123'] }));
+        expect(d?.references).toEqual(['016321145500BTF01234', 'REF123']);
     });
     it('tolerates fenced output and missing fields', () => {
         const d = parseSlipDetails('```json\n{"amount":"1,200.50"}\n```');
@@ -87,5 +92,14 @@ describe('readSlipDetails', () => {
         process.env.OPENROUTER_API_KEY = 'k';
         fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({}), text: async () => 'down' });
         expect(await readSlipDetails('AAAA', 'image/jpeg')).toBeNull();
+    });
+});
+
+describe('the short Buddhist year on a Thai slip', () => {
+    it('reads 69 → 2569 → 2026, however the model wrote it', async () => {
+        const { parseSlipDatetime } = await import('./_slip-ai.js');
+        expect(parseSlipDatetime('2069-11-17T10:05')).toBe('2026-11-17T10:05:00+07:00');
+        expect(parseSlipDatetime('2569-11-17T10:05')).toBe('2026-11-17T10:05:00+07:00');
+        expect(parseSlipDatetime('2026-11-17T10:05')).toBe('2026-11-17T10:05:00+07:00');
     });
 });

@@ -35,7 +35,7 @@ const VENDOR = 'U' + 'v'.repeat(32);
 const scope = { owner_uid: OWNER, building_id: BLD };
 const fetchMock = vi.fn();
 
-const review = { autoApprove: false, outcome: 'review', problems: [], qrPresent: true, bankVerified: false, details: null, verdict: null, fields: {}, verifyNote: 'โปรดตรวจสลิปด้วยตา', aiAmount: 3000, splitAmount: null };
+const review = { autoApprove: false, outcome: 'review', problems: [], qrPresent: true, bankVerified: false, details: null, verdict: null, qrIssues: [], fields: {}, verifyNote: 'โปรดตรวจสลิปด้วยตา', aiAmount: 3000, splitAmount: null };
 const approved = { ...review, autoApprove: true, outcome: 'approved', fields: { slip_account_id: 'acc1' }, verifyNote: 'ok' };
 
 beforeEach(() => {

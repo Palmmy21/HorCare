@@ -36,6 +36,29 @@ const BY_CODE = new Map(BANKS.map(b => [b.code, b]));
 const BY_SHORT = new Map(BANKS.map(b => [b.short, b]));
 
 export const bankByCode = (code: string | null | undefined): Bank | undefined => (code ? BY_CODE.get(code) : undefined);
+// How a bank is written on a slip or said by the reader, besides its short code and its Thai name.
+const BANK_ALIASES: Record<string, string[]> = {
+  KBANK: ['kasikorn', 'กสิกร', 'k plus', 'kplus'], SCB: ['siam commercial', 'ไทยพาณิชย์'], BBL: ['bangkok bank', 'ธนาคารกรุงเทพ', 'ธ.กรุงเทพ', 'bualuang'],
+  KTB: ['krungthai', 'krung thai', 'กรุงไทย'], TTB: ['tmb', 'thanachart', 'ทหารไทย', 'ธนชาต', 'ทีทีบี'], BAY: ['krungsri', 'ayudhya', 'กรุงศรี'],
+  GSB: ['government savings', 'ออมสิน', 'mymo'], GHB: ['government housing', 'อาคารสงเคราะห์', 'ธอส'], BAAC: ['ธ.ก.ส', 'ธกส', 'เพื่อการเกษตร'],
+  KKP: ['kiatnakin', 'เกียรตินาคิน'], TISCO: ['ทิสโก้'], UOB: ['ยูโอบี'], CIMB: ['ซีไอเอ็มบี'], IBANK: ['islamic bank', 'อิสลาม'],
+  TCRB: ['thai credit', 'ไทยเครดิต'], LHB: ['lh bank', 'land and houses', 'แลนด์ แอนด์'], ICBC: ['ไอซีบีซี'], HSBC: ['เอชเอสบีซี'], CITI: ['citibank', 'ซิตี้แบงก์'],
+};
+
+/** The bank a free text names ("ธ.กสิกรไทย", "K PLUS", "SCB") — undefined when none, or more than one, is recognised. */
+export function bankFromText(text: string | null | undefined): Bank | undefined {
+  const t = (text ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!t) return undefined;
+  // a bare Thai name ("กรุงเทพ") only counts when it is the whole text: inside a longer one it may be something else
+  const bare = t.replace(/^ธนาคาร|^ธ\./, '').trim();
+  const hits = BANKS.filter(b =>
+    new RegExp(`(^|[^a-z])${b.short.toLowerCase()}([^a-z]|$)`).test(t)
+    || bare === b.name_th.replace(/^ธนาคาร/, '')
+    || t.includes(b.name_th)
+    || (BANK_ALIASES[b.short] ?? []).some(a => t.includes(a)));
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
 export const bankByShort = (short: string | null | undefined): Bank | undefined => (short ? BY_SHORT.get(short) : undefined);
 
 /** Logos are loaded from a public CDN; callers must fall back to a coloured badge on error. */

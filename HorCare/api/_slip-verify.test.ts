@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
     SLIP_FUTURE_TOLERANCE_MS, checkDatetime, compareAccount, compareNames, describeChecks, normalizeName,
     parseSlipQr, senderBankFromQr, verifySlip, type ReceiverCandidate, type SlipDetails,
+    checkSlipQr, crc16, inspectSlipQr, sameReference,
 } from './_slip-verify.js';
+import { bankFromText } from '../src/shared/banks.js';
 
 const tlv = (id: string, value: string) => `${id}${String(value.length).padStart(2, '0')}${value}`;
 const slipQr = (bank = '014', ref = 'ABCDEFGHIJ1234567890XYZ') =>
@@ -196,5 +198,153 @@ describe('verifySlip', () => {
         const text = describeChecks(run({}, { receiver_account: 'xxx-x-x9999-x' }).checks);
         expect(text).toContain('ผ่าน:');
         expect(text).toContain('ไม่ผ่าน: เลขบัญชีผู้รับ');
+    });
+});
+
+describe('a slip that really is for the property', () => {
+    const now = Date.parse('2026-11-17T05:00:00Z');
+    const bank = { id: 'acc1', name: 'นางสาว ลดา ใจดี', number: '1234567890', label: 'KBANK' };
+    const promptpay = { id: 'acc1', name: 'นางสาว ลดา ใจดี', number: '0891234567', label: 'KBANK' };
+    const slip = (over: Partial<SlipDetails>): SlipDetails => ({
+        amount: 3116.4, sender_name: 'นาย ก', receiver_name: 'น.ส. ลดา ใ', receiver_account: 'xxx-x-x6789-x', receiver_bank: null, sender_bank: null,
+        datetime_iso: '2026-11-17T10:00:00+07:00', reference: null, ...over,
+    });
+    const run = (d: Partial<SlipDetails>, candidates = [bank, promptpay], expectedAmount = 3116.4) =>
+        verifySlip({ details: slip(d), qrPresent: true, duplicate: false, expectedAmount, candidates, now });
+
+    it('matches the account by its number or by its PromptPay id', () => {
+        expect(run({}).auto_approve).toBe(true);                                            // bank account number
+        const pp = run({ receiver_account: 'xxx-xxx-4567' });                               // paid to the PromptPay phone
+        expect(pp.checks.receiver_account).toBe('pass');
+        expect(pp.auto_approve).toBe(true);
+    });
+    it('forgives a character the reader got wrong in the name, and satang kept as a long decimal', () => {
+        expect(run({ receiver_name: 'น.ส. ลดา ใจดิ' }).auto_approve).toBe(true);
+        expect(run({}, [bank, promptpay], 3116.4000000000005).checks.amount).toBe('pass');
+        expect(run({ amount: 3116.41 }).checks.amount).toBe('fail');
+    });
+    it('half a match waits for the owner instead of being called a mismatch', () => {
+        const v = run({ receiver_account: 'xxx-xxx-9999' }, [bank]);                        // a PromptPay number not on file
+        expect(v.checks).toMatchObject({ receiver_name: 'pass', receiver_account: 'fail' });
+        expect(v.receiver_conflict).toBe(true);
+        expect(v.auto_approve).toBe(false);
+        const other = run({ receiver_name: 'นาย สมชาย รักดี', receiver_account: 'xxx-xxx-9999' });
+        expect(other.receiver_conflict).toBe(false);                                        // nothing matches: someone else's account
+        expect(other.checks.receiver_name).toBe('fail');
+    });
+});
+
+describe('the QR on a slip', () => {
+    // published samples: a bank slip (Bangkok Bank), and TrueMoney Wallet's own format
+    const BBL = '004000060000010103002021900021231231212000115102TH91049C30';
+    const TRUEMONEY = '00480002010102010203P2P0313TXN00012345670408250120249104b425';
+    const signed = (body: string) => body + crc16(body).toString(16).toUpperCase().padStart(4, '0');
+    const bankQr = (bank: string, ref: string) => signed(`${tlv('00', tlv('00', '000001') + tlv('01', bank) + tlv('02', ref))}${tlv('51', 'TH')}9104`);
+    const read = (over: Partial<SlipDetails> = {}): SlipDetails => ({
+        amount: 100, sender_name: null, receiver_name: null, receiver_account: null, receiver_bank: null, sender_bank: null,
+        datetime_iso: null, reference: null, ...over,
+    });
+
+    it('computes the checksum banks use', () => {
+        expect(crc16('123456789')).toBe(0x29B1);
+        expect(crc16(BBL.slice(0, -4))).toBe(0x9C30);
+    });
+
+    it('takes a bank slip apart and checks its checksum', () => {
+        expect(inspectSlipQr(BBL)).toEqual({ kind: 'bank', crc_ok: true, bank_code: '002', reference: '0002123123121200011', ref_date: null });
+        expect(inspectSlipQr(` ${BBL}\n`)?.crc_ok).toBe(true);
+        // one character changed anywhere — the reference, the bank, the checksum itself — and it no longer holds
+        expect(inspectSlipQr(BBL.replace('0002123', '0002124'))?.crc_ok).toBe(false);
+        expect(inspectSlipQr(BBL.replace('0103002', '0103014'))?.crc_ok).toBe(false);
+        expect(inspectSlipQr(BBL.slice(0, -1) + '1')?.crc_ok).toBe(false);
+        expect(inspectSlipQr(BBL.slice(0, -8))).toMatchObject({ kind: 'bank', crc_ok: false });   // no checksum at all
+    });
+
+    it('reads TrueMoney, with its lowercase checksum and the day inside', () => {
+        expect(inspectSlipQr(TRUEMONEY)).toEqual({ kind: 'truemoney', crc_ok: true, bank_code: null, reference: 'TXN0001234567', ref_date: '2024-01-25' });
+    });
+
+    it('accepts a checksum whose leading zero the bank app dropped', () => {
+        // find a reference whose checksum starts with 0, then write it the way such an app does
+        const ref = Array.from({ length: 400 }, (_, i) => `2026111712345${String(i).padStart(4, '0')}`).find(r => bankQr('014', r).slice(-4).startsWith('0'))!;
+        const full = bankQr('014', ref);
+        const short = `${full.slice(0, -8)}9103${full.slice(-3)}`;
+        expect(inspectSlipQr(short)).toMatchObject({ kind: 'bank', crc_ok: true, reference: ref, ref_date: '2026-11-17' });
+        expect(inspectSlipQr(`${full.slice(0, -4)}${full.slice(-3)}`)?.crc_ok).toBe(true);
+    });
+
+    it('tells a slip QR from a QR to pay into and from anything else', () => {
+        expect(inspectSlipQr('00020101021129370016A000000677010111011300668123456785802TH530376463041234')?.kind).toBe('payment');
+        for (const other of ['https://line.me/R/ti/p/@horcare', 'WIFI:T:WPA;S:dorm;P:12345678;;', '0099abc', tlv('51', 'TH')]) {
+            expect(inspectSlipQr(other)?.kind).toBe('other');
+        }
+        expect(inspectSlipQr(null)).toBeNull();
+        expect(inspectSlipQr('  ')).toBeNull();
+    });
+
+    it('only reads a date from a reference that really starts with one', () => {
+        expect(inspectSlipQr(bankQr('014', '2026111712345ABCDEFGHIJKL'))?.ref_date).toBe('2026-11-17');
+        expect(inspectSlipQr(bankQr('014', '2026133112345ABCDEFGHIJKL'))?.ref_date).toBeNull();   // month 13
+        expect(inspectSlipQr(bankQr('014', '2026023012345ABCDEFGHIJKL'))?.ref_date).toBeNull();   // 30 February
+        expect(inspectSlipQr(bankQr('004', '016321145500BTF01234'))?.ref_date).toBeNull();
+    });
+
+    it('matches the printed reference allowing for how it is printed and misread', () => {
+        expect(sameReference('016321145500BTF01234', '016321145500BTF01234')).toBe(true);
+        expect(sameReference('016321145500BTF01234', '0163 2114 5500 btf0 1234')).toBe(true);
+        expect(sameReference('016321145500BTF01234', 'O1632114550OBTFO1234')).toBe(true);           // O read for 0
+        expect(sameReference('016321145500BTF01234', 'Ref. 016321145500BTF01234 / 9')).toBe(true);
+        expect(sameReference('016321145500BTF01234', '016321145500BTF01284')).toBe(true);           // one character misread
+        expect(sameReference('016321145500BTF01234', '016321999900BTF09999')).toBe(false);
+        expect(sameReference('016321145500BTF01234', '1234')).toBe(false);
+    });
+
+    it('names the bank a slip shows', () => {
+        expect(bankFromText('ธ.กสิกรไทย')?.short).toBe('KBANK');
+        expect(bankFromText('K PLUS')?.short).toBe('KBANK');
+        expect(bankFromText('SCB')?.short).toBe('SCB');
+        expect(bankFromText('ธนาคารกรุงเทพ')?.short).toBe('BBL');
+        expect(bankFromText('กรุงเทพ')?.short).toBe('BBL');
+        expect(bankFromText('Krungthai NEXT')?.short).toBe('KTB');
+        expect(bankFromText('กรุงศรี')?.short).toBe('BAY');
+        expect(bankFromText('ttb')?.short).toBe('TTB');
+        expect(bankFromText('ออมสิน')?.short).toBe('GSB');
+        expect(bankFromText('TrueMoney Wallet')).toBeUndefined();
+        expect(bankFromText('SCB / KBANK')).toBeUndefined();
+        expect(bankFromText(null)).toBeUndefined();
+    });
+
+    it('passes a QR that agrees with the slip, or that the slip says nothing against', () => {
+        const info = inspectSlipQr(bankQr('014', '2026111712345ABCDEFGHIJKL'));
+        expect(checkSlipQr(info, read())).toEqual({ check: 'pass', issues: [] });
+        expect(checkSlipQr(info, null).check).toBe('pass');
+        expect(checkSlipQr(info, read({ sender_bank: 'ไทยพาณิชย์', datetime_iso: '2026-11-17T23:59:00+07:00', references: ['2026111712345ABCDEFGHIJKL'] })).check).toBe('pass');
+        expect(checkSlipQr(info, read({ datetime_iso: '2026-11-18T00:02:00+07:00' })).check).toBe('pass');   // around midnight
+        expect(checkSlipQr(info, read({ sender_bank: 'ธนาคารที่ไม่รู้จัก', reference: 'R1' })).check).toBe('pass');
+        expect(checkSlipQr(inspectSlipQr(TRUEMONEY), read({ sender_bank: 'TrueMoney', datetime_iso: '2024-01-25T10:00:00+07:00' })).check).toBe('pass');
+        expect(checkSlipQr(null, read()).check).toBe('unknown');
+    });
+
+    it('fails a QR that disagrees with the slip it is on, and says how', () => {
+        const info = inspectSlipQr(bankQr('014', '2026111712345ABCDEFGHIJKL'));
+        const all = checkSlipQr(info, read({ sender_bank: 'กสิกรไทย', datetime_iso: '2026-11-20T10:00:00+07:00', reference: '016321145500BTF01234' }));
+        expect(all.check).toBe('fail');
+        expect(all.issues).toHaveLength(3);
+        expect(checkSlipQr(inspectSlipQr(TRUEMONEY), read({ datetime_iso: '2026-11-17T10:00:00+07:00' })).check).toBe('fail');
+        expect(checkSlipQr(inspectSlipQr(BBL.slice(0, -1) + '1'), read()).issues[0]).toContain('CRC');
+    });
+
+    it('verifySlip: a slip with everything right but a QR that fails is not approved', () => {
+        const acc: ReceiverCandidate = { id: 'acc1', name: 'สมชาย ใจดี', number: '1234567890', label: 'KBANK' };
+        const now = Date.parse('2026-11-17T05:00:00Z');
+        const slip = read({ amount: 3500, receiver_name: 'นาย สมชาย ใ', receiver_account: 'xxx-x-x6789-x', datetime_iso: '2026-11-17T10:00:00+07:00' });
+        const run = (qrPayload: string | null) => verifySlip({ details: slip, qrPresent: !!qrPayload, qrPayload, duplicate: false, expectedAmount: 3500, candidates: [acc], now });
+        const good = bankQr('014', '2026111712345ABCDEFGHIJKL');
+        expect(run(good)).toMatchObject({ auto_approve: true, qr_issues: [] });
+        const forged = run(good.slice(0, -4) + 'FFFF');
+        expect(forged.auto_approve).toBe(false);
+        expect(forged.checks).toMatchObject({ amount: 'pass', receiver_name: 'pass', qr: 'fail' });
+        expect(run(null).checks.qr).toBe('unknown');
+        expect(describeChecks(forged.checks)).toContain('ไม่ผ่าน: QR สลิป');
     });
 });

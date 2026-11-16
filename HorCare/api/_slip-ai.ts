@@ -13,11 +13,12 @@ const PROMPT = `อ่านรายละเอียดจากสลิป�
   "amount": <จำนวนเงินที่โอน เป็นตัวเลข เช่น 1500.00 (ไม่รวมค่าธรรมเนียม) หรือ null>,
   "sender_name": "<ชื่อผู้โอน ตามที่แสดงในสลิป หรือ null>",
   "receiver_name": "<ชื่อผู้รับ ตามที่แสดงในสลิป หรือ null>",
-  "receiver_account": "<เลขบัญชี/พร้อมเพย์ของผู้รับ ตามที่แสดงในสลิปทุกตัวอักษร รวมตัว x หรือ * ที่ปิดบังไว้ เช่น xxx-x-x1234-x หรือ null>",
+  "receiver_account": "<เลขบัญชี หรือเลขพร้อมเพย์ (เบอร์โทร/เลขบัตรประชาชน/e-Wallet) ของผู้รับ ไม่ใช่ของผู้โอน ตามที่แสดงในสลิปทุกตัวอักษร รวมตัว x หรือ * ที่ปิดบังไว้ เช่น xxx-x-x1234-x หรือ null>",
   "receiver_bank": "<ธนาคารของผู้รับ หรือ null>",
   "sender_bank": "<ธนาคารของผู้โอน หรือ null>",
-  "datetime": "<วันที่และเวลาทำรายการ รูปแบบ YYYY-MM-DDTHH:mm เวลาไทย 24 ชั่วโมง ปีเป็น ค.ศ. หรือ null>",
-  "reference": "<เลขที่รายการ/รหัสอ้างอิง หรือ null>"
+  "datetime": "<วันที่และเวลาทำรายการ รูปแบบ YYYY-MM-DDTHH:mm เวลาไทย 24 ชั่วโมง ปีเป็น ค.ศ. (สลิปไทยมักพิมพ์ปี พ.ศ. แบบย่อ เช่น "17 พ.ย. 69" คือ พ.ศ. 2569 = ค.ศ. 2026) หรือ null>",
+  "reference": "<เลขที่รายการ/รหัสอ้างอิง หรือ null>",
+  "references": [<รหัสทุกตัวที่พิมพ์บนสลิป เช่น เลขที่รายการ รหัสอ้างอิง เลขที่อ้างอิง หมายเลขอ้างอิง ทุกตัวอักษรตามที่เห็น — ถ้าไม่มีให้ใส่ []>]
 }`;
 
 const str = (v: unknown, max: number): string | null => {
@@ -46,6 +47,9 @@ export function parseSlipDatetime(v: unknown): string | null {
     if (!m) return null;
     let year = Number(m[1]);
     if (year > 2400) year -= 543;
+    // Thai slips print the Buddhist year short ("17 พ.ย. 69" = 2569 = 2026); read as 2069 it would be a slip "from
+    // the future" and fail the date check
+    else if (year >= 2040 && year <= 2100) year -= 43;
     const [mo, d, h, mi, s] = [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0)];
     if (year < 2000 || year > 2100 || mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || s > 59) return null;
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -68,6 +72,7 @@ export function parseSlipDetails(raw: string): SlipDetails | null {
         sender_bank: str(o.sender_bank, 60),
         datetime_iso: parseSlipDatetime(o.datetime),
         reference: str(o.reference, 60),
+        references: Array.isArray(o.references) ? o.references.map(r => str(r, 60)).filter((r): r is string => !!r).slice(0, 6) : [],
     };
 }
 
@@ -75,7 +80,7 @@ export function parseSlipDetails(raw: string): SlipDetails | null {
 export async function readSlipDetails(base64: string, mimeType: string): Promise<SlipDetails | null> {
     try {
         const text = await aiGenerate({
-            kind: 'vision', prompt: PROMPT, images: [{ base64, mimeType }], json: true, temperature: 0, maxTokens: 500,
+            kind: 'vision', prompt: PROMPT, images: [{ base64, mimeType }], json: true, temperature: 0, maxTokens: 600,
         });
         return parseSlipDetails(text);
     } catch (err) {

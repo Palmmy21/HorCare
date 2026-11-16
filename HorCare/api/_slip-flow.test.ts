@@ -4,6 +4,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 
 import { evaluateSlip, loadReceiverCandidates, tenantSlipReply } from './_slip-flow.js';
 import { read, resetFake, seed } from './_fake-firestore.js';
+import { crc16 } from './_slip-verify.js';
 
 const OWNER = 'owner-1';
 const BLD = 'bld-A';
@@ -11,7 +12,12 @@ const B = `users/${OWNER}/buildings/${BLD}`;
 const fetchMock = vi.fn();
 
 const tlv = (id: string, v: string) => `${id}${String(v.length).padStart(2, '0')}${v}`;
-const QR = tlv('00', tlv('00', '000001') + tlv('01', '014') + tlv('02', 'TXN1234567890ABCDEF')) + tlv('51', 'TH') + tlv('91', 'ABCD');
+// a slip QR as a bank app makes it: the checksum at the end is the real one
+const slipQr = (bank: string, ref: string) => {
+    const body = `${tlv('00', tlv('00', '000001') + tlv('01', bank) + tlv('02', ref))}${tlv('51', 'TH')}9104`;
+    return body + crc16(body).toString(16).toUpperCase().padStart(4, '0');
+};
+const QR = slipQr('014', 'TXN1234567890ABCDEF');
 
 const aiReply = (details: Record<string, unknown>) => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(details) } }] }), text: async () => '' });
 const recent = () => new Date(Date.now() - 3600_000).toISOString().replace(/\.\d{3}Z$/, '').replace('Z', '');
@@ -206,5 +212,54 @@ describe('loadReceiverCandidates', () => {
             { id: 'acc1', name: 'สมชาย ใจดี', number: '1234567890', label: 'KBANK ••••7890' },
             { id: 'acc1', name: 'สมชาย ใจดี', number: '0812345678', label: 'KBANK ••••7890' },
         ]);
+    });
+});
+
+describe('a slip whose QR does not hold up', () => {
+    const suspicious = async (qrPayload: string, slip: Record<string, unknown> = goodSlip()) => {
+        fetchMock.mockResolvedValue(aiReply(slip));
+        return run({ qrPayload });
+    };
+
+    it('is never approved on its own, and the owner is told why — the tenant is not accused', async () => {
+        const e = await suspicious(QR.slice(0, -4) + 'ABCD');                      // the checksum does not match the contents
+        expect(e.autoApprove).toBe(false);
+        expect(e.outcome).toBe('review');
+        expect(e.fields.slip_checks).toMatchObject({ amount: 'pass', qr: 'fail' });
+        expect(e.fields.payment_method).toBeUndefined();
+        expect(e.qrIssues[0]).toContain('CRC');
+        expect(e.verifyNote).toContain('QR น่าสงสัย');
+        expect(tenantSlipReply('101', e)).toContain('ตรวจ QR ในสลิปไม่ผ่าน');
+        expect(tenantSlipReply('101', e)).not.toContain('ปลอม');
+    });
+
+    it('a QR lifted from another slip disagrees with what is printed: reference, bank or day', async () => {
+        const ref = await suspicious(QR, { ...goodSlip(), reference: '016321145500ABC99999', references: ['016321145500ABC99999'] });
+        expect(ref.autoApprove).toBe(false);
+        expect(ref.qrIssues.join()).toContain('เลขอ้างอิง');
+
+        const bank = await suspicious(slipQr('004', 'TXN1234567890ABCDEF'));         // QR says KBANK, the slip shows SCB
+        expect(bank.qrIssues.join()).toContain('ธนาคารผู้โอน');
+
+        const day = await suspicious(slipQr('014', '20240105ABCDEFGHIJKLMNOPQ'));     // QR made on 5 Jan 2024, slip dated today
+        expect(day.autoApprove).toBe(false);
+        expect(day.qrIssues.join()).toContain('วันที่');
+    });
+
+    it('a slip whose printed reference is the one in its QR is approved', async () => {
+        const e = await suspicious(QR, { ...goodSlip(), reference: 'อ้างอิง 99', references: ['TXN1234567890ABCDEF', '0123456789'] });
+        expect(e.autoApprove).toBe(true);
+        expect(e.qrIssues).toEqual([]);
+        expect(e.fields.slip_checks).toMatchObject({ qr: 'pass' });
+        expect(e.fields.transaction_ref).toBe('TXN1234567890ABCDEF');
+    });
+
+    it('a picture of a QR to pay into (PromptPay) or any other QR is not a slip, and no part payment is offered on it', async () => {
+        const pay = await suspicious('00020101021129370016A000000677010111011300668123456785802TH530376463041234');
+        expect(pay.autoApprove).toBe(false);
+        expect(pay.qrIssues[0]).toContain('รับเงิน');
+        const part = await suspicious('https://line.me/R/ti/p/@horcare', { ...goodSlip(), amount: 2000 });
+        expect(part.splitAmount).toBeNull();
+        expect(part.fields.slip_split_amount).toBeUndefined();
     });
 });

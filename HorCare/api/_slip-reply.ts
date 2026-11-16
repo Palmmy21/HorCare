@@ -133,7 +133,8 @@ export function buildSlipFlex(i: SlipReplyInput): { type: 'flex'; altText: strin
         case 'review':
             headline = paidAmount !== null ? `฿${baht(paidAmount)}` : 'รอตรวจสอบ';
             rows.push(['สถานะ', 'เจ้าของหอกำลังตรวจสอบ', true]);
-            note = i.qrPresent
+            note = fail(i.evaluation?.verdict?.checks, 'qr') ? 'ระบบตรวจ QR ในสลิปไม่ผ่าน เจ้าของหอจะตรวจสอบสลิปนี้ด้วยตนเองค่ะ'
+                : i.qrPresent
                 ? 'ตรวจ QR ผ่าน (ไม่ซ้ำ) เจ้าของหอจะยืนยันยอดให้อีกครั้งค่ะ'
                 : 'ระบบอ่านสลิปไม่ชัด เจ้าของหอจะตรวจสอบให้ ส่งภาพที่ชัดขึ้นจะตรวจไวกว่าค่ะ';
             break;

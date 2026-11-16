@@ -1286,6 +1286,7 @@ async function handleSlipImage(
         title: `💳 สลิปใหม่ ห้อง ${room_number}`,
         body: evaluation.outcome === 'approved' ? `รับยอดอัตโนมัติแล้ว ฿${geminiAmount ?? ''}`
             : evaluation.outcome === 'mismatch' ? `สลิปไม่ตรง: ${evaluation.problems.join(' · ')}`
+            : evaluation.qrIssues.length ? `⚠️ QR ในสลิปน่าสงสัย อาจเป็นสลิปปลอม: ${evaluation.qrIssues.join(' / ')}`
             : 'AI ตรวจไม่ได้ — กรุณาดูสลิปและยืนยันยอด',
     });
 }

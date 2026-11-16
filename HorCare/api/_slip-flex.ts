@@ -114,6 +114,7 @@ export function buildSlipResultFlex(input: {
             extra: problems,
             note: canSplit
                 ? `ถ้าตั้งใจแบ่งจ่าย กดปุ่มด้านล่างเพื่อบันทึก ${baht(e.splitAmount!)} เป็นยอดชำระบางส่วนได้เลยค่ะ`
+                : e.outcome === 'review' && e.qrIssues.length ? 'ระบบตรวจ QR ในสลิปไม่ผ่าน เจ้าของหอจะตรวจสอบสลิปนี้ด้วยตนเองค่ะ'
                 : e.outcome === 'review' && !e.qrPresent ? 'อ่าน QR ในสลิปไม่ชัด เจ้าของหอจะตรวจสอบให้ค่ะ' : s.note,
             footer: canSplit ? {
                 type: 'box', layout: 'vertical',
