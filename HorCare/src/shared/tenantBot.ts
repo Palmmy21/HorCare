@@ -103,6 +103,15 @@ export function welcomeText(link: { room_number?: string; dorm_name?: string } |
     return `ยินดีต้อนรับค่ะ 🎉\n\nคุณลงทะเบียน${where} ไว้แล้ว บิลและการแจ้งเตือนจะส่งมาที่แชทนี้\n\n${menuLines(v)}`;
 }
 
+const TH_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+/** Sent when the owner / staff confirms a payment on the payments page: a person checked it, and which bill is settled. */
+export function paidConfirmationText(roomNumber: string, month: string, market: boolean): string {
+    const [y, m] = month.split('-').map(Number);
+    const round = y && m >= 1 && m <= 12 ? `${TH_MONTHS[m - 1]} ${y + 543}` : month;
+    return `✅ แอดมินตรวจสอบเรียบร้อยแล้วค่ะ\n\nบิล${botVocab(market).unit} ${roomNumber} รอบเดือน ${round} ชำระเรียบร้อย ขอบคุณค่ะ 🙏`;
+}
+
 export function ackText(market: boolean): string {
     return `ได้รับข้อความแล้วค่ะ 🙏 ${botVocab(market).owner}จะตอบกลับโดยเร็วที่สุด\n\nระหว่างนี้พิมพ์ "บิล" เพื่อดูบิลล่าสุด หรือ "เมนู" เพื่อดูสิ่งที่ทำได้ในแชทนี้`;
 }

@@ -2,6 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, admin } from './_firebase.js';
 import { linePush, buildReceiptFlex, roomLineToken } from './_line.js';
 import type { MonthlyBill } from '../src/types/index.js';
+import { authorize } from './_rbac.js';
+import { paidConfirmationText } from '../src/shared/tenantBot.js';
 
 
 // ส่งใบเสร็จรับเงินให้ลูกหอทาง LINE เมื่อเจ้าของกด "ยืนยันจ่าย" ในหน้า Payments.
@@ -30,13 +32,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const idToken = authHeader.split('Bearer ')[1];
         const decoded = await admin.auth().verifyIdToken(idToken);
-        const uid = decoded.uid;
 
         const bodyData = req.body?.data || req.body || {};
         const { building_id, bill_id } = bodyData;
         if (!building_id || !bill_id) {
             res.status(400).json({ error: 'Missing building_id or bill_id' });
             return;
+        }
+        // a staff member confirms payments of the owner's property: checked like every other payment action
+        let uid = decoded.uid;
+        if (typeof bodyData.owner_uid === 'string' && bodyData.owner_uid && bodyData.owner_uid !== decoded.uid) {
+            const ctx = await authorize(req, res, { ownerUid: bodyData.owner_uid, buildingId: building_id, permission: 'payment.update' });
+            if (!ctx) return;
+            uid = ctx.ownerUid;
         }
 
         // อ่านบิลเพื่อเอาเลขห้อง/ยอด/รอบเดือน — เชื่อข้อมูลใน Firestore ไม่เชื่อ client
@@ -63,7 +71,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const roomLang = roomSnap.data()?.language || cfgSnap.data()?.bill_customization?.default_language || 'th';
         const bilingual = !!cfgSnap.data()?.bill_customization?.bilingual_mode;
         const secLang = cfgSnap.data()?.bill_customization?.secondary_language || 'en';
-        await linePush(lineUserId, [buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })], await roomLineToken(roomSnap.data()));
+        // said in words first — "the admin checked it, the bill of <month> is paid" — then the receipt card
+        const confirmed = paidConfirmationText(String(bill.room_number ?? ''), String(bill.month ?? ''), (cfgSnap.data()?.building_type as string | undefined) === 'market');
+        await linePush(lineUserId, [{ type: 'text', text: confirmed }, buildReceiptFlex(bill as MonthlyBill, dormName, paidAt, { lang: roomLang, bilingual, secLang })], await roomLineToken(roomSnap.data()));
         res.status(200).json({ data: { notified: true } });
 
     } catch (errorRaw) {

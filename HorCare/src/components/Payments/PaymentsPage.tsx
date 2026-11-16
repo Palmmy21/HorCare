@@ -310,7 +310,7 @@ export default function PaymentsPage({ bills, rooms, config, currentMonth, onMon
             await fetch('/api/notify-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ building_id: buildingId, bill_id: b.id }),
+                body: JSON.stringify({ owner_uid: uid, building_id: buildingId, bill_id: b.id }),
             });
         } catch (err) {
             console.warn('notify-payment failed:', err);
