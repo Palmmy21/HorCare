@@ -676,18 +676,18 @@ export default function Summary({
                                                 {hasBill ? formatCurrency(bill.total_bill) : '-'}
                                             </span>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="summary-bill-card-actions">
                                             <button
-                                                className="btn btn-outline btn-sm flex-1"
+                                                className="btn btn-outline btn-sm"
                                                 onClick={() => bill && setSelectedBill(bill)}
                                                 disabled={!hasBill}
                                             >
                                                 <Eye size={14} />
-                                                ดู
+                                                ดูบิล
                                             </button>
                                             {onEditBillExtras && (
                                                 <button
-                                                    className="btn btn-outline btn-sm flex-1"
+                                                    className="btn btn-outline btn-sm"
                                                     onClick={() => bill && setEditingBillId(bill.id)}
                                                     disabled={!hasBill}
                                                 >
@@ -695,26 +695,28 @@ export default function Summary({
                                                     แก้ไข
                                                 </button>
                                             )}
-{canSendBills && uid && buildingId && config.dorm_code && (
-                                                        <button
-                                                            className="btn btn-outline btn-sm flex-1"
-                                                            onClick={() => bill && handleSendRoomBill(bill)}
-                                                            title={roomSendTitle(room, bill)}
-                                                            disabled={!hasBill || sendingBillId !== null || (canSendLine && !room.line_user_id)}
-                                                            style={hasBill && canSendLine && room.line_user_id ? { color: '#06C755', borderColor: '#06C755' } : undefined}
-                                                        >
-                                                            {canSendLine ? <Send size={14} /> : <Lock size={14} />}
-                                                            {sendingBillId === bill?.id ? 'กำลังส่ง...' : bill?.is_notified ? 'ส่งอีกครั้ง' : 'ส่ง LINE'}
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                className="btn btn-outline btn-sm flex-1"
+                                            <button
+                                                className="btn btn-outline btn-sm"
                                                 onClick={() => bill && handleDownloadBill(bill)}
                                                 disabled={!hasBill}
-
+                                                title="ดาวน์โหลดรูปบิล"
                                             >
                                                 <Download size={14} />
+                                                รูปบิล
                                             </button>
+                                            {canSendBills && uid && buildingId && config.dorm_code && (
+                                                <button
+                                                    className={`btn btn-sm summary-bill-card-send ${hasBill && canSendLine && room.line_user_id ? 'is-ready' : 'btn-outline'}`}
+                                                    onClick={() => bill && handleSendRoomBill(bill)}
+                                                    title={roomSendTitle(room, bill)}
+                                                    disabled={!hasBill || sendingBillId !== null || (canSendLine && !room.line_user_id)}
+                                                >
+                                                    {canSendLine ? <Send size={15} /> : <Lock size={15} />}
+                                                    {sendingBillId === bill?.id ? 'กำลังส่ง...'
+                                                        : hasBill && canSendLine && !room.line_user_id ? 'ยังไม่ลงทะเบียน LINE'
+                                                        : bill?.is_notified ? 'ส่งบิลทาง LINE อีกครั้ง' : 'ส่งบิลทาง LINE'}
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

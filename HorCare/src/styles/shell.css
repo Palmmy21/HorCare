@@ -255,3 +255,49 @@ html.dark .sb-count { background: #3B1F22; color: #FCA5A5; }
   .sk-app .main-content { padding-top: var(--space-5); }
 }
 @media (prefers-reduced-motion: reduce) { .sk, .sk-page { animation: none; } }
+
+/* ===== Bottom navigation (phone only) — the everyday screens; the ☰ menu still holds everything ===== */
+.bottom-nav { display: none; }
+@media (max-width: 768px) {
+  :root { --bottom-nav-h: 58px; }
+  .bottom-nav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    padding: 0 max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px, env(safe-area-inset-left));
+    background: var(--shell-bg); border-top: 1px solid var(--shell-border);
+    box-shadow: 0 -4px 16px rgba(16, 42, 67, 0.06);
+  }
+  .bottom-nav-item {
+    flex: 1 1 0; min-width: 0; height: var(--bottom-nav-h);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    border: none; background: none; padding: 0 2px; cursor: pointer; font: inherit;
+    color: var(--shell-faint); -webkit-tap-highlight-color: transparent;
+  }
+  .bottom-nav-item.active { color: var(--color-primary); }
+  .bottom-nav-item:active .bottom-nav-icon { background: var(--shell-hover); }
+  .bottom-nav-item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; border-radius: 10px; }
+  .bottom-nav-icon {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 52px; height: 28px; border-radius: 14px; transition: background 0.15s ease;
+  }
+  .bottom-nav-item.active .bottom-nav-icon { background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+  .bottom-nav-label {
+    max-width: 100%; font-size: 0.6875rem; line-height: 1.1; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bottom-nav-item.active .bottom-nav-label { font-weight: 700; }
+  .bottom-nav-badge {
+    position: absolute; top: -4px; left: calc(50% + 4px); min-width: 17px; height: 17px; padding: 0 4px;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 9px;
+    background: #EF4444; color: #FFFFFF; font-size: 0.625rem; font-weight: 700; line-height: 1;
+    border: 1.5px solid var(--shell-bg);
+  }
+  /* room for the bar under the page, and for what floats above the bottom edge */
+  .app-container:has(.bottom-nav) .main-content {
+    padding-bottom: calc(var(--bottom-nav-h) + var(--space-6) + env(safe-area-inset-bottom));
+  }
+  .app-container:has(.bottom-nav) .settings-savebar { bottom: calc(var(--bottom-nav-h) + var(--space-3) + env(safe-area-inset-bottom)); }
+  .app-container:has(.bottom-nav) ~ .install-prompt-wrapper,
+  .app-container:has(.bottom-nav) .install-prompt-wrapper { bottom: calc(var(--bottom-nav-h) + 0.75rem + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) { .bottom-nav-icon { transition: none; } }
+@media print { .bottom-nav { display: none !important; } }

@@ -328,7 +328,7 @@ export default function MessagesPage({ ownerUid, buildingId, unitName, threads, 
             <style>{`
                 .messages-back { display: none; }
                 @media (max-width: 760px) {
-                    .messages-grid { grid-template-columns: 1fr !important; height: max(24rem, calc(100dvh - 11rem)) !important; }
+                    .messages-grid { grid-template-columns: 1fr !important; height: max(24rem, calc(100dvh - 11rem - var(--bottom-nav-h, 0px))) !important; }
                     .messages-hide-narrow { display: none !important; }
                     .messages-back { display: inline-flex; }
                 }

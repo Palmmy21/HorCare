@@ -723,6 +723,16 @@ function App() {
     }
   };
 
+  // Bottom bar (phone): only the everyday screens, in this order, and only those this account may open. At most five.
+  const BOTTOM_NAV: [ViewMode, string][] = [
+    ['dashboard', 'ภาพรวม'], ['cleaning', 'งานแม่บ้าน'], ['rooms', terms.isMarket ? 'แผง' : 'ห้อง'],
+    ['collections', 'เก็บเงิน'], ['recording', 'จดมิเตอร์'], ['summary', 'บิล'], ['payments', 'ชำระเงิน'], ['messages', 'ข้อความ'],
+  ];
+  const bottomNavItems = BOTTOM_NAV.flatMap(([id, short]) => {
+    const item = visibleNavItems.find(i => i.id === id);
+    return item ? [{ ...item, short }] : [];
+  }).slice(0, 5);
+
   const navGroups = groupNav(visibleNavItems, navGroupDefs(terms.isMarket));
   const activeNavGroupId = groupOfView(navGroups, currentView);
   const NAV_GROUP_ICONS: Record<string, React.ElementType> = {
@@ -1307,6 +1317,30 @@ function App() {
       {/* Overlay for mobile menu */}
       {mobileMenuOpen && (
         <div className="sb-overlay" onClick={() => setMobileMenuOpen(false)} />
+      )}
+
+      {/* Phone only: the few screens used every day, one thumb away. Everything else stays in the ☰ menu. */}
+      {bottomNavItems.length >= 2 && (
+        <nav className="bottom-nav" aria-label="เมนูหลัก">
+          {bottomNavItems.map(item => {
+            const count = badgeOf(item.id);
+            const active = currentView === item.id;
+            return (
+              <button
+                key={item.id} type="button"
+                className={`bottom-nav-item ${active ? 'active' : ''}`}
+                onClick={() => handleNavClick(item.id)}
+                aria-current={active ? 'page' : undefined}
+              >
+                <span className="bottom-nav-icon">
+                  <item.icon size={22} strokeWidth={active ? 2.4 : 2} aria-hidden />
+                  {count > 0 && <span className="bottom-nav-badge">{count > 99 ? '99+' : count}</span>}
+                </span>
+                <span className="bottom-nav-label">{item.short}</span>
+              </button>
+            );
+          })}
+        </nav>
       )}
 
       {/* Main Content */}

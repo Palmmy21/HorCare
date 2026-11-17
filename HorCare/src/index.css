@@ -1821,8 +1821,8 @@ textarea,
 
 .summary-bill-card-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-gray-100);
 }
@@ -1830,8 +1830,35 @@ textarea,
 .summary-bill-card-total {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
 }
+
+/* the small actions share one row; sending the bill on LINE is the main action and gets a row of its own */
+.summary-bill-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.summary-bill-card-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding-inline: var(--space-2);
+  justify-content: center;
+  white-space: nowrap;
+}
+.summary-bill-card-actions .summary-bill-card-send {
+  flex: 1 0 100%;
+  min-height: 44px;
+  font-weight: 700;
+}
+.summary-bill-card-send.is-ready {
+  background: #06C755;
+  border: 1px solid #06C755;
+  color: #FFFFFF;
+}
+.summary-bill-card-send.is-ready:disabled { opacity: 0.6; }
 
 .summary-total-card {
   display: flex;
