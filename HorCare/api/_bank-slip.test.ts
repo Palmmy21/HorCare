@@ -5,6 +5,7 @@ vi.mock('./_firebase.js', async () => (await import('./_fake-firestore.js')).fir
 import { fromEasySlip, fromSlipOk, slipProvider, verifyBankSlip } from './_bank-slip.js';
 import { evaluateSlip, tenantSlipReply } from './_slip-flow.js';
 import { resetFake, seed } from './_fake-firestore.js';
+import { crc16 } from './_slip-verify.js';
 
 const QR = '0041000600000101030140219TXN1234567890ABCDEF5102TH9104ABCD';
 const reply = (status: number, json: unknown) => ({ ok: status < 300, status, json: async () => json, text: async () => JSON.stringify(json) });
@@ -121,13 +122,45 @@ describe('evaluateSlip with the bank in the loop', () => {
         expect(tenantSlipReply('101', e)).toContain('ตรวจกับธนาคารแล้ว');
     });
 
-    it('rejects a fake slip the bank has never seen', async () => {
+    it('never approves a slip the bank has never seen: the owner is warned, the tenant is not called a cheat', async () => {
         fetchMock.mockResolvedValueOnce(reply(400, { success: false, code: 1011 }));
+        fetchMock.mockResolvedValueOnce(aiReply(pictureSaysPaid));                     // the picture looks perfect
         const e = await run();
         expect(e.autoApprove).toBe(false);
-        expect(e.outcome).toBe('mismatch');
-        expect(e.problems[0]).toContain('ธนาคารไม่พบรายการโอน');
+        // "not found" is also what the bank says about a transfer it has not released yet — so it waits for the owner
+        expect(e.outcome).toBe('review');
+        expect(e.problems).toEqual([]);
+        expect(e.qrIssues[0]).toContain('ธนาคารไม่พบรายการโอน');
+        expect(e.verifyNote).toContain('ธนาคารไม่พบรายการโอน');
+        expect(e.fields).toMatchObject({ slip_bank_check: 'not_found', slip_bank_provider: 'slipok', slip_amount: 3500 });
+        expect(e.fields.slip_checks).toMatchObject({ qr: 'fail', amount: 'pass' });
+        expect(e.fields.payment_method).toBeUndefined();
+        expect(e.splitAmount).toBeNull();
+        expect(tenantSlipReply('101', e)).toContain('เจ้าของหอจะตรวจสอบ');
+    });
+
+    it('still warns when the bank does not know the slip and the picture cannot be read', async () => {
+        fetchMock.mockResolvedValueOnce(reply(400, { success: false, code: 1011 }));
+        fetchMock.mockResolvedValueOnce(reply(500, {}));                               // the AI is down
+        const e = await run();
+        expect(e.outcome).toBe('review');
+        expect(e.qrIssues[0]).toContain('ธนาคารไม่พบรายการโอน');
         expect(e.fields).toEqual({ slip_bank_check: 'not_found', slip_bank_provider: 'slipok' });
+    });
+
+    it('does not ask the bank about a wallet slip (TrueMoney): it waits for the owner', async () => {
+        const tlv = (id: string, v: string) => `${id}${String(v.length).padStart(2, '0')}${v}`;
+        const body = `${tlv('00', tlv('00', '01') + tlv('01', '01') + tlv('03', 'TM1234567890123') + tlv('04', '17112026'))}9104`;
+        fetchMock.mockResolvedValueOnce(aiReply(pictureSaysPaid));                     // only the AI is called
+        const e = await evaluateSlip({
+            ownerUid: OWNER, buildingId: BLD, imageBase64: 'AAAA', mimeType: 'image/jpeg', expectedAmount: 3500, isPro: true,
+            qrPayload: body + crc16(body).toString(16).toUpperCase().padStart(4, '0'),
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(String(fetchMock.mock.calls[0][0])).not.toContain('slipok');
+        expect(e.outcome).toBe('review');
+        expect(e.autoApprove).toBe(false);
+        expect(e.verifyNote).toContain('วอลเล็ต');
     });
 
     it('catches an edited picture: the bank says 350 baht, not 3,500', async () => {

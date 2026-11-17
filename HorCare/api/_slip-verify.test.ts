@@ -53,6 +53,14 @@ describe('compareNames', () => {
         expect(cmp('สมชาย', 'สมชาย ใจดี')).toBe('pass');
         expect(cmp('ใจดี', 'สมชาย ใจดี')).toBe('pass');
     });
+    it('reads names whose words are cut off and masked', () => {
+        expect(cmp('นาย สมช*** ใจ***', 'สมชาย ใจดี')).toBe('pass');
+        expect(cmp('สมชxxx ใจxxx', 'นาย สมชาย ใจดี')).toBe('pass');
+        expect(cmp('นาย สมช***', 'สมชาย ใจดี')).toBe('pass');
+        expect(cmp('นาย ส*** ใ***', 'สมชาย ใจดี')).toBe('unknown');   // one letter each: not wrong, not proof
+        expect(cmp('นาย สมศ*** ใจ***', 'สมชาย ใจดี')).toBe('fail');
+        expect(cmp('นาย สมช*** รั***', 'สมชาย ใจดี')).toBe('fail');
+    });
     it('fails for a different person', () => {
         expect(cmp('นาย สมศักดิ์ ใจดี', 'สมชาย ใจดี')).toBe('fail');
         expect(cmp('สมชาย ว', 'สมชาย ใจดี')).toBe('fail');
@@ -65,10 +73,12 @@ describe('compareNames', () => {
         expect(cmp('xxx', 'สมชาย')).toBe('unknown');
         expect(cmp('MR. SOMCHAI J', 'สมชาย ใจดี')).toBe('unknown');
         expect(cmp('นาย สมชาย', 'SOMCHAI JAIDEE')).toBe('unknown');
+        expect(cmp('MR. SOMCHAI J', 'สมชาย ใจดี (หอ A)')).toBe('unknown');   // a Thai name with a note in Latin letters
     });
     it('English names compare too', () => {
         expect(cmp('MR. SOMCHAI J', 'Somchai Jaidee')).toBe('pass');
         expect(cmp('MR. SOMSAK J', 'Somchai Jaidee')).toBe('fail');
+        expect(cmp('MR.SOMCHAI J', 'Somchai Jaidee')).toBe('pass');         // no space after the title
     });
 });
 
@@ -87,6 +97,13 @@ describe('compareAccount', () => {
         expect(compareAccount('xxxx7890', REAL)).toBe('pass');
         expect(compareAccount('***9999', REAL)).toBe('fail');
         expect(compareAccount('••••7890', REAL)).toBe('pass');
+    });
+    it('a PromptPay id that does not fit the account number proves nothing; against the PromptPay id on file it does', () => {
+        expect(compareAccount('xxx-xxx-9999', REAL)).toBe('unknown');
+        expect(compareAccount('x-xxxx-xxxxx-99-9', REAL)).toBe('unknown');
+        expect(compareAccount('xxx-xxx-9999', '0891234567', 'promptpay')).toBe('fail');
+        expect(compareAccount('xxx-xxx-4567', '0891234567', 'promptpay')).toBe('pass');
+        expect(compareAccount('xxx-x-x1234-x', REAL)).toBe('fail');   // an account number, written as one
     });
     it('is unknown when the slip shows too little or nothing usable', () => {
         expect(compareAccount('xxx-x-xxxx-x', REAL)).toBe('unknown');
@@ -204,7 +221,7 @@ describe('verifySlip', () => {
 describe('a slip that really is for the property', () => {
     const now = Date.parse('2026-11-17T05:00:00Z');
     const bank = { id: 'acc1', name: 'นางสาว ลดา ใจดี', number: '1234567890', label: 'KBANK' };
-    const promptpay = { id: 'acc1', name: 'นางสาว ลดา ใจดี', number: '0891234567', label: 'KBANK' };
+    const promptpay = { id: 'acc1', name: 'นางสาว ลดา ใจดี', number: '0891234567', label: 'KBANK', kind: 'promptpay' as const };
     const slip = (over: Partial<SlipDetails>): SlipDetails => ({
         amount: 3116.4, sender_name: 'นาย ก', receiver_name: 'น.ส. ลดา ใ', receiver_account: 'xxx-x-x6789-x', receiver_bank: null, sender_bank: null,
         datetime_iso: '2026-11-17T10:00:00+07:00', reference: null, ...over,
@@ -224,13 +241,23 @@ describe('a slip that really is for the property', () => {
         expect(run({ amount: 3116.41 }).checks.amount).toBe('fail');
     });
     it('half a match waits for the owner instead of being called a mismatch', () => {
-        const v = run({ receiver_account: 'xxx-xxx-9999' }, [bank]);                        // a PromptPay number not on file
+        const v = run({ receiver_account: 'xxx-xxx-9999' });                                // not the PromptPay number on file
         expect(v.checks).toMatchObject({ receiver_name: 'pass', receiver_account: 'fail' });
         expect(v.receiver_conflict).toBe(true);
         expect(v.auto_approve).toBe(false);
         const other = run({ receiver_name: 'นาย สมชาย รักดี', receiver_account: 'xxx-xxx-9999' });
         expect(other.receiver_conflict).toBe(false);                                        // nothing matches: someone else's account
         expect(other.checks.receiver_name).toBe('fail');
+    });
+    it('a PromptPay transfer is not "the wrong account" just because the property has no PromptPay id on file', () => {
+        const v = run({ receiver_account: 'xxx-xxx-9999' }, [bank]);                        // only the account number is known
+        expect(v.checks).toMatchObject({ receiver_name: 'pass', receiver_account: 'unknown' });
+        expect(v.receiver_conflict).toBe(false);
+        expect(v.auto_approve).toBe(true);                                                  // the name is the evidence
+        // the slip's name in English cannot be compared either: nothing says it is wrong, so it waits — not a mismatch
+        const en = run({ receiver_name: 'MS. LADA J', receiver_account: 'x-xxxx-xxxxx-12-3' }, [bank]);
+        expect(en.checks).toMatchObject({ receiver_name: 'unknown', receiver_account: 'unknown' });
+        expect(en.auto_approve).toBe(false);
     });
 });
 

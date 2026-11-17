@@ -210,7 +210,7 @@ describe('loadReceiverCandidates', () => {
         expect(accounts.map(a => a.id)).toEqual(['acc1']);
         expect(candidates).toEqual([
             { id: 'acc1', name: 'สมชาย ใจดี', number: '1234567890', label: 'KBANK ••••7890' },
-            { id: 'acc1', name: 'สมชาย ใจดี', number: '0812345678', label: 'KBANK ••••7890' },
+            { id: 'acc1', name: 'สมชาย ใจดี', number: '0812345678', label: 'KBANK ••••7890', kind: 'promptpay' },
         ]);
     });
 });

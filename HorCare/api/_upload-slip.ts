@@ -163,6 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             title: `💳 สลิปใหม่ ห้อง ${String(targetData.room_number ?? '')}`,
             body: evaluation.outcome === 'approved' ? `รับยอดอัตโนมัติแล้ว ฿${evaluation.aiAmount ?? ''}`
                 : evaluation.outcome === 'mismatch' ? `สลิปไม่ตรง: ${evaluation.problems.join(' · ')}`
+                : evaluation.qrIssues.length ? `⚠️ QR ในสลิปน่าสงสัย อาจเป็นสลิปปลอม: ${evaluation.qrIssues.join(' / ')}`
                 : 'AI ตรวจไม่ได้ — กรุณาดูสลิปและยืนยันยอด',
         });
         res.status(200).json({

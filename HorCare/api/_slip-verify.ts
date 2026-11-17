@@ -31,6 +31,8 @@ export interface ReceiverCandidate {
     /** Digits only. */
     number: string | null;
     label: string;
+    /** What `number` is: the bank account number (default) or the account's PromptPay id (phone / national ID). */
+    kind?: 'account' | 'promptpay';
 }
 
 // ── Slip QR ───────────────────────────────────────────────────────────────────
@@ -207,6 +209,8 @@ export function normalizeName(raw: string): string[] {
         if (i === 0) {
             const prefix = TITLE_PREFIXES.find(p => t.startsWith(p));
             if (prefix) t = t.slice(prefix.length);
+            // "MR.SAKDIDECH" — an English title printed without a space after it
+            else t = t.replace(/^(?:mr|mrs|ms|miss|mstr)\.(?=.)/, '');
         }
         t = t.replace(/\.+$/g, '').replace(/^\.+/g, '');
         if (!t || DROP_WORDS.has(t)) return;
@@ -232,8 +236,9 @@ export function nearSame(x: string, y: string): boolean {
     return prev[y.length] <= allowed;
 }
 
-/** Strip the trailing mask some slips print after a truncated name ("somchai j***"). */
-const unmask = (t: string) => t.replace(/[*•]+$/g, '');
+/** The mask some slips and wallets print after a cut-off name: "somchai j***", "ศักดิ์*** เนเ***", "สมชxxx". */
+const MASK = /[*•]+$|x{3,}$/;
+const unmask = (t: string) => t.replace(MASK, '');
 
 /**
  * Compare a name printed on a slip (often shortened / masked) with the account holder's name.
@@ -241,7 +246,8 @@ const unmask = (t: string) => t.replace(/[*•]+$/g, '');
  */
 export function compareNames(slipName: string | null, accountName: string | null): SlipCheck {
     if (!slipName || !accountName) return 'unknown';
-    const s = normalizeName(slipName).map(unmask).filter(t => t && !/^x+$/.test(t));
+    const tokens = normalizeName(slipName).map(t => ({ t: unmask(t), cut: MASK.test(t) })).filter(x => x.t && !/^x+$/.test(x.t));
+    const s = tokens.map(x => x.t);
     const a = normalizeName(accountName);
     if (s.length === 0 || a.length === 0) return 'unknown';
 
@@ -249,6 +255,26 @@ export function compareNames(slipName: string | null, accountName: string | null
     const aThai = THAI.test(a.join('')), aLatin = LATIN.test(a.join(''));
     if ((sThai && !sLatin && !aThai && aLatin) || (sLatin && !sThai && !aLatin && aThai)) return 'unknown';
 
+    const verdict = tokens.some(x => x.cut) ? compareCutName(tokens, a) : compareWholeName(s, a);
+    // An English name on the slip against a Thai account name that merely has some Latin in it ("… (หอ A)"): the
+    // spelling cannot be compared, so a difference proves nothing.
+    return verdict === 'fail' && sLatin && !sThai && aThai ? 'unknown' : verdict;
+}
+
+/**
+ * A name whose words are cut off and masked ("ศักดิ์*** เนเ***"): each visible part must be the START of the real
+ * word. One visible letter is too little to call it a match — then it only must not contradict.
+ */
+function compareCutName(tokens: { t: string; cut: boolean }[], a: string[]): SlipCheck {
+    const starts = (x: { t: string; cut: boolean }, real: string) => (x.cut ? real.startsWith(x.t) : nearSame(x.t, real));
+    const first = tokens[0];
+    if (!starts(first, a[0])) return 'fail';
+    const last = tokens[tokens.length - 1];
+    if (tokens.length > 1 && !a.slice(1).some(real => real.startsWith(last.t))) return 'fail';
+    return !first.cut || first.t.length >= 2 ? 'pass' : 'unknown';
+}
+
+function compareWholeName(s: string[], a: string[]): SlipCheck {
     if (nearSame(s.join(''), a.join(''))) return 'pass';
     // first name equal, and any surname text on the slip is the start of the real surname
     if (nearSame(s[0], a[0])) {
@@ -262,12 +288,28 @@ export function compareNames(slipName: string | null, accountName: string | null
 }
 
 // ── Account numbers ───────────────────────────────────────────────────────────
+/** Written the way a PromptPay id is — a phone "xxx-xxx-1234" or a national ID "x-xxxx-xxxxx-12-3" — not a bank account. */
+export function isProxyId(slipAccount: string): boolean {
+    const t = slipAccount.trim().replace(/\s+/g, '');
+    const c = '[\\dxX*•×]';
+    return new RegExp(`^${c}{3}-${c}{3}-${c}{4}$`).test(t) || new RegExp(`^${c}-${c}{4}-${c}{5}-${c}{2}-${c}$`).test(t);
+}
+
 /**
  * Compare a (usually masked) account number from a slip with a real one. Visible digits must
  * match in place when the lengths agree; otherwise every visible run of 3+ digits must appear in
  * the real number. 'unknown' when the slip shows fewer than 3 digits.
  */
-export function compareAccount(slipAccount: string | null, number: string | null): SlipCheck {
+export function compareAccount(slipAccount: string | null, number: string | null, kind: 'account' | 'promptpay' = 'account'): SlipCheck {
+    const check = compareDigits(slipAccount, number);
+    if (kind !== 'account' || !slipAccount || !number || !isProxyId(slipAccount)) return check;
+    // A transfer to PromptPay prints the masked phone / national ID, never the account number behind it. Against an
+    // account NUMBER it proves nothing either way (the property may simply not have its PromptPay id on file) — unless
+    // it is the same length and fits digit for digit, which is the account number written with a phone's dashes.
+    return check === 'pass' && slipAccount.replace(/[\s-]/g, '').length === digitsOnly(number).length ? 'pass' : 'unknown';
+}
+
+function compareDigits(slipAccount: string | null, number: string | null): SlipCheck {
     if (!slipAccount || !number) return 'unknown';
     const real = digitsOnly(number);
     if (real.length < 6) return 'unknown';
@@ -346,11 +388,11 @@ export function verifySlip(input: {
     const byAccount = new Map<string, ReceiverCandidate[]>();
     for (const c of candidates) byAccount.set(c.id, [...(byAccount.get(c.id) ?? []), c]);
     const perCandidate = [...byAccount.values()].map(group => {
-        const numbers = group.map(c => compareAccount(details?.receiver_account ?? null, c.number));
+        const numbers = group.map(c => compareAccount(details?.receiver_account ?? null, c.number, c.kind));
         return {
             c: group[0],
             name: compareNames(details?.receiver_name ?? null, group.find(c => c.name)?.name ?? null),
-            account: (numbers.includes('pass') ? 'pass' : numbers.every(n => n === 'fail') ? 'fail' : 'unknown') as SlipCheck,
+            account: (numbers.includes('pass') ? 'pass' : numbers.includes('fail') ? 'fail' : 'unknown') as SlipCheck,
         };
     });
     const ok = perCandidate.filter(p => (p.name === 'pass' || p.account === 'pass') && p.name !== 'fail' && p.account !== 'fail');
