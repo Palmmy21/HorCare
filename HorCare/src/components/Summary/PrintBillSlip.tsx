@@ -1,6 +1,7 @@
 import type { MonthlyBill, DormConfig, WaterConfig, BillCustomization, BillLanguage } from '../../types';
 import type { DueRoom } from '../../shared/billDue';
 import { t, tBilingual, formatBillDate, formatBillMonth, billFooterNote } from '../../utils/i18n/billTranslations';
+import { useOwnerSignatureCtx } from '../ESignature/OwnerSignatureContext';
 
 interface Props {
     bill: MonthlyBill;
@@ -19,6 +20,7 @@ interface Props {
 function n(v: number) { return v.toLocaleString('th-TH'); }
 
 export default function PrintBillSlip({ bill, config, billDate, effectiveElecRate, effectiveWaterConfig, billCustomization, room, language, bilingualMode, secondaryLanguage }: Props) {
+    const signature = useOwnerSignatureCtx();
     const lang: BillLanguage = language ?? billCustomization?.default_language ?? 'th';
     const isBilingual: boolean = bilingualMode ?? billCustomization?.bilingual_mode ?? false;
     const secLang: BillLanguage = secondaryLanguage ?? billCustomization?.secondary_language ?? 'en';
@@ -173,9 +175,11 @@ export default function PrintBillSlip({ bill, config, billDate, effectiveElecRat
             <div style={{ fontSize: 9, color: '#444', marginTop: 3, lineHeight: 1.4 }}>{footer}</div>
 
             {/* Signature line */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: signature ? 2 : 10 }}>
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
-                    <div style={{ borderTop: '1px solid #000', width: 80, marginBottom: 2 }} />
+                    {signature && <img src={signature.image} alt="" style={{ display: 'block', margin: '0 auto', maxHeight: 28, maxWidth: 90, objectFit: 'contain' }} />}
+                    <div style={{ borderTop: '1px solid #000', width: 80, margin: '0 auto 2px' }} />
+                    {signature?.signer_name && <div>( {signature.signer_name} )</div>}
                     {signLabel}
                 </div>
             </div>

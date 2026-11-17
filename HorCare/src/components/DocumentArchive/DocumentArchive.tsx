@@ -6,6 +6,8 @@ import MonthlyReport from '../Summary/MonthlyReport';
 import PrintBillSlip from '../Summary/PrintBillSlip';
 import jsPDF from 'jspdf';
 import { toPng } from 'html-to-image';
+import OwnerSignatureCard from '../ESignature/OwnerSignatureCard';
+import type { OwnerSignatureState } from '../../hooks/useOwnerSignature';
 
 interface DocumentArchiveProps {
     bills: MonthlyBill[];
@@ -13,9 +15,11 @@ interface DocumentArchiveProps {
     config: DormConfig;
     isPaid: boolean;
     onUpgrade?: () => void;
+    /** The owner's signature — given only to the owner (staff never see or change it here). */
+    ownerSignature?: OwnerSignatureState;
 }
 
-export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrade }: DocumentArchiveProps) {
+export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrade, ownerSignature }: DocumentArchiveProps) {
     /** The last six months, newest first (computed once per mount). */
     const months = useMemo(() => {
         const list: string[] = [];
@@ -86,8 +90,14 @@ export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrad
         }, 500);
     };
 
+    const signatureCard = ownerSignature
+        ? <OwnerSignatureCard state={ownerSignature} defaultName={config.bill_customization?.dorm_name} />
+        : null;
+
     if (!isPaid) {
         return (
+            <div>
+            {signatureCard}
             <div className="card text-center" style={{ padding: '4rem 2rem', marginTop: '2rem', maxWidth: '600px', margin: '2rem auto' }}>
                 <Lock size={56} color="var(--color-warning)" style={{ margin: '0 auto 1.5rem' }} />
                 <h3 className="card-title mb-3" style={{ fontSize: '1.5rem' }}>ระบบคลังเอกสารย้อนหลัง</h3>
@@ -98,6 +108,7 @@ export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrad
                 <button className="btn btn-primary" onClick={onUpgrade} style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}>
                     ดูแพ็กเกจเพื่ออัปเกรด
                 </button>
+            </div>
             </div>
         );
     }
@@ -112,6 +123,8 @@ export default function DocumentArchive({ bills, rooms, config, isPaid, onUpgrad
                     <p className="page-subtitle">ดูสรุปยอดและพิมพ์บิลย้อนหลังสูงสุด 6 เดือน</p>
                 </div>
             </div>
+
+            {signatureCard}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
                 {months.map(month => {

@@ -26,6 +26,7 @@ import { portalLinkFor, resolvePortalLink, rotatePortalLink, type PortalRoom } f
 import { raiseAlert } from './_alerts.js';
 import { linePush, roomLineToken } from './_line.js';
 import { buildContractFlex } from './_contract-line.js';
+import { ownerSignaturePath, parseOwnerSignature } from '../src/shared/ownerSignature.js';
 
 export const config = { maxDuration: 15 };
 
@@ -112,15 +113,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const roomNumber = String(portal.room.room_number ?? portal.roomId);
 
     if (action === 'view') {
-        const [building, profile, bills, fines, maintenance, cleaning] = await Promise.all([
+        const [building, profile, bills, fines, maintenance, cleaning, signature] = await Promise.all([
             db.doc(`users/${portal.ownerUid}/buildings/${portal.buildingId}`).get(),
             db.doc(`${b}/tenants/${portal.roomId}`).get(),
             db.collection(`${b}/bills`).where('room_id', '==', portal.roomId).get(),
             db.collection(`${b}/fines`).where('room_id', '==', portal.roomId).get(),
             db.collection(`${b}/maintenance`).where('room_id', '==', portal.roomId).get(),
             db.collection(`${b}/cleaning`).where('room_id', '==', portal.roomId).get(),
+            // the owner's e-signature, printed on the tenant's invoices (the image only — never anything else)
+            db.doc(ownerSignaturePath(portal.ownerUid)).get().catch(() => null),
         ]);
-        const docs = (s: { docs: { id: string; data: () => unknown }[] }) => s.docs.map(d => ({ ...(d.data() as object), id: d.id }));
+        const ownerSig = signature?.exists ? parseOwnerSignature(signature.data()) : null;
+        const docs =(s: { docs: { id: string; data: () => unknown }[] }) => s.docs.map(d => ({ ...(d.data() as object), id: d.id }));
         res.status(200).json({
             owner_uid: portal.ownerUid,
             building_id: portal.buildingId,
@@ -133,6 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             fines: docs(fines),
             maintenance: docs(maintenance),
             cleaning: docs(cleaning),
+            owner_signature: ownerSig ? { image: ownerSig.image, signer_name: ownerSig.signer_name ?? '' } : null,
         });
         return;
     }

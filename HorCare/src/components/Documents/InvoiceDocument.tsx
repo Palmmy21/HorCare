@@ -10,6 +10,7 @@ import { billFooterNote } from '../../utils/i18n/billTranslations';
 import { invoiceLines, invoiceNumber, type InvoiceLine } from '../../shared/invoice';
 import { thaiLongDate, type DocIssuer } from './docFormat';
 import { fill, invoiceText, type InvoiceText } from './invoiceText';
+import { useOwnerSignatureCtx } from '../ESignature/OwnerSignatureContext';
 
 const money = (n: number) => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -46,6 +47,9 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
   lang?: BillLanguage;
   secondLang?: BillLanguage | null;
 }) {
+  const saved = useOwnerSignatureCtx();
+  const signImg = issuer.signature || saved?.image;
+  const signName = issuer.signature ? issuer.signerName : saved?.signer_name;
   const t = invoiceText(lang);
   const t2 = secondLang && secondLang !== lang ? invoiceText(secondLang) : null;
   /** a label, in both languages when bilingual */
@@ -175,9 +179,9 @@ export function InvoiceDocument({ bill, issuer, tenantName, unitWord, placeName,
       <div className="doc-signs doc-signs--compact doc-block">
         <div />
         <div className="doc-sign">
-          <div className="doc-sign-img" />
+          <div className="doc-sign-img">{signImg && <img src={signImg} alt="ลายมือชื่อผู้ออกเอกสาร" />}</div>
           <div className="doc-sign-line" />
-          <div className="doc-sign-name">( {issuer.name || 'HorCare'} )</div>
+          <div className="doc-sign-name">( {signName || issuer.name || 'HorCare'} )</div>
           <div className="doc-sign-role">{L('issuer_role')}</div>
         </div>
       </div>

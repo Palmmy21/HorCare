@@ -90,6 +90,8 @@ import './styles/assetTheme.css';
 import horcareLogo from './assets/horcare_logo.png';
 import { AppSkeleton, PageSkeleton } from './components/Common/ShellSkeleton';
 import { LOGO_SRC } from './utils/brand';
+import { useOwnerSignature } from './hooks/useOwnerSignature';
+import { OwnerSignatureContext } from './components/ESignature/OwnerSignatureContext';
 
 function PageLoader({ fullScreen = false }: { fullScreen?: boolean }) {
   return (
@@ -296,6 +298,10 @@ function App() {
       }
     });
   }, [maidSession]);
+
+  // The owner's e-signature (คลังเอกสาร): printed on every document. Staff read it for the documents they issue;
+  // only the owner may change it (Firestore rules). A housekeeper session prints nothing and is not given it.
+  const ownerSignature = useOwnerSignature(user && !maidSession ? orgUid : null);
 
   // Active building — persisted per user in localStorage
   const buildingStorageKey = user ? activeBuildingStorageKey(user.uid, membership) : null;
@@ -1042,6 +1048,7 @@ function App() {
   const activeBuilding = buildings.find(b => b.id === activeBuildingId);
 
   return (
+    <OwnerSignatureContext.Provider value={ownerSignature.signature}>
     <div className="app-container">
       {profileSheet}
       <SlipNotificationToast
@@ -1613,6 +1620,7 @@ function App() {
             config={config}
             isPaid={hasPaidSubscription}
             onUpgrade={() => setCurrentView('pricing')}
+            ownerSignature={staffPermissions === null ? ownerSignature : undefined}
           />
         )}
 
@@ -1865,7 +1873,7 @@ function App() {
         onAdd={handleAddBuildingSubmit}
       />
     </div>
-
+    </OwnerSignatureContext.Provider>
   );
 }
 

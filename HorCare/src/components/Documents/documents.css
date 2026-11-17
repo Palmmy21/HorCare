@@ -62,6 +62,7 @@
 /* ── invoice ── */
 .doc-signs--compact { margin-top: 18px; }
 .doc-signs--compact .doc-sign-img { height: 36px; }
+.doc-signs--compact .doc-sign-img img { max-height: 34px; max-width: 160px; }
 .doc-foot--compact { margin-top: 14px; }
 .doc-meta { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; margin: 16px 0 14px; }
 .doc-box { border: 1px solid #D1D5DB; border-radius: 6px; padding: 10px 14px; font-size: 14px; }

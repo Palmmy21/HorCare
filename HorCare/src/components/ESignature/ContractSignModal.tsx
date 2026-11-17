@@ -20,6 +20,7 @@ import {
 } from '../../utils/contractTemplates';
 import SignaturePad from './SignaturePad';
 import ShareContractModal from './ShareContractModal';
+import { useOwnerSignatureCtx } from './OwnerSignatureContext';
 import { PaperSheet } from '../Documents/PaperSheet';
 import { ContractDocument } from '../Documents/ContractDocument';
 import { downloadPaperPdf, printDocument } from '../Documents/paperPdf';
@@ -49,6 +50,7 @@ export default function ContractSignModal({
   initialStep,
 }: ContractSignModalProps) {
   const terms = getWorkspaceTerms(config.building_type);
+  const savedSignature = useOwnerSignatureCtx();
   const printAreaRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize form state
@@ -1029,7 +1031,23 @@ export default function ContractSignModal({
 
               {activeSigner === 'lessor' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {savedSignature && form.lessor_signature !== savedSignature.image && (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ alignSelf: 'flex-start' }}
+                      onClick={() => setForm(prev => ({
+                        ...prev,
+                        lessor_signature: savedSignature.image,
+                        lessor_signed_at: new Date().toISOString(),
+                        lessor_name: prev.lessor_name || savedSignature.signer_name || '',
+                      }))}
+                    >
+                      <PenTool size={15} /> ใช้ลายเซ็นของเจ้าของที่บันทึกไว้
+                    </button>
+                  )}
                   <SignaturePad
+                    key={form.lessor_signature === savedSignature?.image ? 'saved' : 'drawn'}
                     label="ลายมือชื่อฝ่ายผู้ให้เช่า (Lessor Signature)"
                     signerName={form.lessor_name || `ผู้จัดการ / ผู้ให้เช่า`}
                     subtitle="ใช้เมาส์ หรือนิ้วมือเพื่อลงนาม"

@@ -176,6 +176,36 @@ describe.skipIf(!EMULATOR)('firestore.rules (emulator)', () => {
         });
     });
 
+    describe("the owner's e-signature", () => {
+        const SIG = `users/${OWNER}/owner_signature/current`;
+        const sig = { image: 'data:image/png;base64,iVBORw0KGgo=', signer_name: 'สมชาย', updated_at: '2026-11-18T00:00:00Z' };
+
+        it('only the owner draws, changes or removes it', async () => {
+            await assertSucceeds(setDoc(doc(as(OWNER), SIG), sig));
+            for (const staff of ['mgr', 'fin', 'desk']) {
+                await assertFails(setDoc(doc(as(staff), SIG), { ...sig, signer_name: 'ปลอม' }));
+                await assertFails(deleteDoc(doc(as(staff), SIG)));
+            }
+            await assertFails(setDoc(doc(maid(), SIG), sig));
+            await assertSucceeds(deleteDoc(doc(as(OWNER), SIG)));
+        });
+
+        it('staff read it for their documents; strangers and anonymous visitors do not', async () => {
+            await env.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), SIG), sig));
+            await assertSucceeds(getDoc(doc(as('mgr'), SIG)));
+            await assertSucceeds(getDoc(doc(as('techB'), SIG)));
+            await assertFails(getDoc(doc(as('stranger'), SIG)));
+            await assertFails(getDoc(doc(as(null), SIG)));
+        });
+
+        it('holds an image and nothing else', async () => {
+            const o = as(OWNER);
+            await assertFails(setDoc(doc(o, SIG), { ...sig, image: 'https://example.com/x.png' }));
+            await assertFails(setDoc(doc(o, SIG), { ...sig, extra: 1 }));
+            await assertFails(setDoc(doc(o, `users/${OWNER}/owner_signature/other`), sig));
+        });
+    });
+
     describe('housekeepers (custom-token sessions)', () => {
         it('read what their work needs in their own building only', async () => {
             const m = maid();

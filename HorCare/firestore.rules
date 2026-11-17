@@ -415,6 +415,20 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // ── The owner's e-signature (คลังเอกสาร) — printed on every document the organisation issues. ──
+      // Only the owner draws, changes or removes it. Active staff may read it so the documents they print carry it,
+      // but never write it (the wildcard below is owner-only too). The tenant portal gets it through /api/portal.
+      match /owner_signature/{docId} {
+        allow read: if (isOwner(userId) && isNotBanned()) || activeMember(userId);
+        allow create, update: if isOwner(userId) && isNotBanned()
+          && docId == 'current'
+          && request.resource.data.keys().hasOnly(['image', 'signer_name', 'updated_at'])
+          && request.resource.data.image is string
+          && request.resource.data.image.size() <= 300000
+          && request.resource.data.image.matches('^data:image/(png|jpeg|webp);base64,.*');
+        allow delete: if isOwner(userId) && isNotBanned();
+      }
+
       // ── Activity log — append-only. Nobody (owner included) can edit or delete. ──
       // HorCare's own books: written only by /api/ledger. Entries are never edited or deleted.
       match /ledgers/{ledgerId} {
@@ -475,7 +489,7 @@ service cloud.firestore {
         allow read: if isOwner(userId) && isNotBanned() && subCol != 'audit_logs' && subCol != 'members'
                      && subCol != 'accounting_profiles' && subCol != 'accounting_batches' && subCol != 'ledgers';
         allow write: if isOwner(userId) && isNotBanned() && licenseActive(userId)
-                     && subCol != 'audit_logs' && subCol != 'members'
+                     && subCol != 'audit_logs' && subCol != 'members' && subCol != 'owner_signature'
                      && subCol != 'accounting_profiles' && subCol != 'accounting_batches' && subCol != 'ledgers';
       }
     }

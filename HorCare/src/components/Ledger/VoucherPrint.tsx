@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { fromSatang } from '../../shared/accounting';
 import type { JournalEntry, Ledger } from '../../shared/ledger';
 import { bahtText, cashAccounts, VOUCHER_TITLES, voucherKind } from '../../shared/voucher';
+import { useOwnerSignatureCtx } from '../ESignature/OwnerSignatureContext';
 
 const baht = (s: number) => fromSatang(s).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -15,6 +16,7 @@ export default function VoucherPrint({ ledger, entry, onDone }: { ledger: Ledger
         return () => { window.clearTimeout(t); window.removeEventListener('afterprint', after); };
     }, [onDone]);
 
+    const signature = useOwnerSignatureCtx();
     const kind = voucherKind(entry, cashAccounts(ledger));
     const names = new Map(ledger.accounts.map(a => [a.code, a.name]));
     const dr = entry.lines.reduce((s, l) => s + l.dr_satang, 0);
@@ -51,9 +53,12 @@ export default function VoucherPrint({ ledger, entry, onDone }: { ledger: Ledger
             </table>
             {entry.reason && <div className="vp-memo">เหตุผล: {entry.reason}</div>}
             <div className="vp-signs">
-                {signers.map(s => (
+                {signers.map((s, i) => (
                     <div key={s} className="vp-sign">
-                        <div className="vp-line" />
+                        {/* the owner signs the last box (ผู้อนุมัติ / ผู้ตรวจสอบ) with the saved e-signature */}
+                        {signature && i === signers.length - 1
+                            ? <div className="vp-line vp-line--signed"><img src={signature.image} alt="" /></div>
+                            : <div className="vp-line" />}
                         <div>{s}</div>
                         <div className="vp-date">วันที่ ____/____/______</div>
                     </div>

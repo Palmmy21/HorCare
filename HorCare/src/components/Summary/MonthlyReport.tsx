@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import type { MonthlyBill, DormConfig, BillCustomization } from '../../types';
 import { formatCurrency } from '../../utils/calculations';
+import { useOwnerSignatureCtx } from '../ESignature/OwnerSignatureContext';
 
 interface MonthlyReportProps {
     bills: MonthlyBill[];
@@ -32,6 +33,7 @@ function formatThaiDateFull(date: Date): string {
 
 const MonthlyReport = forwardRef<HTMLDivElement, MonthlyReportProps>(
     ({ bills, currentMonth, config, billCustomization }, ref) => {
+        const signature = useOwnerSignatureCtx();
         const monthBills = bills
             .filter(b => b.month === currentMonth)
             .sort((a, b) => a.room_number.localeCompare(b.room_number, 'th', { numeric: true }));
@@ -245,8 +247,10 @@ const MonthlyReport = forwardRef<HTMLDivElement, MonthlyReportProps>(
                         <div style={{ marginTop: '4px' }}>ผู้จัดทำรายงาน</div>
                     </div>
                     <div style={styles.signatureBlock}>
-                        <div style={styles.signatureLine}></div>
-                        <div>( ..................................................... )</div>
+                        <div style={{ ...styles.signatureLine, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', height: signature ? '48px' : '30px' }}>
+                            {signature && <img src={signature.image} alt="" style={{ maxHeight: '46px', maxWidth: '180px', objectFit: 'contain' }} />}
+                        </div>
+                        <div>( {signature?.signer_name || '.....................................................'} )</div>
                         <div style={{ marginTop: '4px' }}>ผู้ตรวจสอบ</div>
                     </div>
                 </div>

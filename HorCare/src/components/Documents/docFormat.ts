@@ -5,6 +5,10 @@ export interface DocIssuer {
   address?: string;
   phone?: string;
   logo?: string;
+  /** the owner's saved e-signature (data URL), for the issuer's signature box; the tenant portal passes it here */
+  signature?: string;
+  /** the name under the signature, when the owner gave one */
+  signerName?: string;
 }
 
 export function thaiLongDate(iso?: string): string {

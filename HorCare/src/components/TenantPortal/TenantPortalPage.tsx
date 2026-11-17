@@ -105,17 +105,19 @@ interface PortalData {
   maintenance: MaintenanceRequest[];
   cleaning: CleaningRequest[];
   buildingName: string;
+  ownerSignature: { image: string; signer_name: string } | null;
 }
 
 interface PortalView {
   owner_uid: string; building_id: string; room_id: string; building_name: string;
   room: Room; config: DormConfig; profile: TenantProfile | null;
   bills: MonthlyBill[]; fines: Fine[]; maintenance: MaintenanceRequest[]; cleaning: CleaningRequest[];
+  owner_signature?: { image: string; signer_name: string } | null;
 }
 
 const EMPTY_PORTAL: PortalData = {
   uid: '', buildingId: '', roomId: '', room: null, config: null, profile: null,
-  bills: [], fines: [], maintenance: [], cleaning: [], buildingName: '',
+  bills: [], fines: [], maintenance: [], cleaning: [], buildingName: '', ownerSignature: null,
 };
 
 /** How often the portal re-reads while open (the tenant sees a slip being confirmed without reloading). */
@@ -137,7 +139,7 @@ function useTenantData(enabled: boolean) {
         if (cancelled) return;
         setData({
           uid: v.owner_uid, buildingId: v.building_id, roomId: v.room_id, buildingName: v.building_name,
-          room: v.room, config: v.config, profile: v.profile,
+          room: v.room, config: v.config, profile: v.profile, ownerSignature: v.owner_signature ?? null,
           bills: [...v.bills].sort((a, b) => b.month.localeCompare(a.month)),
           fines: [...v.fines].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
           maintenance: [...v.maintenance].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '')),
@@ -906,7 +908,7 @@ export default function TenantPortalPage() {
 
   const bc = config?.bill_customization;
   const invoiceCtx: InvoiceContext = {
-    issuer: (i => ({ ...i, name: i.name || buildingName }))(issuerFor(bc, room?.building_name)),
+    issuer: (i => ({ ...i, name: i.name || buildingName, signature: data.ownerSignature?.image, signerName: data.ownerSignature?.signer_name || undefined }))(issuerFor(bc, room?.building_name)),
     tenantName: profile?.full_name,
     // a branch may hold several kinds of property: the unit's own kind names it (บ้านเช่า, ที่ดิน), as on the owner's copy
     unitWord: room?.unit_category ? UNIT_CATEGORY_LABELS[categoryOf(room, config?.building_type)] : config?.building_type === 'market' ? 'แผงค้า' : 'ห้อง',
